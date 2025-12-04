@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Link2, FileText, Wand2, Loader2, AlertCircle } from "lucide-react";
+import { Sparkles, Link2, FileText, Wand2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlatformSelector, Platform } from "./PlatformSelector";
 import { ToneSelector, Tone } from "./ToneSelector";
@@ -8,11 +8,15 @@ import { TemplateSelector, Template } from "./TemplateSelector";
 import { CaptionVariation } from "./CaptionVariation";
 import { PostPreview } from "./PostPreview";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 type CaptionData = { content: string; hashtags: string[] };
 type CaptionsResult = Record<Platform, CaptionData[]>;
+
+// Check if Supabase env vars are available
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
 
 export function PostGenerator() {
   const [inputType, setInputType] = useState<"brief" | "url">("brief");
@@ -24,7 +28,24 @@ export function PostGenerator() {
   const [captions, setCaptions] = useState<CaptionsResult | null>(null);
   const [selectedCaption, setSelectedCaption] = useState<number>(0);
   const [previewPlatform, setPreviewPlatform] = useState<Platform>("instagram");
+  const [backendReady, setBackendReady] = useState(isSupabaseConfigured);
   const { toast } = useToast();
+
+  // Check backend availability on mount
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      console.log("Waiting for backend configuration...");
+      // Check again after a delay
+      const timer = setTimeout(() => {
+        const url = import.meta.env.VITE_SUPABASE_URL;
+        const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        if (url && key) {
+          setBackendReady(true);
+        }
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const handleGenerate = async () => {
     if (!input.trim() || platforms.length === 0) {
@@ -35,11 +56,23 @@ export function PostGenerator() {
       });
       return;
     }
+
+    if (!backendReady) {
+      toast({
+        title: "Backend initializing",
+        description: "Please wait a moment and try again, or refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsGenerating(true);
     setCaptions(null);
     
     try {
+      // Dynamic import of supabase client to avoid initialization errors
+      const { supabase } = await import("@/integrations/supabase/client");
+      
       const { data, error } = await supabase.functions.invoke('generate-captions', {
         body: {
           brief: input,
@@ -85,6 +118,32 @@ export function PostGenerator() {
     <div className="flex gap-6 h-full">
       {/* Left Panel - Input */}
       <div className="flex-1 space-y-6">
+        {/* Backend Status Banner */}
+        {!backendReady && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card p-4 border-l-4 border-primary/50"
+          >
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 text-primary animate-spin" />
+              <div>
+                <p className="text-sm font-medium">Backend initializing...</p>
+                <p className="text-xs text-muted-foreground">Please refresh the page if this persists.</p>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => window.location.reload()}
+                className="ml-auto"
+              >
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Refresh
+              </Button>
+            </div>
+          </motion.div>
+        )}
+
         {/* Input Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
