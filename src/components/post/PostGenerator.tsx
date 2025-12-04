@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Link2, FileText, Wand2, Loader2 } from "lucide-react";
+import { Sparkles, Link2, FileText, Wand2, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlatformSelector, Platform } from "./PlatformSelector";
 import { ToneSelector, Tone } from "./ToneSelector";
@@ -8,50 +8,11 @@ import { TemplateSelector, Template } from "./TemplateSelector";
 import { CaptionVariation } from "./CaptionVariation";
 import { PostPreview } from "./PostPreview";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock generated captions
-const mockCaptions: Record<Platform, { content: string; hashtags: string[] }[]> = {
-  facebook: [
-    {
-      content: "🚀 Exciting news! We've just launched something that's going to change the way you think about productivity. After months of hard work, our team is thrilled to share this with you.\n\nWhat makes it special? It's designed with YOU in mind. Simple. Powerful. Effective.",
-      hashtags: ["#Innovation", "#ProductLaunch", "#GameChanger", "#Technology"],
-    },
-    {
-      content: "Ever wondered what it takes to build something amazing? It starts with a simple idea and the courage to pursue it. Today, we're sharing our journey and the lessons we've learned along the way. 💡",
-      hashtags: ["#Entrepreneurship", "#StartupLife", "#Success", "#Motivation"],
-    },
-    {
-      content: "The future is here, and it's more accessible than ever. We believe great tools should be available to everyone, not just the few. That's why we built this. Check it out! 🌟",
-      hashtags: ["#FutureTech", "#Accessibility", "#Innovation", "#Tech"],
-    },
-  ],
-  instagram: [
-    {
-      content: "✨ New drop alert! Something special is coming your way. Double tap if you're ready to level up your game 🔥\n\nLink in bio to learn more 👆",
-      hashtags: ["#NewLaunch", "#ComingSoon", "#ExcitingNews", "#StayTuned", "#Innovation"],
-    },
-    {
-      content: "Behind every success is a story of dedication, late nights, and unwavering belief. This is ours. 💫\n\nSwipe to see the journey →",
-      hashtags: ["#BehindTheScenes", "#JourneyToSuccess", "#Hustle", "#DreamBig"],
-    },
-  ],
-  linkedin: [
-    {
-      content: "I'm thrilled to announce a major milestone in our company's journey.\n\nAfter 18 months of development, countless iterations, and invaluable feedback from our early adopters, we're finally ready to share what we've been building.\n\nHere's what I've learned: Innovation isn't about having the best idea—it's about execution, persistence, and surrounding yourself with the right team.\n\nWhat's the biggest lesson you've learned in your professional journey?",
-      hashtags: ["#Leadership", "#Innovation", "#ProfessionalGrowth", "#Startup"],
-    },
-  ],
-  twitter: [
-    {
-      content: "Just shipped something we've been working on for months 🚀\n\nIt's not perfect, but it's ours. And we're proud of it.\n\nThread on what we learned 🧵👇",
-      hashtags: ["#BuildInPublic", "#StartupLife", "#Tech"],
-    },
-    {
-      content: "Hot take: The best products aren't built in isolation.\n\nThey're built with users, for users.\n\nThat's exactly what we did. Here's the result:",
-      hashtags: ["#ProductDev", "#UserFirst", "#Startup"],
-    },
-  ],
-};
+type CaptionData = { content: string; hashtags: string[] };
+type CaptionsResult = Record<Platform, CaptionData[]>;
 
 export function PostGenerator() {
   const [inputType, setInputType] = useState<"brief" | "url">("brief");
@@ -60,19 +21,62 @@ export function PostGenerator() {
   const [tone, setTone] = useState<Tone>("conversational");
   const [template, setTemplate] = useState<Template>("promo");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [captions, setCaptions] = useState<typeof mockCaptions | null>(null);
+  const [captions, setCaptions] = useState<CaptionsResult | null>(null);
   const [selectedCaption, setSelectedCaption] = useState<number>(0);
   const [previewPlatform, setPreviewPlatform] = useState<Platform>("instagram");
+  const { toast } = useToast();
 
   const handleGenerate = async () => {
-    if (!input.trim() || platforms.length === 0) return;
+    if (!input.trim() || platforms.length === 0) {
+      toast({
+        title: "Missing information",
+        description: "Please enter a brief and select at least one platform.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsGenerating(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setCaptions(mockCaptions);
-    setPreviewPlatform(platforms[0]);
-    setIsGenerating(false);
+    setCaptions(null);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-captions', {
+        body: {
+          brief: input,
+          platforms,
+          tone,
+          template,
+          variationsPerPlatform: 3,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || "Failed to generate captions");
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (data.captions) {
+        setCaptions(data.captions as CaptionsResult);
+        setPreviewPlatform(platforms[0]);
+        setSelectedCaption(0);
+        toast({
+          title: "Captions generated!",
+          description: `Created ${platforms.length * 3} unique variations across ${platforms.length} platform${platforms.length > 1 ? 's' : ''}.`,
+        });
+      }
+    } catch (error) {
+      console.error("Generation error:", error);
+      toast({
+        title: "Generation failed",
+        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const currentCaptions = captions?.[previewPlatform] || [];
@@ -191,7 +195,10 @@ export function PostGenerator() {
                 {platforms.map((p) => (
                   <button
                     key={p}
-                    onClick={() => setPreviewPlatform(p)}
+                    onClick={() => {
+                      setPreviewPlatform(p);
+                      setSelectedCaption(0);
+                    }}
                     className={cn(
                       "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                       previewPlatform === p
@@ -206,17 +213,24 @@ export function PostGenerator() {
 
               {/* Caption Cards */}
               <div className="space-y-4">
-                {currentCaptions.map((caption, index) => (
-                  <CaptionVariation
-                    key={`${previewPlatform}-${index}`}
-                    content={caption.content}
-                    hashtags={caption.hashtags}
-                    platform={previewPlatform}
-                    index={index}
-                    onSelect={() => setSelectedCaption(index)}
-                    isSelected={selectedCaption === index}
-                  />
-                ))}
+                {currentCaptions.length > 0 ? (
+                  currentCaptions.map((caption, index) => (
+                    <CaptionVariation
+                      key={`${previewPlatform}-${index}`}
+                      content={caption.content}
+                      hashtags={caption.hashtags}
+                      platform={previewPlatform}
+                      index={index}
+                      onSelect={() => setSelectedCaption(index)}
+                      isSelected={selectedCaption === index}
+                    />
+                  ))
+                ) : (
+                  <div className="glass-card p-6 text-center">
+                    <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground">No captions generated for this platform yet.</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -238,7 +252,7 @@ export function PostGenerator() {
           />
 
           {/* Quick Actions */}
-          {captions && (
+          {captions && currentCaptions.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
