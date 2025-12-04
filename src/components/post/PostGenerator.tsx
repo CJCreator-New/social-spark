@@ -39,8 +39,9 @@ export function PostGenerator() {
     setCaptions(null);
     
     try {
-      // Dynamic import to avoid crash if env vars not ready
-      const { supabase } = await import("@/integrations/supabase/client");
+      // Lazy initialization to avoid crash if env vars not ready at module load
+      const { getSupabaseClient } = await import("@/lib/supabase");
+      const supabase = getSupabaseClient();
       
       const { data, error } = await supabase.functions.invoke('generate-captions', {
         body: {
