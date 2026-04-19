@@ -33,7 +33,7 @@ const INDUSTRY_TOPICS: Record<string, string[]> = {
   hr: ["Remote work culture", "Hiring & recruiting", "Employee retention", "DEI & inclusion", "Performance management", "Workplace wellbeing", "Future of work", "Compensation strategy", "Team dynamics", "Leadership development"],
   sustainability: ["ESG investing", "Climate tech", "Circular economy", "Carbon footprinting", "Sustainable supply chains", "Green energy", "Impact measurement", "Corporate sustainability", "Consumer behaviour", "Net zero"],
   creator: ["Monetisation strategies", "Audience building", "Newsletter growth", "YouTube & video", "Short-form content", "Brand deals", "Creator tools", "Community & memberships", "Personal branding", "Creator burnout"],
-  other: [],
+  other: ["Industry trends & predictions", "Behind-the-scenes story", "Lessons learned (mistakes)", "Quick how-to / framework", "Hot take / contrarian view"],
 };
 
 const PLATFORM_OPTIONS = [
@@ -206,8 +206,9 @@ const css = `
 @keyframes cfSpin { to{transform:rotate(360deg)} }
 .cf-app .gen-title { font-family:'Playfair Display',serif;font-size:26px;color:var(--text);margin-bottom:8px;font-weight:400; }
 .cf-app .gen-msg { font-size:13px;color:var(--text2);margin-bottom:28px;font-weight:300;min-height:18px; }
-.cf-app .prog-track { width:240px;height:2px;background:var(--surface3);border-radius:99px;overflow:hidden;margin:0 auto; }
-.cf-app .prog-fill { height:100%;background:var(--accent);border-radius:99px;transition:width .45s ease; }
+.cf-app .prog-track { width:240px;height:2px;background:var(--surface3);border-radius:99px;overflow:hidden;margin:0 auto;position:relative; }
+.cf-app .prog-indet { position:absolute;top:0;left:0;height:100%;width:40%;background:var(--accent);border-radius:99px;animation:cfIndet 1.4s ease-in-out infinite; }
+@keyframes cfIndet { 0% { left:-40%; } 100% { left:100%; } }
 .cf-app .gen-checklist { margin-top:28px;display:flex;flex-direction:column;gap:7px;align-items:flex-start;max-width:260px; }
 .cf-app .gci { font-size:12px;color:var(--text3);display:flex;align-items:center;gap:8px;font-weight:300;transition:color .3s; }
 .cf-app .gci.done { color:var(--accent); }
@@ -258,7 +259,9 @@ const css = `
   .cf-app .g2{grid-template-columns:1fr;}
   .cf-app .inner{padding:36px 16px 80px;}
   .cf-app .brand-title{font-size:30px;}
-  .cf-app .stepper .slabel{display:none;}
+  /* Hide inactive step labels on mobile but keep the active one for context. */
+  .cf-app .stepper .slabel:not(.active){display:none;}
+  .cf-app .stepper .slabel.active{font-size:11px;}
 }
 `;
 
