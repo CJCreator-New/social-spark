@@ -658,13 +658,30 @@ ${postText(p)}
 
         <div className="inner">
           {/* HEADER */}
-          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 14, marginBottom: 24, fontSize: 12, color: "#7a7a8e" }}>
-            <Link to="/my-calendars" style={{ color: "#7a7a8e", textDecoration: "none" }}>My calendars</Link>
+          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginBottom: 24, fontSize: 12, color: "#7a7a8e", flexWrap: "wrap" }}>
+            <Link
+              to="/my-calendars"
+              style={{
+                color: "#c8f09a",
+                textDecoration: "none",
+                background: "rgba(200,240,154,0.10)",
+                border: "1px solid rgba(200,240,154,0.32)",
+                padding: "6px 14px",
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 500,
+                letterSpacing: ".02em",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              📅 My calendars
+            </Link>
+            <Link to="/profile" style={{ color: "#7a7a8e", textDecoration: "none", padding: "6px 10px" }}>Profile</Link>
             <span style={{ color: "#3a3a50" }}>·</span>
-            <Link to="/profile" style={{ color: "#7a7a8e", textDecoration: "none" }}>Profile</Link>
-            <span style={{ color: "#3a3a50" }}>·</span>
-            <span style={{ color: "#7a7a8e" }}>{user?.email}</span>
-            <button onClick={async () => { await signOut(); navigate("/auth"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#7a7a8e", padding: "5px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "Sora, sans-serif" }}>Sign out</button>
+            <span style={{ color: "#9a9aae", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email}</span>
+            <button onClick={async () => { await signOut(); navigate("/auth"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#9a9aae", padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "Sora, sans-serif" }}>Sign out</button>
           </div>
 
           {/* BRAND */}
@@ -837,6 +854,12 @@ ${postText(p)}
                   </div>
                 ))}
               </div>
+              <button
+                onClick={cancelGeneration}
+                style={{ marginTop: 24, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#7a7a8e", padding: "7px 16px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Sora, sans-serif" }}
+              >
+                Cancel and try again
+              </button>
             </div>
           </div>
 
