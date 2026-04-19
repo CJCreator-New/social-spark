@@ -7,6 +7,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
+import Profile from "./pages/Profile";
 import MyCalendars from "./pages/MyCalendars";
 import CalendarDetail from "./pages/CalendarDetail";
 import NotFound from "./pages/NotFound";
@@ -22,7 +24,9 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/my-calendars" element={<ProtectedRoute><MyCalendars /></ProtectedRoute>} />
             <Route path="/calendar/:id" element={<ProtectedRoute><CalendarDetail /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
