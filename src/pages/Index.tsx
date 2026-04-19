@@ -385,6 +385,8 @@ interface Post {
 
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
+const DRAFT_KEY = "contentforge:draft:v1";
+
 const Index = () => {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -417,6 +419,39 @@ const Index = () => {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const progRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hydrated = useRef(false);
+
+  // Hydrate from localStorage once on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as { form?: typeof form; step?: number; extraTopics?: string[] };
+        if (saved.form) setForm(f => ({ ...f, ...saved.form }));
+        if (saved.extraTopics) setExtraTopics(saved.extraTopics);
+        // Don't restore step 3 (mid-generation) or 4 (no posts persisted).
+        if (saved.step === 1 || saved.step === 2) setStep(saved.step);
+      }
+    } catch (e) {
+      console.warn("Failed to hydrate draft", e);
+    }
+    hydrated.current = true;
+  }, []);
+
+  // Persist form/step/extraTopics whenever they change (only on steps 1–2)
+  useEffect(() => {
+    if (!hydrated.current) return;
+    if (step > 2) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, step, extraTopics }));
+    } catch (e) {
+      console.warn("Failed to persist draft", e);
+    }
+  }, [form, step, extraTopics]);
+
+  const clearDraft = () => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+  };
 
   const upd = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm(f => ({ ...f, [k]: v }));
   const toggleChip = (k: "goals", v: string) =>
