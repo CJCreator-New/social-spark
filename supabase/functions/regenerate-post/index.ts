@@ -1,0 +1,238 @@
+// Regenerate a single post in a 7-day calendar via Lovable AI Gateway.
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+interface ExistingPost {
+  day: number;
+  dow: string;
+  topic: string;
+  format?: string;
+  title?: string;
+  hook?: string;
+  body?: string;
+  cta?: string;
+  hashtags?: string;
+  rationale?: string;
+}
+
+interface Payload {
+  industry?: string;
+  industryLabel?: string;
+  platform?: string;
+  coreIdea?: string;
+  audiences?: string[];
+  voice?: string;
+  style?: string;
+  goals?: string[];
+  format?: string;
+  cta?: string;
+  length?: string;
+  structure?: string;
+  extra?: string;
+  // Single-post context
+  post: ExistingPost;
+  // Other 6 posts so AI doesn't duplicate angles/openers
+  siblings?: ExistingPost[];
+  // Optional override topic (defaults to post.topic)
+  newTopic?: string;
+}
+
+const LENGTH_GUIDE: Record<string, string> = {
+  short: "80–120 words (tight, punchy)",
+  medium: "160–230 words (balanced depth)",
+  long: "280–380 words (deep, substantive)",
+  mixed: "160–230 words (balanced depth)",
+};
+
+const STRUCTURE_GUIDE: Record<string, string> = {
+  paragraphs: "Use flowing paragraphs only. No bullet points or numbered lists in the body.",
+  bullets: "Structure the body primarily as bullet points or short numbered items.",
+  mixed: "MIX paragraphs and bullet points — paragraph hook, bullets for the meat, paragraph close. Use '→' or '•' markers.",
+  perPost: "Pick the best structure for this single post — prose, bullets, or hybrid.",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const body: Payload = await req.json();
+    const {
+      industry = "",
+      industryLabel = "",
+      platform = "LinkedIn",
+      coreIdea = "",
+      audiences = [],
+      voice = "",
+      style = "",
+      goals = [],
+      format = "Balanced mix",
+      cta = "Share & repost bait",
+      length = "medium",
+      structure = "mixed",
+      extra = "",
+      post,
+      siblings = [],
+      newTopic,
+    } = body;
+
+    if (!post || typeof post.day !== "number" || !post.dow) {
+      return new Response(
+        JSON.stringify({ error: "Missing post context (day/dow required)." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "AI is not configured." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const targetTopic = (newTopic && newTopic.trim()) || post.topic || "general topic";
+    const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
+    const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
+
+    const longFormPlatform = platform === "Newsletter" || platform === "Blog";
+    const hashtagInstr = longFormPlatform
+      ? `HASHTAGS: This is a ${platform} post — return an EMPTY string ("") for hashtags.`
+      : `HASHTAGS: Provide 3–6 platform-native hashtags as a single space-separated string (e.g. "#AI #ProductOps #SaaS").`;
+
+    const siblingSummary = siblings
+      .filter(s => s && s.day !== post.day)
+      .map(s => `- Day ${s.day} (${s.dow}) · "${s.topic}" — opener: "${(s.hook || s.title || "").slice(0, 100)}"`)
+      .join("\n");
+
+    const prompt = `You are a world-class ${platform} content strategist specialising in ${industryLabel || industry} content.
+
+Re-write a SINGLE post (Day ${post.day} — ${post.dow}) in an existing 7-day ${platform} content calendar. The other 6 posts are unchanged — your post must feel fresh and complementary, not duplicative.
+
+CONTEXT:
+- Industry / niche: ${industryLabel || industry}
+- Core idea: ${coreIdea}
+- Audience: ${audiences.length ? audiences.join(", ") : "industry professionals"}
+- Voice / tone: ${voice || "conversational and professional"}
+- Writing style: ${style || "balanced"}
+- Goals: ${goals.join(", ") || "Awareness, Engagement"}
+- Post format mix: ${format}
+- CTA approach: ${cta}
+- POST LENGTH: ${lengthInstr}
+- POST STRUCTURE: ${structureInstr}
+${extra ? `- Extra instructions: ${extra}` : ""}
+
+THIS POST:
+- Day: ${post.day} (${post.dow})
+- Topic: ${targetTopic}
+${post.title ? `- Previous title (do NOT reuse): "${post.title}"` : ""}
+${post.hook ? `- Previous hook (do NOT reuse opener): "${post.hook.slice(0, 120)}"` : ""}
+
+OTHER POSTS IN THIS WEEK (do NOT duplicate angles, openers, statistics, or examples):
+${siblingSummary || "(none provided)"}
+
+HARD RULES:
+1. Write a genuinely fresh take on "${targetTopic}" that does NOT repeat the previous title/hook above.
+2. Stay specific to the ${industryLabel || industry} space — real terminology, real platforms, real trends.
+3. Follow the POST LENGTH and POST STRUCTURE rules exactly.
+4. ${hashtagInstr}
+5. The "dow" field MUST be "${post.dow}" and "day" MUST be ${post.day}.
+6. In the "format" field, append the structure used (e.g. "How-to — hybrid").
+
+BANNED PHRASES — do NOT use these or close variants:
+- "in today's fast-paced world" / "in the ever-evolving landscape"
+- "game-changer" / "revolutionize" / "unlock the power of"
+- "take it to the next level" / "leverage synergies"
+- "let's dive in" / "let's dive into" / "at the end of the day"
+Open with a specific observation, number, or contrarian claim — not hype.`;
+
+    const tool = {
+      type: "function",
+      function: {
+        name: "return_post",
+        description: "Return a single re-written post with full structure.",
+        parameters: {
+          type: "object",
+          properties: {
+            day: { type: "number" },
+            dow: { type: "string", enum: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] },
+            topic: { type: "string" },
+            format: { type: "string" },
+            title: { type: "string" },
+            hook: { type: "string" },
+            body: { type: "string" },
+            cta: { type: "string" },
+            hashtags: {
+              type: "string",
+              description: longFormPlatform
+                ? "MUST be empty string for Newsletter/Blog."
+                : "3–6 platform-native hashtags space-separated.",
+            },
+            rationale: { type: "string" },
+          },
+          required: ["day", "dow", "topic", "format", "title", "hook", "body", "cta", "hashtags", "rationale"],
+          additionalProperties: false,
+        },
+      },
+    };
+
+    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content: prompt }],
+        tools: [tool],
+        tool_choice: { type: "function", function: { name: "return_post" } },
+      }),
+    });
+
+    if (aiRes.status === 429) {
+      return new Response(JSON.stringify({ error: "Rate limit hit. Please wait a moment and try again." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (aiRes.status === 402) {
+      return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits in Settings → Workspace → Usage." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (!aiRes.ok) {
+      const t = await aiRes.text();
+      console.error("AI gateway error", aiRes.status, t);
+      return new Response(JSON.stringify({ error: `AI error: ${aiRes.status}` }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const data = await aiRes.json();
+    const toolCall = data?.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall?.function?.arguments) {
+      console.error("No tool call in response", JSON.stringify(data));
+      return new Response(JSON.stringify({ error: "AI returned no structured output." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    let parsed: ExistingPost;
+    try {
+      parsed = JSON.parse(toolCall.function.arguments);
+    } catch (e) {
+      console.error("Failed to parse tool args", e);
+      return new Response(JSON.stringify({ error: "Failed to parse AI output." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Force day/dow to match the slot (defensive)
+    parsed.day = post.day;
+    parsed.dow = post.dow;
+
+    return new Response(JSON.stringify({ post: parsed }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    console.error("regenerate-post error", e);
+    return new Response(
+      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+});

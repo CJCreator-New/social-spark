@@ -33,7 +33,7 @@ const INDUSTRY_TOPICS: Record<string, string[]> = {
   hr: ["Remote work culture", "Hiring & recruiting", "Employee retention", "DEI & inclusion", "Performance management", "Workplace wellbeing", "Future of work", "Compensation strategy", "Team dynamics", "Leadership development"],
   sustainability: ["ESG investing", "Climate tech", "Circular economy", "Carbon footprinting", "Sustainable supply chains", "Green energy", "Impact measurement", "Corporate sustainability", "Consumer behaviour", "Net zero"],
   creator: ["Monetisation strategies", "Audience building", "Newsletter growth", "YouTube & video", "Short-form content", "Brand deals", "Creator tools", "Community & memberships", "Personal branding", "Creator burnout"],
-  other: [],
+  other: ["Industry trends & predictions", "Behind-the-scenes story", "Lessons learned (mistakes)", "Quick how-to / framework", "Hot take / contrarian view"],
 };
 
 const PLATFORM_OPTIONS = [
@@ -206,8 +206,9 @@ const css = `
 @keyframes cfSpin { to{transform:rotate(360deg)} }
 .cf-app .gen-title { font-family:'Playfair Display',serif;font-size:26px;color:var(--text);margin-bottom:8px;font-weight:400; }
 .cf-app .gen-msg { font-size:13px;color:var(--text2);margin-bottom:28px;font-weight:300;min-height:18px; }
-.cf-app .prog-track { width:240px;height:2px;background:var(--surface3);border-radius:99px;overflow:hidden;margin:0 auto; }
-.cf-app .prog-fill { height:100%;background:var(--accent);border-radius:99px;transition:width .45s ease; }
+.cf-app .prog-track { width:240px;height:2px;background:var(--surface3);border-radius:99px;overflow:hidden;margin:0 auto;position:relative; }
+.cf-app .prog-indet { position:absolute;top:0;left:0;height:100%;width:40%;background:var(--accent);border-radius:99px;animation:cfIndet 1.4s ease-in-out infinite; }
+@keyframes cfIndet { 0% { left:-40%; } 100% { left:100%; } }
 .cf-app .gen-checklist { margin-top:28px;display:flex;flex-direction:column;gap:7px;align-items:flex-start;max-width:260px; }
 .cf-app .gci { font-size:12px;color:var(--text3);display:flex;align-items:center;gap:8px;font-weight:300;transition:color .3s; }
 .cf-app .gci.done { color:var(--accent); }
@@ -258,7 +259,9 @@ const css = `
   .cf-app .g2{grid-template-columns:1fr;}
   .cf-app .inner{padding:36px 16px 80px;}
   .cf-app .brand-title{font-size:30px;}
-  .cf-app .stepper .slabel{display:none;}
+  /* Hide inactive step labels on mobile but keep the active one for context. */
+  .cf-app .stepper .slabel:not(.active){display:none;}
+  .cf-app .stepper .slabel.active{font-size:11px;}
 }
 `;
 
@@ -408,17 +411,17 @@ const Index = () => {
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeDay, setActiveDay] = useState(0);
-  const [progress, setProgress] = useState(0);
   const [genMsg, setGenMsg] = useState("");
   const [genStep, setGenStep] = useState(0);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [regenIdx, setRegenIdx] = useState<number | null>(null);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
-  const progRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const hydrated = useRef(false);
 
@@ -489,15 +492,15 @@ const Index = () => {
 
   async function generate() {
     if (!validate(2)) return;
-    setStep(3); setProgress(0); setGenStep(0); setGenMsg(GEN_MSGS[0]); setSavedId(null);
+    setStep(3); setGenStep(0); setGenMsg(GEN_MSGS[0]); setSavedId(null);
 
-    let pct = 0, mi = 0;
-    progRef.current = setInterval(() => {
-      pct = Math.min(pct + 2, 90);
-      setProgress(Math.round(pct));
-      const ni = Math.min(Math.floor(pct / 20), GEN_MSGS.length - 1);
-      if (ni > mi) { mi = ni; setGenMsg(GEN_MSGS[ni]); setGenStep(ni); }
-    }, 200);
+    // Cycle the friendly status messages on a steady cadence; the bar itself is indeterminate.
+    let mi = 0;
+    msgRef.current = setInterval(() => {
+      mi = Math.min(mi + 1, GEN_MSGS.length - 1);
+      setGenMsg(GEN_MSGS[mi]);
+      setGenStep(mi);
+    }, 2200);
 
     // Abort plumbing: user-cancel + 90s hard timeout.
     const ac = new AbortController();
@@ -505,7 +508,7 @@ const Index = () => {
     const timeoutId = setTimeout(() => ac.abort("timeout"), 90_000);
 
     const cleanup = () => {
-      if (progRef.current) clearInterval(progRef.current);
+      if (msgRef.current) clearInterval(msgRef.current);
       clearTimeout(timeoutId);
       abortRef.current = null;
     };
@@ -552,9 +555,9 @@ const Index = () => {
       const result: Post[] = Array.isArray(data?.posts) ? data.posts : [];
       if (result.length === 0) { setStep(2); setError("Empty response. Please try again."); return; }
 
-      setProgress(100); setGenStep(5);
+      setGenStep(GEN_LABELS.length);
       setPosts(result); setActiveDay(0);
-      setTimeout(() => setStep(4), 450);
+      setTimeout(() => setStep(4), 350);
     } catch (err) {
       cleanup();
       const aborted = err instanceof DOMException && err.name === "AbortError";
@@ -572,6 +575,55 @@ const Index = () => {
 
   function cancelGeneration() {
     if (abortRef.current) abortRef.current.abort("user");
+  }
+
+  async function regenerateDay(idx: number) {
+    if (regenIdx !== null) return;
+    const target = posts[idx];
+    if (!target) return;
+    setRegenIdx(idx);
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({
+          industry: form.industry,
+          industryLabel: selectedIndustry?.label || form.industry,
+          platform: form.platform,
+          coreIdea: form.coreIdea,
+          audiences: form.audiences,
+          voice: form.voice,
+          style: form.style,
+          goals: form.goals,
+          format: form.format,
+          cta: form.cta,
+          length: form.length,
+          structure: form.structure,
+          extra: form.extra,
+          post: target,
+          siblings: posts,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.error || !data?.post) {
+        toast.error(data?.error || `Regenerate failed (${res.status}).`);
+        return;
+      }
+      setPosts(prev => prev.map((p, i) => (i === idx ? data.post : p)));
+      setSavedId(null); // calendar drifted from saved version — let user re-save
+      toast.success(`Day ${target.day} regenerated`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Regenerate failed");
+    } finally {
+      setRegenIdx(null);
+    }
   }
 
   function copyText(text: string, cb: () => void) {
@@ -844,7 +896,7 @@ ${postText(p)}
               <div className="gen-title">Writing your week</div>
               <div className="gen-msg">{genMsg}</div>
               <div className="prog-track">
-                <div className="prog-fill" style={{ width: progress + "%" }} />
+                <div className="prog-indet" />
               </div>
               <div className="gen-checklist">
                 {GEN_LABELS.map((l, i) => (
@@ -884,9 +936,19 @@ ${postText(p)}
                         <span className="ptag pt-topic">{p.topic}</span>
                         <span className="ptag pt-fmt">{p.format}</span>
                       </div>
-                      <button className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`} onClick={() => copyPost(activeDay)}>
-                        {copiedIdx === activeDay ? "Copied ✓" : "Copy post"}
-                      </button>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                        <button
+                          className="cpbtn"
+                          onClick={() => regenerateDay(activeDay)}
+                          disabled={regenIdx !== null}
+                          title="Re-roll this single day without touching the other six"
+                        >
+                          {regenIdx === activeDay ? "Regenerating…" : "↻ Regenerate"}
+                        </button>
+                        <button className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`} onClick={() => copyPost(activeDay)}>
+                          {copiedIdx === activeDay ? "Copied ✓" : "Copy post"}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="ptitle">{p.title}</div>

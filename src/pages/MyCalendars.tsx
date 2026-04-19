@@ -38,8 +38,16 @@ const css = `
 .mc-item-title { font-family:'Playfair Display',serif; font-size:17px; color:#edeae3; margin:0 0 4px; font-weight:400; }
 .mc-meta { font-size:11px; color:#7a7a8e; font-weight:300; }
 .mc-tag { display:inline-block; padding:2px 8px; border-radius:99px; background:rgba(200,240,154,0.1); color:#c8f09a; font-size:10px; margin-right:6px; letter-spacing:.04em; }
+.mc-actions { display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+.mc-act { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:6px 12px; border-radius:6px; font-size:11px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; flex-shrink:0; }
+.mc-act:hover { border-color:rgba(200,240,154,0.32); color:#c8f09a; }
 .mc-del { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:6px 12px; border-radius:6px; font-size:11px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; flex-shrink:0; }
 .mc-del:hover { border-color:rgba(240,154,154,0.3); color:#f09a9a; }
+.mc-rename-input { width:100%; background:#07080d; border:1px solid rgba(200,240,154,0.32); border-radius:6px; padding:8px 10px; font-size:14px; color:#edeae3; font-family:'Playfair Display',serif; outline:none; box-sizing:border-box; }
+.mc-dialog-action { background:#c8f09a !important; color:#07080d !important; border:1px solid #c8f09a !important; }
+.mc-dialog-action:hover { background:#b9e289 !important; }
+.mc-dialog-danger { background:#f09a9a !important; color:#07080d !important; border:1px solid #f09a9a !important; }
+.mc-dialog-danger:hover { background:#e88a8a !important; }
 `;
 
 export default function MyCalendars() {
@@ -49,6 +57,10 @@ export default function MyCalendars() {
   const [loading, setLoading] = useState(true);
   const [pendingDelete, setPendingDelete] = useState<SavedCalendar | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameSaving, setRenameSaving] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -77,6 +89,61 @@ export default function MyCalendars() {
     setPendingDelete(null);
   }
 
+  function startRename(it: SavedCalendar) {
+    setRenamingId(it.id);
+    setRenameValue(it.title);
+  }
+
+  async function saveRename() {
+    if (!renamingId) return;
+    const value = renameValue.trim();
+    if (!value) { toast.error("Title cannot be empty"); return; }
+    setRenameSaving(true);
+    const { error } = await supabase.from("saved_calendars")
+      .update({ title: value })
+      .eq("id", renamingId);
+    setRenameSaving(false);
+    if (error) { toast.error(error.message); return; }
+    setItems(p => p.map(i => i.id === renamingId ? { ...i, title: value } : i));
+    setRenamingId(null);
+    toast.success("Renamed");
+  }
+
+  async function duplicate(it: SavedCalendar) {
+    if (!user || duplicatingId) return;
+    setDuplicatingId(it.id);
+    // Fetch full row including posts + form_payload
+    const { data: full, error: fetchErr } = await supabase
+      .from("saved_calendars")
+      .select("*")
+      .eq("id", it.id)
+      .maybeSingle();
+    if (fetchErr || !full) {
+      setDuplicatingId(null);
+      toast.error(fetchErr?.message || "Failed to load source");
+      return;
+    }
+    const newTitle = `${full.title} (copy)`.slice(0, 80);
+    const { data: inserted, error: insErr } = await supabase
+      .from("saved_calendars")
+      .insert([{
+        user_id: user.id,
+        title: newTitle,
+        industry: full.industry,
+        industry_label: full.industry_label,
+        platform: full.platform,
+        core_idea: full.core_idea,
+        form_payload: full.form_payload as never,
+        posts: full.posts as never,
+      }])
+      .select("id, title, industry_label, platform, core_idea, created_at")
+      .single();
+    setDuplicatingId(null);
+    if (insErr || !inserted) { toast.error(insErr?.message || "Duplicate failed"); return; }
+    setItems(p => [inserted as SavedCalendar, ...p]);
+    toast.success("Duplicated");
+  }
+
   return (
     <>
       <style>{css}</style>
@@ -89,7 +156,7 @@ export default function MyCalendars() {
             </div>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <Link to="/" className="mc-back">← New calendar</Link>
-              <button className="mc-del" onClick={async () => { await signOut(); navigate("/auth"); }}>Sign out</button>
+              <button className="mc-act" onClick={async () => { await signOut(); navigate("/auth"); }}>Sign out</button>
             </div>
           </div>
 
@@ -104,15 +171,46 @@ export default function MyCalendars() {
             <div className="mc-list">
               {items.map(it => (
                 <div key={it.id} className="mc-item">
-                  <Link to={`/calendar/${it.id}`} style={{ textDecoration: "none", color: "inherit", flex: 1 }}>
-                    <h3 className="mc-item-title">{it.title}</h3>
-                    <div className="mc-meta">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {renamingId === it.id ? (
+                      <input
+                        className="mc-rename-input"
+                        autoFocus
+                        value={renameValue}
+                        disabled={renameSaving}
+                        onChange={e => setRenameValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") { e.preventDefault(); saveRename(); }
+                          if (e.key === "Escape") { e.preventDefault(); setRenamingId(null); }
+                        }}
+                        onBlur={saveRename}
+                      />
+                    ) : (
+                      <Link to={`/calendar/${it.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                        <h3 className="mc-item-title">{it.title}</h3>
+                      </Link>
+                    )}
+                    <div className="mc-meta" style={{ marginTop: 4 }}>
                       {it.industry_label && <span className="mc-tag">{it.industry_label}</span>}
                       {it.platform && <span className="mc-tag">{it.platform}</span>}
                       <span>{new Date(it.created_at).toLocaleDateString()}</span>
                     </div>
-                  </Link>
-                  <button className="mc-del" onClick={() => setPendingDelete(it)}>Delete</button>
+                  </div>
+                  <div className="mc-actions">
+                    {renamingId === it.id ? (
+                      <button className="mc-act" onClick={() => setRenamingId(null)} disabled={renameSaving}>
+                        {renameSaving ? "Saving…" : "Cancel"}
+                      </button>
+                    ) : (
+                      <>
+                        <button className="mc-act" onClick={() => startRename(it)}>Rename</button>
+                        <button className="mc-act" onClick={() => duplicate(it)} disabled={duplicatingId === it.id}>
+                          {duplicatingId === it.id ? "Copying…" : "Duplicate"}
+                        </button>
+                        <button className="mc-del" onClick={() => setPendingDelete(it)}>Delete</button>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -130,7 +228,11 @@ export default function MyCalendars() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmDelete(); }} disabled={deleting}>
+            <AlertDialogAction
+              className="mc-dialog-danger"
+              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+              disabled={deleting}
+            >
               {deleting ? "Deleting…" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
