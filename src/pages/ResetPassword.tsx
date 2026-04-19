@@ -25,16 +25,29 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const [linkExpired, setLinkExpired] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
+    let resolved = false;
     // Supabase parses the recovery hash and emits PASSWORD_RECOVERY
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+        resolved = true;
+        setReady(true);
+      }
     });
     // Also check if a session already exists (link already processed)
-    supabase.auth.getSession().then(({ data }) => { if (data.session) setReady(true); });
-    return () => sub.subscription.unsubscribe();
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) { resolved = true; setReady(true); }
+    });
+
+    // Timeout: if neither event nor session resolves the link in 6s, treat as invalid/expired.
+    const timer = setTimeout(() => {
+      if (!resolved) setLinkExpired(true);
+    }, 6000);
+
+    return () => { sub.subscription.unsubscribe(); clearTimeout(timer); };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -56,9 +69,18 @@ export default function ResetPassword() {
       <div className="rp-app">
         <div className="rp-card">
           <div className="rp-eyebrow">Reset password</div>
-          <h1 className="rp-title">Set a new password</h1>
-          <p className="rp-sub">{ready ? "Enter and confirm your new password below." : "Verifying your reset link…"}</p>
-          {ready && (
+          <h1 className="rp-title">{linkExpired ? "Link expired" : "Set a new password"}</h1>
+          <p className="rp-sub">
+            {linkExpired
+              ? "This password reset link is invalid or has expired. Request a new one to continue."
+              : ready
+                ? "Enter and confirm your new password below."
+                : "Verifying your reset link…"}
+          </p>
+          {linkExpired && (
+            <button className="rp-btn" onClick={() => navigate("/auth")}>Back to sign in</button>
+          )}
+          {ready && !linkExpired && (
             <form onSubmit={handleSubmit}>
               <div className="rp-label">New password</div>
               <input className="rp-input" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters" />

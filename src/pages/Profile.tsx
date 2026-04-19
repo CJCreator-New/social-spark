@@ -51,14 +51,48 @@ export default function Profile() {
     if (!file || !user) return;
     if (file.size > 2 * 1024 * 1024) return toast.error("Image must be under 2MB");
     setUploading(true);
-    const ext = file.name.split(".").pop();
+
+    // Remember previous avatar so we can clean it up after a successful save.
+    const previousUrl = avatarUrl;
+
+    const ext = (file.name.split(".").pop() || "png").toLowerCase();
     const path = `${user.id}/avatar-${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
     if (upErr) { setUploading(false); return toast.error(upErr.message); }
+
     const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-    setAvatarUrl(data.publicUrl);
+    const newUrl = data.publicUrl;
+
+    // Auto-persist the avatar URL so the upload isn't orphaned if the user navigates away.
+    const { error: updErr } = await supabase.from("profiles")
+      .update({ avatar_url: newUrl })
+      .eq("user_id", user.id);
+
+    if (updErr) {
+      // Roll back the storage object on DB failure.
+      await supabase.storage.from("avatars").remove([path]);
+      setUploading(false);
+      return toast.error(updErr.message);
+    }
+
+    setAvatarUrl(newUrl);
+
+    // Best-effort: delete the previous avatar object owned by this user.
+    if (previousUrl) {
+      const marker = `/avatars/${user.id}/`;
+      const idx = previousUrl.indexOf(marker);
+      if (idx !== -1) {
+        const oldPath = previousUrl.slice(idx + "/avatars/".length);
+        // Fire-and-forget; don't block UX on cleanup failures.
+        void supabase.storage.from("avatars").remove([oldPath]);
+      }
+    }
+
+    // Reset the file input so the same file can be re-selected later.
+    if (fileRef.current) fileRef.current.value = "";
+
     setUploading(false);
-    toast.success("Avatar uploaded — don't forget to save");
+    toast.success("Avatar updated");
   }
 
   async function handleSave() {
