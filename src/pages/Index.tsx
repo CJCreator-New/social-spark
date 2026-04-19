@@ -419,6 +419,7 @@ const Index = () => {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const progRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const hydrated = useRef(false);
 
   // Hydrate from localStorage once on mount
