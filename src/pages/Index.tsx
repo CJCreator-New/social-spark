@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { getSupabaseClient } from "@/lib/supabase";
+import { Link, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -395,6 +398,10 @@ const Index = () => {
   const [genMsg, setGenMsg] = useState("");
   const [genStep, setGenStep] = useState(0);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const progRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -434,7 +441,7 @@ const Index = () => {
 
   async function generate() {
     if (!validate(2)) return;
-    setStep(3); setProgress(0); setGenStep(0); setGenMsg(GEN_MSGS[0]);
+    setStep(3); setProgress(0); setGenStep(0); setGenMsg(GEN_MSGS[0]); setSavedId(null);
 
     let pct = 0, mi = 0;
     progRef.current = setInterval(() => {
@@ -445,7 +452,6 @@ const Index = () => {
     }, 200);
 
     try {
-      const supabase = getSupabaseClient();
       const { data, error: fnError } = await supabase.functions.invoke("generate-calendar", {
         body: {
           industry: form.industry,
@@ -538,6 +544,30 @@ ${postText(p)}
     document.body.removeChild(a); URL.revokeObjectURL(url);
   }
 
+  async function saveCalendar() {
+    if (!user || posts.length === 0) return;
+    setSaving(true);
+    const title = form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`;
+    const { data, error: insErr } = await supabase
+      .from("saved_calendars")
+      .insert([{
+        user_id: user.id,
+        title,
+        industry: form.industry,
+        industry_label: selectedIndustry?.label || form.industry,
+        platform: form.platform,
+        core_idea: form.coreIdea,
+        form_payload: form as never,
+        posts: posts as never,
+      }])
+      .select("id")
+      .single();
+    setSaving(false);
+    if (insErr) { toast.error(insErr.message); return; }
+    setSavedId(data.id);
+    toast.success("Calendar saved");
+  }
+
   const STEP_LABELS = ["Industry", "Topics", "Generate", "Calendar"];
   const p = posts[activeDay];
 
@@ -549,6 +579,14 @@ ${postText(p)}
         <div className="bg-glow" />
 
         <div className="inner">
+          {/* HEADER */}
+          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 14, marginBottom: 24, fontSize: 12, color: "#7a7a8e" }}>
+            <Link to="/my-calendars" style={{ color: "#7a7a8e", textDecoration: "none" }}>My calendars</Link>
+            <span style={{ color: "#3a3a50" }}>·</span>
+            <span style={{ color: "#7a7a8e" }}>{user?.email}</span>
+            <button onClick={async () => { await signOut(); navigate("/auth"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#7a7a8e", padding: "5px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "Sora, sans-serif" }}>Sign out</button>
+          </div>
+
           {/* BRAND */}
           <div className="brand">
             <div className="brand-eyebrow">AI content studio</div>
@@ -771,6 +809,9 @@ ${postText(p)}
                 <div className="bbar">
                   <button className="restart" onClick={() => { setPosts([]); setActiveDay(0); setStep(1); setError(""); }}>← Start over</button>
                   <div className="bactions">
+                    <button className="dlbtn" onClick={saveCalendar} disabled={saving || !!savedId}>
+                      {savedId ? "Saved ✓" : saving ? "Saving…" : "Save calendar"}
+                    </button>
                     <button className="dlbtn" onClick={downloadTxt}>
                       <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M6.5 1v7M4 5.5l2.5 2.5L9 5.5M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" />
