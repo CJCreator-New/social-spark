@@ -30,15 +30,19 @@ const css = `
 .auth-google { width:100%; padding:11px; border-radius:8px; font-size:13px; font-weight:400; font-family:'Sora',sans-serif; cursor:pointer; background:transparent; border:1px solid rgba(255,255,255,0.1); color:#edeae3; transition:all .15s; display:flex; align-items:center; justify-content:center; gap:8px; }
 .auth-google:hover { border-color:rgba(200,240,154,0.28); }
 .auth-err { background:rgba(240,154,154,0.07); border:1px solid rgba(240,154,154,0.2); border-radius:8px; padding:10px 13px; font-size:12px; color:#f09a9a; margin-top:10px; font-weight:300; }
+.auth-ok { background:rgba(200,240,154,0.06); border:1px solid rgba(200,240,154,0.2); border-radius:8px; padding:10px 13px; font-size:12px; color:#c8f09a; margin-top:10px; font-weight:300; }
+.auth-forgot { background:none; border:none; color:#7a7a8e; font-size:11px; font-family:'Sora',sans-serif; cursor:pointer; padding:0; margin-top:8px; text-align:right; display:block; margin-left:auto; }
+.auth-forgot:hover { color:#c8f09a; }
 `;
 
 export default function AuthPage() {
-  const [tab, setTab] = useState<"signin" | "signup">("signin");
+  const [tab, setTab] = useState<"signin" | "signup" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
@@ -82,6 +86,21 @@ export default function AuthPage() {
     if (result.error) setError(result.error.message || "Google sign-in failed.");
   }
 
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault();
+    setError(""); setInfo(""); setLoading(true);
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setLoading(false);
+    if (err) return setError(err.message);
+    setInfo("Check your email for a password reset link.");
+  }
+
+  function switchTab(t: "signin" | "signup" | "forgot") {
+    setTab(t); setError(""); setInfo("");
+  }
+
   return (
     <>
       <style>{css}</style>
@@ -89,33 +108,51 @@ export default function AuthPage() {
         <div className="auth-card">
           <div className="auth-eyebrow">AI content studio</div>
           <h1 className="auth-title">Content<em>Forge</em></h1>
-          <p className="auth-sub">{tab === "signin" ? "Sign in to generate and save your weekly calendars." : "Create your account to start writing your content week."}</p>
+          <p className="auth-sub">{tab === "signin" ? "Sign in to generate and save your weekly calendars." : tab === "signup" ? "Create your account to start writing your content week." : "Enter your email and we'll send you a reset link."}</p>
 
-          <div className="auth-tabs">
-            <button className={`auth-tab ${tab === "signin" ? "on" : ""}`} onClick={() => { setTab("signin"); setError(""); }}>Sign in</button>
-            <button className={`auth-tab ${tab === "signup" ? "on" : ""}`} onClick={() => { setTab("signup"); setError(""); }}>Sign up</button>
-          </div>
+          {tab !== "forgot" && (
+            <div className="auth-tabs">
+              <button className={`auth-tab ${tab === "signin" ? "on" : ""}`} onClick={() => switchTab("signin")}>Sign in</button>
+              <button className={`auth-tab ${tab === "signup" ? "on" : ""}`} onClick={() => switchTab("signup")}>Sign up</button>
+            </div>
+          )}
 
-          <form onSubmit={handleEmailAuth}>
-            {tab === "signup" && (
+          {tab === "forgot" ? (
+            <form onSubmit={handleForgot}>
               <div className="auth-field">
-                <div className="auth-label">Display name</div>
-                <input className="auth-input" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" />
+                <div className="auth-label">Email</div>
+                <input className="auth-input" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" />
               </div>
-            )}
-            <div className="auth-field">
-              <div className="auth-label">Email</div>
-              <input className="auth-input" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" />
-            </div>
-            <div className="auth-field">
-              <div className="auth-label">Password</div>
-              <input className="auth-input" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters" />
-            </div>
-            {error && <div className="auth-err">{error}</div>}
-            <button className="auth-btn" type="submit" disabled={loading}>
-              {loading ? "Please wait…" : tab === "signin" ? "Sign in" : "Create account"}
-            </button>
-          </form>
+              {error && <div className="auth-err">{error}</div>}
+              {info && <div className="auth-ok">{info}</div>}
+              <button className="auth-btn" type="submit" disabled={loading}>{loading ? "Sending…" : "Send reset link"}</button>
+              <button type="button" className="auth-forgot" onClick={() => switchTab("signin")}>← Back to sign in</button>
+            </form>
+          ) : (
+            <form onSubmit={handleEmailAuth}>
+              {tab === "signup" && (
+                <div className="auth-field">
+                  <div className="auth-label">Display name</div>
+                  <input className="auth-input" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" />
+                </div>
+              )}
+              <div className="auth-field">
+                <div className="auth-label">Email</div>
+                <input className="auth-input" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" />
+              </div>
+              <div className="auth-field">
+                <div className="auth-label">Password</div>
+                <input className="auth-input" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters" />
+              </div>
+              {error && <div className="auth-err">{error}</div>}
+              <button className="auth-btn" type="submit" disabled={loading}>
+                {loading ? "Please wait…" : tab === "signin" ? "Sign in" : "Create account"}
+              </button>
+              {tab === "signin" && (
+                <button type="button" className="auth-forgot" onClick={() => switchTab("forgot")}>Forgot password?</button>
+              )}
+            </form>
+          )}
 
           <div className="auth-divider">or</div>
           <button className="auth-google" onClick={handleGoogle} type="button">
