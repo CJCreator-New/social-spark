@@ -411,17 +411,17 @@ const Index = () => {
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeDay, setActiveDay] = useState(0);
-  const [progress, setProgress] = useState(0);
   const [genMsg, setGenMsg] = useState("");
   const [genStep, setGenStep] = useState(0);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [regenIdx, setRegenIdx] = useState<number | null>(null);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
-  const progRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const hydrated = useRef(false);
 
@@ -492,15 +492,15 @@ const Index = () => {
 
   async function generate() {
     if (!validate(2)) return;
-    setStep(3); setProgress(0); setGenStep(0); setGenMsg(GEN_MSGS[0]); setSavedId(null);
+    setStep(3); setGenStep(0); setGenMsg(GEN_MSGS[0]); setSavedId(null);
 
-    let pct = 0, mi = 0;
-    progRef.current = setInterval(() => {
-      pct = Math.min(pct + 2, 90);
-      setProgress(Math.round(pct));
-      const ni = Math.min(Math.floor(pct / 20), GEN_MSGS.length - 1);
-      if (ni > mi) { mi = ni; setGenMsg(GEN_MSGS[ni]); setGenStep(ni); }
-    }, 200);
+    // Cycle the friendly status messages on a steady cadence; the bar itself is indeterminate.
+    let mi = 0;
+    msgRef.current = setInterval(() => {
+      mi = Math.min(mi + 1, GEN_MSGS.length - 1);
+      setGenMsg(GEN_MSGS[mi]);
+      setGenStep(mi);
+    }, 2200);
 
     // Abort plumbing: user-cancel + 90s hard timeout.
     const ac = new AbortController();
@@ -508,7 +508,7 @@ const Index = () => {
     const timeoutId = setTimeout(() => ac.abort("timeout"), 90_000);
 
     const cleanup = () => {
-      if (progRef.current) clearInterval(progRef.current);
+      if (msgRef.current) clearInterval(msgRef.current);
       clearTimeout(timeoutId);
       abortRef.current = null;
     };
@@ -555,9 +555,9 @@ const Index = () => {
       const result: Post[] = Array.isArray(data?.posts) ? data.posts : [];
       if (result.length === 0) { setStep(2); setError("Empty response. Please try again."); return; }
 
-      setProgress(100); setGenStep(5);
+      setGenStep(GEN_LABELS.length);
       setPosts(result); setActiveDay(0);
-      setTimeout(() => setStep(4), 450);
+      setTimeout(() => setStep(4), 350);
     } catch (err) {
       cleanup();
       const aborted = err instanceof DOMException && err.name === "AbortError";
@@ -575,6 +575,54 @@ const Index = () => {
 
   function cancelGeneration() {
     if (abortRef.current) abortRef.current.abort("user");
+  }
+
+  async function regenerateDay(idx: number) {
+    if (regenIdx !== null) return;
+    const target = posts[idx];
+    if (!target) return;
+    setRegenIdx(idx);
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({
+          industry: form.industry,
+          industryLabel: selectedIndustry?.label || form.industry,
+          platform: form.platform,
+          coreIdea: form.coreIdea,
+          audiences: form.audiences,
+          voice: form.voice,
+          style: form.style,
+          goals: form.goals,
+          format: form.format,
+          cta: form.cta,
+          length: form.length,
+          structure: form.structure,
+          extra: form.extra,
+          post: target,
+          siblings: posts,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.error || !data?.post) {
+        toast.error(data?.error || `Regenerate failed (${res.status}).`);
+        return;
+      }
+      setPosts(prev => prev.map((p, i) => (i === idx ? data.post : p)));
+      toast.success(`Day ${target.day} regenerated`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Regenerate failed");
+    } finally {
+      setRegenIdx(null);
+    }
   }
 
   function copyText(text: string, cb: () => void) {
