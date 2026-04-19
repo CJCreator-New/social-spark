@@ -17,8 +17,24 @@ interface Payload {
   topics?: string[];
   format?: string;
   cta?: string;
+  length?: string;
+  structure?: string;
   extra?: string;
 }
+
+const LENGTH_GUIDE: Record<string, string> = {
+  short: "80–120 words per post (tight, punchy)",
+  medium: "160–230 words per post (balanced depth)",
+  long: "280–380 words per post (deep, substantive)",
+  mixed: "VARY length across the week — at least 2 short (80–120w), 3 medium (160–230w), and 2 long (280–380w) posts. Distribute deliberately.",
+};
+
+const STRUCTURE_GUIDE: Record<string, string> = {
+  paragraphs: "Use flowing paragraphs only. No bullet points or numbered lists in the body.",
+  bullets: "Structure the body primarily as bullet points or short numbered items. Minimal prose connective tissue.",
+  mixed: "Within each post, MIX paragraphs and bullet points — typically a paragraph hook, then bullets for the meat, then a paragraph close. Use line breaks and '→' or '•' markers.",
+  perPost: "Pick the best structure per post based on its topic and format — some all-prose, some all-bullets, some hybrid. Vary deliberately across the week.",
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
