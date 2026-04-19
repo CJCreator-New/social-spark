@@ -612,6 +612,7 @@ ${postText(p)}
     setSaving(false);
     if (insErr) { toast.error(insErr.message); return; }
     setSavedId(data.id);
+    clearDraft();
     toast.success("Calendar saved");
   }
 
@@ -725,7 +726,8 @@ ${postText(p)}
                 <MultiSelect
                   label="Topics to cover"
                   hint="(pick up to 7 — 1 per day)"
-                  options={topicPool.length > 0 ? topicPool : ["Add custom topics below"]}
+                  options={topicPool.length > 0 ? topicPool : ["Add custom topics below ↓"]}
+                  disabledOptions={topicPool.length > 0 ? [] : ["Add custom topics below ↓"]}
                   value={form.topics}
                   onChange={v => upd("topics", v)}
                   placeholder={form.industry ? "Select topics…" : "Select industry first"}
@@ -854,7 +856,7 @@ ${postText(p)}
                 )}
 
                 <div className="bbar">
-                  <button className="restart" onClick={() => { setPosts([]); setActiveDay(0); setStep(1); setError(""); }}>← Start over</button>
+                  <button className="restart" onClick={() => { clearDraft(); setPosts([]); setActiveDay(0); setSavedId(null); setStep(1); setError(""); }}>← Start over</button>
                   <div className="bactions">
                     <button className="dlbtn" onClick={saveCalendar} disabled={saving || !!savedId}>
                       {savedId ? "Saved ✓" : saving ? "Saving…" : "Save calendar"}
