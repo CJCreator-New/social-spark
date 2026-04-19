@@ -312,9 +312,10 @@ interface MultiSelectProps {
   placeholder?: string;
   max?: number;
   hint?: string;
+  disabledOptions?: string[];
 }
 
-function MultiSelect({ label, options, value, onChange, placeholder, max = 6, hint }: MultiSelectProps) {
+function MultiSelect({ label, options, value, onChange, placeholder, max = 6, hint, disabledOptions = [] }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -323,6 +324,7 @@ function MultiSelect({ label, options, value, onChange, placeholder, max = 6, hi
     return () => document.removeEventListener("mousedown", h);
   }, []);
   const toggle = (v: string) => {
+    if (disabledOptions.includes(v)) return;
     if (value.includes(v)) onChange(value.filter(x => x !== v));
     else if (value.length < max) onChange([...value, v]);
   };
@@ -343,12 +345,22 @@ function MultiSelect({ label, options, value, onChange, placeholder, max = 6, hi
         </div>
         {open && (
           <div className="ms-drop">
-            {options.map(o => (
-              <div key={o} className={`ms-opt ${value.includes(o) ? "sel" : ""}`} onClick={() => toggle(o)}>
-                {o}
-                <span className="ms-chk">{value.includes(o) && <Check />}</span>
-              </div>
-            ))}
+            {options.map(o => {
+              const disabled = disabledOptions.includes(o);
+              if (disabled) {
+                return (
+                  <div key={o} className="ms-opt" style={{ opacity: 0.5, cursor: "default", fontStyle: "italic" }} onClick={e => e.stopPropagation()}>
+                    {o}
+                  </div>
+                );
+              }
+              return (
+                <div key={o} className={`ms-opt ${value.includes(o) ? "sel" : ""}`} onClick={() => toggle(o)}>
+                  {o}
+                  <span className="ms-chk">{value.includes(o) && <Check />}</span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -600,12 +612,10 @@ ${postText(p)}
           <div className="stepper">
             {STEP_LABELS.map((s, i) => (
               <div key={s} className="snode" style={{ flexShrink: 0 }}>
-                <div className="snode">
-                  <div className={`sdot ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>
-                    {i + 1 < step ? <Check /> : i + 1}
-                  </div>
-                  <div className={`slabel ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>{s}</div>
+                <div className={`sdot ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>
+                  {i + 1 < step ? <Check /> : i + 1}
                 </div>
+                <div className={`slabel ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>{s}</div>
                 {i < STEP_LABELS.length - 1 && <div className={`sline ${i + 1 < step ? "done" : ""}`} style={{ flex: 1, minWidth: 8 }} />}
               </div>
             ))}

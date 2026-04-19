@@ -78,6 +78,11 @@ Deno.serve(async (req) => {
     const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
 
+    const longFormPlatform = platform === "Newsletter" || platform === "Blog";
+    const hashtagInstr = longFormPlatform
+      ? `HASHTAGS: This is a ${platform} post — return an EMPTY string ("") for the hashtags field. Do NOT invent hashtags.`
+      : `HASHTAGS: Provide 3–6 platform-native hashtags as a single space-separated string (e.g. "#AI #ProductOps #SaaS"). Mix one broad, two niche, and one trending where relevant.`;
+
     const prompt = `You are a world-class ${platform} content strategist specialising in ${industryLabel || industry} content.
 
 Create a complete 7-day ${platform} content calendar for this creator:
@@ -94,16 +99,33 @@ Create a complete 7-day ${platform} content calendar for this creator:
 - POST STRUCTURE: ${structureInstr}
 ${extra ? `- Extra instructions: ${extra}` : ""}
 
-IMPORTANT:
+HARD RULES (follow strictly):
 1. Generate content that is genuinely specific to the ${industryLabel || industry} space — use real terminology, real platforms, real trends, real names where relevant. Do NOT write generic content.
 2. Strictly follow the POST LENGTH and POST STRUCTURE rules above for the body of every post.
-3. In the "format" field of each post, append the structure used (e.g. "List post — bullets", "Storytelling — paragraphs", "How-to — hybrid") so the user can see the mix at a glance.`;
+3. In the "format" field of each post, append the structure used (e.g. "List post — bullets", "Storytelling — paragraphs", "How-to — hybrid") so the user can see the mix at a glance.
+4. ${hashtagInstr}
+5. The chosen format mix "${format}" must drive AT LEAST 4 of the 7 posts. The remaining 3 may vary for rhythm.
+6. AT LEAST 3 of the 7 posts must include a concrete number, percentage, year, dollar figure, or named statistic embedded in the body or hook (not made-up — use realistic, defensible figures from the ${industryLabel || industry} space).
+7. The "dow" field MUST be exactly one of: "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" — and the 7 posts must be ordered Mon → Sun, with "day" 1..7 matching that order.
+
+BANNED PHRASES — do NOT use any of these or close variants:
+- "in today's fast-paced world"
+- "in the ever-evolving landscape"
+- "game-changer" / "game changer"
+- "revolutionize" / "revolutionary"
+- "unlock the power of"
+- "take it to the next level"
+- "leverage synergies"
+- "in this day and age"
+- "at the end of the day"
+- "let's dive in" / "let's dive into"
+Avoid empty hype openers. Open with a specific observation, number, or contrarian claim instead.`;
 
     const tool = {
       type: "function",
       function: {
         name: "return_calendar",
-        description: "Return a 7-day content calendar as a structured array.",
+        description: "Return a 7-day content calendar as a structured array, ordered Mon → Sun.",
         parameters: {
           type: "object",
           properties: {
@@ -114,15 +136,23 @@ IMPORTANT:
               items: {
                 type: "object",
                 properties: {
-                  day: { type: "number" },
-                  dow: { type: "string", description: "Mon, Tue, Wed, Thu, Fri, Sat, Sun" },
+                  day: { type: "number", description: "1..7, matching Mon..Sun order" },
+                  dow: {
+                    type: "string",
+                    enum: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+                  },
                   topic: { type: "string" },
                   format: { type: "string" },
                   title: { type: "string" },
                   hook: { type: "string" },
                   body: { type: "string" },
                   cta: { type: "string" },
-                  hashtags: { type: "string" },
+                  hashtags: {
+                    type: "string",
+                    description: longFormPlatform
+                      ? "MUST be an empty string for Newsletter/Blog."
+                      : "3–6 platform-native hashtags as a single space-separated string.",
+                  },
                   rationale: { type: "string" },
                 },
                 required: ["day", "dow", "topic", "format", "title", "hook", "body", "cta", "hashtags", "rationale"],
