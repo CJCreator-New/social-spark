@@ -130,6 +130,33 @@ export default function CalendarDetail() {
 
           {p && editing && draft && (
             <div className="cd-card">
+              <div className="cd-blabel"><span>Day · Day-of-week</span></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <input
+                  className="cd-edit-input"
+                  type="number"
+                  min={1}
+                  max={7}
+                  value={draft.day}
+                  onChange={e => setDraft({ ...draft, day: Number(e.target.value) || draft.day })}
+                  style={{ marginBottom: 0, fontFamily: "Sora, sans-serif", fontSize: 13 }}
+                />
+                <select
+                  className="cd-edit-input"
+                  value={draft.dow}
+                  onChange={e => setDraft({ ...draft, dow: e.target.value })}
+                  style={{ marginBottom: 0, fontFamily: "Sora, sans-serif", fontSize: 13, appearance: "auto" }}
+                >
+                  {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+
+              <div className="cd-blabel"><span>Topic</span></div>
+              <input className="cd-edit-input" style={{ fontFamily: "Sora, sans-serif", fontSize: 13 }} value={draft.topic} onChange={e => setDraft({ ...draft, topic: e.target.value })} />
+
+              <div className="cd-blabel"><span>Format</span></div>
+              <input className="cd-edit-input" style={{ fontFamily: "Sora, sans-serif", fontSize: 13 }} value={draft.format} onChange={e => setDraft({ ...draft, format: e.target.value })} />
+
               <div className="cd-blabel"><span>Title</span></div>
               <input className="cd-edit-input" value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} />
               <div className="cd-blabel"><span>Hook</span></div>
@@ -140,6 +167,8 @@ export default function CalendarDetail() {
               <textarea className="cd-edit-area" rows={2} value={draft.cta} onChange={e => setDraft({ ...draft, cta: e.target.value })} />
               <div className="cd-blabel"><span>Hashtags</span></div>
               <textarea className="cd-edit-area" rows={2} value={draft.hashtags} onChange={e => setDraft({ ...draft, hashtags: e.target.value })} />
+              <div className="cd-blabel"><span>Why this works (rationale)</span></div>
+              <textarea className="cd-edit-area" rows={3} value={draft.rationale} onChange={e => setDraft({ ...draft, rationale: e.target.value })} />
               <div className="cd-actions">
                 <button className="cd-btn cd-btn-p" onClick={saveEdit} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
                 <button className="cd-btn" onClick={cancelEdit} disabled={saving}>Cancel</button>
