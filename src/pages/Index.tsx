@@ -544,7 +544,29 @@ ${postText(p)}
     document.body.removeChild(a); URL.revokeObjectURL(url);
   }
 
-  const STEP_LABELS = ["Industry", "Topics", "Generate", "Calendar"];
+  async function saveCalendar() {
+    if (!user || posts.length === 0) return;
+    setSaving(true);
+    const title = form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`;
+    const { data, error: insErr } = await supabase
+      .from("saved_calendars")
+      .insert({
+        user_id: user.id,
+        title,
+        industry: form.industry,
+        industry_label: selectedIndustry?.label || form.industry,
+        platform: form.platform,
+        core_idea: form.coreIdea,
+        form_payload: form as unknown as Record<string, unknown>,
+        posts: posts as unknown as Record<string, unknown>[],
+      })
+      .select("id")
+      .single();
+    setSaving(false);
+    if (insErr) { toast.error(insErr.message); return; }
+    setSavedId(data.id);
+    toast.success("Calendar saved");
+  }
   const p = posts[activeDay];
 
   return (
