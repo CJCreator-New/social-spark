@@ -312,9 +312,10 @@ interface MultiSelectProps {
   placeholder?: string;
   max?: number;
   hint?: string;
+  disabledOptions?: string[];
 }
 
-function MultiSelect({ label, options, value, onChange, placeholder, max = 6, hint }: MultiSelectProps) {
+function MultiSelect({ label, options, value, onChange, placeholder, max = 6, hint, disabledOptions = [] }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -323,6 +324,7 @@ function MultiSelect({ label, options, value, onChange, placeholder, max = 6, hi
     return () => document.removeEventListener("mousedown", h);
   }, []);
   const toggle = (v: string) => {
+    if (disabledOptions.includes(v)) return;
     if (value.includes(v)) onChange(value.filter(x => x !== v));
     else if (value.length < max) onChange([...value, v]);
   };
@@ -343,12 +345,22 @@ function MultiSelect({ label, options, value, onChange, placeholder, max = 6, hi
         </div>
         {open && (
           <div className="ms-drop">
-            {options.map(o => (
-              <div key={o} className={`ms-opt ${value.includes(o) ? "sel" : ""}`} onClick={() => toggle(o)}>
-                {o}
-                <span className="ms-chk">{value.includes(o) && <Check />}</span>
-              </div>
-            ))}
+            {options.map(o => {
+              const disabled = disabledOptions.includes(o);
+              if (disabled) {
+                return (
+                  <div key={o} className="ms-opt" style={{ opacity: 0.5, cursor: "default", fontStyle: "italic" }} onClick={e => e.stopPropagation()}>
+                    {o}
+                  </div>
+                );
+              }
+              return (
+                <div key={o} className={`ms-opt ${value.includes(o) ? "sel" : ""}`} onClick={() => toggle(o)}>
+                  {o}
+                  <span className="ms-chk">{value.includes(o) && <Check />}</span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -372,6 +384,8 @@ interface Post {
 }
 
 // ─── MAIN ────────────────────────────────────────────────────────────────────
+
+const DRAFT_KEY = "contentforge:draft:v1";
 
 const Index = () => {
   const [step, setStep] = useState(1);
@@ -405,6 +419,39 @@ const Index = () => {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const progRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hydrated = useRef(false);
+
+  // Hydrate from localStorage once on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as { form?: typeof form; step?: number; extraTopics?: string[] };
+        if (saved.form) setForm(f => ({ ...f, ...saved.form }));
+        if (saved.extraTopics) setExtraTopics(saved.extraTopics);
+        // Don't restore step 3 (mid-generation) or 4 (no posts persisted).
+        if (saved.step === 1 || saved.step === 2) setStep(saved.step);
+      }
+    } catch (e) {
+      console.warn("Failed to hydrate draft", e);
+    }
+    hydrated.current = true;
+  }, []);
+
+  // Persist form/step/extraTopics whenever they change (only on steps 1–2)
+  useEffect(() => {
+    if (!hydrated.current) return;
+    if (step > 2) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, step, extraTopics }));
+    } catch (e) {
+      console.warn("Failed to persist draft", e);
+    }
+  }, [form, step, extraTopics]);
+
+  const clearDraft = () => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+  };
 
   const upd = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm(f => ({ ...f, [k]: v }));
   const toggleChip = (k: "goals", v: string) =>
@@ -565,6 +612,7 @@ ${postText(p)}
     setSaving(false);
     if (insErr) { toast.error(insErr.message); return; }
     setSavedId(data.id);
+    clearDraft();
     toast.success("Calendar saved");
   }
 
@@ -600,12 +648,10 @@ ${postText(p)}
           <div className="stepper">
             {STEP_LABELS.map((s, i) => (
               <div key={s} className="snode" style={{ flexShrink: 0 }}>
-                <div className="snode">
-                  <div className={`sdot ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>
-                    {i + 1 < step ? <Check /> : i + 1}
-                  </div>
-                  <div className={`slabel ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>{s}</div>
+                <div className={`sdot ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>
+                  {i + 1 < step ? <Check /> : i + 1}
                 </div>
+                <div className={`slabel ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>{s}</div>
                 {i < STEP_LABELS.length - 1 && <div className={`sline ${i + 1 < step ? "done" : ""}`} style={{ flex: 1, minWidth: 8 }} />}
               </div>
             ))}
@@ -680,7 +726,8 @@ ${postText(p)}
                 <MultiSelect
                   label="Topics to cover"
                   hint="(pick up to 7 — 1 per day)"
-                  options={topicPool.length > 0 ? topicPool : ["Add custom topics below"]}
+                  options={topicPool.length > 0 ? topicPool : ["Add custom topics below ↓"]}
+                  disabledOptions={topicPool.length > 0 ? [] : ["Add custom topics below ↓"]}
                   value={form.topics}
                   onChange={v => upd("topics", v)}
                   placeholder={form.industry ? "Select topics…" : "Select industry first"}
@@ -809,7 +856,7 @@ ${postText(p)}
                 )}
 
                 <div className="bbar">
-                  <button className="restart" onClick={() => { setPosts([]); setActiveDay(0); setStep(1); setError(""); }}>← Start over</button>
+                  <button className="restart" onClick={() => { clearDraft(); setPosts([]); setActiveDay(0); setSavedId(null); setStep(1); setError(""); }}>← Start over</button>
                   <div className="bactions">
                     <button className="dlbtn" onClick={saveCalendar} disabled={saving || !!savedId}>
                       {savedId ? "Saved ✓" : saving ? "Saving…" : "Save calendar"}

@@ -58,7 +58,7 @@ export default function AuthPage() {
     setError(""); setLoading(true);
     try {
       if (tab === "signup") {
-        const { error: err } = await supabase.auth.signUp({
+        const { data, error: err } = await supabase.auth.signUp({
           email, password,
           options: {
             emailRedirectTo: `${window.location.origin}/`,
@@ -66,7 +66,14 @@ export default function AuthPage() {
           },
         });
         if (err) throw err;
-        toast.success("Account created — signing you in…");
+        if (!data.session) {
+          // Email confirmation required — user is NOT signed in yet.
+          setInfo("Check your inbox to confirm your email, then sign in.");
+          setPassword("");
+          setTab("signin");
+        } else {
+          toast.success("Account created — you're signed in");
+        }
       } else {
         const { error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
@@ -74,7 +81,15 @@ export default function AuthPage() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
-      setError(msg.includes("Invalid login") ? "Invalid email or password." : msg);
+      if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("user already")) {
+        setError("This email is already registered. Try signing in instead.");
+      } else if (msg.includes("Invalid login")) {
+        setError("Invalid email or password.");
+      } else if (msg.toLowerCase().includes("email not confirmed")) {
+        setError("Please confirm your email first — check your inbox for the link.");
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
