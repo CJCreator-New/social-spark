@@ -383,6 +383,8 @@ const Index = () => {
     topics: [] as string[],
     format: "Balanced mix",
     cta: "Share & repost bait",
+    length: "medium",
+    structure: "mixed",
     extra: "",
   });
   const [customTopic, setCustomTopic] = useState("");
