@@ -617,6 +617,7 @@ const Index = () => {
         return;
       }
       setPosts(prev => prev.map((p, i) => (i === idx ? data.post : p)));
+      setSavedId(null); // calendar drifted from saved version — let user re-save
       toast.success(`Day ${target.day} regenerated`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Regenerate failed");
