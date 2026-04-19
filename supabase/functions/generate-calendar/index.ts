@@ -55,6 +55,8 @@ Deno.serve(async (req) => {
       topics = [],
       format = "Balanced mix",
       cta = "Share & repost bait",
+      length = "medium",
+      structure = "mixed",
       extra = "",
     } = body;
 
@@ -73,6 +75,9 @@ Deno.serve(async (req) => {
       );
     }
 
+    const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
+    const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
+
     const prompt = `You are a world-class ${platform} content strategist specialising in ${industryLabel || industry} content.
 
 Create a complete 7-day ${platform} content calendar for this creator:
@@ -85,9 +90,14 @@ Create a complete 7-day ${platform} content calendar for this creator:
 - Topics to cover (1 per day; use a wrap-up or adjacent topic for day 7 if fewer than 7 topics): ${topics.join(", ")}
 - Post format mix: ${format}
 - CTA approach: ${cta}
+- POST LENGTH: ${lengthInstr}
+- POST STRUCTURE: ${structureInstr}
 ${extra ? `- Extra instructions: ${extra}` : ""}
 
-IMPORTANT: Generate content that is genuinely specific to the ${industryLabel || industry} space — use real terminology, real platforms, real trends, real names where relevant. Do NOT write generic content. Each post body must be 160-230 words.`;
+IMPORTANT:
+1. Generate content that is genuinely specific to the ${industryLabel || industry} space — use real terminology, real platforms, real trends, real names where relevant. Do NOT write generic content.
+2. Strictly follow the POST LENGTH and POST STRUCTURE rules above for the body of every post.
+3. In the "format" field of each post, append the structure used (e.g. "List post — bullets", "Storytelling — paragraphs", "How-to — hybrid") so the user can see the mix at a glance.`;
 
     const tool = {
       type: "function",
