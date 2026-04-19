@@ -663,6 +663,30 @@ ${postText(p)}
               </div>
 
               <div className="csect">
+                <div className="flabel">Post length</div>
+                <div className="plat-grid">
+                  {LENGTH_OPTIONS.map(o => (
+                    <div key={o.id} className={`plat-card ${form.length === o.id ? "on" : ""}`} onClick={() => upd("length", o.id)}>
+                      <div className="plat-name">{o.label}</div>
+                      <div className="plat-hint">{o.hint}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="csect">
+                <div className="flabel">Structure <span className="fhint">(paragraphs vs bullets)</span></div>
+                <div className="plat-grid">
+                  {STRUCTURE_OPTIONS.map(o => (
+                    <div key={o.id} className={`plat-card ${form.structure === o.id ? "on" : ""}`} onClick={() => upd("structure", o.id)}>
+                      <div className="plat-name">{o.label}</div>
+                      <div className="plat-hint">{o.hint}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="csect">
                 <div className="flabel">Extra context <span className="fhint">(optional)</span></div>
                 <textarea rows={2} placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
               </div>
