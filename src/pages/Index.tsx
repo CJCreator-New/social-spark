@@ -895,7 +895,7 @@ ${postText(p)}
               <div className="gen-title">Writing your week</div>
               <div className="gen-msg">{genMsg}</div>
               <div className="prog-track">
-                <div className="prog-fill" style={{ width: progress + "%" }} />
+                <div className="prog-indet" />
               </div>
               <div className="gen-checklist">
                 {GEN_LABELS.map((l, i) => (
@@ -935,9 +935,19 @@ ${postText(p)}
                         <span className="ptag pt-topic">{p.topic}</span>
                         <span className="ptag pt-fmt">{p.format}</span>
                       </div>
-                      <button className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`} onClick={() => copyPost(activeDay)}>
-                        {copiedIdx === activeDay ? "Copied ✓" : "Copy post"}
-                      </button>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                        <button
+                          className="cpbtn"
+                          onClick={() => regenerateDay(activeDay)}
+                          disabled={regenIdx !== null}
+                          title="Re-roll this single day without touching the other six"
+                        >
+                          {regenIdx === activeDay ? "Regenerating…" : "↻ Regenerate"}
+                        </button>
+                        <button className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`} onClick={() => copyPost(activeDay)}>
+                          {copiedIdx === activeDay ? "Copied ✓" : "Copy post"}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="ptitle">{p.title}</div>
