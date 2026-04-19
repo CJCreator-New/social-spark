@@ -498,9 +498,29 @@ const Index = () => {
       if (ni > mi) { mi = ni; setGenMsg(GEN_MSGS[ni]); setGenStep(ni); }
     }, 200);
 
+    // Abort plumbing: user-cancel + 90s hard timeout.
+    const ac = new AbortController();
+    abortRef.current = ac;
+    const timeoutId = setTimeout(() => ac.abort("timeout"), 90_000);
+
+    const cleanup = () => {
+      if (progRef.current) clearInterval(progRef.current);
+      clearTimeout(timeoutId);
+      abortRef.current = null;
+    };
+
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("generate-calendar", {
-        body: {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-calendar`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({
           industry: form.industry,
           industryLabel: selectedIndustry?.label || form.industry,
           platform: form.platform,
@@ -515,19 +535,16 @@ const Index = () => {
           length: form.length,
           structure: form.structure,
           extra: form.extra,
-        },
+        }),
+        signal: ac.signal,
       });
 
-      if (progRef.current) clearInterval(progRef.current);
+      const data = await res.json().catch(() => ({}));
+      cleanup();
 
-      if (fnError) {
+      if (!res.ok || data?.error) {
         setStep(2);
-        setError(fnError.message || "Failed to generate calendar.");
-        return;
-      }
-      if (data?.error) {
-        setStep(2);
-        setError(data.error);
+        setError(data?.error || `Generation failed (${res.status}).`);
         return;
       }
 
@@ -538,10 +555,22 @@ const Index = () => {
       setPosts(result); setActiveDay(0);
       setTimeout(() => setStep(4), 450);
     } catch (err) {
-      if (progRef.current) clearInterval(progRef.current);
+      cleanup();
+      const aborted = err instanceof DOMException && err.name === "AbortError";
+      const reason = (ac.signal as AbortSignal & { reason?: unknown }).reason;
       setStep(2);
-      setError(`Connection error: ${err instanceof Error ? err.message : "Unknown"}`);
+      if (aborted && reason === "timeout") {
+        setError("Generation timed out after 90 seconds. Please try again.");
+      } else if (aborted) {
+        setError("Generation cancelled.");
+      } else {
+        setError(`Connection error: ${err instanceof Error ? err.message : "Unknown"}`);
+      }
     }
+  }
+
+  function cancelGeneration() {
+    if (abortRef.current) abortRef.current.abort("user");
   }
 
   function copyText(text: string, cb: () => void) {
