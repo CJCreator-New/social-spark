@@ -555,6 +555,14 @@ ${postText(p)}
         <div className="bg-glow" />
 
         <div className="inner">
+          {/* HEADER */}
+          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 14, marginBottom: 24, fontSize: 12, color: "#7a7a8e" }}>
+            <Link to="/my-calendars" style={{ color: "#7a7a8e", textDecoration: "none" }}>My calendars</Link>
+            <span style={{ color: "#3a3a50" }}>·</span>
+            <span style={{ color: "#7a7a8e" }}>{user?.email}</span>
+            <button onClick={async () => { await signOut(); navigate("/auth"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#7a7a8e", padding: "5px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "Sora, sans-serif" }}>Sign out</button>
+          </div>
+
           {/* BRAND */}
           <div className="brand">
             <div className="brand-eyebrow">AI content studio</div>
