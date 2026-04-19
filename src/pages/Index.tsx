@@ -63,6 +63,20 @@ const FORMAT_OPTIONS = ["Balanced mix", "Storytelling-led", "Data & insights", "
 const CTA_OPTIONS = ["Share & repost bait", "Spark comments & debate", "Drive to profile / newsletter", "Collect leads", "Build community", "No hard CTA"];
 const GOAL_OPTIONS = ["Awareness", "Engagement", "Drive traffic", "Lead generation", "Thought leadership", "Community building", "Sales & conversion"];
 
+const LENGTH_OPTIONS = [
+  { id: "short", label: "Short", hint: "80–120 words" },
+  { id: "medium", label: "Medium", hint: "160–230 words" },
+  { id: "long", label: "Long", hint: "280–380 words" },
+  { id: "mixed", label: "Mixed lengths", hint: "Vary across the week" },
+];
+
+const STRUCTURE_OPTIONS = [
+  { id: "paragraphs", label: "Paragraphs only", hint: "Flowing prose" },
+  { id: "bullets", label: "Bullet points only", hint: "Scannable lists" },
+  { id: "mixed", label: "Mix of both", hint: "Paragraphs + bullets" },
+  { id: "perPost", label: "Per-post best fit", hint: "AI picks per topic" },
+];
+
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 
 const css = `
