@@ -441,7 +441,7 @@ const Index = () => {
 
   async function generate() {
     if (!validate(2)) return;
-    setStep(3); setProgress(0); setGenStep(0); setGenMsg(GEN_MSGS[0]);
+    setStep(3); setProgress(0); setGenStep(0); setGenMsg(GEN_MSGS[0]); setSavedId(null);
 
     let pct = 0, mi = 0;
     progRef.current = setInterval(() => {
@@ -809,6 +809,9 @@ ${postText(p)}
                 <div className="bbar">
                   <button className="restart" onClick={() => { setPosts([]); setActiveDay(0); setStep(1); setError(""); }}>← Start over</button>
                   <div className="bactions">
+                    <button className="dlbtn" onClick={saveCalendar} disabled={saving || !!savedId}>
+                      {savedId ? "Saved ✓" : saving ? "Saving…" : "Save calendar"}
+                    </button>
                     <button className="dlbtn" onClick={downloadTxt}>
                       <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M6.5 1v7M4 5.5l2.5 2.5L9 5.5M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" />
