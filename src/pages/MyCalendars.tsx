@@ -3,6 +3,16 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SavedCalendar {
   id: string;
@@ -37,6 +47,8 @@ export default function MyCalendars() {
   const navigate = useNavigate();
   const [items, setItems] = useState<SavedCalendar[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingDelete, setPendingDelete] = useState<SavedCalendar | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -51,11 +63,18 @@ export default function MyCalendars() {
       });
   }, [user]);
 
-  async function del(id: string) {
-    if (!confirm("Delete this calendar?")) return;
-    const { error } = await supabase.from("saved_calendars").delete().eq("id", id);
-    if (error) toast.error(error.message);
-    else { setItems(p => p.filter(i => i.id !== id)); toast.success("Deleted"); }
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    const { error } = await supabase.from("saved_calendars").delete().eq("id", pendingDelete.id);
+    setDeleting(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setItems(p => p.filter(i => i.id !== pendingDelete.id));
+      toast.success("Deleted");
+    }
+    setPendingDelete(null);
   }
 
   return (
@@ -93,13 +112,30 @@ export default function MyCalendars() {
                       <span>{new Date(it.created_at).toLocaleDateString()}</span>
                     </div>
                   </Link>
-                  <button className="mc-del" onClick={() => del(it.id)}>Delete</button>
+                  <button className="mc-del" onClick={() => setPendingDelete(it)}>Delete</button>
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open && !deleting) setPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this calendar?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete ? `“${pendingDelete.title}” will be permanently removed. This cannot be undone.` : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmDelete(); }} disabled={deleting}>
+              {deleting ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

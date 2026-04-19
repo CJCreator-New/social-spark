@@ -419,6 +419,7 @@ const Index = () => {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const progRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const hydrated = useRef(false);
 
   // Hydrate from localStorage once on mount
@@ -498,9 +499,29 @@ const Index = () => {
       if (ni > mi) { mi = ni; setGenMsg(GEN_MSGS[ni]); setGenStep(ni); }
     }, 200);
 
+    // Abort plumbing: user-cancel + 90s hard timeout.
+    const ac = new AbortController();
+    abortRef.current = ac;
+    const timeoutId = setTimeout(() => ac.abort("timeout"), 90_000);
+
+    const cleanup = () => {
+      if (progRef.current) clearInterval(progRef.current);
+      clearTimeout(timeoutId);
+      abortRef.current = null;
+    };
+
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("generate-calendar", {
-        body: {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-calendar`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({
           industry: form.industry,
           industryLabel: selectedIndustry?.label || form.industry,
           platform: form.platform,
@@ -515,19 +536,16 @@ const Index = () => {
           length: form.length,
           structure: form.structure,
           extra: form.extra,
-        },
+        }),
+        signal: ac.signal,
       });
 
-      if (progRef.current) clearInterval(progRef.current);
+      const data = await res.json().catch(() => ({}));
+      cleanup();
 
-      if (fnError) {
+      if (!res.ok || data?.error) {
         setStep(2);
-        setError(fnError.message || "Failed to generate calendar.");
-        return;
-      }
-      if (data?.error) {
-        setStep(2);
-        setError(data.error);
+        setError(data?.error || `Generation failed (${res.status}).`);
         return;
       }
 
@@ -538,10 +556,22 @@ const Index = () => {
       setPosts(result); setActiveDay(0);
       setTimeout(() => setStep(4), 450);
     } catch (err) {
-      if (progRef.current) clearInterval(progRef.current);
+      cleanup();
+      const aborted = err instanceof DOMException && err.name === "AbortError";
+      const reason = (ac.signal as AbortSignal & { reason?: unknown }).reason;
       setStep(2);
-      setError(`Connection error: ${err instanceof Error ? err.message : "Unknown"}`);
+      if (aborted && reason === "timeout") {
+        setError("Generation timed out after 90 seconds. Please try again.");
+      } else if (aborted) {
+        setError("Generation cancelled.");
+      } else {
+        setError(`Connection error: ${err instanceof Error ? err.message : "Unknown"}`);
+      }
     }
+  }
+
+  function cancelGeneration() {
+    if (abortRef.current) abortRef.current.abort("user");
   }
 
   function copyText(text: string, cb: () => void) {
@@ -628,13 +658,30 @@ ${postText(p)}
 
         <div className="inner">
           {/* HEADER */}
-          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 14, marginBottom: 24, fontSize: 12, color: "#7a7a8e" }}>
-            <Link to="/my-calendars" style={{ color: "#7a7a8e", textDecoration: "none" }}>My calendars</Link>
+          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginBottom: 24, fontSize: 12, color: "#7a7a8e", flexWrap: "wrap" }}>
+            <Link
+              to="/my-calendars"
+              style={{
+                color: "#c8f09a",
+                textDecoration: "none",
+                background: "rgba(200,240,154,0.10)",
+                border: "1px solid rgba(200,240,154,0.32)",
+                padding: "6px 14px",
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 500,
+                letterSpacing: ".02em",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              📅 My calendars
+            </Link>
+            <Link to="/profile" style={{ color: "#7a7a8e", textDecoration: "none", padding: "6px 10px" }}>Profile</Link>
             <span style={{ color: "#3a3a50" }}>·</span>
-            <Link to="/profile" style={{ color: "#7a7a8e", textDecoration: "none" }}>Profile</Link>
-            <span style={{ color: "#3a3a50" }}>·</span>
-            <span style={{ color: "#7a7a8e" }}>{user?.email}</span>
-            <button onClick={async () => { await signOut(); navigate("/auth"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#7a7a8e", padding: "5px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "Sora, sans-serif" }}>Sign out</button>
+            <span style={{ color: "#9a9aae", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email}</span>
+            <button onClick={async () => { await signOut(); navigate("/auth"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#9a9aae", padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "Sora, sans-serif" }}>Sign out</button>
           </div>
 
           {/* BRAND */}
@@ -807,6 +854,12 @@ ${postText(p)}
                   </div>
                 ))}
               </div>
+              <button
+                onClick={cancelGeneration}
+                style={{ marginTop: 24, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#7a7a8e", padding: "7px 16px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Sora, sans-serif" }}
+              >
+                Cancel and try again
+              </button>
             </div>
           </div>
 
