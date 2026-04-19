@@ -63,6 +63,20 @@ const FORMAT_OPTIONS = ["Balanced mix", "Storytelling-led", "Data & insights", "
 const CTA_OPTIONS = ["Share & repost bait", "Spark comments & debate", "Drive to profile / newsletter", "Collect leads", "Build community", "No hard CTA"];
 const GOAL_OPTIONS = ["Awareness", "Engagement", "Drive traffic", "Lead generation", "Thought leadership", "Community building", "Sales & conversion"];
 
+const LENGTH_OPTIONS = [
+  { id: "short", label: "Short", hint: "80–120 words" },
+  { id: "medium", label: "Medium", hint: "160–230 words" },
+  { id: "long", label: "Long", hint: "280–380 words" },
+  { id: "mixed", label: "Mixed lengths", hint: "Vary across the week" },
+];
+
+const STRUCTURE_OPTIONS = [
+  { id: "paragraphs", label: "Paragraphs only", hint: "Flowing prose" },
+  { id: "bullets", label: "Bullet points only", hint: "Scannable lists" },
+  { id: "mixed", label: "Mix of both", hint: "Paragraphs + bullets" },
+  { id: "perPost", label: "Per-post best fit", hint: "AI picks per topic" },
+];
+
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 
 const css = `
@@ -369,6 +383,8 @@ const Index = () => {
     topics: [] as string[],
     format: "Balanced mix",
     cta: "Share & repost bait",
+    length: "medium",
+    structure: "mixed",
     extra: "",
   });
   const [customTopic, setCustomTopic] = useState("");
@@ -443,6 +459,8 @@ const Index = () => {
           topics: form.topics,
           format: form.format,
           cta: form.cta,
+          length: form.length,
+          structure: form.structure,
           extra: form.extra,
         },
       });
@@ -642,6 +660,30 @@ ${postText(p)}
               <div className="g2" style={{ marginBottom: 16 }}>
                 <SelectField label="Format mix" options={FORMAT_OPTIONS} value={form.format} onChange={v => upd("format", v)} />
                 <SelectField label="CTA style" options={CTA_OPTIONS} value={form.cta} onChange={v => upd("cta", v)} />
+              </div>
+
+              <div className="csect">
+                <div className="flabel">Post length</div>
+                <div className="plat-grid">
+                  {LENGTH_OPTIONS.map(o => (
+                    <div key={o.id} className={`plat-card ${form.length === o.id ? "on" : ""}`} onClick={() => upd("length", o.id)}>
+                      <div className="plat-name">{o.label}</div>
+                      <div className="plat-hint">{o.hint}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="csect">
+                <div className="flabel">Structure <span className="fhint">(paragraphs vs bullets)</span></div>
+                <div className="plat-grid">
+                  {STRUCTURE_OPTIONS.map(o => (
+                    <div key={o.id} className={`plat-card ${form.structure === o.id ? "on" : ""}`} onClick={() => upd("structure", o.id)}>
+                      <div className="plat-name">{o.label}</div>
+                      <div className="plat-hint">{o.hint}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="csect">

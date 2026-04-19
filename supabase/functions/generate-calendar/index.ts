@@ -17,8 +17,24 @@ interface Payload {
   topics?: string[];
   format?: string;
   cta?: string;
+  length?: string;
+  structure?: string;
   extra?: string;
 }
+
+const LENGTH_GUIDE: Record<string, string> = {
+  short: "80–120 words per post (tight, punchy)",
+  medium: "160–230 words per post (balanced depth)",
+  long: "280–380 words per post (deep, substantive)",
+  mixed: "VARY length across the week — at least 2 short (80–120w), 3 medium (160–230w), and 2 long (280–380w) posts. Distribute deliberately.",
+};
+
+const STRUCTURE_GUIDE: Record<string, string> = {
+  paragraphs: "Use flowing paragraphs only. No bullet points or numbered lists in the body.",
+  bullets: "Structure the body primarily as bullet points or short numbered items. Minimal prose connective tissue.",
+  mixed: "Within each post, MIX paragraphs and bullet points — typically a paragraph hook, then bullets for the meat, then a paragraph close. Use line breaks and '→' or '•' markers.",
+  perPost: "Pick the best structure per post based on its topic and format — some all-prose, some all-bullets, some hybrid. Vary deliberately across the week.",
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -39,6 +55,8 @@ Deno.serve(async (req) => {
       topics = [],
       format = "Balanced mix",
       cta = "Share & repost bait",
+      length = "medium",
+      structure = "mixed",
       extra = "",
     } = body;
 
@@ -57,6 +75,9 @@ Deno.serve(async (req) => {
       );
     }
 
+    const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
+    const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
+
     const prompt = `You are a world-class ${platform} content strategist specialising in ${industryLabel || industry} content.
 
 Create a complete 7-day ${platform} content calendar for this creator:
@@ -69,9 +90,14 @@ Create a complete 7-day ${platform} content calendar for this creator:
 - Topics to cover (1 per day; use a wrap-up or adjacent topic for day 7 if fewer than 7 topics): ${topics.join(", ")}
 - Post format mix: ${format}
 - CTA approach: ${cta}
+- POST LENGTH: ${lengthInstr}
+- POST STRUCTURE: ${structureInstr}
 ${extra ? `- Extra instructions: ${extra}` : ""}
 
-IMPORTANT: Generate content that is genuinely specific to the ${industryLabel || industry} space — use real terminology, real platforms, real trends, real names where relevant. Do NOT write generic content. Each post body must be 160-230 words.`;
+IMPORTANT:
+1. Generate content that is genuinely specific to the ${industryLabel || industry} space — use real terminology, real platforms, real trends, real names where relevant. Do NOT write generic content.
+2. Strictly follow the POST LENGTH and POST STRUCTURE rules above for the body of every post.
+3. In the "format" field of each post, append the structure used (e.g. "List post — bullets", "Storytelling — paragraphs", "How-to — hybrid") so the user can see the mix at a glance.`;
 
     const tool = {
       type: "function",
