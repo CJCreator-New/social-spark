@@ -550,16 +550,16 @@ ${postText(p)}
     const title = form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`;
     const { data, error: insErr } = await supabase
       .from("saved_calendars")
-      .insert({
+      .insert([{
         user_id: user.id,
         title,
         industry: form.industry,
         industry_label: selectedIndustry?.label || form.industry,
         platform: form.platform,
         core_idea: form.coreIdea,
-        form_payload: form as unknown as Record<string, unknown>,
-        posts: posts as unknown as Record<string, unknown>[],
-      })
+        form_payload: form as never,
+        posts: posts as never,
+      }])
       .select("id")
       .single();
     setSaving(false);
@@ -567,6 +567,8 @@ ${postText(p)}
     setSavedId(data.id);
     toast.success("Calendar saved");
   }
+
+  const STEP_LABELS = ["Industry", "Topics", "Generate", "Calendar"];
   const p = posts[activeDay];
 
   return (
