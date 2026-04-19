@@ -459,6 +459,8 @@ const Index = () => {
           topics: form.topics,
           format: form.format,
           cta: form.cta,
+          length: form.length,
+          structure: form.structure,
           extra: form.extra,
         },
       });
