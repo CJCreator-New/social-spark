@@ -448,7 +448,6 @@ const Index = () => {
     }, 200);
 
     try {
-      const supabase = getSupabaseClient();
       const { data, error: fnError } = await supabase.functions.invoke("generate-calendar", {
         body: {
           industry: form.industry,
