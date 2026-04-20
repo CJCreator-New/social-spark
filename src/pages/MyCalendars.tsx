@@ -49,6 +49,14 @@ const css = `
 .mc-dialog-action:hover { background:#b9e289 !important; }
 .mc-dialog-danger { background:#f09a9a !important; color:#07080d !important; border:1px solid #f09a9a !important; }
 .mc-dialog-danger:hover { background:#e88a8a !important; }
+.mc-filter-row { display:flex; gap:8px; align-items:center; margin-bottom:18px; flex-wrap:wrap; }
+.mc-search { flex:1; min-width:200px; background:#0d0f18; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:9px 13px; font-size:13px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; }
+.mc-search:focus { border-color:rgba(200,240,154,0.32); }
+.mc-chip { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:8px 14px; border-radius:99px; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
+.mc-chip.on { background:rgba(200,240,154,0.1); border-color:rgba(200,240,154,0.32); color:#c8f09a; }
+.mc-star { background:transparent; border:none; cursor:pointer; font-size:18px; color:#3a3a50; padding:4px 6px; transition:color .15s; line-height:1; }
+.mc-star.on { color:#c8f09a; }
+.mc-star:hover { color:#c8f09a; }
 `;
 
 export default function MyCalendars() {
