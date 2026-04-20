@@ -171,8 +171,9 @@ export default function MyCalendars() {
         core_idea: full.core_idea,
         form_payload: full.form_payload as never,
         posts: full.posts as never,
+        is_favorite: false,
       }])
-      .select("id, title, industry_label, platform, core_idea, created_at")
+      .select("id, title, industry_label, platform, core_idea, created_at, is_favorite")
       .single();
     setDuplicatingId(null);
     if (insErr || !inserted) { toast.error(insErr?.message || "Duplicate failed"); return; }
