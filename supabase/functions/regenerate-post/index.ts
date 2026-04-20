@@ -88,6 +88,7 @@ Deno.serve(async (req) => {
       post,
       siblings = [],
       newTopic,
+      tweak,
     } = body;
 
     if (!post || typeof post.day !== "number" || !post.dow) {
@@ -108,6 +109,7 @@ Deno.serve(async (req) => {
     const targetTopic = (newTopic && newTopic.trim()) || post.topic || "general topic";
     const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
+    const tweakInstr = (tweak && TWEAK_INSTRUCTIONS[tweak]) || "";
 
     const longFormPlatform = platform === "Newsletter" || platform === "Blog";
     const hashtagInstr = longFormPlatform
