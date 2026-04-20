@@ -197,6 +197,26 @@ export default function MyCalendars() {
             </div>
           </div>
 
+          {!loading && items.length > 0 && (
+            <div className="mc-filter-row">
+              <input
+                type="search"
+                className="mc-search"
+                placeholder="Search by title, industry, or platform…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              <button
+                type="button"
+                className={`mc-chip ${favOnly ? "on" : ""}`}
+                onClick={() => setFavOnly(f => !f)}
+                aria-pressed={favOnly}
+              >
+                {favOnly ? "★ Starred only" : "☆ Starred only"}
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <div className="mc-empty">Loading…</div>
           ) : items.length === 0 ? (
@@ -204,10 +224,22 @@ export default function MyCalendars() {
               No saved calendars yet.<br />
               <Link to="/" style={{ color: "#c8f09a", textDecoration: "none", marginTop: 12, display: "inline-block" }}>Generate your first week →</Link>
             </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="mc-empty">No calendars match your filters.</div>
           ) : (
             <div className="mc-list">
-              {items.map(it => (
+              {filteredItems.map(it => (
                 <div key={it.id} className="mc-item">
+                  <button
+                    type="button"
+                    className={`mc-star ${it.is_favorite ? "on" : ""}`}
+                    onClick={() => toggleFavorite(it)}
+                    aria-pressed={!!it.is_favorite}
+                    aria-label={it.is_favorite ? "Unstar" : "Star"}
+                    title={it.is_favorite ? "Unstar" : "Star"}
+                  >
+                    {it.is_favorite ? "★" : "☆"}
+                  </button>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {renamingId === it.id ? (
                       <input
