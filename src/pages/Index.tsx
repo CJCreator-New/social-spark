@@ -635,11 +635,12 @@ const Index = () => {
     if (abortRef.current) abortRef.current.abort("user");
   }
 
-  async function regenerateDay(idx: number) {
+  async function regenerateDay(idx: number, tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal") {
     if (regenIdx !== null) return;
     const target = posts[idx];
     if (!target) return;
     setRegenIdx(idx);
+    setTweakOpenIdx(null);
     try {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -667,6 +668,7 @@ const Index = () => {
           extra: form.extra,
           post: target,
           siblings: posts,
+          tweak,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -676,7 +678,8 @@ const Index = () => {
       }
       setPosts(prev => prev.map((p, i) => (i === idx ? data.post : p)));
       setSavedId(null); // calendar drifted from saved version — let user re-save
-      toast.success(`Day ${target.day} regenerated`);
+      const tweakLabel = tweak ? ` (${tweak.replace("-", " ")})` : "";
+      toast.success(`Day ${target.day} regenerated${tweakLabel}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Regenerate failed");
     } finally {
