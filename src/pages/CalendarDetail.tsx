@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
@@ -31,12 +32,18 @@ const css = `
 .cd-title { font-family:'Playfair Display',serif; font-size:28px; font-weight:400; margin:14px 0 6px; }
 .cd-meta { font-size:12px; color:#7a7a8e; margin-bottom:24px; }
 .cd-strip { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-bottom:18px; }
-.cd-tab { padding:10px 4px; border-radius:8px; border:1px solid rgba(255,255,255,0.055); text-align:center; cursor:pointer; background:#0d0f18; }
+.cd-tab { padding:10px 4px; border-radius:8px; border:1px solid rgba(255,255,255,0.055); text-align:center; cursor:pointer; background:#0d0f18; font-family:'Sora',sans-serif; color:inherit; width:100%; transition:border-color .15s; }
+.cd-tab:hover { border-color:rgba(255,255,255,0.12); }
 .cd-tab.on { background:rgba(200,240,154,0.12); border-color:rgba(200,240,154,0.32); }
-.cd-tab-dow { font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:#3a3a50; }
+.cd-tab:focus-visible { outline:2px solid rgba(200,240,154,0.7); outline-offset:2px; }
+.cd-tab-dow { font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:#6a6a82; }
 .cd-tab.on .cd-tab-dow { color:rgba(200,240,154,0.55); }
 .cd-tab-n { font-family:'Playfair Display',serif; font-size:17px; color:#7a7a8e; margin-top:2px; }
 .cd-tab.on .cd-tab-n { color:#c8f09a; }
+.cd-export-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; justify-content:flex-end; }
+.cd-export-btn { padding:7px 14px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:transparent; color:#9a9aae; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
+.cd-export-btn:hover { border-color:rgba(200,240,154,0.32); color:#c8f09a; }
+.cd-export-btn:focus-visible { outline:2px solid rgba(200,240,154,0.7); outline-offset:2px; }
 .cd-card { background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:16px; padding:26px; }
 .cd-ptitle { font-family:'Playfair Display',serif; font-size:21px; font-weight:400; line-height:1.35; margin-bottom:18px; }
 .cd-blabel { font-size:9px; letter-spacing:.15em; text-transform:uppercase; color:#3a3a50; margin:16px 0 7px; font-weight:500; display:flex; justify-content:space-between; align-items:center; }
@@ -196,13 +203,38 @@ export default function CalendarDetail() {
           <h1 className="cd-title">{title}</h1>
           <div className="cd-meta">{meta}</div>
 
-          <div className="cd-strip">
+          <div className="cd-strip" role="tablist" aria-label="Days of the week">
             {posts.map((post, i) => (
-              <div key={i} className={`cd-tab ${i === active ? "on" : ""}`} onClick={() => { if (!editing) setActive(i); }}>
+              <button
+                key={i}
+                type="button"
+                role="tab"
+                aria-selected={i === active}
+                disabled={editing}
+                className={`cd-tab ${i === active ? "on" : ""}`}
+                onClick={() => { if (!editing) setActive(i); }}
+              >
                 <div className="cd-tab-dow">{post.dow}</div>
                 <div className="cd-tab-n">{i + 1}</div>
-              </div>
+              </button>
             ))}
+          </div>
+
+          <div className="cd-export-row" aria-label="Export options">
+            <button
+              type="button"
+              className="cd-export-btn"
+              onClick={() => downloadMd({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts)}
+            >
+              ↓ .md
+            </button>
+            <button
+              type="button"
+              className="cd-export-btn"
+              onClick={() => downloadPdf({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts)}
+            >
+              ↓ .pdf
+            </button>
           </div>
 
           {p && !editing && (
