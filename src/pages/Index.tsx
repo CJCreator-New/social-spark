@@ -1161,6 +1161,9 @@ ${postText(p)}
                     >
                       .pdf
                     </button>
+                    <button className="dlbtn" onClick={exportIcs} title="Export to Google Calendar / Outlook / Apple Cal">
+                      📅 .ics
+                    </button>
                     <button className="btn btn-p" style={{ fontSize: 13 }} onClick={copyAll}>
                       {copiedAll ? "All copied ✓" : "Copy all 7"}
                     </button>
