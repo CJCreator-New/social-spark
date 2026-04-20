@@ -178,11 +178,12 @@ export default function CalendarDetail() {
     toast.success("Post updated");
   }
 
-  async function regenerateDay() {
+  async function regenerateDay(tweak?: TweakKind) {
     if (!id || regenerating || editing) return;
     const target = posts[active];
     if (!target) return;
     setRegenerating(true);
+    setTweakOpen(false);
     try {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -210,6 +211,7 @@ export default function CalendarDetail() {
           extra: formPayload.extra || "",
           post: target,
           siblings: posts,
+          tweak,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -226,13 +228,53 @@ export default function CalendarDetail() {
         return;
       }
       setPosts(updated);
-      toast.success(`Day ${target.day} regenerated`);
+      const tweakLabel = tweak ? ` (${tweak.replace("-", " ")})` : "";
+      toast.success(`Day ${target.day} regenerated${tweakLabel}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Regenerate failed");
     } finally {
       setRegenerating(false);
     }
   }
+
+  async function updatePostTime(day: number, time: string) {
+    const next = { ...postTimes, [String(day)]: time };
+    setPostTimes(next);
+    if (!id) return;
+    const { error } = await supabase.from("saved_calendars")
+      .update({ post_times: next as never })
+      .eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  async function updateWeekStart(value: string) {
+    setWeekStart(value);
+    if (!id) return;
+    const { error } = await supabase.from("saved_calendars")
+      .update({ week_start_date: value || null })
+      .eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  async function toggleFavorite() {
+    if (!id) return;
+    const next = !isFavorite;
+    setIsFavorite(next);
+    const { error } = await supabase.from("saved_calendars")
+      .update({ is_favorite: next })
+      .eq("id", id);
+    if (error) {
+      setIsFavorite(!next);
+      toast.error(error.message);
+    }
+  }
+
+  function exportIcs() {
+    const ws = parseLocalDate(weekStart) || nextMonday();
+    downloadIcs({ calendarTitle: title, weekStart: ws, postTimes, platform }, posts);
+  }
+
+  const weekStartDate = useMemo(() => parseLocalDate(weekStart) || nextMonday(), [weekStart]);
 
   const p = posts[active];
   const bodyWords = useMemo(() => wordCount(draft?.body || ""), [draft?.body]);
