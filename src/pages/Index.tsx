@@ -425,10 +425,12 @@ const Index = () => {
     length: "medium",
     structure: "mixed",
     extra: "",
+    weekStart: toDateInputValue(nextMonday()), // YYYY-MM-DD, defaults to next Monday
   });
   const [customTopic, setCustomTopic] = useState("");
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [postTimes, setPostTimes] = useState<Record<string, string>>({}); // {"1":"09:00",...}
   const [activeDay, setActiveDay] = useState(0);
   const [genMsg, setGenMsg] = useState("");
   const [genStep, setGenStep] = useState(0);
@@ -436,6 +438,7 @@ const Index = () => {
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [regenIdx, setRegenIdx] = useState<number | null>(null);
+  const [tweakOpenIdx, setTweakOpenIdx] = useState<number | null>(null);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
@@ -443,6 +446,17 @@ const Index = () => {
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const hydrated = useRef(false);
+  const tweakRef = useRef<HTMLDivElement>(null);
+
+  // Close tweak menu on outside click
+  useEffect(() => {
+    if (tweakOpenIdx === null) return;
+    const h = (e: MouseEvent) => {
+      if (tweakRef.current && !tweakRef.current.contains(e.target as Node)) setTweakOpenIdx(null);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [tweakOpenIdx]);
 
   // Hydrate from localStorage once on mount, then layer profile brand defaults on top of an empty form.
   useEffect(() => {
