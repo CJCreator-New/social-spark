@@ -749,6 +749,8 @@ ${postText(p)}
         core_idea: form.coreIdea,
         form_payload: form as never,
         posts: posts as never,
+        week_start_date: form.weekStart || null,
+        post_times: postTimes as never,
       }])
       .select("id")
       .single();
@@ -758,6 +760,19 @@ ${postText(p)}
     clearDraft();
     toast.success("Calendar saved");
   }
+
+  function exportIcs() {
+    const weekStart = parseLocalDate(form.weekStart) || nextMonday();
+    const title = form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`;
+    downloadIcs({
+      calendarTitle: title,
+      weekStart,
+      postTimes,
+      platform: form.platform,
+    }, posts);
+  }
+
+  const weekStartDate = useMemo(() => parseLocalDate(form.weekStart) || nextMonday(), [form.weekStart]);
 
   const STEP_LABELS = ["Industry", "Topics", "Generate", "Calendar"];
   const p = posts[activeDay];
