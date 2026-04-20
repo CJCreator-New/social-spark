@@ -1,8 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
+import {
+  downloadIcs,
+  parseLocalDate,
+  nextMonday,
+  toDateInputValue,
+  dateForDow,
+  shortDateLabel,
+} from "@/lib/calendarSchedule";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
@@ -22,7 +30,10 @@ interface FormPayload {
   length?: string;
   structure?: string;
   extra?: string;
+  weekStart?: string;
 }
+
+type TweakKind = "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal";
 
 const css = `
 .cd-app { min-height:100vh; background:#07080d; color:#edeae3; font-family:'Sora',sans-serif; padding:40px 24px 100px; }
