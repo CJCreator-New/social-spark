@@ -977,6 +977,19 @@ ${postText(p)}
               </div>
 
               <div className="csect">
+                <div className="flabel">Week starting <span className="fhint">(used for dates + .ics export)</span></div>
+                <input
+                  type="date"
+                  className="date-input"
+                  value={form.weekStart}
+                  onChange={e => upd("weekStart", e.target.value)}
+                />
+                <div className="time-hint" style={{ marginTop: 6 }}>
+                  Day 1 will be <strong style={{ color: "rgba(200,240,154,.85)" }}>{shortDateLabel(weekStartDate)}</strong>. Each post defaults to 9:00 AM — you can adjust per post on the next screen.
+                </div>
+              </div>
+
+              <div className="csect">
                 <div className="flabel">Extra context <span className="fhint">(optional)</span></div>
                 <textarea rows={2} placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
               </div>
