@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -151,17 +152,19 @@ const css = `
 .cf-app .chip.on { background:var(--adim);border-color:rgba(200,240,154,.38);color:var(--accent);font-weight:400; }
 
 .cf-app .ind-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:8px; }
-.cf-app .ind-card { border:1px solid var(--border);border-radius:var(--r-md);padding:14px 10px;cursor:pointer;text-align:center;background:var(--bg);transition:all .15s; }
+.cf-app .ind-card { border:1px solid var(--border);border-radius:var(--r-md);padding:14px 10px;cursor:pointer;text-align:center;background:var(--bg);transition:all .15s;font-family:'Sora',sans-serif;color:inherit; }
 .cf-app .ind-card:hover { border-color:var(--border2);background:var(--surface2); }
 .cf-app .ind-card.on { border-color:rgba(200,240,154,.35);background:var(--adim); }
+.cf-app .ind-card:focus-visible { outline:2px solid rgba(200,240,154,.7);outline-offset:2px; }
 .cf-app .ind-icon { font-size:20px;margin-bottom:6px;line-height:1; }
 .cf-app .ind-label { font-size:11px;color:var(--text2);font-weight:400;line-height:1.3; }
 .cf-app .ind-card.on .ind-label { color:var(--accent); }
 
 .cf-app .plat-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:8px; }
-.cf-app .plat-card { border:1px solid var(--border);border-radius:var(--r-md);padding:12px 10px;cursor:pointer;background:var(--bg);transition:all .15s; }
+.cf-app .plat-card { border:1px solid var(--border);border-radius:var(--r-md);padding:12px 10px;cursor:pointer;background:var(--bg);transition:all .15s;font-family:'Sora',sans-serif;color:inherit;text-align:left; }
 .cf-app .plat-card:hover { border-color:var(--border2); }
 .cf-app .plat-card.on { border-color:rgba(200,240,154,.38);background:var(--adim); }
+.cf-app .plat-card:focus-visible { outline:2px solid rgba(200,240,154,.7);outline-offset:2px; }
 .cf-app .plat-name { font-size:13px;font-weight:500;color:var(--text2);margin-bottom:3px; }
 .cf-app .plat-hint { font-size:11px;color:var(--text3);font-weight:300; }
 .cf-app .plat-card.on .plat-name { color:var(--accent); }
@@ -215,9 +218,10 @@ const css = `
 .cf-app .gci-dot { width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0; }
 
 .cf-app .week-strip { display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:18px; }
-.cf-app .dtab { padding:10px 4px;border-radius:var(--r-sm);border:1px solid var(--border);text-align:center;cursor:pointer;background:var(--surface);transition:all .15s; }
+.cf-app .dtab { padding:10px 4px;border-radius:var(--r-sm);border:1px solid var(--border);text-align:center;cursor:pointer;background:var(--surface);transition:all .15s;font-family:'Sora',sans-serif;color:inherit;width:100%; }
 .cf-app .dtab:hover { border-color:var(--border2); }
 .cf-app .dtab.on { background:var(--adim);border-color:rgba(200,240,154,.32); }
+.cf-app .dtab:focus-visible { outline:2px solid rgba(200,240,154,.7);outline-offset:2px; }
 .cf-app .dtab-dow { font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3); }
 .cf-app .dtab.on .dtab-dow { color:rgba(200,240,154,.55); }
 .cf-app .dtab-n { font-family:'Playfair Display',serif;font-size:17px;color:var(--text2);margin-top:2px; }
@@ -425,13 +429,14 @@ const Index = () => {
   const abortRef = useRef<AbortController | null>(null);
   const hydrated = useRef(false);
 
-  // Hydrate from localStorage once on mount
+  // Hydrate from localStorage once on mount, then layer profile brand defaults on top of an empty form.
   useEffect(() => {
+    let restoredFromDraft = false;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
         const saved = JSON.parse(raw) as { form?: typeof form; step?: number; extraTopics?: string[] };
-        if (saved.form) setForm(f => ({ ...f, ...saved.form }));
+        if (saved.form) { setForm(f => ({ ...f, ...saved.form })); restoredFromDraft = true; }
         if (saved.extraTopics) setExtraTopics(saved.extraTopics);
         // Don't restore step 3 (mid-generation) or 4 (no posts persisted).
         if (saved.step === 1 || saved.step === 2) setStep(saved.step);
@@ -439,8 +444,28 @@ const Index = () => {
     } catch (e) {
       console.warn("Failed to hydrate draft", e);
     }
-    hydrated.current = true;
-  }, []);
+
+    // Only pre-fill from profile when there's no in-progress draft AND we have a user.
+    if (!restoredFromDraft && user) {
+      supabase.from("profiles")
+        .select("default_voice, default_style, default_audiences, default_goals")
+        .eq("user_id", user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!data) { hydrated.current = true; return; }
+          setForm(f => ({
+            ...f,
+            voice: f.voice || data.default_voice || "",
+            style: f.style || data.default_style || "",
+            audiences: f.audiences.length ? f.audiences : (data.default_audiences || []),
+            goals: data.default_goals && data.default_goals.length ? data.default_goals : f.goals,
+          }));
+          hydrated.current = true;
+        });
+    } else {
+      hydrated.current = true;
+    }
+  }, [user]);
 
   // Persist form/step/extraTopics whenever they change (only on steps 1–2)
   useEffect(() => {
@@ -760,12 +785,19 @@ ${postText(p)}
           <div className={`screen ${step === 1 ? "active" : ""}`}>
             <div className="card">
               <div className="sh">What's your <span>industry / niche?</span></div>
-              <div className="ind-grid">
+              <div className="ind-grid" role="radiogroup" aria-label="Industry or niche">
                 {INDUSTRIES.map(ind => (
-                  <div key={ind.id} className={`ind-card ${form.industry === ind.id ? "on" : ""}`} onClick={() => setIndustry(ind.id)}>
-                    <div className="ind-icon">{ind.icon}</div>
+                  <button
+                    key={ind.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={form.industry === ind.id}
+                    className={`ind-card ${form.industry === ind.id ? "on" : ""}`}
+                    onClick={() => setIndustry(ind.id)}
+                  >
+                    <div className="ind-icon" aria-hidden="true">{ind.icon}</div>
                     <div className="ind-label">{ind.label}</div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -774,13 +806,20 @@ ${postText(p)}
               <div className="sh">Your <span>platform & content</span></div>
 
               <div className="csect">
-                <div className="flabel">Platform</div>
-                <div className="plat-grid">
+                <div className="flabel" id="cf-platform-label">Platform</div>
+                <div className="plat-grid" role="radiogroup" aria-labelledby="cf-platform-label">
                   {PLATFORM_OPTIONS.map(pl => (
-                    <div key={pl.id} className={`plat-card ${form.platform === pl.id ? "on" : ""}`} onClick={() => upd("platform", pl.id)}>
+                    <button
+                      key={pl.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.platform === pl.id}
+                      className={`plat-card ${form.platform === pl.id ? "on" : ""}`}
+                      onClick={() => upd("platform", pl.id)}
+                    >
                       <div className="plat-name">{pl.label}</div>
                       <div className="plat-hint">{pl.hint}</div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -849,25 +888,39 @@ ${postText(p)}
               </div>
 
               <div className="csect">
-                <div className="flabel">Post length</div>
-                <div className="plat-grid">
+                <div className="flabel" id="cf-length-label">Post length</div>
+                <div className="plat-grid" role="radiogroup" aria-labelledby="cf-length-label">
                   {LENGTH_OPTIONS.map(o => (
-                    <div key={o.id} className={`plat-card ${form.length === o.id ? "on" : ""}`} onClick={() => upd("length", o.id)}>
+                    <button
+                      key={o.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.length === o.id}
+                      className={`plat-card ${form.length === o.id ? "on" : ""}`}
+                      onClick={() => upd("length", o.id)}
+                    >
                       <div className="plat-name">{o.label}</div>
                       <div className="plat-hint">{o.hint}</div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
 
               <div className="csect">
-                <div className="flabel">Structure <span className="fhint">(paragraphs vs bullets)</span></div>
-                <div className="plat-grid">
+                <div className="flabel" id="cf-structure-label">Structure <span className="fhint">(paragraphs vs bullets)</span></div>
+                <div className="plat-grid" role="radiogroup" aria-labelledby="cf-structure-label">
                   {STRUCTURE_OPTIONS.map(o => (
-                    <div key={o.id} className={`plat-card ${form.structure === o.id ? "on" : ""}`} onClick={() => upd("structure", o.id)}>
+                    <button
+                      key={o.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.structure === o.id}
+                      className={`plat-card ${form.structure === o.id ? "on" : ""}`}
+                      onClick={() => upd("structure", o.id)}
+                    >
                       <div className="plat-name">{o.label}</div>
                       <div className="plat-hint">{o.hint}</div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -919,12 +972,19 @@ ${postText(p)}
           <div className={`screen ${step === 4 ? "active" : ""}`}>
             {posts.length > 0 && (
               <>
-                <div className="week-strip">
+                <div className="week-strip" role="tablist" aria-label="Days of the week">
                   {posts.map((post, i) => (
-                    <div key={i} className={`dtab ${i === activeDay ? "on" : ""}`} onClick={() => setActiveDay(i)}>
+                    <button
+                      key={i}
+                      type="button"
+                      role="tab"
+                      aria-selected={i === activeDay}
+                      className={`dtab ${i === activeDay ? "on" : ""}`}
+                      onClick={() => setActiveDay(i)}
+                    >
                       <div className="dtab-dow">{post.dow}</div>
                       <div className="dtab-n">{i + 1}</div>
-                    </div>
+                    </button>
                   ))}
                 </div>
 
@@ -980,7 +1040,29 @@ ${postText(p)}
                       <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M6.5 1v7M4 5.5l2.5 2.5L9 5.5M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" />
                       </svg>
-                      Download .txt
+                      .txt
+                    </button>
+                    <button
+                      className="dlbtn"
+                      onClick={() => downloadMd({
+                        title: form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
+                        industryLabel: selectedIndustry?.label,
+                        platform: form.platform,
+                        coreIdea: form.coreIdea,
+                      }, posts)}
+                    >
+                      .md
+                    </button>
+                    <button
+                      className="dlbtn"
+                      onClick={() => downloadPdf({
+                        title: form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
+                        industryLabel: selectedIndustry?.label,
+                        platform: form.platform,
+                        coreIdea: form.coreIdea,
+                      }, posts)}
+                    >
+                      .pdf
                     </button>
                     <button className="btn btn-p" style={{ fontSize: 13 }} onClick={copyAll}>
                       {copiedAll ? "All copied ✓" : "Copy all 7"}
