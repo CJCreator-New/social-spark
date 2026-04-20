@@ -888,25 +888,39 @@ ${postText(p)}
               </div>
 
               <div className="csect">
-                <div className="flabel">Post length</div>
-                <div className="plat-grid">
+                <div className="flabel" id="cf-length-label">Post length</div>
+                <div className="plat-grid" role="radiogroup" aria-labelledby="cf-length-label">
                   {LENGTH_OPTIONS.map(o => (
-                    <div key={o.id} className={`plat-card ${form.length === o.id ? "on" : ""}`} onClick={() => upd("length", o.id)}>
+                    <button
+                      key={o.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.length === o.id}
+                      className={`plat-card ${form.length === o.id ? "on" : ""}`}
+                      onClick={() => upd("length", o.id)}
+                    >
                       <div className="plat-name">{o.label}</div>
                       <div className="plat-hint">{o.hint}</div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
 
               <div className="csect">
-                <div className="flabel">Structure <span className="fhint">(paragraphs vs bullets)</span></div>
-                <div className="plat-grid">
+                <div className="flabel" id="cf-structure-label">Structure <span className="fhint">(paragraphs vs bullets)</span></div>
+                <div className="plat-grid" role="radiogroup" aria-labelledby="cf-structure-label">
                   {STRUCTURE_OPTIONS.map(o => (
-                    <div key={o.id} className={`plat-card ${form.structure === o.id ? "on" : ""}`} onClick={() => upd("structure", o.id)}>
+                    <button
+                      key={o.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.structure === o.id}
+                      className={`plat-card ${form.structure === o.id ? "on" : ""}`}
+                      onClick={() => upd("structure", o.id)}
+                    >
                       <div className="plat-name">{o.label}</div>
                       <div className="plat-hint">{o.hint}</div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -958,12 +972,19 @@ ${postText(p)}
           <div className={`screen ${step === 4 ? "active" : ""}`}>
             {posts.length > 0 && (
               <>
-                <div className="week-strip">
+                <div className="week-strip" role="tablist" aria-label="Days of the week">
                   {posts.map((post, i) => (
-                    <div key={i} className={`dtab ${i === activeDay ? "on" : ""}`} onClick={() => setActiveDay(i)}>
+                    <button
+                      key={i}
+                      type="button"
+                      role="tab"
+                      aria-selected={i === activeDay}
+                      className={`dtab ${i === activeDay ? "on" : ""}`}
+                      onClick={() => setActiveDay(i)}
+                    >
                       <div className="dtab-dow">{post.dow}</div>
                       <div className="dtab-n">{i + 1}</div>
-                    </div>
+                    </button>
                   ))}
                 </div>
 
@@ -1019,7 +1040,29 @@ ${postText(p)}
                       <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M6.5 1v7M4 5.5l2.5 2.5L9 5.5M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" />
                       </svg>
-                      Download .txt
+                      .txt
+                    </button>
+                    <button
+                      className="dlbtn"
+                      onClick={() => downloadMd({
+                        title: form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
+                        industryLabel: selectedIndustry?.label,
+                        platform: form.platform,
+                        coreIdea: form.coreIdea,
+                      }, posts)}
+                    >
+                      .md
+                    </button>
+                    <button
+                      className="dlbtn"
+                      onClick={() => downloadPdf({
+                        title: form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
+                        industryLabel: selectedIndustry?.label,
+                        platform: form.platform,
+                        coreIdea: form.coreIdea,
+                      }, posts)}
+                    >
+                      .pdf
                     </button>
                     <button className="btn btn-p" style={{ fontSize: 13 }} onClick={copyAll}>
                       {copiedAll ? "All copied ✓" : "Copy all 7"}
