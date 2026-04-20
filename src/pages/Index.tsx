@@ -785,12 +785,19 @@ ${postText(p)}
           <div className={`screen ${step === 1 ? "active" : ""}`}>
             <div className="card">
               <div className="sh">What's your <span>industry / niche?</span></div>
-              <div className="ind-grid">
+              <div className="ind-grid" role="radiogroup" aria-label="Industry or niche">
                 {INDUSTRIES.map(ind => (
-                  <div key={ind.id} className={`ind-card ${form.industry === ind.id ? "on" : ""}`} onClick={() => setIndustry(ind.id)}>
-                    <div className="ind-icon">{ind.icon}</div>
+                  <button
+                    key={ind.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={form.industry === ind.id}
+                    className={`ind-card ${form.industry === ind.id ? "on" : ""}`}
+                    onClick={() => setIndustry(ind.id)}
+                  >
+                    <div className="ind-icon" aria-hidden="true">{ind.icon}</div>
                     <div className="ind-label">{ind.label}</div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -799,13 +806,20 @@ ${postText(p)}
               <div className="sh">Your <span>platform & content</span></div>
 
               <div className="csect">
-                <div className="flabel">Platform</div>
-                <div className="plat-grid">
+                <div className="flabel" id="cf-platform-label">Platform</div>
+                <div className="plat-grid" role="radiogroup" aria-labelledby="cf-platform-label">
                   {PLATFORM_OPTIONS.map(pl => (
-                    <div key={pl.id} className={`plat-card ${form.platform === pl.id ? "on" : ""}`} onClick={() => upd("platform", pl.id)}>
+                    <button
+                      key={pl.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.platform === pl.id}
+                      className={`plat-card ${form.platform === pl.id ? "on" : ""}`}
+                      onClick={() => upd("platform", pl.id)}
+                    >
                       <div className="plat-name">{pl.label}</div>
                       <div className="plat-hint">{pl.hint}</div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
