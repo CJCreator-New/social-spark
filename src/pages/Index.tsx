@@ -611,6 +611,10 @@ const Index = () => {
 
       setGenStep(GEN_LABELS.length);
       setPosts(result); setActiveDay(0);
+      // Seed default 09:00 time per post (keyed by post.day)
+      const seedTimes: Record<string, string> = {};
+      for (const r of result) seedTimes[String(r.day)] = "09:00";
+      setPostTimes(seedTimes);
       setTimeout(() => setStep(4), 350);
     } catch (err) {
       cleanup();
