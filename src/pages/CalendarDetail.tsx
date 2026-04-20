@@ -109,16 +109,45 @@ export default function CalendarDetail() {
   const [formPayload, setFormPayload] = useState<FormPayload>({});
   const [platform, setPlatform] = useState<string>("");
   const [industryLabel, setIndustryLabel] = useState<string>("");
+  const [weekStart, setWeekStart] = useState<string>(toDateInputValue(nextMonday()));
+  const [postTimes, setPostTimes] = useState<Record<string, string>>({});
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [tweakOpen, setTweakOpen] = useState(false);
+  const tweakRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!tweakOpen) return;
+    const h = (e: MouseEvent) => {
+      if (tweakRef.current && !tweakRef.current.contains(e.target as Node)) setTweakOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [tweakOpen]);
 
   useEffect(() => {
     if (!id) return;
     supabase.from("saved_calendars").select("*").eq("id", id).maybeSingle().then(({ data, error }) => {
       if (error || !data) { toast.error("Calendar not found"); navigate("/my-calendars"); return; }
-      setPosts((data.posts as unknown as Post[]) || []);
+      const loadedPosts = (data.posts as unknown as Post[]) || [];
+      setPosts(loadedPosts);
       setTitle(data.title);
       setPlatform(data.platform || "");
       setIndustryLabel(data.industry_label || "");
       setFormPayload((data.form_payload as unknown as FormPayload) || {});
+      setIsFavorite(!!(data as { is_favorite?: boolean }).is_favorite);
+      const fp = (data.form_payload as { weekStart?: string } | null);
+      const ws = (data as { week_start_date?: string | null }).week_start_date
+        || fp?.weekStart
+        || toDateInputValue(nextMonday());
+      setWeekStart(ws);
+      const storedTimes = (data as { post_times?: Record<string, string> | null }).post_times;
+      if (storedTimes && typeof storedTimes === "object") {
+        setPostTimes(storedTimes);
+      } else {
+        const seed: Record<string, string> = {};
+        for (const p of loadedPosts) seed[String(p.day)] = "09:00";
+        setPostTimes(seed);
+      }
       setMeta(`${data.industry_label || ""} · ${data.platform || ""} · ${new Date(data.created_at).toLocaleDateString()}`);
       setLoading(false);
     });
