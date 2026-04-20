@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -151,17 +152,19 @@ const css = `
 .cf-app .chip.on { background:var(--adim);border-color:rgba(200,240,154,.38);color:var(--accent);font-weight:400; }
 
 .cf-app .ind-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:8px; }
-.cf-app .ind-card { border:1px solid var(--border);border-radius:var(--r-md);padding:14px 10px;cursor:pointer;text-align:center;background:var(--bg);transition:all .15s; }
+.cf-app .ind-card { border:1px solid var(--border);border-radius:var(--r-md);padding:14px 10px;cursor:pointer;text-align:center;background:var(--bg);transition:all .15s;font-family:'Sora',sans-serif;color:inherit; }
 .cf-app .ind-card:hover { border-color:var(--border2);background:var(--surface2); }
 .cf-app .ind-card.on { border-color:rgba(200,240,154,.35);background:var(--adim); }
+.cf-app .ind-card:focus-visible { outline:2px solid rgba(200,240,154,.7);outline-offset:2px; }
 .cf-app .ind-icon { font-size:20px;margin-bottom:6px;line-height:1; }
 .cf-app .ind-label { font-size:11px;color:var(--text2);font-weight:400;line-height:1.3; }
 .cf-app .ind-card.on .ind-label { color:var(--accent); }
 
 .cf-app .plat-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:8px; }
-.cf-app .plat-card { border:1px solid var(--border);border-radius:var(--r-md);padding:12px 10px;cursor:pointer;background:var(--bg);transition:all .15s; }
+.cf-app .plat-card { border:1px solid var(--border);border-radius:var(--r-md);padding:12px 10px;cursor:pointer;background:var(--bg);transition:all .15s;font-family:'Sora',sans-serif;color:inherit;text-align:left; }
 .cf-app .plat-card:hover { border-color:var(--border2); }
 .cf-app .plat-card.on { border-color:rgba(200,240,154,.38);background:var(--adim); }
+.cf-app .plat-card:focus-visible { outline:2px solid rgba(200,240,154,.7);outline-offset:2px; }
 .cf-app .plat-name { font-size:13px;font-weight:500;color:var(--text2);margin-bottom:3px; }
 .cf-app .plat-hint { font-size:11px;color:var(--text3);font-weight:300; }
 .cf-app .plat-card.on .plat-name { color:var(--accent); }
@@ -215,9 +218,10 @@ const css = `
 .cf-app .gci-dot { width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0; }
 
 .cf-app .week-strip { display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:18px; }
-.cf-app .dtab { padding:10px 4px;border-radius:var(--r-sm);border:1px solid var(--border);text-align:center;cursor:pointer;background:var(--surface);transition:all .15s; }
+.cf-app .dtab { padding:10px 4px;border-radius:var(--r-sm);border:1px solid var(--border);text-align:center;cursor:pointer;background:var(--surface);transition:all .15s;font-family:'Sora',sans-serif;color:inherit;width:100%; }
 .cf-app .dtab:hover { border-color:var(--border2); }
 .cf-app .dtab.on { background:var(--adim);border-color:rgba(200,240,154,.32); }
+.cf-app .dtab:focus-visible { outline:2px solid rgba(200,240,154,.7);outline-offset:2px; }
 .cf-app .dtab-dow { font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3); }
 .cf-app .dtab.on .dtab-dow { color:rgba(200,240,154,.55); }
 .cf-app .dtab-n { font-family:'Playfair Display',serif;font-size:17px;color:var(--text2);margin-top:2px; }
@@ -425,13 +429,14 @@ const Index = () => {
   const abortRef = useRef<AbortController | null>(null);
   const hydrated = useRef(false);
 
-  // Hydrate from localStorage once on mount
+  // Hydrate from localStorage once on mount, then layer profile brand defaults on top of an empty form.
   useEffect(() => {
+    let restoredFromDraft = false;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
         const saved = JSON.parse(raw) as { form?: typeof form; step?: number; extraTopics?: string[] };
-        if (saved.form) setForm(f => ({ ...f, ...saved.form }));
+        if (saved.form) { setForm(f => ({ ...f, ...saved.form })); restoredFromDraft = true; }
         if (saved.extraTopics) setExtraTopics(saved.extraTopics);
         // Don't restore step 3 (mid-generation) or 4 (no posts persisted).
         if (saved.step === 1 || saved.step === 2) setStep(saved.step);
@@ -439,8 +444,28 @@ const Index = () => {
     } catch (e) {
       console.warn("Failed to hydrate draft", e);
     }
-    hydrated.current = true;
-  }, []);
+
+    // Only pre-fill from profile when there's no in-progress draft AND we have a user.
+    if (!restoredFromDraft && user) {
+      supabase.from("profiles")
+        .select("default_voice, default_style, default_audiences, default_goals")
+        .eq("user_id", user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!data) { hydrated.current = true; return; }
+          setForm(f => ({
+            ...f,
+            voice: f.voice || data.default_voice || "",
+            style: f.style || data.default_style || "",
+            audiences: f.audiences.length ? f.audiences : (data.default_audiences || []),
+            goals: data.default_goals && data.default_goals.length ? data.default_goals : f.goals,
+          }));
+          hydrated.current = true;
+        });
+    } else {
+      hydrated.current = true;
+    }
+  }, [user]);
 
   // Persist form/step/extraTopics whenever they change (only on steps 1–2)
   useEffect(() => {
