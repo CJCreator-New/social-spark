@@ -38,7 +38,17 @@ interface Payload {
   siblings?: ExistingPost[];
   // Optional override topic (defaults to post.topic)
   newTopic?: string;
+  // Optional tweak directive — keeps the angle, applies a small transform
+  tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal";
 }
+
+const TWEAK_INSTRUCTIONS: Record<string, string> = {
+  "shorter": "TWEAK: Keep the same angle, hook, and CTA, but cut the body length by ~35%. Tighten every sentence. Remove anything not load-bearing.",
+  "punchier": "TWEAK: Keep the same angle, but rewrite for more impact — shorter sentences, stronger verbs, sharper opener. No fluff.",
+  "add-stat": "TWEAK: Keep the same angle, but weave in 1–2 specific, plausible statistics or concrete numbers (e.g. percentages, dollar figures, time spans). Cite them as 'roughly' or 'around' if you can't be sure.",
+  "remove-emoji": "TWEAK: Keep the same angle and structure, but remove ALL emojis from the title, hook, body, and CTA. Replace with plain punctuation.",
+  "more-personal": "TWEAK: Keep the same angle, but rewrite in first-person with a small, specific personal anecdote or observation in the hook. Make it feel like a human wrote it, not a brand.",
+};
 
 const LENGTH_GUIDE: Record<string, string> = {
   short: "80–120 words (tight, punchy)",
