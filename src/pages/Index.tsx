@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
+import { downloadIcs, nextMonday, toDateInputValue, parseLocalDate, dateForDow, shortDateLabel } from "@/lib/calendarSchedule";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -257,7 +258,21 @@ const css = `
 .cf-app .sh { font-family:'Playfair Display',serif;font-size:16px;font-weight:400;color:var(--text);margin-bottom:16px;line-height:1.3; }
 .cf-app .sh span { font-style:italic;color:var(--accent); }
 
-@media(max-width:560px){
+.cf-app .date-input { width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r-sm);padding:11px 13px;font-size:13px;color:var(--text);font-family:'Sora',sans-serif;font-weight:300;outline:none;color-scheme:dark; }
+.cf-app .date-input:focus { border-color:rgba(200,240,154,.28); }
+
+.cf-app .pt-date { background:rgba(200,240,154,.06);border:1px solid rgba(200,240,154,.16);color:rgba(200,240,154,.78); }
+.cf-app .time-row { display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap; }
+.cf-app .time-label { font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);font-weight:500; }
+.cf-app .time-input { background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:6px 9px;font-size:12px;color:var(--text);font-family:'Sora',sans-serif;font-weight:300;outline:none;color-scheme:dark;width:100px; }
+.cf-app .time-input:focus { border-color:rgba(200,240,154,.28); }
+.cf-app .time-hint { font-size:11px;color:var(--text3);font-weight:300; }
+
+.cf-app .tweak-wrap { position:relative;display:inline-block; }
+.cf-app .tweak-menu { position:absolute;top:calc(100% + 4px);right:0;z-index:200;background:var(--surface3);border:1px solid var(--border2);border-radius:var(--r-md);overflow:hidden;min-width:180px;box-shadow:0 6px 24px rgba(0,0,0,.45); }
+.cf-app .tweak-opt { padding:9px 13px;font-size:12px;color:var(--text2);cursor:pointer;font-family:'Sora',sans-serif;font-weight:300;border:none;background:transparent;width:100%;text-align:left;display:block; }
+.cf-app .tweak-opt:hover { background:var(--adim2);color:var(--accent); }
+.cf-app .tweak-opt:disabled { opacity:.4;cursor:not-allowed; }
   .cf-app .ind-grid{grid-template-columns:repeat(3,1fr);}
   .cf-app .plat-grid{grid-template-columns:repeat(2,1fr);}
   .cf-app .g2{grid-template-columns:1fr;}
@@ -410,10 +425,12 @@ const Index = () => {
     length: "medium",
     structure: "mixed",
     extra: "",
+    weekStart: toDateInputValue(nextMonday()), // YYYY-MM-DD, defaults to next Monday
   });
   const [customTopic, setCustomTopic] = useState("");
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [postTimes, setPostTimes] = useState<Record<string, string>>({}); // {"1":"09:00",...}
   const [activeDay, setActiveDay] = useState(0);
   const [genMsg, setGenMsg] = useState("");
   const [genStep, setGenStep] = useState(0);
@@ -421,6 +438,7 @@ const Index = () => {
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [regenIdx, setRegenIdx] = useState<number | null>(null);
+  const [tweakOpenIdx, setTweakOpenIdx] = useState<number | null>(null);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
@@ -428,6 +446,17 @@ const Index = () => {
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const hydrated = useRef(false);
+  const tweakRef = useRef<HTMLDivElement>(null);
+
+  // Close tweak menu on outside click
+  useEffect(() => {
+    if (tweakOpenIdx === null) return;
+    const h = (e: MouseEvent) => {
+      if (tweakRef.current && !tweakRef.current.contains(e.target as Node)) setTweakOpenIdx(null);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [tweakOpenIdx]);
 
   // Hydrate from localStorage once on mount, then layer profile brand defaults on top of an empty form.
   useEffect(() => {
@@ -582,6 +611,10 @@ const Index = () => {
 
       setGenStep(GEN_LABELS.length);
       setPosts(result); setActiveDay(0);
+      // Seed default 09:00 time per post (keyed by post.day)
+      const seedTimes: Record<string, string> = {};
+      for (const r of result) seedTimes[String(r.day)] = "09:00";
+      setPostTimes(seedTimes);
       setTimeout(() => setStep(4), 350);
     } catch (err) {
       cleanup();
@@ -602,11 +635,12 @@ const Index = () => {
     if (abortRef.current) abortRef.current.abort("user");
   }
 
-  async function regenerateDay(idx: number) {
+  async function regenerateDay(idx: number, tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal") {
     if (regenIdx !== null) return;
     const target = posts[idx];
     if (!target) return;
     setRegenIdx(idx);
+    setTweakOpenIdx(null);
     try {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -634,6 +668,7 @@ const Index = () => {
           extra: form.extra,
           post: target,
           siblings: posts,
+          tweak,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -643,7 +678,8 @@ const Index = () => {
       }
       setPosts(prev => prev.map((p, i) => (i === idx ? data.post : p)));
       setSavedId(null); // calendar drifted from saved version — let user re-save
-      toast.success(`Day ${target.day} regenerated`);
+      const tweakLabel = tweak ? ` (${tweak.replace("-", " ")})` : "";
+      toast.success(`Day ${target.day} regenerated${tweakLabel}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Regenerate failed");
     } finally {
@@ -713,6 +749,8 @@ ${postText(p)}
         core_idea: form.coreIdea,
         form_payload: form as never,
         posts: posts as never,
+        week_start_date: form.weekStart || null,
+        post_times: postTimes as never,
       }])
       .select("id")
       .single();
@@ -722,6 +760,19 @@ ${postText(p)}
     clearDraft();
     toast.success("Calendar saved");
   }
+
+  function exportIcs() {
+    const weekStart = parseLocalDate(form.weekStart) || nextMonday();
+    const title = form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`;
+    downloadIcs({
+      calendarTitle: title,
+      weekStart,
+      postTimes,
+      platform: form.platform,
+    }, posts);
+  }
+
+  const weekStartDate = useMemo(() => parseLocalDate(form.weekStart) || nextMonday(), [form.weekStart]);
 
   const STEP_LABELS = ["Industry", "Topics", "Generate", "Calendar"];
   const p = posts[activeDay];
@@ -926,6 +977,19 @@ ${postText(p)}
               </div>
 
               <div className="csect">
+                <div className="flabel">Week starting <span className="fhint">(used for dates + .ics export)</span></div>
+                <input
+                  type="date"
+                  className="date-input"
+                  value={form.weekStart}
+                  onChange={e => upd("weekStart", e.target.value)}
+                />
+                <div className="time-hint" style={{ marginTop: 6 }}>
+                  Day 1 will be <strong style={{ color: "rgba(200,240,154,.85)" }}>{shortDateLabel(weekStartDate)}</strong>. Each post defaults to 9:00 AM — you can adjust per post on the next screen.
+                </div>
+              </div>
+
+              <div className="csect">
                 <div className="flabel">Extra context <span className="fhint">(optional)</span></div>
                 <textarea rows={2} placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
               </div>
@@ -993,10 +1057,11 @@ ${postText(p)}
                     <div className="ph">
                       <div className="ptags">
                         <span className="ptag pt-day">Day {p.day} · {p.dow}</span>
+                        <span className="ptag pt-date">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
                         <span className="ptag pt-topic">{p.topic}</span>
                         <span className="ptag pt-fmt">{p.format}</span>
                       </div>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", position: "relative" }} ref={tweakOpenIdx === activeDay ? tweakRef : undefined}>
                         <button
                           className="cpbtn"
                           onClick={() => regenerateDay(activeDay)}
@@ -1005,13 +1070,45 @@ ${postText(p)}
                         >
                           {regenIdx === activeDay ? "Regenerating…" : "↻ Regenerate"}
                         </button>
+                        <div className="tweak-wrap">
+                          <button
+                            className="cpbtn"
+                            disabled={regenIdx !== null}
+                            onClick={() => setTweakOpenIdx(tweakOpenIdx === activeDay ? null : activeDay)}
+                            aria-haspopup="menu"
+                            aria-expanded={tweakOpenIdx === activeDay}
+                            title="Quick tweaks that preserve the angle"
+                          >
+                            ⚡ Tweak ▾
+                          </button>
+                          {tweakOpenIdx === activeDay && (
+                            <div className="tweak-menu" role="menu">
+                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "shorter")}>Make shorter</button>
+                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "punchier")}>Make punchier</button>
+                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "add-stat")}>Add a stat</button>
+                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "remove-emoji")}>Remove emoji</button>
+                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "more-personal")}>More personal</button>
+                            </div>
+                          )}
+                        </div>
                         <button className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`} onClick={() => copyPost(activeDay)}>
                           {copiedIdx === activeDay ? "Copied ✓" : "Copy post"}
                         </button>
                       </div>
                     </div>
 
-                    <div className="ptitle">{p.title}</div>
+                    <div className="time-row">
+                      <span className="time-label">Post time</span>
+                      <input
+                        type="time"
+                        className="time-input"
+                        value={postTimes[String(p.day)] || "09:00"}
+                        onChange={e => setPostTimes(prev => ({ ...prev, [String(p.day)]: e.target.value }))}
+                      />
+                      <span className="time-hint">{shortDateLabel(dateForDow(weekStartDate, p.dow))} at {postTimes[String(p.day)] || "09:00"}</span>
+                    </div>
+
+                    <div className="ptitle" style={{ marginTop: 18 }}>{p.title}</div>
 
                     <div className="blabel">Hook</div>
                     <div className="hook-block"><div className="hook-text">{p.hook}</div></div>
@@ -1063,6 +1160,9 @@ ${postText(p)}
                       }, posts)}
                     >
                       .pdf
+                    </button>
+                    <button className="dlbtn" onClick={exportIcs} title="Export to Google Calendar / Outlook / Apple Cal">
+                      📅 .ics
                     </button>
                     <button className="btn btn-p" style={{ fontSize: 13 }} onClick={copyAll}>
                       {copiedAll ? "All copied ✓" : "Copy all 7"}

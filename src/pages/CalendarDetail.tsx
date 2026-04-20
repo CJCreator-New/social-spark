@@ -1,8 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
+import {
+  downloadIcs,
+  parseLocalDate,
+  nextMonday,
+  toDateInputValue,
+  dateForDow,
+  shortDateLabel,
+} from "@/lib/calendarSchedule";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
@@ -22,7 +30,10 @@ interface FormPayload {
   length?: string;
   structure?: string;
   extra?: string;
+  weekStart?: string;
 }
+
+type TweakKind = "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal";
 
 const css = `
 .cd-app { min-height:100vh; background:#07080d; color:#edeae3; font-family:'Sora',sans-serif; padding:40px 24px 100px; }
@@ -62,6 +73,20 @@ const css = `
 .cd-edit-input:focus { border-color:rgba(200,240,154,0.28); }
 .cd-edit-area { width:100%; background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:11px 13px; font-size:13px; color:#edeae3; font-family:'Sora',sans-serif; font-weight:300; outline:none; box-sizing:border-box; resize:vertical; line-height:1.65; }
 .cd-edit-area:focus { border-color:rgba(200,240,154,0.28); }
+.cd-tab-date { font-size:9px; color:#5a5a72; font-weight:300; margin-top:2px; }
+.cd-tab.on .cd-tab-date { color:rgba(200,240,154,0.45); }
+.cd-date-pill { display:inline-block; padding:3px 10px; border-radius:99px; background:rgba(200,240,154,0.06); border:1px solid rgba(200,240,154,0.18); color:rgba(200,240,154,0.78); font-size:11px; margin-left:8px; }
+.cd-time-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:14px 0 4px; }
+.cd-time-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
+.cd-time-input { background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px 9px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; color-scheme:dark; width:100px; }
+.cd-time-input:focus { border-color:rgba(200,240,154,0.28); }
+.cd-tweak-wrap { position:relative; display:inline-block; }
+.cd-tweak-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:200; background:#181a26; border:1px solid rgba(255,255,255,0.1); border-radius:10px; overflow:hidden; min-width:170px; box-shadow:0 6px 24px rgba(0,0,0,.45); }
+.cd-tweak-opt { padding:9px 13px; font-size:12px; color:#7a7a8e; cursor:pointer; font-family:'Sora',sans-serif; font-weight:300; border:none; background:transparent; width:100%; text-align:left; display:block; }
+.cd-tweak-opt:hover { background:rgba(200,240,154,0.06); color:#c8f09a; }
+.cd-fav-btn { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
+.cd-fav-btn.on { color:#c8f09a; border-color:rgba(200,240,154,0.32); background:rgba(200,240,154,0.06); }
+.cd-fav-btn:hover { border-color:rgba(200,240,154,0.32); }
 `;
 
 function wordCount(s: string): number {
@@ -84,16 +109,45 @@ export default function CalendarDetail() {
   const [formPayload, setFormPayload] = useState<FormPayload>({});
   const [platform, setPlatform] = useState<string>("");
   const [industryLabel, setIndustryLabel] = useState<string>("");
+  const [weekStart, setWeekStart] = useState<string>(toDateInputValue(nextMonday()));
+  const [postTimes, setPostTimes] = useState<Record<string, string>>({});
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [tweakOpen, setTweakOpen] = useState(false);
+  const tweakRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!tweakOpen) return;
+    const h = (e: MouseEvent) => {
+      if (tweakRef.current && !tweakRef.current.contains(e.target as Node)) setTweakOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [tweakOpen]);
 
   useEffect(() => {
     if (!id) return;
     supabase.from("saved_calendars").select("*").eq("id", id).maybeSingle().then(({ data, error }) => {
       if (error || !data) { toast.error("Calendar not found"); navigate("/my-calendars"); return; }
-      setPosts((data.posts as unknown as Post[]) || []);
+      const loadedPosts = (data.posts as unknown as Post[]) || [];
+      setPosts(loadedPosts);
       setTitle(data.title);
       setPlatform(data.platform || "");
       setIndustryLabel(data.industry_label || "");
       setFormPayload((data.form_payload as unknown as FormPayload) || {});
+      setIsFavorite(!!(data as { is_favorite?: boolean }).is_favorite);
+      const fp = (data.form_payload as { weekStart?: string } | null);
+      const ws = (data as { week_start_date?: string | null }).week_start_date
+        || fp?.weekStart
+        || toDateInputValue(nextMonday());
+      setWeekStart(ws);
+      const storedTimes = (data as { post_times?: Record<string, string> | null }).post_times;
+      if (storedTimes && typeof storedTimes === "object") {
+        setPostTimes(storedTimes);
+      } else {
+        const seed: Record<string, string> = {};
+        for (const p of loadedPosts) seed[String(p.day)] = "09:00";
+        setPostTimes(seed);
+      }
       setMeta(`${data.industry_label || ""} · ${data.platform || ""} · ${new Date(data.created_at).toLocaleDateString()}`);
       setLoading(false);
     });
@@ -124,11 +178,12 @@ export default function CalendarDetail() {
     toast.success("Post updated");
   }
 
-  async function regenerateDay() {
+  async function regenerateDay(tweak?: TweakKind) {
     if (!id || regenerating || editing) return;
     const target = posts[active];
     if (!target) return;
     setRegenerating(true);
+    setTweakOpen(false);
     try {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -156,6 +211,7 @@ export default function CalendarDetail() {
           extra: formPayload.extra || "",
           post: target,
           siblings: posts,
+          tweak,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -172,13 +228,53 @@ export default function CalendarDetail() {
         return;
       }
       setPosts(updated);
-      toast.success(`Day ${target.day} regenerated`);
+      const tweakLabel = tweak ? ` (${tweak.replace("-", " ")})` : "";
+      toast.success(`Day ${target.day} regenerated${tweakLabel}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Regenerate failed");
     } finally {
       setRegenerating(false);
     }
   }
+
+  async function updatePostTime(day: number, time: string) {
+    const next = { ...postTimes, [String(day)]: time };
+    setPostTimes(next);
+    if (!id) return;
+    const { error } = await supabase.from("saved_calendars")
+      .update({ post_times: next as never })
+      .eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  async function updateWeekStart(value: string) {
+    setWeekStart(value);
+    if (!id) return;
+    const { error } = await supabase.from("saved_calendars")
+      .update({ week_start_date: value || null })
+      .eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  async function toggleFavorite() {
+    if (!id) return;
+    const next = !isFavorite;
+    setIsFavorite(next);
+    const { error } = await supabase.from("saved_calendars")
+      .update({ is_favorite: next })
+      .eq("id", id);
+    if (error) {
+      setIsFavorite(!next);
+      toast.error(error.message);
+    }
+  }
+
+  function exportIcs() {
+    const ws = parseLocalDate(weekStart) || nextMonday();
+    downloadIcs({ calendarTitle: title, weekStart: ws, postTimes, platform }, posts);
+  }
+
+  const weekStartDate = useMemo(() => parseLocalDate(weekStart) || nextMonday(), [weekStart]);
 
   const p = posts[active];
   const bodyWords = useMemo(() => wordCount(draft?.body || ""), [draft?.body]);
@@ -199,9 +295,31 @@ export default function CalendarDetail() {
       <style>{css}</style>
       <div className="cd-app">
         <div className="cd-inner">
-          <Link to="/my-calendars" className="cd-back">← Back to my calendars</Link>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <Link to="/my-calendars" className="cd-back">← Back to my calendars</Link>
+            <button
+              type="button"
+              className={`cd-fav-btn ${isFavorite ? "on" : ""}`}
+              onClick={toggleFavorite}
+              aria-pressed={isFavorite}
+              title={isFavorite ? "Unstar" : "Star"}
+            >
+              {isFavorite ? "★ Starred" : "☆ Star"}
+            </button>
+          </div>
           <h1 className="cd-title">{title}</h1>
           <div className="cd-meta">{meta}</div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
+            <span style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#7a7a8e" }}>Week starting</span>
+            <input
+              type="date"
+              value={weekStart}
+              onChange={e => updateWeekStart(e.target.value)}
+              style={{ background: "#07080d", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "6px 10px", fontSize: 12, color: "#edeae3", fontFamily: "Sora, sans-serif", outline: "none", colorScheme: "dark" }}
+            />
+            <span style={{ fontSize: 11, color: "#7a7a8e" }}>Day 1 = {shortDateLabel(weekStartDate)}</span>
+          </div>
 
           <div className="cd-strip" role="tablist" aria-label="Days of the week">
             {posts.map((post, i) => (
@@ -216,30 +334,32 @@ export default function CalendarDetail() {
               >
                 <div className="cd-tab-dow">{post.dow}</div>
                 <div className="cd-tab-n">{i + 1}</div>
+                <div className="cd-tab-date">{shortDateLabel(dateForDow(weekStartDate, post.dow)).split(" · ")[1]}</div>
               </button>
             ))}
           </div>
 
           <div className="cd-export-row" aria-label="Export options">
-            <button
-              type="button"
-              className="cd-export-btn"
-              onClick={() => downloadMd({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts)}
-            >
-              ↓ .md
-            </button>
-            <button
-              type="button"
-              className="cd-export-btn"
-              onClick={() => downloadPdf({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts)}
-            >
-              ↓ .pdf
-            </button>
+            <button type="button" className="cd-export-btn" onClick={() => downloadMd({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts)}>↓ .md</button>
+            <button type="button" className="cd-export-btn" onClick={() => downloadPdf({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts)}>↓ .pdf</button>
+            <button type="button" className="cd-export-btn" onClick={exportIcs} title="Export to Google Calendar / Outlook / Apple Cal">📅 .ics</button>
           </div>
 
           {p && !editing && (
             <div className="cd-card">
-              <div className="cd-ptitle">{p.title}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+                <span className="cd-date-pill">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
+              </div>
+              <div className="cd-time-row">
+                <span className="cd-time-label">Post time</span>
+                <input
+                  type="time"
+                  className="cd-time-input"
+                  value={postTimes[String(p.day)] || "09:00"}
+                  onChange={e => updatePostTime(p.day, e.target.value)}
+                />
+              </div>
+              <div className="cd-ptitle" style={{ marginTop: 14 }}>{p.title}</div>
               <div className="cd-blabel"><span>Hook</span></div>
               <div className="cd-hook">{p.hook}</div>
               <div className="cd-blabel"><span>Post body</span></div>
@@ -252,12 +372,32 @@ export default function CalendarDetail() {
                 <button className="cd-btn cd-btn-p" onClick={startEdit} disabled={regenerating}>Edit this post</button>
                 <button
                   className="cd-btn"
-                  onClick={regenerateDay}
+                  onClick={() => regenerateDay()}
                   disabled={regenerating}
                   title="Re-roll this day without touching the other six"
                 >
-                  {regenerating ? "Regenerating…" : "↻ Regenerate this day"}
+                  {regenerating ? "Regenerating…" : "↻ Regenerate"}
                 </button>
+                <div className="cd-tweak-wrap" ref={tweakOpen ? tweakRef : undefined}>
+                  <button
+                    className="cd-btn"
+                    disabled={regenerating}
+                    onClick={() => setTweakOpen(o => !o)}
+                    aria-haspopup="menu"
+                    aria-expanded={tweakOpen}
+                  >
+                    ⚡ Tweak ▾
+                  </button>
+                  {tweakOpen && (
+                    <div className="cd-tweak-menu" role="menu">
+                      <button className="cd-tweak-opt" onClick={() => regenerateDay("shorter")}>Make shorter</button>
+                      <button className="cd-tweak-opt" onClick={() => regenerateDay("punchier")}>Make punchier</button>
+                      <button className="cd-tweak-opt" onClick={() => regenerateDay("add-stat")}>Add a stat</button>
+                      <button className="cd-tweak-opt" onClick={() => regenerateDay("remove-emoji")}>Remove emoji</button>
+                      <button className="cd-tweak-opt" onClick={() => regenerateDay("more-personal")}>More personal</button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

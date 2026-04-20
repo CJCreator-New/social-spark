@@ -21,6 +21,7 @@ interface SavedCalendar {
   platform: string | null;
   core_idea: string | null;
   created_at: string;
+  is_favorite?: boolean;
 }
 
 const css = `
@@ -48,6 +49,14 @@ const css = `
 .mc-dialog-action:hover { background:#b9e289 !important; }
 .mc-dialog-danger { background:#f09a9a !important; color:#07080d !important; border:1px solid #f09a9a !important; }
 .mc-dialog-danger:hover { background:#e88a8a !important; }
+.mc-filter-row { display:flex; gap:8px; align-items:center; margin-bottom:18px; flex-wrap:wrap; }
+.mc-search { flex:1; min-width:200px; background:#0d0f18; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:9px 13px; font-size:13px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; }
+.mc-search:focus { border-color:rgba(200,240,154,0.32); }
+.mc-chip { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:8px 14px; border-radius:99px; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
+.mc-chip.on { background:rgba(200,240,154,0.1); border-color:rgba(200,240,154,0.32); color:#c8f09a; }
+.mc-star { background:transparent; border:none; cursor:pointer; font-size:18px; color:#3a3a50; padding:4px 6px; transition:color .15s; line-height:1; }
+.mc-star.on { color:#c8f09a; }
+.mc-star:hover { color:#c8f09a; }
 `;
 
 export default function MyCalendars() {
@@ -61,19 +70,46 @@ export default function MyCalendars() {
   const [renameValue, setRenameValue] = useState("");
   const [renameSaving, setRenameSaving] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [favOnly, setFavOnly] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     supabase
       .from("saved_calendars")
-      .select("id, title, industry_label, platform, core_idea, created_at")
+      .select("id, title, industry_label, platform, core_idea, created_at, is_favorite")
+      .order("is_favorite", { ascending: false })
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) toast.error(error.message);
-        else setItems(data || []);
+        else setItems((data as SavedCalendar[]) || []);
         setLoading(false);
       });
   }, [user]);
+
+  async function toggleFavorite(it: SavedCalendar) {
+    const next = !it.is_favorite;
+    setItems(p => p.map(i => i.id === it.id ? { ...i, is_favorite: next } : i));
+    const { error } = await supabase.from("saved_calendars").update({ is_favorite: next }).eq("id", it.id);
+    if (error) {
+      setItems(p => p.map(i => i.id === it.id ? { ...i, is_favorite: !next } : i));
+      toast.error(error.message);
+    }
+  }
+
+  const filteredItems = items.filter(it => {
+    if (favOnly && !it.is_favorite) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      return (
+        it.title.toLowerCase().includes(q) ||
+        (it.industry_label || "").toLowerCase().includes(q) ||
+        (it.platform || "").toLowerCase().includes(q) ||
+        (it.core_idea || "").toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
 
   async function confirmDelete() {
     if (!pendingDelete) return;
@@ -135,8 +171,9 @@ export default function MyCalendars() {
         core_idea: full.core_idea,
         form_payload: full.form_payload as never,
         posts: full.posts as never,
+        is_favorite: false,
       }])
-      .select("id, title, industry_label, platform, core_idea, created_at")
+      .select("id, title, industry_label, platform, core_idea, created_at, is_favorite")
       .single();
     setDuplicatingId(null);
     if (insErr || !inserted) { toast.error(insErr?.message || "Duplicate failed"); return; }
@@ -160,6 +197,26 @@ export default function MyCalendars() {
             </div>
           </div>
 
+          {!loading && items.length > 0 && (
+            <div className="mc-filter-row">
+              <input
+                type="search"
+                className="mc-search"
+                placeholder="Search by title, industry, or platform…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              <button
+                type="button"
+                className={`mc-chip ${favOnly ? "on" : ""}`}
+                onClick={() => setFavOnly(f => !f)}
+                aria-pressed={favOnly}
+              >
+                {favOnly ? "★ Starred only" : "☆ Starred only"}
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <div className="mc-empty">Loading…</div>
           ) : items.length === 0 ? (
@@ -167,10 +224,22 @@ export default function MyCalendars() {
               No saved calendars yet.<br />
               <Link to="/" style={{ color: "#c8f09a", textDecoration: "none", marginTop: 12, display: "inline-block" }}>Generate your first week →</Link>
             </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="mc-empty">No calendars match your filters.</div>
           ) : (
             <div className="mc-list">
-              {items.map(it => (
+              {filteredItems.map(it => (
                 <div key={it.id} className="mc-item">
+                  <button
+                    type="button"
+                    className={`mc-star ${it.is_favorite ? "on" : ""}`}
+                    onClick={() => toggleFavorite(it)}
+                    aria-pressed={!!it.is_favorite}
+                    aria-label={it.is_favorite ? "Unstar" : "Star"}
+                    title={it.is_favorite ? "Unstar" : "Star"}
+                  >
+                    {it.is_favorite ? "★" : "☆"}
+                  </button>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {renamingId === it.id ? (
                       <input

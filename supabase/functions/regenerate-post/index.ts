@@ -38,7 +38,17 @@ interface Payload {
   siblings?: ExistingPost[];
   // Optional override topic (defaults to post.topic)
   newTopic?: string;
+  // Optional tweak directive — keeps the angle, applies a small transform
+  tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal";
 }
+
+const TWEAK_INSTRUCTIONS: Record<string, string> = {
+  "shorter": "TWEAK: Keep the same angle, hook, and CTA, but cut the body length by ~35%. Tighten every sentence. Remove anything not load-bearing.",
+  "punchier": "TWEAK: Keep the same angle, but rewrite for more impact — shorter sentences, stronger verbs, sharper opener. No fluff.",
+  "add-stat": "TWEAK: Keep the same angle, but weave in 1–2 specific, plausible statistics or concrete numbers (e.g. percentages, dollar figures, time spans). Cite them as 'roughly' or 'around' if you can't be sure.",
+  "remove-emoji": "TWEAK: Keep the same angle and structure, but remove ALL emojis from the title, hook, body, and CTA. Replace with plain punctuation.",
+  "more-personal": "TWEAK: Keep the same angle, but rewrite in first-person with a small, specific personal anecdote or observation in the hook. Make it feel like a human wrote it, not a brand.",
+};
 
 const LENGTH_GUIDE: Record<string, string> = {
   short: "80–120 words (tight, punchy)",
@@ -78,6 +88,7 @@ Deno.serve(async (req) => {
       post,
       siblings = [],
       newTopic,
+      tweak,
     } = body;
 
     if (!post || typeof post.day !== "number" || !post.dow) {
@@ -98,6 +109,7 @@ Deno.serve(async (req) => {
     const targetTopic = (newTopic && newTopic.trim()) || post.topic || "general topic";
     const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
+    const tweakInstr = (tweak && TWEAK_INSTRUCTIONS[tweak]) || "";
 
     const longFormPlatform = platform === "Newsletter" || platform === "Blog";
     const hashtagInstr = longFormPlatform
@@ -129,16 +141,17 @@ ${extra ? `- Extra instructions: ${extra}` : ""}
 THIS POST:
 - Day: ${post.day} (${post.dow})
 - Topic: ${targetTopic}
-${post.title ? `- Previous title (do NOT reuse): "${post.title}"` : ""}
-${post.hook ? `- Previous hook (do NOT reuse opener): "${post.hook.slice(0, 120)}"` : ""}
-
+${tweakInstr ? "" : (post.title ? `- Previous title (do NOT reuse): "${post.title}"` : "")}
+${tweakInstr ? "" : (post.hook ? `- Previous hook (do NOT reuse opener): "${post.hook.slice(0, 120)}"` : "")}
+${tweakInstr ? `\nCURRENT VERSION TO TWEAK (preserve angle, transform per tweak instruction):\n- Title: "${post.title || ""}"\n- Hook: "${post.hook || ""}"\n- Body: "${(post.body || "").slice(0, 600)}"\n- CTA: "${post.cta || ""}"\n` : ""}
+${tweakInstr ? tweakInstr + "\n" : ""}
 OTHER POSTS IN THIS WEEK (do NOT duplicate angles, openers, statistics, or examples):
 ${siblingSummary || "(none provided)"}
 
 HARD RULES:
-1. Write a genuinely fresh take on "${targetTopic}" that does NOT repeat the previous title/hook above.
+1. ${tweakInstr ? `Apply the TWEAK above to the current version. Keep the same core angle and topic.` : `Write a genuinely fresh take on "${targetTopic}" that does NOT repeat the previous title/hook above.`}
 2. Stay specific to the ${industryLabel || industry} space — real terminology, real platforms, real trends.
-3. Follow the POST LENGTH and POST STRUCTURE rules exactly.
+3. Follow the POST LENGTH and POST STRUCTURE rules exactly${tweakInstr === TWEAK_INSTRUCTIONS.shorter ? " (the 'shorter' tweak overrides the length target)" : ""}.
 4. ${hashtagInstr}
 5. The "dow" field MUST be "${post.dow}" and "day" MUST be ${post.day}.
 6. In the "format" field, append the structure used (e.g. "How-to — hybrid").
