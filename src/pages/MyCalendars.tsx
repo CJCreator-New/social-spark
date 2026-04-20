@@ -21,6 +21,7 @@ interface SavedCalendar {
   platform: string | null;
   core_idea: string | null;
   created_at: string;
+  is_favorite?: boolean;
 }
 
 const css = `
