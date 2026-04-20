@@ -61,11 +61,14 @@ export type Database = {
           id: string
           industry: string | null
           industry_label: string | null
+          is_favorite: boolean
           platform: string | null
+          post_times: Json | null
           posts: Json
           title: string
           updated_at: string
           user_id: string
+          week_start_date: string | null
         }
         Insert: {
           core_idea?: string | null
@@ -74,11 +77,14 @@ export type Database = {
           id?: string
           industry?: string | null
           industry_label?: string | null
+          is_favorite?: boolean
           platform?: string | null
+          post_times?: Json | null
           posts: Json
           title: string
           updated_at?: string
           user_id: string
+          week_start_date?: string | null
         }
         Update: {
           core_idea?: string | null
@@ -87,11 +93,14 @@ export type Database = {
           id?: string
           industry?: string | null
           industry_label?: string | null
+          is_favorite?: boolean
           platform?: string | null
+          post_times?: Json | null
           posts?: Json
           title?: string
           updated_at?: string
           user_id?: string
+          week_start_date?: string | null
         }
         Relationships: []
       }
