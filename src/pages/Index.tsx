@@ -258,7 +258,21 @@ const css = `
 .cf-app .sh { font-family:'Playfair Display',serif;font-size:16px;font-weight:400;color:var(--text);margin-bottom:16px;line-height:1.3; }
 .cf-app .sh span { font-style:italic;color:var(--accent); }
 
-@media(max-width:560px){
+.cf-app .date-input { width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r-sm);padding:11px 13px;font-size:13px;color:var(--text);font-family:'Sora',sans-serif;font-weight:300;outline:none;color-scheme:dark; }
+.cf-app .date-input:focus { border-color:rgba(200,240,154,.28); }
+
+.cf-app .pt-date { background:rgba(200,240,154,.06);border:1px solid rgba(200,240,154,.16);color:rgba(200,240,154,.78); }
+.cf-app .time-row { display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap; }
+.cf-app .time-label { font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);font-weight:500; }
+.cf-app .time-input { background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:6px 9px;font-size:12px;color:var(--text);font-family:'Sora',sans-serif;font-weight:300;outline:none;color-scheme:dark;width:100px; }
+.cf-app .time-input:focus { border-color:rgba(200,240,154,.28); }
+.cf-app .time-hint { font-size:11px;color:var(--text3);font-weight:300; }
+
+.cf-app .tweak-wrap { position:relative;display:inline-block; }
+.cf-app .tweak-menu { position:absolute;top:calc(100% + 4px);right:0;z-index:200;background:var(--surface3);border:1px solid var(--border2);border-radius:var(--r-md);overflow:hidden;min-width:180px;box-shadow:0 6px 24px rgba(0,0,0,.45); }
+.cf-app .tweak-opt { padding:9px 13px;font-size:12px;color:var(--text2);cursor:pointer;font-family:'Sora',sans-serif;font-weight:300;border:none;background:transparent;width:100%;text-align:left;display:block; }
+.cf-app .tweak-opt:hover { background:var(--adim2);color:var(--accent); }
+.cf-app .tweak-opt:disabled { opacity:.4;cursor:not-allowed; }
   .cf-app .ind-grid{grid-template-columns:repeat(3,1fr);}
   .cf-app .plat-grid{grid-template-columns:repeat(2,1fr);}
   .cf-app .g2{grid-template-columns:1fr;}
