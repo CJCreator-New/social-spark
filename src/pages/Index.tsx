@@ -1057,10 +1057,11 @@ ${postText(p)}
                     <div className="ph">
                       <div className="ptags">
                         <span className="ptag pt-day">Day {p.day} · {p.dow}</span>
+                        <span className="ptag pt-date">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
                         <span className="ptag pt-topic">{p.topic}</span>
                         <span className="ptag pt-fmt">{p.format}</span>
                       </div>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", position: "relative" }} ref={tweakOpenIdx === activeDay ? tweakRef : undefined}>
                         <button
                           className="cpbtn"
                           onClick={() => regenerateDay(activeDay)}
@@ -1069,13 +1070,45 @@ ${postText(p)}
                         >
                           {regenIdx === activeDay ? "Regenerating…" : "↻ Regenerate"}
                         </button>
+                        <div className="tweak-wrap">
+                          <button
+                            className="cpbtn"
+                            disabled={regenIdx !== null}
+                            onClick={() => setTweakOpenIdx(tweakOpenIdx === activeDay ? null : activeDay)}
+                            aria-haspopup="menu"
+                            aria-expanded={tweakOpenIdx === activeDay}
+                            title="Quick tweaks that preserve the angle"
+                          >
+                            ⚡ Tweak ▾
+                          </button>
+                          {tweakOpenIdx === activeDay && (
+                            <div className="tweak-menu" role="menu">
+                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "shorter")}>Make shorter</button>
+                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "punchier")}>Make punchier</button>
+                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "add-stat")}>Add a stat</button>
+                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "remove-emoji")}>Remove emoji</button>
+                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "more-personal")}>More personal</button>
+                            </div>
+                          )}
+                        </div>
                         <button className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`} onClick={() => copyPost(activeDay)}>
                           {copiedIdx === activeDay ? "Copied ✓" : "Copy post"}
                         </button>
                       </div>
                     </div>
 
-                    <div className="ptitle">{p.title}</div>
+                    <div className="time-row">
+                      <span className="time-label">Post time</span>
+                      <input
+                        type="time"
+                        className="time-input"
+                        value={postTimes[String(p.day)] || "09:00"}
+                        onChange={e => setPostTimes(prev => ({ ...prev, [String(p.day)]: e.target.value }))}
+                      />
+                      <span className="time-hint">{shortDateLabel(dateForDow(weekStartDate, p.dow))} at {postTimes[String(p.day)] || "09:00"}</span>
+                    </div>
+
+                    <div className="ptitle" style={{ marginTop: 18 }}>{p.title}</div>
 
                     <div className="blabel">Hook</div>
                     <div className="hook-block"><div className="hook-text">{p.hook}</div></div>
