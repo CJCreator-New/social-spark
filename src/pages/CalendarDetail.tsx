@@ -73,6 +73,20 @@ const css = `
 .cd-edit-input:focus { border-color:rgba(200,240,154,0.28); }
 .cd-edit-area { width:100%; background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:11px 13px; font-size:13px; color:#edeae3; font-family:'Sora',sans-serif; font-weight:300; outline:none; box-sizing:border-box; resize:vertical; line-height:1.65; }
 .cd-edit-area:focus { border-color:rgba(200,240,154,0.28); }
+.cd-tab-date { font-size:9px; color:#5a5a72; font-weight:300; margin-top:2px; }
+.cd-tab.on .cd-tab-date { color:rgba(200,240,154,0.45); }
+.cd-date-pill { display:inline-block; padding:3px 10px; border-radius:99px; background:rgba(200,240,154,0.06); border:1px solid rgba(200,240,154,0.18); color:rgba(200,240,154,0.78); font-size:11px; margin-left:8px; }
+.cd-time-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:14px 0 4px; }
+.cd-time-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
+.cd-time-input { background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px 9px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; color-scheme:dark; width:100px; }
+.cd-time-input:focus { border-color:rgba(200,240,154,0.28); }
+.cd-tweak-wrap { position:relative; display:inline-block; }
+.cd-tweak-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:200; background:#181a26; border:1px solid rgba(255,255,255,0.1); border-radius:10px; overflow:hidden; min-width:170px; box-shadow:0 6px 24px rgba(0,0,0,.45); }
+.cd-tweak-opt { padding:9px 13px; font-size:12px; color:#7a7a8e; cursor:pointer; font-family:'Sora',sans-serif; font-weight:300; border:none; background:transparent; width:100%; text-align:left; display:block; }
+.cd-tweak-opt:hover { background:rgba(200,240,154,0.06); color:#c8f09a; }
+.cd-fav-btn { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
+.cd-fav-btn.on { color:#c8f09a; border-color:rgba(200,240,154,0.32); background:rgba(200,240,154,0.06); }
+.cd-fav-btn:hover { border-color:rgba(200,240,154,0.32); }
 `;
 
 function wordCount(s: string): number {
