@@ -141,16 +141,17 @@ ${extra ? `- Extra instructions: ${extra}` : ""}
 THIS POST:
 - Day: ${post.day} (${post.dow})
 - Topic: ${targetTopic}
-${post.title ? `- Previous title (do NOT reuse): "${post.title}"` : ""}
-${post.hook ? `- Previous hook (do NOT reuse opener): "${post.hook.slice(0, 120)}"` : ""}
-
+${tweakInstr ? "" : (post.title ? `- Previous title (do NOT reuse): "${post.title}"` : "")}
+${tweakInstr ? "" : (post.hook ? `- Previous hook (do NOT reuse opener): "${post.hook.slice(0, 120)}"` : "")}
+${tweakInstr ? `\nCURRENT VERSION TO TWEAK (preserve angle, transform per tweak instruction):\n- Title: "${post.title || ""}"\n- Hook: "${post.hook || ""}"\n- Body: "${(post.body || "").slice(0, 600)}"\n- CTA: "${post.cta || ""}"\n` : ""}
+${tweakInstr ? tweakInstr + "\n" : ""}
 OTHER POSTS IN THIS WEEK (do NOT duplicate angles, openers, statistics, or examples):
 ${siblingSummary || "(none provided)"}
 
 HARD RULES:
-1. Write a genuinely fresh take on "${targetTopic}" that does NOT repeat the previous title/hook above.
+1. ${tweakInstr ? `Apply the TWEAK above to the current version. Keep the same core angle and topic.` : `Write a genuinely fresh take on "${targetTopic}" that does NOT repeat the previous title/hook above.`}
 2. Stay specific to the ${industryLabel || industry} space — real terminology, real platforms, real trends.
-3. Follow the POST LENGTH and POST STRUCTURE rules exactly.
+3. Follow the POST LENGTH and POST STRUCTURE rules exactly${tweakInstr === TWEAK_INSTRUCTIONS.shorter ? " (the 'shorter' tweak overrides the length target)" : ""}.
 4. ${hashtagInstr}
 5. The "dow" field MUST be "${post.dow}" and "day" MUST be ${post.day}.
 6. In the "format" field, append the structure used (e.g. "How-to — hybrid").
