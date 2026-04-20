@@ -1,55 +1,52 @@
 
-The user wants to replace the current PostAI app with a "ContentForge" 7-day content calendar generator. The provided code is a single-file React app that:
-- Uses a multi-step wizard (Industry → Topics → Generate → Calendar)
-- Calls Anthropic API directly from the browser (we must replace this with our Lovable AI edge function)
-- Has its own styling (custom CSS with Playfair Display + Sora fonts, dark theme)
-- Generates 7 posts as JSON
 
-Key adaptations needed:
-1. **Replace direct Anthropic call** with a new Supabase edge function using Lovable AI Gateway (google/gemini-2.5-flash) — never call AI from client.
-2. **Keep the existing styling approach** — inject the provided CSS and fonts. Replace current `Index.tsx` content.
-3. **Fix broken JSX** in the pasted code — many JSX tags are missing (Caret, Check, SelectField, MultiSelect, the brand/stepper/screens render). I'll reconstruct them properly using the intent shown in the className strings.
-4. **Remove old components** (Sidebar, PostGenerator, PlatformSelector, etc.) — not used anymore. I'll keep files but stop importing them; safer to leave them.
-5. **Edge function**: new `generate-calendar` function that takes the form payload, calls Lovable AI with structured tool-calling for the 7-post array, handles 429/402.
+Looking at what's been shipped and what's left in the backlog, plus what I can observe about the app, here's a focused enhancement plan.
 
-## Plan
+## Already shipped (rounds 1–3)
+Auth polish, wizard persistence, save/edit/duplicate/rename calendars, regenerate-single-day, PDF/MD export, brand defaults, a11y pass, indeterminate progress, abort/timeout, tone-conditional hashtags, prompt anti-patterns.
 
-### 1. New edge function `supabase/functions/generate-calendar/index.ts`
-- Accepts: `{ industry, industryLabel, platform, coreIdea, audiences, voice, style, goals, topics, format, cta, extra }`
-- Builds the same prompt shown in the user's code
-- Calls Lovable AI Gateway with `google/gemini-2.5-flash` using **tool calling** to enforce the 7-post JSON schema (day, dow, topic, format, title, hook, body, cta, hashtags, rationale)
-- Handles 429 (rate limit) and 402 (credits) → returns friendly errors
-- CORS headers, public (verify_jwt = false in config.toml)
+## Proposed enhancement plan — 3 themes
 
-### 2. Update `supabase/config.toml`
-Add `[functions.generate-calendar]` with `verify_jwt = false`.
+### Theme A — Make the deliverable real (scheduling)
+The calendar is currently abstract ("Day 1, Mon"). Turning it into a real, dated, exportable schedule is the single biggest jump in perceived value.
 
-### 3. Replace `src/pages/Index.tsx`
-- Inject the provided CSS + Google Fonts via a `<style>` tag and `<link>` (or just `@import` inside the style block as the code already does).
-- Reconstruct the full ContentForge component with proper JSX:
-  - `Caret`, `Check` SVG components
-  - `SelectField` (label + native `<select>`)
-  - `MultiSelect` (custom dropdown with chips)
-  - 4 screens (Industry, Topics, Generating, Calendar)
-  - Stepper, brand header, background grid/glow
-- Replace the `fetch("https://api.anthropic.com/...")` call with `supabase.functions.invoke("generate-calendar", { body: formPayload })` using the lazy `getSupabaseClient()` helper that already exists in `src/lib/supabase.ts`.
-- Keep all copy/download logic intact.
+1. **Per-day calendar dates** — add a "Week starting" date picker on Step 2. Render real dates on each card (e.g. "Mon · Apr 22").
+2. **`.ics` export** — one VEVENT per post, time defaults to 9:00 local, body = hook + body + cta + hashtags. Drops straight into Google Cal / Outlook / Apple Cal.
+3. **"Copy for [Platform]" per card** — formatted for the chosen platform (e.g. line breaks for LinkedIn, hashtag block for IG, ≤280 char check for X).
 
-### 4. Simplify `src/App.tsx`
-Remove the catch-all routing complexity if needed — actually keep as-is; just `Index` renders the new app.
+### Theme B — Quality & control loop
+Users currently get 7 posts and either accept or re-roll. Give them more steering.
 
-### 5. Files left untouched (orphaned but harmless)
-- `src/components/layout/Sidebar.tsx`, `src/components/post/*` — no longer imported.
-- `supabase/functions/generate-captions/*` — leave deployed, unused.
+4. **Tone/voice preview on Step 1** — show a 2-line sample for the selected voice + style combo before generating, so users don't waste a generation discovering "Contrarian + Storytelling" isn't what they wanted.
+5. **Inline post tweaks** — small actions on each post card: "Make shorter", "Make punchier", "Add a stat", "Remove emoji". Each calls `regenerate-post` with a tweak directive, preserving the rest.
+6. **Banned-words / required-words per generation** — optional inputs on Step 2 ("never say:", "must mention:") fed into the prompt. Power users repeatedly ask for this.
 
-## Technical notes
-- Tool calling structure: one tool `return_calendar` with `parameters.posts` = array of 7 objects, each with the 10 required string/number fields. Force with `tool_choice: { type: "function", function: { name: "return_calendar" } }`.
-- Parse `choices[0].message.tool_calls[0].function.arguments` → JSON → `.posts`.
-- Frontend posts payload as JSON, expects `{ posts: [...] }` or `{ error: "..." }`.
+### Theme C — Retention & organization
+Users will accumulate calendars; current My Calendars is a flat list.
 
-## Out of scope (not doing)
-- Authentication, persistence (no DB tables) — pure stateless generation per request.
-- Removing old unused files.
-- Image generation.
+7. **Favorites + filter** — star toggle on each calendar card, filter chip for "Starred only".
+8. **Search + sort** — search by title/topic, sort by date/title/platform.
+9. **Tags or folders** (pick one — folders is simpler) — assign a calendar to a folder ("Q2 Launch", "Newsletter series"), filter by folder in the sidebar.
 
-After approval I'll implement in this order: edge function → config.toml → Index.tsx rewrite.
+## What I'd recommend prioritizing
+
+If you want one focused round: **Theme A (1+2+3)** — it transforms output from "draft text" to "drop-in schedule" and is the most differentiated vs. ChatGPT.
+
+If you want one quick-win round: **Theme B item 5 (inline tweaks)** — biggest UX delight per hour of work, builds on the existing regenerate-post function.
+
+If you want a balanced round: **A1 + A2 + B5 + C7** — adds dates, .ics export, inline tweaks, and favorites. ~2–3 hours of work, touches Index.tsx, CalendarDetail.tsx, MyCalendars.tsx, regenerate-post edge function, plus a tiny migration for `is_favorite` and `week_start_date` columns.
+
+## Out of scope (intentionally deferred)
+- Streaming generation (needs SSE infra rework)
+- Teams / multi-user collab
+- Direct publishing to social APIs (OAuth per platform — large)
+- AI image generation per post (cost + UX scope)
+- Tailwind token refactor (large, low user-visible value)
+
+## Questions before implementing
+1. Which theme(s) to ship — A, B, C, all of A, or the balanced bundle (A1+A2+B5+C7)?
+2. For scheduling: default post time (9am local? user-configurable?) and default timezone (browser local OK?).
+3. For folders vs tags in C9 — skip entirely for now, or pick one?
+
+Reply with which bundle to ship and I'll switch to default mode and implement.
+
