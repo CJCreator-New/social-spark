@@ -70,19 +70,46 @@ export default function MyCalendars() {
   const [renameValue, setRenameValue] = useState("");
   const [renameSaving, setRenameSaving] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [favOnly, setFavOnly] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     supabase
       .from("saved_calendars")
-      .select("id, title, industry_label, platform, core_idea, created_at")
+      .select("id, title, industry_label, platform, core_idea, created_at, is_favorite")
+      .order("is_favorite", { ascending: false })
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) toast.error(error.message);
-        else setItems(data || []);
+        else setItems((data as SavedCalendar[]) || []);
         setLoading(false);
       });
   }, [user]);
+
+  async function toggleFavorite(it: SavedCalendar) {
+    const next = !it.is_favorite;
+    setItems(p => p.map(i => i.id === it.id ? { ...i, is_favorite: next } : i));
+    const { error } = await supabase.from("saved_calendars").update({ is_favorite: next }).eq("id", it.id);
+    if (error) {
+      setItems(p => p.map(i => i.id === it.id ? { ...i, is_favorite: !next } : i));
+      toast.error(error.message);
+    }
+  }
+
+  const filteredItems = items.filter(it => {
+    if (favOnly && !it.is_favorite) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      return (
+        it.title.toLowerCase().includes(q) ||
+        (it.industry_label || "").toLowerCase().includes(q) ||
+        (it.platform || "").toLowerCase().includes(q) ||
+        (it.core_idea || "").toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
 
   async function confirmDelete() {
     if (!pendingDelete) return;
