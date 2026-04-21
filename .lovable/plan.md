@@ -1,52 +1,74 @@
 
 
-Looking at what's been shipped and what's left in the backlog, plus what I can observe about the app, here's a focused enhancement plan.
+## Add "Copy for [Platform]" — platform-ready text
 
-## Already shipped (rounds 1–3)
-Auth polish, wizard persistence, save/edit/duplicate/rename calendars, regenerate-single-day, PDF/MD export, brand defaults, a11y pass, indeterminate progress, abort/timeout, tone-conditional hashtags, prompt anti-patterns.
+Replace the current generic copy action with platform-tailored output, so users paste text that already matches each network's conventions instead of raw markdown.
 
-## Proposed enhancement plan — 3 themes
+## What changes
 
-### Theme A — Make the deliverable real (scheduling)
-The calendar is currently abstract ("Day 1, Mon"). Turning it into a real, dated, exportable schedule is the single biggest jump in perceived value.
+A new **Copy for [Platform]** button on every post card (Step 4 in `Index.tsx` and `CalendarDetail.tsx`). It copies the post formatted for the calendar's selected platform — no markdown, no asterisks, no leftover hashes.
 
-1. **Per-day calendar dates** — add a "Week starting" date picker on Step 2. Render real dates on each card (e.g. "Mon · Apr 22").
-2. **`.ics` export** — one VEVENT per post, time defaults to 9:00 local, body = hook + body + cta + hashtags. Drops straight into Google Cal / Outlook / Apple Cal.
-3. **"Copy for [Platform]" per card** — formatted for the chosen platform (e.g. line breaks for LinkedIn, hashtag block for IG, ≤280 char check for X).
+### Per-platform formatting rules
 
-### Theme B — Quality & control loop
-Users currently get 7 posts and either accept or re-roll. Give them more steering.
+| Platform | Formatting |
+|---|---|
+| **LinkedIn** | Hook on its own line · blank line · body broken every 1–2 sentences · blank line · CTA · blank line · hashtags (max 5, space-separated, end of post) |
+| **Instagram** | Hook + body as one block (line breaks preserved) · blank line · CTA · blank line · `⠀⠀⠀.⠀.⠀.` separator · hashtag block (up to 15, space-separated) |
+| **X / Twitter** | Single block: hook + body + CTA condensed · 1–2 hashtags inline at end · **hard 280-char limit** (truncate with `…` and show a red warning toast if trimmed) |
+| **Facebook** | Hook · blank line · body (preserved) · blank line · CTA · blank line · max 3 hashtags |
 
-4. **Tone/voice preview on Step 1** — show a 2-line sample for the selected voice + style combo before generating, so users don't waste a generation discovering "Contrarian + Storytelling" isn't what they wanted.
-5. **Inline post tweaks** — small actions on each post card: "Make shorter", "Make punchier", "Add a stat", "Remove emoji". Each calls `regenerate-post` with a tweak directive, preserving the rest.
-6. **Banned-words / required-words per generation** — optional inputs on Step 2 ("never say:", "must mention:") fed into the prompt. Power users repeatedly ask for this.
+All variants:
+- Strip markdown (`**bold**` → `bold`, `_italic_` → `italic`, `#`/`>` line prefixes removed)
+- Collapse 3+ blank lines to 2
+- Trim trailing whitespace
+- Hashtags normalized: ensure leading `#`, dedupe, drop empties
 
-### Theme C — Retention & organization
-Users will accumulate calendars; current My Calendars is a flat list.
+### UX details
 
-7. **Favorites + filter** — star toggle on each calendar card, filter chip for "Starred only".
-8. **Search + sort** — search by title/topic, sort by date/title/platform.
-9. **Tags or folders** (pick one — folders is simpler) — assign a calendar to a folder ("Q2 Launch", "Newsletter series"), filter by folder in the sidebar.
+- Button label adapts: "Copy for LinkedIn", "Copy for X", etc. (uses calendar's `platform`).
+- On click: copy to clipboard → toast "Copied for LinkedIn ✓" (lime accent).
+- For X only: if the assembled text exceeds 280 chars, show toast "Trimmed to fit X's 280-char limit" in destructive color, and the copied text ends with `…`.
+- Small char-count hint under the button on hover/focus (e.g. "412 / 3000" for LinkedIn) — uses muted foreground, no extra layout shift.
+- Replaces the existing generic "Copy" icon button on the post cards. The markdown export buttons in the footer stay (file export is a separate flow).
 
-## What I'd recommend prioritizing
+## Technical plan
 
-If you want one focused round: **Theme A (1+2+3)** — it transforms output from "draft text" to "drop-in schedule" and is the most differentiated vs. ChatGPT.
+### New file: `src/lib/platformCopy.ts`
+Pure functions, no React:
+- `stripMarkdown(s: string): string`
+- `normalizeHashtags(input: string | string[], max: number): string[]`
+- `formatForPlatform(post, platform): { text: string, charCount: number, truncated: boolean }`
+- `PLATFORM_LIMITS = { facebook: 63206, instagram: 2200, linkedin: 3000, twitter: 280 }`
 
-If you want one quick-win round: **Theme B item 5 (inline tweaks)** — biggest UX delight per hour of work, builds on the existing regenerate-post function.
+Input shape matches the existing post object: `{ title, hook, body, cta, hashtags }`.
 
-If you want a balanced round: **A1 + A2 + B5 + C7** — adds dates, .ics export, inline tweaks, and favorites. ~2–3 hours of work, touches Index.tsx, CalendarDetail.tsx, MyCalendars.tsx, regenerate-post edge function, plus a tiny migration for `is_favorite` and `week_start_date` columns.
+### Edits
 
-## Out of scope (intentionally deferred)
-- Streaming generation (needs SSE infra rework)
-- Teams / multi-user collab
-- Direct publishing to social APIs (OAuth per platform — large)
-- AI image generation per post (cost + UX scope)
-- Tailwind token refactor (large, low user-visible value)
+**`src/pages/Index.tsx`** (Step 4 post cards)
+- Import `formatForPlatform` and `PLATFORM_LIMITS`.
+- Add `<Button>` next to existing Tweak/Regenerate actions: `Copy for {platformLabel}`.
+- On click: call formatter with current post + wizard's selected platform, write to clipboard, toast result.
+- If `truncated`, use destructive toast variant.
 
-## Questions before implementing
-1. Which theme(s) to ship — A, B, C, all of A, or the balanced bundle (A1+A2+B5+C7)?
-2. For scheduling: default post time (9am local? user-configurable?) and default timezone (browser local OK?).
-3. For folders vs tags in C9 — skip entirely for now, or pick one?
+**`src/pages/CalendarDetail.tsx`** (saved-calendar post cards)
+- Same button + handler, using `calendar.platform` from the loaded record.
 
-Reply with which bundle to ship and I'll switch to default mode and implement.
+**`src/components/post/CaptionVariation.tsx`** (if still rendered anywhere)
+- Swap its current `handleCopy` (which appends raw hashtags) to use `formatForPlatform`. Keeps behavior consistent if this card is reused.
+
+### Not changed
+- Markdown export (`src/lib/exportCalendar.ts`) — unaffected, still produces `.md` files.
+- PDF export — unaffected.
+- `.ics` export — unaffected (description stays multi-section).
+- DB schema — no migration needed.
+- Edge functions — no change.
+
+## Out of scope
+- "Copy with formatting" (rich-text clipboard) — plain text only, per request.
+- Per-platform regeneration ("Reformat this calendar for X") — separate Theme D item, not in this round.
+- Live char-budget badge on every card at all times (we show it on the button hint only, to avoid clutter).
+
+## Files touched
+- **New:** `src/lib/platformCopy.ts`
+- **Edited:** `src/pages/Index.tsx`, `src/pages/CalendarDetail.tsx`, `src/components/post/CaptionVariation.tsx`
 
