@@ -11,6 +11,7 @@ import {
   dateForDow,
   shortDateLabel,
 } from "@/lib/calendarSchedule";
+import { formatForPlatform, writeToClipboard, resolvePlatform } from "@/lib/platformCopy";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
@@ -369,7 +370,29 @@ export default function CalendarDetail() {
               <div className="cd-blabel"><span>Hashtags</span></div>
               <div className="cd-tags">{p.hashtags}</div>
               <div className="cd-actions">
-                <button className="cd-btn cd-btn-p" onClick={startEdit} disabled={regenerating}>Edit this post</button>
+                {(() => {
+                  const f = formatForPlatform(p, platform);
+                  const niceLabel = resolvePlatform(platform) === "twitter" ? "X" : f.platformLabel;
+                  return (
+                    <button
+                      className="cd-btn cd-btn-p"
+                      disabled={regenerating}
+                      title={`${f.charCount} / ${f.limit} chars`}
+                      onClick={async () => {
+                        const ok = await writeToClipboard(f.text);
+                        if (!ok) { toast.error("Could not copy to clipboard"); return; }
+                        if (f.truncated && f.platform === "twitter") {
+                          toast.error("Trimmed to fit X's 280-char limit");
+                        } else {
+                          toast.success(`Copied for ${niceLabel} ✓`);
+                        }
+                      }}
+                    >
+                      Copy for {niceLabel}
+                    </button>
+                  );
+                })()}
+                <button className="cd-btn" onClick={startEdit} disabled={regenerating}>Edit this post</button>
                 <button
                   className="cd-btn"
                   onClick={() => regenerateDay()}

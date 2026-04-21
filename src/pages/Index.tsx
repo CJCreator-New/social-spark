@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
 import { downloadIcs, nextMonday, toDateInputValue, parseLocalDate, dateForDow, shortDateLabel } from "@/lib/calendarSchedule";
+import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform } from "@/lib/platformCopy";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -704,12 +705,31 @@ const Index = () => {
     return `${p.title}\n\n${p.hook}\n\n${p.body}\n\n${p.cta}\n\n${p.hashtags}`;
   }
 
-  function copyPost(i: number) {
-    copyText(postText(posts[i]), () => { setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 2000); });
+  async function copyPost(i: number) {
+    const p = posts[i];
+    if (!p) return;
+    const formatted = formatForPlatform(p, form.platform);
+    const ok = await writeToClipboard(formatted.text);
+    if (!ok) { toast.error("Could not copy to clipboard"); return; }
+    setCopiedIdx(i);
+    setTimeout(() => setCopiedIdx(null), 2000);
+    if (formatted.truncated && formatted.platform === "twitter") {
+      toast.error("Trimmed to fit X's 280-char limit");
+    } else {
+      toast.success(`Copied for ${formatted.platformLabel} ✓`);
+    }
   }
-  function copyAll() {
-    const all = posts.map(p => `=== Day ${p.day} — ${p.dow} | ${p.topic} ===\n${postText(p)}`).join("\n\n\n");
-    copyText(all, () => { setCopiedAll(true); setTimeout(() => setCopiedAll(false), 2000); });
+  async function copyAll() {
+    const all = posts.map(p => {
+      const f = formatForPlatform(p, form.platform);
+      return `=== Day ${p.day} — ${p.dow} | ${p.topic} ===\n${f.text}`;
+    }).join("\n\n\n");
+    const ok = await writeToClipboard(all);
+    if (!ok) { toast.error("Could not copy to clipboard"); return; }
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2000);
+    const label = resolvePlatform(form.platform);
+    toast.success(`All 7 copied for ${PLATFORM_LIMITS[label] ? label.charAt(0).toUpperCase() + label.slice(1) : "all platforms"} ✓`);
   }
   function downloadTxt() {
     const header = `CONTENTFORGE — 7-DAY ${form.platform.toUpperCase()} CONTENT CALENDAR
@@ -1091,9 +1111,22 @@ ${postText(p)}
                             </div>
                           )}
                         </div>
-                        <button className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`} onClick={() => copyPost(activeDay)}>
-                          {copiedIdx === activeDay ? "Copied ✓" : "Copy post"}
-                        </button>
+                        {(() => {
+                          const platLabel = (PLATFORM_LIMITS as Record<string, number>)[resolvePlatform(form.platform)]
+                            ? resolvePlatform(form.platform).charAt(0).toUpperCase() + resolvePlatform(form.platform).slice(1).replace("twitter", "X")
+                            : "platform";
+                          const niceLabel = resolvePlatform(form.platform) === "twitter" ? "X" : platLabel;
+                          const f = formatForPlatform(posts[activeDay], form.platform);
+                          return (
+                            <button
+                              className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`}
+                              onClick={() => copyPost(activeDay)}
+                              title={`${f.charCount} / ${f.limit} chars`}
+                            >
+                              {copiedIdx === activeDay ? "Copied ✓" : `Copy for ${niceLabel}`}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -1165,7 +1198,7 @@ ${postText(p)}
                       📅 .ics
                     </button>
                     <button className="btn btn-p" style={{ fontSize: 13 }} onClick={copyAll}>
-                      {copiedAll ? "All copied ✓" : "Copy all 7"}
+                      {copiedAll ? "All copied ✓" : `Copy all 7 for ${resolvePlatform(form.platform) === "twitter" ? "X" : resolvePlatform(form.platform).charAt(0).toUpperCase() + resolvePlatform(form.platform).slice(1)}`}
                     </button>
                   </div>
                 </div>
