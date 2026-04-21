@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Platform } from "./PlatformSelector";
+import { formatForPlatform, writeToClipboard } from "@/lib/platformCopy";
 
 interface CaptionVariationProps {
   content: string;
@@ -27,7 +28,8 @@ export function CaptionVariation({
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    await navigator.clipboard.writeText(content + "\n\n" + hashtags.join(" "));
+    const formatted = formatForPlatform({ body: content, hashtags }, platform);
+    await writeToClipboard(formatted.text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
