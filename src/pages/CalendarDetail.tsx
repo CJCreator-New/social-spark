@@ -469,6 +469,15 @@ export default function CalendarDetail() {
             <div className="cd-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
                 <span className="cd-date-pill">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
+                <button
+                  type="button"
+                  className={`cd-pin-btn ${lockedDays.has(p.day) ? "on" : ""}`}
+                  onClick={() => toggleLock(p.day)}
+                  title={lockedDays.has(p.day) ? "Pinned" : "Pin this post"}
+                  aria-pressed={lockedDays.has(p.day)}
+                >
+                  {lockedDays.has(p.day) ? "📌" : "📍"}
+                </button>
               </div>
               <div className="cd-time-row">
                 <span className="cd-time-label">Post time</span>
