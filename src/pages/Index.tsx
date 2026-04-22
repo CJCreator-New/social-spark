@@ -274,6 +274,30 @@ const css = `
 .cf-app .tweak-opt { padding:9px 13px;font-size:12px;color:var(--text2);cursor:pointer;font-family:'Sora',sans-serif;font-weight:300;border:none;background:transparent;width:100%;text-align:left;display:block; }
 .cf-app .tweak-opt:hover { background:var(--adim2);color:var(--accent); }
 .cf-app .tweak-opt:disabled { opacity:.4;cursor:not-allowed; }
+
+.cf-app .budget { display:inline-flex;align-items:center;gap:5px;font-size:10px;letter-spacing:.04em;padding:3px 9px;border-radius:99px;border:1px solid var(--border2);background:rgba(255,255,255,.02);color:var(--text2);font-family:'Sora',sans-serif;font-weight:400;font-variant-numeric:tabular-nums;white-space:nowrap; }
+.cf-app .budget.warn { color:#f0d49a;border-color:rgba(240,212,154,.32);background:rgba(240,212,154,.06); }
+.cf-app .budget.over { color:var(--err);border-color:rgba(240,154,154,.35);background:rgba(240,154,154,.08); }
+.cf-app .budget-dot { width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7; }
+
+.cf-app .recent-strip { background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px 22px;margin-bottom:18px; }
+.cf-app .recent-head { display:flex;justify-content:space-between;align-items:baseline;margin-bottom:13px; }
+.cf-app .recent-eyebrow { font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--text2);font-weight:500; }
+.cf-app .recent-link { font-size:11px;color:var(--text2);text-decoration:none;transition:color .15s; }
+.cf-app .recent-link:hover { color:var(--accent); }
+.cf-app .recent-list { display:flex;flex-direction:column;gap:7px; }
+.cf-app .recent-item { display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--bg);transition:border-color .15s; }
+.cf-app .recent-item:hover { border-color:rgba(200,240,154,.22); }
+.cf-app .recent-meta { min-width:0;flex:1; }
+.cf-app .recent-title { font-family:'Playfair Display',serif;font-size:14px;color:var(--text);margin:0 0 2px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.cf-app .recent-sub { font-size:10px;color:var(--text3);font-weight:300; }
+.cf-app .recent-tag { display:inline-block;padding:1px 7px;border-radius:99px;background:var(--adim);color:var(--accent);font-size:9px;letter-spacing:.04em;margin-right:5px; }
+.cf-app .recent-actions { display:flex;gap:5px;flex-shrink:0; }
+.cf-app .recent-btn { font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-family:'Sora',sans-serif;transition:all .15s;white-space:nowrap; }
+.cf-app .recent-btn:hover { border-color:rgba(200,240,154,.32);color:var(--accent); }
+.cf-app .recent-btn.primary { background:var(--adim);border-color:rgba(200,240,154,.28);color:var(--accent); }
+
+@media (max-width: 640px) {
   .cf-app .ind-grid{grid-template-columns:repeat(3,1fr);}
   .cf-app .plat-grid{grid-template-columns:repeat(2,1fr);}
   .cf-app .g2{grid-template-columns:1fr;}
