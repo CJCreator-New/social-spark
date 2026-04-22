@@ -1305,7 +1305,7 @@ ${postText(p)}
                       📅 .ics
                     </button>
                     <button className="btn btn-p" style={{ fontSize: 13 }} onClick={copyAll}>
-                      {copiedAll ? "All copied ✓" : `Copy all 7 for ${resolvePlatform(form.platform) === "twitter" ? "X" : resolvePlatform(form.platform).charAt(0).toUpperCase() + resolvePlatform(form.platform).slice(1)}`}
+                      {copiedAll ? "All copied ✓" : `Copy all 7 for ${niceLabelFor(form.platform)}`}
                     </button>
                   </div>
                 </div>
