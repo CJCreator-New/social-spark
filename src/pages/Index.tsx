@@ -898,6 +898,37 @@ ${postText(p)}
 
           {/* ── STEP 1 ── */}
           <div className={`screen ${step === 1 ? "active" : ""}`}>
+            {recentCalendars.length > 0 && (
+              <div className="recent-strip">
+                <div className="recent-head">
+                  <div className="recent-eyebrow">Pick up where you left off</div>
+                  <Link to="/my-calendars" className="recent-link">View all →</Link>
+                </div>
+                <div className="recent-list">
+                  {recentCalendars.map(rc => (
+                    <div key={rc.id} className="recent-item">
+                      <div className="recent-meta">
+                        <div className="recent-title">{rc.title}</div>
+                        <div className="recent-sub">
+                          {rc.platform && <span className="recent-tag">{rc.platform}</span>}
+                          {rc.industry_label && <span className="recent-tag">{rc.industry_label}</span>}
+                          <span>{new Date(rc.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      <div className="recent-actions">
+                        <button
+                          type="button"
+                          className="recent-btn primary"
+                          onClick={() => navigate(`/calendar/${rc.id}`)}
+                        >
+                          Open →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="card">
               <div className="sh">What's your <span>industry / niche?</span></div>
               <div className="ind-grid" role="radiogroup" aria-label="Industry or niche">
