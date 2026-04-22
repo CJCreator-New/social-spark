@@ -776,7 +776,183 @@ const Index = () => {
     }
   }
 
-  function copyText(text: string, cb: () => void) {
+  function toggleLock(day: number) {
+    setLockedDays(prev => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day); else next.add(day);
+      return next;
+    });
+  }
+
+  async function regenerateUnlocked() {
+    if (regenIdx !== null || reformatting) return;
+    const targets = posts
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => !lockedDays.has(p.day));
+    if (targets.length === 0) {
+      toast.error("All posts are locked. Unpin at least one to regenerate.");
+      return;
+    }
+    if (targets.length === posts.length) {
+      const ok = window.confirm(`Regenerate all ${posts.length} posts? Tip: pin posts you love first.`);
+      if (!ok) return;
+    }
+    setReformatting(true);
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const next = [...posts];
+      let okCount = 0;
+      for (const { p: target, i } of targets) {
+        setRegenIdx(i);
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
+          },
+          body: JSON.stringify({
+            industry: form.industry,
+            industryLabel: selectedIndustry?.label || form.industry,
+            platform: form.platform,
+            coreIdea: form.coreIdea,
+            audiences: form.audiences,
+            voice: form.voice,
+            style: form.style,
+            goals: form.goals,
+            format: form.format,
+            cta: form.cta,
+            length: form.length,
+            structure: form.structure,
+            extra: form.extra,
+            bannedWords: form.bannedWords,
+            requiredWords: form.requiredWords,
+            post: target,
+            siblings: next,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.post) {
+          next[i] = data.post;
+          setPosts([...next]);
+          okCount++;
+        }
+      }
+      setSavedId(null);
+      toast.success(`Regenerated ${okCount} of ${targets.length} unlocked post${targets.length === 1 ? "" : "s"}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Regenerate failed");
+    } finally {
+      setRegenIdx(null);
+      setReformatting(false);
+    }
+  }
+
+  async function reformatAllForPlatform(targetPlatform: string) {
+    if (!targetPlatform || targetPlatform === form.platform || reformatting || regenIdx !== null) return;
+    if (!user) {
+      toast.error("Sign in to reformat — the result is saved as a new calendar.");
+      return;
+    }
+    const ok = window.confirm(
+      `Reformat this 7-day calendar for ${niceLabelFor(targetPlatform)}? It will be saved as a NEW calendar — your current one stays untouched.`
+    );
+    if (!ok) return;
+    setReformatting(true);
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const next: Post[] = [...posts];
+      for (let i = 0; i < posts.length; i++) {
+        setRegenIdx(i);
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
+          },
+          body: JSON.stringify({
+            industry: form.industry,
+            industryLabel: selectedIndustry?.label || form.industry,
+            platform: targetPlatform,
+            coreIdea: form.coreIdea,
+            audiences: form.audiences,
+            voice: form.voice,
+            style: form.style,
+            goals: form.goals,
+            format: form.format,
+            cta: form.cta,
+            length: form.length,
+            structure: form.structure,
+            extra: form.extra,
+            bannedWords: form.bannedWords,
+            requiredWords: form.requiredWords,
+            post: posts[i],
+            siblings: next,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.post) {
+          next[i] = data.post;
+        }
+      }
+      // Save as new calendar
+      const title = `${form.coreIdea.slice(0, 60) || selectedIndustry?.label || "Calendar"} — ${targetPlatform}`;
+      const newForm = { ...form, platform: targetPlatform };
+      const { data: ins, error: insErr } = await supabase
+        .from("saved_calendars")
+        .insert([{
+          user_id: user.id,
+          title,
+          industry: form.industry,
+          industry_label: selectedIndustry?.label || form.industry,
+          platform: targetPlatform,
+          core_idea: form.coreIdea,
+          form_payload: newForm as never,
+          posts: next as never,
+          week_start_date: form.weekStart || null,
+          post_times: postTimes as never,
+        }])
+        .select("id")
+        .single();
+      if (insErr) {
+        toast.error(insErr.message);
+        return;
+      }
+      toast.success(`Reformatted for ${niceLabelFor(targetPlatform)} ✓ — opening new calendar`);
+      navigate(`/calendar/${ins.id}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Reformat failed");
+    } finally {
+      setRegenIdx(null);
+      setReformatting(false);
+      setReformatTarget("");
+    }
+  }
+
+  function loadSample() {
+    setForm(f => ({ ...f, ...SAMPLE_FORM }));
+    setPosts(SAMPLE_POSTS);
+    setPostTimes(SAMPLE_POST_TIMES);
+    setActiveDay(0);
+    setSampleMode(true);
+    setSavedId(null);
+    setLockedDays(new Set());
+    setStep(4);
+    toast.success("Sample calendar loaded — explore the layout, then start your own.");
+  }
+
+  function exitSample() {
+    setSampleMode(false);
+    setPosts([]);
+    setActiveDay(0);
+    setStep(1);
+  }
+
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(text).then(cb).catch(() => fbCopy(text, cb));
     } else fbCopy(text, cb);
