@@ -1149,6 +1149,11 @@ ${postText(p)}
                 </div>
               </div>
             )}
+            <div className="try-sample">
+              <button type="button" className="try-sample-btn" onClick={loadSample}>
+                ✨ See an example calendar (no sign-up, no API call)
+              </button>
+            </div>
             <div className="card">
               <div className="sh">What's your <span>industry / niche?</span></div>
               <div className="ind-grid" role="radiogroup" aria-label="Industry or niche">
