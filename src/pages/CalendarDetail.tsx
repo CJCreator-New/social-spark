@@ -11,7 +11,7 @@ import {
   dateForDow,
   shortDateLabel,
 } from "@/lib/calendarSchedule";
-import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor } from "@/lib/platformCopy";
+import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor, buildRawMarkdown, PLATFORM_LABELS } from "@/lib/platformCopy";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
