@@ -509,10 +509,16 @@ const Index = () => {
   const navigate = useNavigate();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
+  const [lockedDays, setLockedDays] = useState<Set<number>>(new Set());
+  const [sampleMode, setSampleMode] = useState(false);
+  const [copyMenuOpen, setCopyMenuOpen] = useState(false);
+  const [reformatTarget, setReformatTarget] = useState<string>("");
+  const [reformatting, setReformatting] = useState(false);
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const hydrated = useRef(false);
   const tweakRef = useRef<HTMLDivElement>(null);
+  const copyMenuRef = useRef<HTMLDivElement>(null);
 
   // Close tweak menu on outside click
   useEffect(() => {
