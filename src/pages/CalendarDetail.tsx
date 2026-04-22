@@ -11,7 +11,7 @@ import {
   dateForDow,
   shortDateLabel,
 } from "@/lib/calendarSchedule";
-import { formatForPlatform, writeToClipboard, resolvePlatform } from "@/lib/platformCopy";
+import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor } from "@/lib/platformCopy";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
@@ -31,6 +31,8 @@ interface FormPayload {
   length?: string;
   structure?: string;
   extra?: string;
+  bannedWords?: string[];
+  requiredWords?: string[];
   weekStart?: string;
 }
 
@@ -210,6 +212,8 @@ export default function CalendarDetail() {
           length: formPayload.length || "medium",
           structure: formPayload.structure || "mixed",
           extra: formPayload.extra || "",
+          bannedWords: formPayload.bannedWords || [],
+          requiredWords: formPayload.requiredWords || [],
           post: target,
           siblings: posts,
           tweak,
