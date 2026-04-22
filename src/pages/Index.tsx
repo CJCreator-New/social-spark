@@ -596,6 +596,8 @@ const Index = () => {
           length: form.length,
           structure: form.structure,
           extra: form.extra,
+          bannedWords: form.bannedWords,
+          requiredWords: form.requiredWords,
         }),
         signal: ac.signal,
       });
@@ -669,6 +671,8 @@ const Index = () => {
           length: form.length,
           structure: form.structure,
           extra: form.extra,
+          bannedWords: form.bannedWords,
+          requiredWords: form.requiredWords,
           post: target,
           siblings: posts,
           tweak,
