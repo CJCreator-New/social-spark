@@ -1204,6 +1204,27 @@ ${postText(p)}
                 <SelectField label="Writing style" options={STYLE_OPTIONS} value={form.style} onChange={v => upd("style", v)} placeholder="Select a style…" />
               </div>
 
+              {(() => {
+                const preview = getVoiceStylePreview(form.voice, form.style);
+                if (!preview) {
+                  return (
+                    <div className="vsp">
+                      <div className="vsp-eyebrow">Live voice preview</div>
+                      <div className="vsp-empty">Pick a voice and style above to see a 2-line sample of how your posts will sound — before you generate.</div>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="vsp">
+                    <div className="vsp-eyebrow">
+                      Live voice preview · {form.voice || "default voice"} × {form.style || "default style"}
+                    </div>
+                    <div className="vsp-hook">{preview.hook}</div>
+                    <div className="vsp-tail">{preview.tail}</div>
+                  </div>
+                );
+              })()}
+
               <div className="divider" />
 
               <div className="csect">
