@@ -417,6 +417,30 @@ export default function CalendarDetail() {
             <span style={{ fontSize: 11, color: "#7a7a8e" }}>Day 1 = {shortDateLabel(weekStartDate)}</span>
           </div>
 
+          <div className="cd-reformat-bar">
+            <span className="cd-reformat-label">Reformat for</span>
+            <select
+              className="cd-reformat-sel"
+              value={reformatTarget}
+              onChange={(e) => setReformatTarget(e.target.value)}
+              disabled={reformatting || regenerating}
+            >
+              <option value="">Another platform…</option>
+              {(["LinkedIn","Twitter/X","Instagram","Facebook","Newsletter","Blog"] as const)
+                .filter(p => p !== platform)
+                .map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <button
+              type="button"
+              className="cd-reformat-btn"
+              disabled={!reformatTarget || reformatting || regenerating}
+              onClick={() => reformatAllForPlatform(reformatTarget)}
+              title="Re-runs all 7; saved as a new calendar"
+            >
+              {reformatting ? "Reformatting all 7…" : "Reformat all 7 →"}
+            </button>
+          </div>
+
           <div className="cd-strip" role="tablist" aria-label="Days of the week">
             {posts.map((post, i) => (
               <button
@@ -425,7 +449,7 @@ export default function CalendarDetail() {
                 role="tab"
                 aria-selected={i === active}
                 disabled={editing}
-                className={`cd-tab ${i === active ? "on" : ""}`}
+                className={`cd-tab ${i === active ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
                 onClick={() => { if (!editing) setActive(i); }}
               >
                 <div className="cd-tab-dow">{post.dow}</div>
