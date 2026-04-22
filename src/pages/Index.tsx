@@ -1621,10 +1621,10 @@ ${postText(p)}
                 )}
 
                 <div className="bbar">
-                  <button className="restart" onClick={() => { clearDraft(); setPosts([]); setActiveDay(0); setSavedId(null); setStep(1); setError(""); }}>← Start over</button>
+                  <button className="restart" onClick={() => { clearDraft(); setPosts([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setSampleMode(false); setStep(1); setError(""); }}>← Start over</button>
                   <div className="bactions">
-                    <button className="dlbtn" onClick={saveCalendar} disabled={saving || !!savedId}>
-                      {savedId ? "Saved ✓" : saving ? "Saving…" : "Save calendar"}
+                    <button className="dlbtn" onClick={saveCalendar} disabled={saving || !!savedId || sampleMode} title={sampleMode ? "Sample mode — start your own to save" : ""}>
+                      {sampleMode ? "Save (sample only)" : savedId ? "Saved ✓" : saving ? "Saving…" : "Save calendar"}
                     </button>
                     <button className="dlbtn" onClick={downloadTxt}>
                       <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
