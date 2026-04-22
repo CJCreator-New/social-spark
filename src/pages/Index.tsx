@@ -524,6 +524,19 @@ const Index = () => {
     }
   }, [user]);
 
+  // Fetch 3 most recent saved calendars for the recent strip on Step 1.
+  useEffect(() => {
+    if (!user) { setRecentCalendars([]); return; }
+    supabase
+      .from("saved_calendars")
+      .select("id, title, platform, industry_label, created_at")
+      .order("created_at", { ascending: false })
+      .limit(3)
+      .then(({ data }) => {
+        if (data) setRecentCalendars(data);
+      });
+  }, [user]);
+
   // Persist form/step/extraTopics whenever they change (only on steps 1–2)
   useEffect(() => {
     if (!hydrated.current) return;
