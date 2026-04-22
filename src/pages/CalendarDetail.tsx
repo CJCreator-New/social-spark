@@ -380,24 +380,36 @@ export default function CalendarDetail() {
               <div className="cd-actions">
                 {(() => {
                   const f = formatForPlatform(p, platform);
-                  const niceLabel = resolvePlatform(platform) === "twitter" ? "X" : f.platformLabel;
+                  const niceLabel = niceLabelFor(platform);
+                  const ratio = f.charCount / f.limit;
+                  const budgetCls = f.charCount > f.limit ? "over" : ratio >= 0.9 ? "warn" : "";
                   return (
-                    <button
-                      className="cd-btn cd-btn-p"
-                      disabled={regenerating}
-                      title={`${f.charCount} / ${f.limit} chars`}
-                      onClick={async () => {
-                        const ok = await writeToClipboard(f.text);
-                        if (!ok) { toast.error("Could not copy to clipboard"); return; }
-                        if (f.truncated && f.platform === "twitter") {
-                          toast.error("Trimmed to fit X's 280-char limit");
-                        } else {
-                          toast.success(`Copied for ${niceLabel} ✓`);
-                        }
-                      }}
-                    >
-                      Copy for {niceLabel}
-                    </button>
+                    <>
+                      <span
+                        className={`cd-budget ${budgetCls}`}
+                        title={`Post-format length for ${niceLabel}`}
+                        aria-label={`${f.charCount} of ${f.limit} characters used for ${niceLabel}`}
+                      >
+                        <span className="cd-budget-dot" aria-hidden="true" />
+                        {f.charCount.toLocaleString()} / {f.limit.toLocaleString()}
+                      </span>
+                      <button
+                        className="cd-btn cd-btn-p"
+                        disabled={regenerating}
+                        title={`${f.charCount} / ${f.limit} chars`}
+                        onClick={async () => {
+                          const ok = await writeToClipboard(f.text);
+                          if (!ok) { toast.error("Could not copy to clipboard"); return; }
+                          if (f.truncated && f.platform === "twitter") {
+                            toast.error("Trimmed to fit X's 280-char limit");
+                          } else {
+                            toast.success(`Copied for ${niceLabel} ✓`);
+                          }
+                        }}
+                      >
+                        Copy for {niceLabel}
+                      </button>
+                    </>
                   );
                 })()}
                 <button className="cd-btn" onClick={startEdit} disabled={regenerating}>Edit this post</button>
