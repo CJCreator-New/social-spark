@@ -530,6 +530,16 @@ const Index = () => {
     return () => document.removeEventListener("mousedown", h);
   }, [tweakOpenIdx]);
 
+  // Close copy-split menu on outside click
+  useEffect(() => {
+    if (!copyMenuOpen) return;
+    const h = (e: MouseEvent) => {
+      if (copyMenuRef.current && !copyMenuRef.current.contains(e.target as Node)) setCopyMenuOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [copyMenuOpen]);
+
   // Hydrate from localStorage once on mount, then layer profile brand defaults on top of an empty form.
   useEffect(() => {
     let restoredFromDraft = false;
