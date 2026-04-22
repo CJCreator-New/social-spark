@@ -11,7 +11,7 @@ import {
   dateForDow,
   shortDateLabel,
 } from "@/lib/calendarSchedule";
-import { formatForPlatform, writeToClipboard, resolvePlatform } from "@/lib/platformCopy";
+import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor } from "@/lib/platformCopy";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
@@ -31,6 +31,8 @@ interface FormPayload {
   length?: string;
   structure?: string;
   extra?: string;
+  bannedWords?: string[];
+  requiredWords?: string[];
   weekStart?: string;
 }
 
@@ -88,6 +90,10 @@ const css = `
 .cd-fav-btn { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
 .cd-fav-btn.on { color:#c8f09a; border-color:rgba(200,240,154,0.32); background:rgba(200,240,154,0.06); }
 .cd-fav-btn:hover { border-color:rgba(200,240,154,0.32); }
+.cd-budget { display:inline-flex; align-items:center; gap:5px; font-size:10px; letter-spacing:.04em; padding:3px 9px; border-radius:99px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,.02); color:#7a7a8e; font-family:'Sora',sans-serif; font-weight:400; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cd-budget.warn { color:#f0d49a; border-color:rgba(240,212,154,.32); background:rgba(240,212,154,.06); }
+.cd-budget.over { color:#f09a9a; border-color:rgba(240,154,154,.35); background:rgba(240,154,154,.08); }
+.cd-budget-dot { width:5px; height:5px; border-radius:50%; background:currentColor; opacity:.7; }
 `;
 
 function wordCount(s: string): number {
@@ -210,6 +216,8 @@ export default function CalendarDetail() {
           length: formPayload.length || "medium",
           structure: formPayload.structure || "mixed",
           extra: formPayload.extra || "",
+          bannedWords: formPayload.bannedWords || [],
+          requiredWords: formPayload.requiredWords || [],
           post: target,
           siblings: posts,
           tweak,
@@ -372,24 +380,36 @@ export default function CalendarDetail() {
               <div className="cd-actions">
                 {(() => {
                   const f = formatForPlatform(p, platform);
-                  const niceLabel = resolvePlatform(platform) === "twitter" ? "X" : f.platformLabel;
+                  const niceLabel = niceLabelFor(platform);
+                  const ratio = f.charCount / f.limit;
+                  const budgetCls = f.charCount > f.limit ? "over" : ratio >= 0.9 ? "warn" : "";
                   return (
-                    <button
-                      className="cd-btn cd-btn-p"
-                      disabled={regenerating}
-                      title={`${f.charCount} / ${f.limit} chars`}
-                      onClick={async () => {
-                        const ok = await writeToClipboard(f.text);
-                        if (!ok) { toast.error("Could not copy to clipboard"); return; }
-                        if (f.truncated && f.platform === "twitter") {
-                          toast.error("Trimmed to fit X's 280-char limit");
-                        } else {
-                          toast.success(`Copied for ${niceLabel} ✓`);
-                        }
-                      }}
-                    >
-                      Copy for {niceLabel}
-                    </button>
+                    <>
+                      <span
+                        className={`cd-budget ${budgetCls}`}
+                        title={`Post-format length for ${niceLabel}`}
+                        aria-label={`${f.charCount} of ${f.limit} characters used for ${niceLabel}`}
+                      >
+                        <span className="cd-budget-dot" aria-hidden="true" />
+                        {f.charCount.toLocaleString()} / {f.limit.toLocaleString()}
+                      </span>
+                      <button
+                        className="cd-btn cd-btn-p"
+                        disabled={regenerating}
+                        title={`${f.charCount} / ${f.limit} chars`}
+                        onClick={async () => {
+                          const ok = await writeToClipboard(f.text);
+                          if (!ok) { toast.error("Could not copy to clipboard"); return; }
+                          if (f.truncated && f.platform === "twitter") {
+                            toast.error("Trimmed to fit X's 280-char limit");
+                          } else {
+                            toast.success(`Copied for ${niceLabel} ✓`);
+                          }
+                        }}
+                      >
+                        Copy for {niceLabel}
+                      </button>
+                    </>
                   );
                 })()}
                 <button className="cd-btn" onClick={startEdit} disabled={regenerating}>Edit this post</button>

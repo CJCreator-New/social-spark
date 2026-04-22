@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
 import { downloadIcs, nextMonday, toDateInputValue, parseLocalDate, dateForDow, shortDateLabel } from "@/lib/calendarSchedule";
-import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform } from "@/lib/platformCopy";
+import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform, niceLabelFor } from "@/lib/platformCopy";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -274,6 +274,30 @@ const css = `
 .cf-app .tweak-opt { padding:9px 13px;font-size:12px;color:var(--text2);cursor:pointer;font-family:'Sora',sans-serif;font-weight:300;border:none;background:transparent;width:100%;text-align:left;display:block; }
 .cf-app .tweak-opt:hover { background:var(--adim2);color:var(--accent); }
 .cf-app .tweak-opt:disabled { opacity:.4;cursor:not-allowed; }
+
+.cf-app .budget { display:inline-flex;align-items:center;gap:5px;font-size:10px;letter-spacing:.04em;padding:3px 9px;border-radius:99px;border:1px solid var(--border2);background:rgba(255,255,255,.02);color:var(--text2);font-family:'Sora',sans-serif;font-weight:400;font-variant-numeric:tabular-nums;white-space:nowrap; }
+.cf-app .budget.warn { color:#f0d49a;border-color:rgba(240,212,154,.32);background:rgba(240,212,154,.06); }
+.cf-app .budget.over { color:var(--err);border-color:rgba(240,154,154,.35);background:rgba(240,154,154,.08); }
+.cf-app .budget-dot { width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7; }
+
+.cf-app .recent-strip { background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px 22px;margin-bottom:18px; }
+.cf-app .recent-head { display:flex;justify-content:space-between;align-items:baseline;margin-bottom:13px; }
+.cf-app .recent-eyebrow { font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--text2);font-weight:500; }
+.cf-app .recent-link { font-size:11px;color:var(--text2);text-decoration:none;transition:color .15s; }
+.cf-app .recent-link:hover { color:var(--accent); }
+.cf-app .recent-list { display:flex;flex-direction:column;gap:7px; }
+.cf-app .recent-item { display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--bg);transition:border-color .15s; }
+.cf-app .recent-item:hover { border-color:rgba(200,240,154,.22); }
+.cf-app .recent-meta { min-width:0;flex:1; }
+.cf-app .recent-title { font-family:'Playfair Display',serif;font-size:14px;color:var(--text);margin:0 0 2px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.cf-app .recent-sub { font-size:10px;color:var(--text3);font-weight:300; }
+.cf-app .recent-tag { display:inline-block;padding:1px 7px;border-radius:99px;background:var(--adim);color:var(--accent);font-size:9px;letter-spacing:.04em;margin-right:5px; }
+.cf-app .recent-actions { display:flex;gap:5px;flex-shrink:0; }
+.cf-app .recent-btn { font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-family:'Sora',sans-serif;transition:all .15s;white-space:nowrap; }
+.cf-app .recent-btn:hover { border-color:rgba(200,240,154,.32);color:var(--accent); }
+.cf-app .recent-btn.primary { background:var(--adim);border-color:rgba(200,240,154,.28);color:var(--accent); }
+
+@media (max-width: 640px) {
   .cf-app .ind-grid{grid-template-columns:repeat(3,1fr);}
   .cf-app .plat-grid{grid-template-columns:repeat(2,1fr);}
   .cf-app .g2{grid-template-columns:1fr;}
@@ -426,10 +450,13 @@ const Index = () => {
     length: "medium",
     structure: "mixed",
     extra: "",
+    bannedWords: [] as string[],
+    requiredWords: [] as string[],
     weekStart: toDateInputValue(nextMonday()), // YYYY-MM-DD, defaults to next Monday
   });
   const [customTopic, setCustomTopic] = useState("");
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
+  const [recentCalendars, setRecentCalendars] = useState<{ id: string; title: string; platform: string | null; industry_label: string | null; created_at: string }[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [postTimes, setPostTimes] = useState<Record<string, string>>({}); // {"1":"09:00",...}
   const [activeDay, setActiveDay] = useState(0);
@@ -495,6 +522,19 @@ const Index = () => {
     } else {
       hydrated.current = true;
     }
+  }, [user]);
+
+  // Fetch 3 most recent saved calendars for the recent strip on Step 1.
+  useEffect(() => {
+    if (!user) { setRecentCalendars([]); return; }
+    supabase
+      .from("saved_calendars")
+      .select("id, title, platform, industry_label, created_at")
+      .order("created_at", { ascending: false })
+      .limit(3)
+      .then(({ data }) => {
+        if (data) setRecentCalendars(data);
+      });
   }, [user]);
 
   // Persist form/step/extraTopics whenever they change (only on steps 1–2)
@@ -594,6 +634,8 @@ const Index = () => {
           length: form.length,
           structure: form.structure,
           extra: form.extra,
+          bannedWords: form.bannedWords,
+          requiredWords: form.requiredWords,
         }),
         signal: ac.signal,
       });
@@ -667,6 +709,8 @@ const Index = () => {
           length: form.length,
           structure: form.structure,
           extra: form.extra,
+          bannedWords: form.bannedWords,
+          requiredWords: form.requiredWords,
           post: target,
           siblings: posts,
           tweak,
@@ -728,8 +772,7 @@ const Index = () => {
     if (!ok) { toast.error("Could not copy to clipboard"); return; }
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
-    const label = resolvePlatform(form.platform);
-    toast.success(`All 7 copied for ${PLATFORM_LIMITS[label] ? label.charAt(0).toUpperCase() + label.slice(1) : "all platforms"} ✓`);
+    toast.success(`All 7 copied for ${niceLabelFor(form.platform)} ✓`);
   }
   function downloadTxt() {
     const header = `CONTENTFORGE — 7-DAY ${form.platform.toUpperCase()} CONTENT CALENDAR
@@ -854,6 +897,37 @@ ${postText(p)}
 
           {/* ── STEP 1 ── */}
           <div className={`screen ${step === 1 ? "active" : ""}`}>
+            {recentCalendars.length > 0 && (
+              <div className="recent-strip">
+                <div className="recent-head">
+                  <div className="recent-eyebrow">Pick up where you left off</div>
+                  <Link to="/my-calendars" className="recent-link">View all →</Link>
+                </div>
+                <div className="recent-list">
+                  {recentCalendars.map(rc => (
+                    <div key={rc.id} className="recent-item">
+                      <div className="recent-meta">
+                        <div className="recent-title">{rc.title}</div>
+                        <div className="recent-sub">
+                          {rc.platform && <span className="recent-tag">{rc.platform}</span>}
+                          {rc.industry_label && <span className="recent-tag">{rc.industry_label}</span>}
+                          <span>{new Date(rc.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      <div className="recent-actions">
+                        <button
+                          type="button"
+                          className="recent-btn primary"
+                          onClick={() => navigate(`/calendar/${rc.id}`)}
+                        >
+                          Open →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="card">
               <div className="sh">What's your <span>industry / niche?</span></div>
               <div className="ind-grid" role="radiogroup" aria-label="Industry or niche">
@@ -1013,6 +1087,29 @@ ${postText(p)}
                 <div className="flabel">Extra context <span className="fhint">(optional)</span></div>
                 <textarea rows={2} placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
               </div>
+
+              <div className="g2">
+                <div>
+                  <div className="flabel">Never say <span className="fhint">(comma-separated, hard ban)</span></div>
+                  <input
+                    type="text"
+                    className="ti"
+                    placeholder="e.g. game-changer, synergy, leverage"
+                    value={form.bannedWords.join(", ")}
+                    onChange={e => upd("bannedWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                  />
+                </div>
+                <div>
+                  <div className="flabel">Must mention <span className="fhint">(comma-separated, weave in)</span></div>
+                  <input
+                    type="text"
+                    className="ti"
+                    placeholder="e.g. our product name, RAG, India"
+                    value={form.requiredWords.join(", ")}
+                    onChange={e => upd("requiredWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                  />
+                </div>
+              </div>
             </div>
 
             {error && <div className="err-box">{error}</div>}
@@ -1112,19 +1209,28 @@ ${postText(p)}
                           )}
                         </div>
                         {(() => {
-                          const platLabel = (PLATFORM_LIMITS as Record<string, number>)[resolvePlatform(form.platform)]
-                            ? resolvePlatform(form.platform).charAt(0).toUpperCase() + resolvePlatform(form.platform).slice(1).replace("twitter", "X")
-                            : "platform";
-                          const niceLabel = resolvePlatform(form.platform) === "twitter" ? "X" : platLabel;
+                          const niceLabel = niceLabelFor(form.platform);
                           const f = formatForPlatform(posts[activeDay], form.platform);
+                          const ratio = f.charCount / f.limit;
+                          const budgetCls = f.charCount > f.limit ? "over" : ratio >= 0.9 ? "warn" : "";
                           return (
-                            <button
-                              className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`}
-                              onClick={() => copyPost(activeDay)}
-                              title={`${f.charCount} / ${f.limit} chars`}
-                            >
-                              {copiedIdx === activeDay ? "Copied ✓" : `Copy for ${niceLabel}`}
-                            </button>
+                            <>
+                              <span
+                                className={`budget ${budgetCls}`}
+                                title={`Post-format length for ${niceLabel}`}
+                                aria-label={`${f.charCount} of ${f.limit} characters used for ${niceLabel}`}
+                              >
+                                <span className="budget-dot" aria-hidden="true" />
+                                {f.charCount.toLocaleString()} / {f.limit.toLocaleString()}
+                              </span>
+                              <button
+                                className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`}
+                                onClick={() => copyPost(activeDay)}
+                                title={`${f.charCount} / ${f.limit} chars`}
+                              >
+                                {copiedIdx === activeDay ? "Copied ✓" : `Copy for ${niceLabel}`}
+                              </button>
+                            </>
                           );
                         })()}
                       </div>
@@ -1198,7 +1304,7 @@ ${postText(p)}
                       📅 .ics
                     </button>
                     <button className="btn btn-p" style={{ fontSize: 13 }} onClick={copyAll}>
-                      {copiedAll ? "All copied ✓" : `Copy all 7 for ${resolvePlatform(form.platform) === "twitter" ? "X" : resolvePlatform(form.platform).charAt(0).toUpperCase() + resolvePlatform(form.platform).slice(1)}`}
+                      {copiedAll ? "All copied ✓" : `Copy all 7 for ${niceLabelFor(form.platform)}`}
                     </button>
                   </div>
                 </div>

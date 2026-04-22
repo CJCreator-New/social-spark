@@ -32,6 +32,8 @@ interface Payload {
   length?: string;
   structure?: string;
   extra?: string;
+  bannedWords?: string[];
+  requiredWords?: string[];
   // Single-post context
   post: ExistingPost;
   // Other 6 posts so AI doesn't duplicate angles/openers
@@ -85,11 +87,16 @@ Deno.serve(async (req) => {
       length = "medium",
       structure = "mixed",
       extra = "",
+      bannedWords = [],
+      requiredWords = [],
       post,
       siblings = [],
       newTopic,
       tweak,
     } = body;
+
+    const cleanBanned = (bannedWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
+    const cleanRequired = (requiredWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 10);
 
     if (!post || typeof post.day !== "number" || !post.dow) {
       return new Response(
@@ -137,6 +144,8 @@ CONTEXT:
 - POST LENGTH: ${lengthInstr}
 - POST STRUCTURE: ${structureInstr}
 ${extra ? `- Extra instructions: ${extra}` : ""}
+${cleanBanned.length ? `- NEVER SAY (hard ban — do not use these words or close variants): ${cleanBanned.join(", ")}` : ""}
+${cleanRequired.length ? `- TRY TO MENTION (prefer naturally weaving in at least one of these if it fits the topic): ${cleanRequired.join(", ")}` : ""}
 
 THIS POST:
 - Day: ${post.day} (${post.dow})

@@ -45,6 +45,11 @@ export function resolvePlatform(input?: string | null): PlatformKey {
   return "facebook";
 }
 
+// Friendly label for buttons / chips ("X" instead of "Twitter").
+export function niceLabelFor(input?: string | null): string {
+  return PLATFORM_LABELS[resolvePlatform(input)];
+}
+
 export function stripMarkdown(input: string): string {
   if (!input) return "";
   let s = input;

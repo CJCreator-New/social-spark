@@ -33,6 +33,12 @@ const css = `
 .mc-back { font-size:12px; color:#7a7a8e; text-decoration:none; transition:color .15s; }
 .mc-back:hover { color:#c8f09a; }
 .mc-empty { text-align:center; padding:60px 20px; color:#7a7a8e; font-size:14px; font-weight:300; border:1px dashed rgba(255,255,255,0.08); border-radius:16px; }
+.mc-empty-illus { width:84px; height:84px; margin:0 auto 22px; border-radius:50%; background:radial-gradient(circle at 30% 30%, rgba(200,240,154,0.18), rgba(200,240,154,0.04) 65%, transparent 80%); border:1px solid rgba(200,240,154,0.18); display:flex; align-items:center; justify-content:center; font-size:34px; color:#c8f09a; }
+.mc-empty-title { font-family:'Playfair Display',serif; font-size:22px; color:#edeae3; margin:0 0 8px; font-weight:400; }
+.mc-empty-title em { font-style:italic; color:#c8f09a; }
+.mc-empty-sub { font-size:13px; color:#7a7a8e; max-width:380px; margin:0 auto 22px; line-height:1.65; font-weight:300; }
+.mc-empty-cta { display:inline-block; background:#c8f09a; color:#07080d; padding:11px 22px; border-radius:8px; font-size:13px; font-weight:500; text-decoration:none; font-family:'Sora',sans-serif; transition:transform .15s; }
+.mc-empty-cta:hover { transform:translateY(-1px); }
 .mc-list { display:flex; flex-direction:column; gap:10px; }
 .mc-item { background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:12px; padding:18px 20px; transition:border-color .15s; display:flex; justify-content:space-between; align-items:flex-start; gap:14px; }
 .mc-item:hover { border-color:rgba(200,240,154,0.2); }
@@ -220,9 +226,13 @@ export default function MyCalendars() {
           {loading ? (
             <div className="mc-empty">Loading…</div>
           ) : items.length === 0 ? (
-            <div className="mc-empty">
-              No saved calendars yet.<br />
-              <Link to="/" style={{ color: "#c8f09a", textDecoration: "none", marginTop: 12, display: "inline-block" }}>Generate your first week →</Link>
+            <div className="mc-empty" style={{ padding: "72px 24px" }}>
+              <div className="mc-empty-illus" aria-hidden="true">✦</div>
+              <h2 className="mc-empty-title">No <em>calendars</em> yet</h2>
+              <p className="mc-empty-sub">
+                Generate a full week of platform-native posts tailored to your niche, voice, and audience — saved here for quick access.
+              </p>
+              <Link to="/" className="mc-empty-cta">Generate your first calendar →</Link>
             </div>
           ) : filteredItems.length === 0 ? (
             <div className="mc-empty">No calendars match your filters.</div>

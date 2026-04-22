@@ -20,6 +20,8 @@ interface Payload {
   length?: string;
   structure?: string;
   extra?: string;
+  bannedWords?: string[];
+  requiredWords?: string[];
 }
 
 const LENGTH_GUIDE: Record<string, string> = {
@@ -58,7 +60,12 @@ Deno.serve(async (req) => {
       length = "medium",
       structure = "mixed",
       extra = "",
+      bannedWords = [],
+      requiredWords = [],
     } = body;
+
+    const cleanBanned = (bannedWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
+    const cleanRequired = (requiredWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 10);
 
     if (!coreIdea.trim() || topics.length === 0) {
       return new Response(
@@ -98,6 +105,8 @@ Create a complete 7-day ${platform} content calendar for this creator:
 - POST LENGTH: ${lengthInstr}
 - POST STRUCTURE: ${structureInstr}
 ${extra ? `- Extra instructions: ${extra}` : ""}
+${cleanBanned.length ? `- NEVER SAY (hard ban — do not use these words or close variants in any post): ${cleanBanned.join(", ")}` : ""}
+${cleanRequired.length ? `- MUST MENTION (each of these terms must appear naturally in AT LEAST ONE post across the week): ${cleanRequired.join(", ")}` : ""}
 
 HARD RULES (follow strictly):
 1. Generate content that is genuinely specific to the ${industryLabel || industry} space — use real terminology, real platforms, real trends, real names where relevant. Do NOT write generic content.
