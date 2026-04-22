@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
 import { downloadIcs, nextMonday, toDateInputValue, parseLocalDate, dateForDow, shortDateLabel } from "@/lib/calendarSchedule";
-import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform } from "@/lib/platformCopy";
+import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform, niceLabelFor } from "@/lib/platformCopy";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -426,6 +426,8 @@ const Index = () => {
     length: "medium",
     structure: "mixed",
     extra: "",
+    bannedWords: [] as string[],
+    requiredWords: [] as string[],
     weekStart: toDateInputValue(nextMonday()), // YYYY-MM-DD, defaults to next Monday
   });
   const [customTopic, setCustomTopic] = useState("");
