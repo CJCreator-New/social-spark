@@ -138,6 +138,11 @@ export default function CalendarDetail() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [tweakOpen, setTweakOpen] = useState(false);
   const tweakRef = useRef<HTMLDivElement>(null);
+  const [lockedDays, setLockedDays] = useState<Set<number>>(new Set());
+  const [reformatTarget, setReformatTarget] = useState<string>("");
+  const [reformatting, setReformatting] = useState(false);
+  const [copyMenuOpen, setCopyMenuOpen] = useState(false);
+  const copyMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!tweakOpen) return;
