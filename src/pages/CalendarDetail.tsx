@@ -90,6 +90,10 @@ const css = `
 .cd-fav-btn { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
 .cd-fav-btn.on { color:#c8f09a; border-color:rgba(200,240,154,0.32); background:rgba(200,240,154,0.06); }
 .cd-fav-btn:hover { border-color:rgba(200,240,154,0.32); }
+.cd-budget { display:inline-flex; align-items:center; gap:5px; font-size:10px; letter-spacing:.04em; padding:3px 9px; border-radius:99px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,.02); color:#7a7a8e; font-family:'Sora',sans-serif; font-weight:400; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cd-budget.warn { color:#f0d49a; border-color:rgba(240,212,154,.32); background:rgba(240,212,154,.06); }
+.cd-budget.over { color:#f09a9a; border-color:rgba(240,154,154,.35); background:rgba(240,154,154,.08); }
+.cd-budget-dot { width:5px; height:5px; border-radius:50%; background:currentColor; opacity:.7; }
 `;
 
 function wordCount(s: string): number {
