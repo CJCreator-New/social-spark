@@ -154,6 +154,71 @@ export default function CalendarDetail() {
   }, [tweakOpen]);
 
   useEffect(() => {
+    if (!copyMenuOpen) return;
+    const h = (e: MouseEvent) => {
+      if (copyMenuRef.current && !copyMenuRef.current.contains(e.target as Node)) setCopyMenuOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [copyMenuOpen]);
+
+  function toggleLock(day: number) {
+    setLockedDays(prev => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day); else next.add(day);
+      return next;
+    });
+  }
+
+  async function reformatAllForPlatform(targetPlatform: string) {
+    if (!targetPlatform || targetPlatform === platform || reformatting || regenerating) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error("Sign in required"); return; }
+    const ok = window.confirm(`Reformat all 7 posts for ${niceLabelFor(targetPlatform)}? Saves as a NEW calendar — this one stays untouched.`);
+    if (!ok) return;
+    setReformatting(true);
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const next: Post[] = [...posts];
+      for (let i = 0; i < posts.length; i++) {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}` },
+          body: JSON.stringify({
+            industry: formPayload.industry || "", industryLabel, platform: targetPlatform,
+            coreIdea: formPayload.coreIdea || title, audiences: formPayload.audiences || [],
+            voice: formPayload.voice || "", style: formPayload.style || "", goals: formPayload.goals || [],
+            format: formPayload.format || "Balanced mix", cta: formPayload.cta || "Share & repost bait",
+            length: formPayload.length || "medium", structure: formPayload.structure || "mixed",
+            extra: formPayload.extra || "", bannedWords: formPayload.bannedWords || [], requiredWords: formPayload.requiredWords || [],
+            post: posts[i], siblings: next,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.post) next[i] = data.post;
+      }
+      const newTitle = `${title} — ${targetPlatform}`;
+      const newForm = { ...formPayload, platform: targetPlatform };
+      const { data: ins, error: insErr } = await supabase.from("saved_calendars").insert([{
+        user_id: user.id, title: newTitle, industry: formPayload.industry || null,
+        industry_label: industryLabel || null, platform: targetPlatform, core_idea: formPayload.coreIdea || null,
+        form_payload: newForm as never, posts: next as never, week_start_date: weekStart || null,
+        post_times: postTimes as never,
+      }]).select("id").single();
+      if (insErr) { toast.error(insErr.message); return; }
+      toast.success(`Reformatted for ${niceLabelFor(targetPlatform)} ✓`);
+      navigate(`/calendar/${ins.id}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Reformat failed");
+    } finally {
+      setReformatting(false);
+      setReformatTarget("");
+    }
+  }
+
+  useEffect(() => {
     if (!id) return;
     supabase.from("saved_calendars").select("*").eq("id", id).maybeSingle().then(({ data, error }) => {
       if (error || !data) { toast.error("Calendar not found"); navigate("/my-calendars"); return; }
