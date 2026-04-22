@@ -456,6 +456,7 @@ const Index = () => {
   });
   const [customTopic, setCustomTopic] = useState("");
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
+  const [recentCalendars, setRecentCalendars] = useState<{ id: string; title: string; platform: string | null; industry_label: string | null; created_at: string }[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [postTimes, setPostTimes] = useState<Record<string, string>>({}); // {"1":"09:00",...}
   const [activeDay, setActiveDay] = useState(0);
