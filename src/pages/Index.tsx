@@ -772,8 +772,7 @@ const Index = () => {
     if (!ok) { toast.error("Could not copy to clipboard"); return; }
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
-    const label = resolvePlatform(form.platform);
-    toast.success(`All 7 copied for ${PLATFORM_LIMITS[label] ? label.charAt(0).toUpperCase() + label.slice(1) : "all platforms"} ✓`);
+    toast.success(`All 7 copied for ${niceLabelFor(form.platform)} ✓`);
   }
   function downloadTxt() {
     const header = `CONTENTFORGE — 7-DAY ${form.platform.toUpperCase()} CONTENT CALENDAR
