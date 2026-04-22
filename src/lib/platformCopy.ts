@@ -221,6 +221,21 @@ export function formatForPlatform(post: PostLike, platformInput?: string | null)
   };
 }
 
+// Raw markdown / unformatted dump — useful when pasting into Notion, Buffer,
+// or anywhere the user wants to keep the original structure & headings.
+export function buildRawMarkdown(post: PostLike): string {
+  const parts: string[] = [];
+  if (post.title) parts.push(`# ${post.title}`);
+  if (post.hook) parts.push(`> ${String(post.hook).replace(/\n/g, "\n> ")}`);
+  if (post.body) parts.push(String(post.body));
+  if (post.cta) parts.push(`**CTA:** ${post.cta}`);
+  const tags = Array.isArray(post.hashtags)
+    ? post.hashtags.join(" ")
+    : (post.hashtags || "");
+  if (tags.trim()) parts.push(tags.trim());
+  return parts.join("\n\n").trim();
+}
+
 // Convenience: copy text to clipboard with a graceful execCommand fallback.
 export async function writeToClipboard(text: string): Promise<boolean> {
   try {

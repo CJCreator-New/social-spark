@@ -5,7 +5,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
 import { downloadIcs, nextMonday, toDateInputValue, parseLocalDate, dateForDow, shortDateLabel } from "@/lib/calendarSchedule";
-import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform, niceLabelFor } from "@/lib/platformCopy";
+import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform, niceLabelFor, buildRawMarkdown } from "@/lib/platformCopy";
+import { getVoiceStylePreview } from "@/lib/voiceStylePreview";
+import { SAMPLE_FORM, SAMPLE_POSTS, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -297,6 +299,42 @@ const css = `
 .cf-app .recent-btn:hover { border-color:rgba(200,240,154,.32);color:var(--accent); }
 .cf-app .recent-btn.primary { background:var(--adim);border-color:rgba(200,240,154,.28);color:var(--accent); }
 
+.cf-app .vsp { margin-top:14px;border:1px dashed var(--border2);border-radius:var(--r-md);padding:14px 16px;background:var(--bg); }
+.cf-app .vsp-eyebrow { font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;font-weight:500; }
+.cf-app .vsp-hook { font-family:'Playfair Display',serif;font-style:italic;font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:8px;white-space:pre-line; }
+.cf-app .vsp-tail { font-size:12px;color:#686880;line-height:1.7;font-weight:300;white-space:pre-line; }
+.cf-app .vsp-empty { font-size:11px;color:var(--text3);font-style:italic; }
+
+.cf-app .sample-banner { background:rgba(200,240,154,.07);border:1px solid rgba(200,240,154,.22);border-radius:var(--r-md);padding:12px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap; }
+.cf-app .sample-banner-text { font-size:12px;color:rgba(200,240,154,.85);line-height:1.5;font-weight:400; }
+.cf-app .sample-banner-text strong { color:var(--accent);font-weight:500; }
+.cf-app .sample-cta { background:var(--accent);color:#07080d;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:500;border:none;cursor:pointer;font-family:'Sora',sans-serif;letter-spacing:.02em;white-space:nowrap; }
+.cf-app .sample-cta:hover { background:#d4f7aa; }
+.cf-app .sample-link { background:transparent;border:1px solid var(--border2);color:var(--text2);padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-family:'Sora',sans-serif;font-weight:400; }
+.cf-app .sample-link:hover { border-color:rgba(200,240,154,.35);color:var(--accent); }
+.cf-app .try-sample { display:flex;justify-content:center;margin:-4px 0 14px; }
+.cf-app .try-sample-btn { background:transparent;border:1px dashed var(--border2);color:var(--text2);padding:8px 18px;border-radius:99px;font-size:11px;cursor:pointer;font-family:'Sora',sans-serif;letter-spacing:.04em;transition:all .15s; }
+.cf-app .try-sample-btn:hover { border-color:rgba(200,240,154,.35);color:var(--accent);border-style:solid; }
+
+.cf-app .pin-btn { background:transparent;border:1px solid var(--border2);color:var(--text3);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0; }
+.cf-app .pin-btn:hover { border-color:rgba(200,240,154,.32);color:var(--accent); }
+.cf-app .pin-btn.on { background:var(--adim);border-color:rgba(200,240,154,.42);color:var(--accent); }
+.cf-app .dtab.locked { position:relative; }
+.cf-app .dtab.locked::after { content:'📌';position:absolute;top:3px;right:4px;font-size:9px;line-height:1; }
+.cf-app .reformat-bar { display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;margin-bottom:14px; }
+.cf-app .reformat-label { font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);font-weight:500; }
+.cf-app .reformat-sel { background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:6px 28px 6px 10px;font-size:12px;color:var(--text);font-family:'Sora',sans-serif;outline:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 11 11' fill='none' stroke='%237a7a8e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M2.5 4l3 3 3-3'/></svg>");background-repeat:no-repeat;background-position:right 9px center; }
+.cf-app .reformat-btn { background:var(--adim);border:1px solid rgba(200,240,154,.28);color:var(--accent);padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-family:'Sora',sans-serif;font-weight:500; }
+.cf-app .reformat-btn:disabled { opacity:.5;cursor:not-allowed; }
+
+.cf-app .copy-split { position:relative;display:inline-flex; }
+.cf-app .copy-split-main { border-top-right-radius:0;border-bottom-right-radius:0;border-right-width:0; }
+.cf-app .copy-split-caret { padding:5px 8px;border-radius:0 var(--r-sm) var(--r-sm) 0;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-family:'Sora',sans-serif;display:inline-flex;align-items:center;transition:all .15s; }
+.cf-app .copy-split-caret:hover { border-color:rgba(200,240,154,.28);color:var(--accent); }
+.cf-app .copy-menu { position:absolute;top:calc(100% + 4px);right:0;z-index:200;background:var(--surface3);border:1px solid var(--border2);border-radius:var(--r-md);overflow:hidden;min-width:180px;box-shadow:0 6px 24px rgba(0,0,0,.45); }
+.cf-app .copy-menu-opt { padding:9px 13px;font-size:12px;color:var(--text2);cursor:pointer;font-family:'Sora',sans-serif;font-weight:300;border:none;background:transparent;width:100%;text-align:left;display:block; }
+.cf-app .copy-menu-opt:hover { background:var(--adim2);color:var(--accent); }
+
 @media (max-width: 640px) {
   .cf-app .ind-grid{grid-template-columns:repeat(3,1fr);}
   .cf-app .plat-grid{grid-template-columns:repeat(2,1fr);}
@@ -471,10 +509,16 @@ const Index = () => {
   const navigate = useNavigate();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
+  const [lockedDays, setLockedDays] = useState<Set<number>>(new Set());
+  const [sampleMode, setSampleMode] = useState(false);
+  const [copyMenuOpen, setCopyMenuOpen] = useState(false);
+  const [reformatTarget, setReformatTarget] = useState<string>("");
+  const [reformatting, setReformatting] = useState(false);
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const hydrated = useRef(false);
   const tweakRef = useRef<HTMLDivElement>(null);
+  const copyMenuRef = useRef<HTMLDivElement>(null);
 
   // Close tweak menu on outside click
   useEffect(() => {
@@ -485,6 +529,16 @@ const Index = () => {
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [tweakOpenIdx]);
+
+  // Close copy-split menu on outside click
+  useEffect(() => {
+    if (!copyMenuOpen) return;
+    const h = (e: MouseEvent) => {
+      if (copyMenuRef.current && !copyMenuRef.current.contains(e.target as Node)) setCopyMenuOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [copyMenuOpen]);
 
   // Hydrate from localStorage once on mount, then layer profile brand defaults on top of an empty form.
   useEffect(() => {
@@ -732,6 +786,183 @@ const Index = () => {
     }
   }
 
+  function toggleLock(day: number) {
+    setLockedDays(prev => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day); else next.add(day);
+      return next;
+    });
+  }
+
+  async function regenerateUnlocked() {
+    if (regenIdx !== null || reformatting) return;
+    const targets = posts
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => !lockedDays.has(p.day));
+    if (targets.length === 0) {
+      toast.error("All posts are locked. Unpin at least one to regenerate.");
+      return;
+    }
+    if (targets.length === posts.length) {
+      const ok = window.confirm(`Regenerate all ${posts.length} posts? Tip: pin posts you love first.`);
+      if (!ok) return;
+    }
+    setReformatting(true);
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const next = [...posts];
+      let okCount = 0;
+      for (const { p: target, i } of targets) {
+        setRegenIdx(i);
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
+          },
+          body: JSON.stringify({
+            industry: form.industry,
+            industryLabel: selectedIndustry?.label || form.industry,
+            platform: form.platform,
+            coreIdea: form.coreIdea,
+            audiences: form.audiences,
+            voice: form.voice,
+            style: form.style,
+            goals: form.goals,
+            format: form.format,
+            cta: form.cta,
+            length: form.length,
+            structure: form.structure,
+            extra: form.extra,
+            bannedWords: form.bannedWords,
+            requiredWords: form.requiredWords,
+            post: target,
+            siblings: next,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.post) {
+          next[i] = data.post;
+          setPosts([...next]);
+          okCount++;
+        }
+      }
+      setSavedId(null);
+      toast.success(`Regenerated ${okCount} of ${targets.length} unlocked post${targets.length === 1 ? "" : "s"}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Regenerate failed");
+    } finally {
+      setRegenIdx(null);
+      setReformatting(false);
+    }
+  }
+
+  async function reformatAllForPlatform(targetPlatform: string) {
+    if (!targetPlatform || targetPlatform === form.platform || reformatting || regenIdx !== null) return;
+    if (!user) {
+      toast.error("Sign in to reformat — the result is saved as a new calendar.");
+      return;
+    }
+    const ok = window.confirm(
+      `Reformat this 7-day calendar for ${niceLabelFor(targetPlatform)}? It will be saved as a NEW calendar — your current one stays untouched.`
+    );
+    if (!ok) return;
+    setReformatting(true);
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const next: Post[] = [...posts];
+      for (let i = 0; i < posts.length; i++) {
+        setRegenIdx(i);
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
+          },
+          body: JSON.stringify({
+            industry: form.industry,
+            industryLabel: selectedIndustry?.label || form.industry,
+            platform: targetPlatform,
+            coreIdea: form.coreIdea,
+            audiences: form.audiences,
+            voice: form.voice,
+            style: form.style,
+            goals: form.goals,
+            format: form.format,
+            cta: form.cta,
+            length: form.length,
+            structure: form.structure,
+            extra: form.extra,
+            bannedWords: form.bannedWords,
+            requiredWords: form.requiredWords,
+            post: posts[i],
+            siblings: next,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.post) {
+          next[i] = data.post;
+        }
+      }
+      // Save as new calendar
+      const title = `${form.coreIdea.slice(0, 60) || selectedIndustry?.label || "Calendar"} — ${targetPlatform}`;
+      const newForm = { ...form, platform: targetPlatform };
+      const { data: ins, error: insErr } = await supabase
+        .from("saved_calendars")
+        .insert([{
+          user_id: user.id,
+          title,
+          industry: form.industry,
+          industry_label: selectedIndustry?.label || form.industry,
+          platform: targetPlatform,
+          core_idea: form.coreIdea,
+          form_payload: newForm as never,
+          posts: next as never,
+          week_start_date: form.weekStart || null,
+          post_times: postTimes as never,
+        }])
+        .select("id")
+        .single();
+      if (insErr) {
+        toast.error(insErr.message);
+        return;
+      }
+      toast.success(`Reformatted for ${niceLabelFor(targetPlatform)} ✓ — opening new calendar`);
+      navigate(`/calendar/${ins.id}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Reformat failed");
+    } finally {
+      setRegenIdx(null);
+      setReformatting(false);
+      setReformatTarget("");
+    }
+  }
+
+  function loadSample() {
+    setForm(f => ({ ...f, ...SAMPLE_FORM }));
+    setPosts(SAMPLE_POSTS);
+    setPostTimes(SAMPLE_POST_TIMES);
+    setActiveDay(0);
+    setSampleMode(true);
+    setSavedId(null);
+    setLockedDays(new Set());
+    setStep(4);
+    toast.success("Sample calendar loaded — explore the layout, then start your own.");
+  }
+
+  function exitSample() {
+    setSampleMode(false);
+    setPosts([]);
+    setActiveDay(0);
+    setStep(1);
+  }
+
   function copyText(text: string, cb: () => void) {
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(text).then(cb).catch(() => fbCopy(text, cb));
@@ -928,6 +1159,11 @@ ${postText(p)}
                 </div>
               </div>
             )}
+            <div className="try-sample">
+              <button type="button" className="try-sample-btn" onClick={loadSample}>
+                ✨ See an example calendar (no sign-up, no API call)
+              </button>
+            </div>
             <div className="card">
               <div className="sh">What's your <span>industry / niche?</span></div>
               <div className="ind-grid" role="radiogroup" aria-label="Industry or niche">
@@ -982,6 +1218,27 @@ ${postText(p)}
                 <SelectField label="Voice / tone" options={VOICE_OPTIONS} value={form.voice} onChange={v => upd("voice", v)} placeholder="Select a voice…" />
                 <SelectField label="Writing style" options={STYLE_OPTIONS} value={form.style} onChange={v => upd("style", v)} placeholder="Select a style…" />
               </div>
+
+              {(() => {
+                const preview = getVoiceStylePreview(form.voice, form.style);
+                if (!preview) {
+                  return (
+                    <div className="vsp">
+                      <div className="vsp-eyebrow">Live voice preview</div>
+                      <div className="vsp-empty">Pick a voice and style above to see a 2-line sample of how your posts will sound — before you generate.</div>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="vsp">
+                    <div className="vsp-eyebrow">
+                      Live voice preview · {form.voice || "default voice"} × {form.style || "default style"}
+                    </div>
+                    <div className="vsp-hook">{preview.hook}</div>
+                    <div className="vsp-tail">{preview.tail}</div>
+                  </div>
+                );
+              })()}
 
               <div className="divider" />
 
@@ -1153,6 +1410,54 @@ ${postText(p)}
           <div className={`screen ${step === 4 ? "active" : ""}`}>
             {posts.length > 0 && (
               <>
+                {sampleMode && (
+                  <div className="sample-banner">
+                    <div className="sample-banner-text">
+                      <strong>Sample calendar.</strong> This is a pre-baked example to show you the layout.
+                      Save isn't available — start your own to keep results.
+                    </div>
+                    <button type="button" className="sample-cta" onClick={exitSample}>Start my own →</button>
+                  </div>
+                )}
+
+                {!sampleMode && (
+                  <div className="reformat-bar">
+                    <span className="reformat-label">Reformat for</span>
+                    <select
+                      className="reformat-sel"
+                      value={reformatTarget}
+                      onChange={(e) => setReformatTarget(e.target.value)}
+                      disabled={reformatting || regenIdx !== null}
+                      aria-label="Choose another platform to reformat for"
+                    >
+                      <option value="">Another platform…</option>
+                      {PLATFORM_OPTIONS.filter(po => po.id !== form.platform).map(po => (
+                        <option key={po.id} value={po.id}>{po.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="reformat-btn"
+                      disabled={!reformatTarget || reformatting || regenIdx !== null || !user}
+                      onClick={() => reformatAllForPlatform(reformatTarget)}
+                      title={!user ? "Sign in — saved as a new calendar" : "Re-runs all 7 posts; saved as a new calendar"}
+                    >
+                      {reformatting ? `Reformatting… ${regenIdx !== null ? `(${regenIdx + 1}/7)` : ""}` : "Reformat all 7 →"}
+                    </button>
+                    <span style={{ flex: 1 }} />
+                    <button
+                      type="button"
+                      className="reformat-btn"
+                      style={{ background: "transparent", color: "var(--text2)", borderColor: "var(--border2)" }}
+                      disabled={reformatting || regenIdx !== null || lockedDays.size === posts.length}
+                      onClick={regenerateUnlocked}
+                      title="Re-roll only the days you haven't pinned"
+                    >
+                      ↻ Regenerate unlocked ({posts.length - lockedDays.size})
+                    </button>
+                  </div>
+                )}
+
                 <div className="week-strip" role="tablist" aria-label="Days of the week">
                   {posts.map((post, i) => (
                     <button
@@ -1160,7 +1465,7 @@ ${postText(p)}
                       type="button"
                       role="tab"
                       aria-selected={i === activeDay}
-                      className={`dtab ${i === activeDay ? "on" : ""}`}
+                      className={`dtab ${i === activeDay ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
                       onClick={() => setActiveDay(i)}
                     >
                       <div className="dtab-dow">{post.dow}</div>
@@ -1180,9 +1485,18 @@ ${postText(p)}
                       </div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", position: "relative" }} ref={tweakOpenIdx === activeDay ? tweakRef : undefined}>
                         <button
+                          type="button"
+                          className={`pin-btn ${lockedDays.has(p.day) ? "on" : ""}`}
+                          onClick={() => toggleLock(p.day)}
+                          title={lockedDays.has(p.day) ? "Pinned — won't be touched by 'Regenerate unlocked'" : "Pin this post to protect it"}
+                          aria-pressed={lockedDays.has(p.day)}
+                        >
+                          {lockedDays.has(p.day) ? "📌" : "📍"}
+                        </button>
+                        <button
                           className="cpbtn"
                           onClick={() => regenerateDay(activeDay)}
-                          disabled={regenIdx !== null}
+                          disabled={regenIdx !== null || reformatting}
                           title="Re-roll this single day without touching the other six"
                         >
                           {regenIdx === activeDay ? "Regenerating…" : "↻ Regenerate"}
@@ -1190,7 +1504,7 @@ ${postText(p)}
                         <div className="tweak-wrap">
                           <button
                             className="cpbtn"
-                            disabled={regenIdx !== null}
+                            disabled={regenIdx !== null || reformatting}
                             onClick={() => setTweakOpenIdx(tweakOpenIdx === activeDay ? null : activeDay)}
                             aria-haspopup="menu"
                             aria-expanded={tweakOpenIdx === activeDay}
@@ -1223,13 +1537,53 @@ ${postText(p)}
                                 <span className="budget-dot" aria-hidden="true" />
                                 {f.charCount.toLocaleString()} / {f.limit.toLocaleString()}
                               </span>
-                              <button
-                                className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`}
-                                onClick={() => copyPost(activeDay)}
-                                title={`${f.charCount} / ${f.limit} chars`}
-                              >
-                                {copiedIdx === activeDay ? "Copied ✓" : `Copy for ${niceLabel}`}
-                              </button>
+                              <div className="copy-split" ref={copyMenuOpen ? copyMenuRef : undefined}>
+                                <button
+                                  className={`cpbtn copy-split-main ${copiedIdx === activeDay ? "done" : ""}`}
+                                  onClick={() => copyPost(activeDay)}
+                                  title={`${f.charCount} / ${f.limit} chars`}
+                                >
+                                  {copiedIdx === activeDay ? "Copied ✓" : `Copy for ${niceLabel}`}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="copy-split-caret"
+                                  onClick={() => setCopyMenuOpen(o => !o)}
+                                  aria-haspopup="menu"
+                                  aria-expanded={copyMenuOpen}
+                                  aria-label="More copy options"
+                                >
+                                  ▾
+                                </button>
+                                {copyMenuOpen && (
+                                  <div className="copy-menu" role="menu">
+                                    <button
+                                      type="button"
+                                      className="copy-menu-opt"
+                                      onClick={async () => {
+                                        const ok = await writeToClipboard(buildRawMarkdown(posts[activeDay]));
+                                        setCopyMenuOpen(false);
+                                        if (ok) toast.success("Copied raw markdown ✓");
+                                        else toast.error("Could not copy");
+                                      }}
+                                    >
+                                      Copy as raw markdown
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="copy-menu-opt"
+                                      onClick={async () => {
+                                        const ok = await writeToClipboard(postText(posts[activeDay]));
+                                        setCopyMenuOpen(false);
+                                        if (ok) toast.success("Copied as plain text ✓");
+                                        else toast.error("Could not copy");
+                                      }}
+                                    >
+                                      Copy as plain text (no formatting)
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </>
                           );
                         })()}
@@ -1267,10 +1621,10 @@ ${postText(p)}
                 )}
 
                 <div className="bbar">
-                  <button className="restart" onClick={() => { clearDraft(); setPosts([]); setActiveDay(0); setSavedId(null); setStep(1); setError(""); }}>← Start over</button>
+                  <button className="restart" onClick={() => { clearDraft(); setPosts([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setSampleMode(false); setStep(1); setError(""); }}>← Start over</button>
                   <div className="bactions">
-                    <button className="dlbtn" onClick={saveCalendar} disabled={saving || !!savedId}>
-                      {savedId ? "Saved ✓" : saving ? "Saving…" : "Save calendar"}
+                    <button className="dlbtn" onClick={saveCalendar} disabled={saving || !!savedId || sampleMode} title={sampleMode ? "Sample mode — start your own to save" : ""}>
+                      {sampleMode ? "Save (sample only)" : savedId ? "Saved ✓" : saving ? "Saving…" : "Save calendar"}
                     </button>
                     <button className="dlbtn" onClick={downloadTxt}>
                       <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

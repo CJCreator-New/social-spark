@@ -11,7 +11,7 @@ import {
   dateForDow,
   shortDateLabel,
 } from "@/lib/calendarSchedule";
-import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor } from "@/lib/platformCopy";
+import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor, buildRawMarkdown, PLATFORM_LABELS } from "@/lib/platformCopy";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
@@ -94,6 +94,23 @@ const css = `
 .cd-budget.warn { color:#f0d49a; border-color:rgba(240,212,154,.32); background:rgba(240,212,154,.06); }
 .cd-budget.over { color:#f09a9a; border-color:rgba(240,154,154,.35); background:rgba(240,154,154,.08); }
 .cd-budget-dot { width:5px; height:5px; border-radius:50%; background:currentColor; opacity:.7; }
+.cd-pin-btn { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; width:30px; height:30px; border-radius:50%; cursor:pointer; font-size:14px; display:inline-flex; align-items:center; justify-content:center; transition:all .15s; flex-shrink:0; }
+.cd-pin-btn.on { background:rgba(200,240,154,.12); border-color:rgba(200,240,154,.42); color:#c8f09a; }
+.cd-pin-btn:hover { border-color:rgba(200,240,154,.32); color:#c8f09a; }
+.cd-tab.locked::after { content:'📌'; position:absolute; top:3px; right:4px; font-size:9px; line-height:1; }
+.cd-tab { position:relative; }
+.cd-reformat-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:12px; padding:10px 14px; margin-bottom:14px; }
+.cd-reformat-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
+.cd-reformat-sel { background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px 28px 6px 10px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; appearance:none; cursor:pointer; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 11 11' fill='none' stroke='%237a7a8e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M2.5 4l3 3 3-3'/></svg>"); background-repeat:no-repeat; background-position:right 9px center; }
+.cd-reformat-btn { background:rgba(200,240,154,.12); border:1px solid rgba(200,240,154,.28); color:#c8f09a; padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; font-weight:500; }
+.cd-reformat-btn:disabled { opacity:.5; cursor:not-allowed; }
+.cd-copy-split { position:relative; display:inline-flex; }
+.cd-copy-split-main { border-top-right-radius:0; border-bottom-right-radius:0; border-right-width:0; }
+.cd-copy-caret { padding:0 10px; border-radius:0 8px 8px 0; border:1px solid rgba(255,255,255,0.1); background:transparent; color:#9a9aae; cursor:pointer; font-family:'Sora',sans-serif; display:inline-flex; align-items:center; transition:all .15s; }
+.cd-copy-caret:hover { border-color:rgba(200,240,154,.32); color:#c8f09a; }
+.cd-copy-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:200; background:#181a26; border:1px solid rgba(255,255,255,0.1); border-radius:10px; overflow:hidden; min-width:200px; box-shadow:0 6px 24px rgba(0,0,0,.45); }
+.cd-copy-menu-opt { padding:9px 13px; font-size:12px; color:#7a7a8e; cursor:pointer; font-family:'Sora',sans-serif; font-weight:300; border:none; background:transparent; width:100%; text-align:left; display:block; }
+.cd-copy-menu-opt:hover { background:rgba(200,240,154,.06); color:#c8f09a; }
 `;
 
 function wordCount(s: string): number {
@@ -121,6 +138,11 @@ export default function CalendarDetail() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [tweakOpen, setTweakOpen] = useState(false);
   const tweakRef = useRef<HTMLDivElement>(null);
+  const [lockedDays, setLockedDays] = useState<Set<number>>(new Set());
+  const [reformatTarget, setReformatTarget] = useState<string>("");
+  const [reformatting, setReformatting] = useState(false);
+  const [copyMenuOpen, setCopyMenuOpen] = useState(false);
+  const copyMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!tweakOpen) return;
@@ -130,6 +152,71 @@ export default function CalendarDetail() {
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [tweakOpen]);
+
+  useEffect(() => {
+    if (!copyMenuOpen) return;
+    const h = (e: MouseEvent) => {
+      if (copyMenuRef.current && !copyMenuRef.current.contains(e.target as Node)) setCopyMenuOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [copyMenuOpen]);
+
+  function toggleLock(day: number) {
+    setLockedDays(prev => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day); else next.add(day);
+      return next;
+    });
+  }
+
+  async function reformatAllForPlatform(targetPlatform: string) {
+    if (!targetPlatform || targetPlatform === platform || reformatting || regenerating) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error("Sign in required"); return; }
+    const ok = window.confirm(`Reformat all 7 posts for ${niceLabelFor(targetPlatform)}? Saves as a NEW calendar — this one stays untouched.`);
+    if (!ok) return;
+    setReformatting(true);
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const next: Post[] = [...posts];
+      for (let i = 0; i < posts.length; i++) {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}` },
+          body: JSON.stringify({
+            industry: formPayload.industry || "", industryLabel, platform: targetPlatform,
+            coreIdea: formPayload.coreIdea || title, audiences: formPayload.audiences || [],
+            voice: formPayload.voice || "", style: formPayload.style || "", goals: formPayload.goals || [],
+            format: formPayload.format || "Balanced mix", cta: formPayload.cta || "Share & repost bait",
+            length: formPayload.length || "medium", structure: formPayload.structure || "mixed",
+            extra: formPayload.extra || "", bannedWords: formPayload.bannedWords || [], requiredWords: formPayload.requiredWords || [],
+            post: posts[i], siblings: next,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.post) next[i] = data.post;
+      }
+      const newTitle = `${title} — ${targetPlatform}`;
+      const newForm = { ...formPayload, platform: targetPlatform };
+      const { data: ins, error: insErr } = await supabase.from("saved_calendars").insert([{
+        user_id: user.id, title: newTitle, industry: formPayload.industry || null,
+        industry_label: industryLabel || null, platform: targetPlatform, core_idea: formPayload.coreIdea || null,
+        form_payload: newForm as never, posts: next as never, week_start_date: weekStart || null,
+        post_times: postTimes as never,
+      }]).select("id").single();
+      if (insErr) { toast.error(insErr.message); return; }
+      toast.success(`Reformatted for ${niceLabelFor(targetPlatform)} ✓`);
+      navigate(`/calendar/${ins.id}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Reformat failed");
+    } finally {
+      setReformatting(false);
+      setReformatTarget("");
+    }
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -330,6 +417,30 @@ export default function CalendarDetail() {
             <span style={{ fontSize: 11, color: "#7a7a8e" }}>Day 1 = {shortDateLabel(weekStartDate)}</span>
           </div>
 
+          <div className="cd-reformat-bar">
+            <span className="cd-reformat-label">Reformat for</span>
+            <select
+              className="cd-reformat-sel"
+              value={reformatTarget}
+              onChange={(e) => setReformatTarget(e.target.value)}
+              disabled={reformatting || regenerating}
+            >
+              <option value="">Another platform…</option>
+              {(["LinkedIn","Twitter/X","Instagram","Facebook","Newsletter","Blog"] as const)
+                .filter(p => p !== platform)
+                .map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <button
+              type="button"
+              className="cd-reformat-btn"
+              disabled={!reformatTarget || reformatting || regenerating}
+              onClick={() => reformatAllForPlatform(reformatTarget)}
+              title="Re-runs all 7; saved as a new calendar"
+            >
+              {reformatting ? "Reformatting all 7…" : "Reformat all 7 →"}
+            </button>
+          </div>
+
           <div className="cd-strip" role="tablist" aria-label="Days of the week">
             {posts.map((post, i) => (
               <button
@@ -338,7 +449,7 @@ export default function CalendarDetail() {
                 role="tab"
                 aria-selected={i === active}
                 disabled={editing}
-                className={`cd-tab ${i === active ? "on" : ""}`}
+                className={`cd-tab ${i === active ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
                 onClick={() => { if (!editing) setActive(i); }}
               >
                 <div className="cd-tab-dow">{post.dow}</div>
@@ -358,6 +469,15 @@ export default function CalendarDetail() {
             <div className="cd-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
                 <span className="cd-date-pill">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
+                <button
+                  type="button"
+                  className={`cd-pin-btn ${lockedDays.has(p.day) ? "on" : ""}`}
+                  onClick={() => toggleLock(p.day)}
+                  title={lockedDays.has(p.day) ? "Pinned" : "Pin this post"}
+                  aria-pressed={lockedDays.has(p.day)}
+                >
+                  {lockedDays.has(p.day) ? "📌" : "📍"}
+                </button>
               </div>
               <div className="cd-time-row">
                 <span className="cd-time-label">Post time</span>
