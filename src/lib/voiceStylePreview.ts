@@ -1,0 +1,85 @@
+// Static 2-line preview samples for tone × structure combinations.
+// Pure lookup, no API calls. Used on Step 1 to prevent wasted generations.
+
+const VOICE_OPENERS: Record<string, string> = {
+  "Technical & analytical": "Most teams measure velocity wrong. Story points without cycle-time context are vanity metrics.",
+  "Conversational & warm": "Okay, real talk: I rebuilt this dashboard three times before it clicked. Here's what I'd do differently.",
+  "PM / product thinking": "We shipped the feature nobody asked for, and adoption tripled. Here's what the roadmap missed.",
+  "Opinionated & bold": "Stop running standups. They're a tax on your senior engineers and a crutch for poor planning.",
+  "Data-driven": "We analysed 10,400 sign-ups across 6 months. The activation gap wasn't onboarding — it was day 7.",
+  "Storytelling-first": "It was 11pm on a Tuesday when our biggest customer churned. The post-mortem changed how we hire.",
+  "Educational & clear": "There are three ways to handle race conditions in async UIs. Most teams pick the wrong one.",
+  "Contrarian / challenger": "Everyone says 'ship fast, learn fast'. The teams I admire ship slow on purpose — and learn more.",
+  "Founder POV": "Year 2 of the company nearly killed me. Here's the one decision that flipped the trajectory.",
+  "Academic & research-backed": "A 2023 Stanford study found async-first teams shipped 23% faster — but only when documentation was non-negotiable.",
+  "Humorous & witty": "Our 'AI strategy' is three founders, one Notion doc, and a deeply concerning amount of caffeine.",
+  "Inspirational & motivating": "You don't need permission to start. The version of you in 12 months is begging you to begin today.",
+};
+
+const STYLE_TAILS: Record<string, { kind: "para" | "bullets"; lines: string[] }> = {
+  "Short punchy lines": {
+    kind: "para",
+    lines: ["No fluff. No throat-clearing. Just the thing that matters."],
+  },
+  "Long-form narrative": {
+    kind: "para",
+    lines: ["What followed was six months of slow, deliberate rebuilding — and a quieter kind of confidence I didn't know I needed."],
+  },
+  "Lists & frameworks": {
+    kind: "bullets",
+    lines: ["• Define the constraint", "• Measure the slack", "• Re-design around the bottleneck"],
+  },
+  "Thread-style breakdown": {
+    kind: "bullets",
+    lines: ["1/ The premise everyone gets wrong", "2/ What the data actually shows", "3/ The one shift that changes everything →"],
+  },
+  "Stats-led": {
+    kind: "para",
+    lines: ["73% of teams skip this step. The 27% who don't ship 2.4x more often. The math is uncomfortable."],
+  },
+  "Case study format": {
+    kind: "para",
+    lines: ["Company: a Series A SaaS. Problem: 11% MoM churn. Fix: one onboarding email. Result: churn at 4% in eight weeks."],
+  },
+  "Question-led": {
+    kind: "para",
+    lines: ["So what would you actually do differently if you knew your roadmap was wrong by Q3?"],
+  },
+  "First-person story": {
+    kind: "para",
+    lines: ["I almost quit that morning. Then I opened the dashboard, saw one number move, and stayed for another year."],
+  },
+  "Industry insight": {
+    kind: "para",
+    lines: ["The shift from feature-led to outcome-led product orgs isn't coming. It's already restructuring how the best teams hire."],
+  },
+  "Myth-busting": {
+    kind: "bullets",
+    lines: ["Myth: more meetings → better alignment.", "Reality: alignment is a writing problem, not a meeting problem."],
+  },
+  "How-to guide": {
+    kind: "bullets",
+    lines: ["Step 1: write the one-pager", "Step 2: read it out loud", "Step 3: cut everything that doesn't survive"],
+  },
+  "Behind-the-scenes": {
+    kind: "para",
+    lines: ["Here's the messy version: three Slack threads, one whiteboard photo, and a 2am voice note that became the actual decision."],
+  },
+};
+
+export interface VoiceStylePreview {
+  hook: string;
+  tail: string;
+  isBullets: boolean;
+}
+
+export function getVoiceStylePreview(voice: string, style: string): VoiceStylePreview | null {
+  if (!voice && !style) return null;
+  const hook = VOICE_OPENERS[voice] || VOICE_OPENERS["Conversational & warm"];
+  const styleEntry = STYLE_TAILS[style] || STYLE_TAILS["Short punchy lines"];
+  return {
+    hook,
+    tail: styleEntry.lines.join("\n"),
+    isBullets: styleEntry.kind === "bullets",
+  };
+}
