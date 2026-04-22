@@ -1088,6 +1088,29 @@ ${postText(p)}
                 <div className="flabel">Extra context <span className="fhint">(optional)</span></div>
                 <textarea rows={2} placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
               </div>
+
+              <div className="g2">
+                <div>
+                  <div className="flabel">Never say <span className="fhint">(comma-separated, hard ban)</span></div>
+                  <input
+                    type="text"
+                    className="ti"
+                    placeholder="e.g. game-changer, synergy, leverage"
+                    value={form.bannedWords.join(", ")}
+                    onChange={e => upd("bannedWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                  />
+                </div>
+                <div>
+                  <div className="flabel">Must mention <span className="fhint">(comma-separated, weave in)</span></div>
+                  <input
+                    type="text"
+                    className="ti"
+                    placeholder="e.g. our product name, RAG, India"
+                    value={form.requiredWords.join(", ")}
+                    onChange={e => upd("requiredWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                  />
+                </div>
+              </div>
             </div>
 
             {error && <div className="err-box">{error}</div>}
