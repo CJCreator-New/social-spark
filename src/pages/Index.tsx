@@ -953,6 +953,7 @@ const Index = () => {
     setStep(1);
   }
 
+  function copyText(text: string, cb: () => void) {
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(text).then(cb).catch(() => fbCopy(text, cb));
     } else fbCopy(text, cb);
