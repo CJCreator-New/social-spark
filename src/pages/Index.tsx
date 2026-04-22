@@ -1475,9 +1475,18 @@ ${postText(p)}
                       </div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", position: "relative" }} ref={tweakOpenIdx === activeDay ? tweakRef : undefined}>
                         <button
+                          type="button"
+                          className={`pin-btn ${lockedDays.has(p.day) ? "on" : ""}`}
+                          onClick={() => toggleLock(p.day)}
+                          title={lockedDays.has(p.day) ? "Pinned — won't be touched by 'Regenerate unlocked'" : "Pin this post to protect it"}
+                          aria-pressed={lockedDays.has(p.day)}
+                        >
+                          {lockedDays.has(p.day) ? "📌" : "📍"}
+                        </button>
+                        <button
                           className="cpbtn"
                           onClick={() => regenerateDay(activeDay)}
-                          disabled={regenIdx !== null}
+                          disabled={regenIdx !== null || reformatting}
                           title="Re-roll this single day without touching the other six"
                         >
                           {regenIdx === activeDay ? "Regenerating…" : "↻ Regenerate"}
@@ -1485,7 +1494,7 @@ ${postText(p)}
                         <div className="tweak-wrap">
                           <button
                             className="cpbtn"
-                            disabled={regenIdx !== null}
+                            disabled={regenIdx !== null || reformatting}
                             onClick={() => setTweakOpenIdx(tweakOpenIdx === activeDay ? null : activeDay)}
                             aria-haspopup="menu"
                             aria-expanded={tweakOpenIdx === activeDay}
@@ -1518,13 +1527,53 @@ ${postText(p)}
                                 <span className="budget-dot" aria-hidden="true" />
                                 {f.charCount.toLocaleString()} / {f.limit.toLocaleString()}
                               </span>
-                              <button
-                                className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`}
-                                onClick={() => copyPost(activeDay)}
-                                title={`${f.charCount} / ${f.limit} chars`}
-                              >
-                                {copiedIdx === activeDay ? "Copied ✓" : `Copy for ${niceLabel}`}
-                              </button>
+                              <div className="copy-split" ref={copyMenuOpen ? copyMenuRef : undefined}>
+                                <button
+                                  className={`cpbtn copy-split-main ${copiedIdx === activeDay ? "done" : ""}`}
+                                  onClick={() => copyPost(activeDay)}
+                                  title={`${f.charCount} / ${f.limit} chars`}
+                                >
+                                  {copiedIdx === activeDay ? "Copied ✓" : `Copy for ${niceLabel}`}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="copy-split-caret"
+                                  onClick={() => setCopyMenuOpen(o => !o)}
+                                  aria-haspopup="menu"
+                                  aria-expanded={copyMenuOpen}
+                                  aria-label="More copy options"
+                                >
+                                  ▾
+                                </button>
+                                {copyMenuOpen && (
+                                  <div className="copy-menu" role="menu">
+                                    <button
+                                      type="button"
+                                      className="copy-menu-opt"
+                                      onClick={async () => {
+                                        const ok = await writeToClipboard(buildRawMarkdown(posts[activeDay]));
+                                        setCopyMenuOpen(false);
+                                        if (ok) toast.success("Copied raw markdown ✓");
+                                        else toast.error("Could not copy");
+                                      }}
+                                    >
+                                      Copy as raw markdown
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="copy-menu-opt"
+                                      onClick={async () => {
+                                        const ok = await writeToClipboard(postText(posts[activeDay]));
+                                        setCopyMenuOpen(false);
+                                        if (ok) toast.success("Copied as plain text ✓");
+                                        else toast.error("Could not copy");
+                                      }}
+                                    >
+                                      Copy as plain text (no formatting)
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </>
                           );
                         })()}
