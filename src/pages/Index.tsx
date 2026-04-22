@@ -1210,19 +1210,28 @@ ${postText(p)}
                           )}
                         </div>
                         {(() => {
-                          const platLabel = (PLATFORM_LIMITS as Record<string, number>)[resolvePlatform(form.platform)]
-                            ? resolvePlatform(form.platform).charAt(0).toUpperCase() + resolvePlatform(form.platform).slice(1).replace("twitter", "X")
-                            : "platform";
-                          const niceLabel = resolvePlatform(form.platform) === "twitter" ? "X" : platLabel;
+                          const niceLabel = niceLabelFor(form.platform);
                           const f = formatForPlatform(posts[activeDay], form.platform);
+                          const ratio = f.charCount / f.limit;
+                          const budgetCls = f.charCount > f.limit ? "over" : ratio >= 0.9 ? "warn" : "";
                           return (
-                            <button
-                              className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`}
-                              onClick={() => copyPost(activeDay)}
-                              title={`${f.charCount} / ${f.limit} chars`}
-                            >
-                              {copiedIdx === activeDay ? "Copied ✓" : `Copy for ${niceLabel}`}
-                            </button>
+                            <>
+                              <span
+                                className={`budget ${budgetCls}`}
+                                title={`Post-format length for ${niceLabel}`}
+                                aria-label={`${f.charCount} of ${f.limit} characters used for ${niceLabel}`}
+                              >
+                                <span className="budget-dot" aria-hidden="true" />
+                                {f.charCount.toLocaleString()} / {f.limit.toLocaleString()}
+                              </span>
+                              <button
+                                className={`cpbtn ${copiedIdx === activeDay ? "done" : ""}`}
+                                onClick={() => copyPost(activeDay)}
+                                title={`${f.charCount} / ${f.limit} chars`}
+                              >
+                                {copiedIdx === activeDay ? "Copied ✓" : `Copy for ${niceLabel}`}
+                              </button>
+                            </>
                           );
                         })()}
                       </div>
