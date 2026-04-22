@@ -1400,6 +1400,54 @@ ${postText(p)}
           <div className={`screen ${step === 4 ? "active" : ""}`}>
             {posts.length > 0 && (
               <>
+                {sampleMode && (
+                  <div className="sample-banner">
+                    <div className="sample-banner-text">
+                      <strong>Sample calendar.</strong> This is a pre-baked example to show you the layout.
+                      Save isn't available — start your own to keep results.
+                    </div>
+                    <button type="button" className="sample-cta" onClick={exitSample}>Start my own →</button>
+                  </div>
+                )}
+
+                {!sampleMode && (
+                  <div className="reformat-bar">
+                    <span className="reformat-label">Reformat for</span>
+                    <select
+                      className="reformat-sel"
+                      value={reformatTarget}
+                      onChange={(e) => setReformatTarget(e.target.value)}
+                      disabled={reformatting || regenIdx !== null}
+                      aria-label="Choose another platform to reformat for"
+                    >
+                      <option value="">Another platform…</option>
+                      {PLATFORM_OPTIONS.filter(po => po.id !== form.platform).map(po => (
+                        <option key={po.id} value={po.id}>{po.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="reformat-btn"
+                      disabled={!reformatTarget || reformatting || regenIdx !== null || !user}
+                      onClick={() => reformatAllForPlatform(reformatTarget)}
+                      title={!user ? "Sign in — saved as a new calendar" : "Re-runs all 7 posts; saved as a new calendar"}
+                    >
+                      {reformatting ? `Reformatting… ${regenIdx !== null ? `(${regenIdx + 1}/7)` : ""}` : "Reformat all 7 →"}
+                    </button>
+                    <span style={{ flex: 1 }} />
+                    <button
+                      type="button"
+                      className="reformat-btn"
+                      style={{ background: "transparent", color: "var(--text2)", borderColor: "var(--border2)" }}
+                      disabled={reformatting || regenIdx !== null || lockedDays.size === posts.length}
+                      onClick={regenerateUnlocked}
+                      title="Re-roll only the days you haven't pinned"
+                    >
+                      ↻ Regenerate unlocked ({posts.length - lockedDays.size})
+                    </button>
+                  </div>
+                )}
+
                 <div className="week-strip" role="tablist" aria-label="Days of the week">
                   {posts.map((post, i) => (
                     <button
@@ -1407,7 +1455,7 @@ ${postText(p)}
                       type="button"
                       role="tab"
                       aria-selected={i === activeDay}
-                      className={`dtab ${i === activeDay ? "on" : ""}`}
+                      className={`dtab ${i === activeDay ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
                       onClick={() => setActiveDay(i)}
                     >
                       <div className="dtab-dow">{post.dow}</div>
