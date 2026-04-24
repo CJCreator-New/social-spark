@@ -111,6 +111,12 @@ const css = `
 .cd-copy-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:200; background:#181a26; border:1px solid rgba(255,255,255,0.1); border-radius:10px; overflow:hidden; min-width:200px; box-shadow:0 6px 24px rgba(0,0,0,.45); }
 .cd-copy-menu-opt { padding:9px 13px; font-size:12px; color:#7a7a8e; cursor:pointer; font-family:'Sora',sans-serif; font-weight:300; border:none; background:transparent; width:100%; text-align:left; display:block; }
 .cd-copy-menu-opt:hover { background:rgba(200,240,154,.06); color:#c8f09a; }
+.cd-stats { background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:12px; padding:14px 18px; margin-bottom:14px; display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; }
+.cd-stat { display:flex; flex-direction:column; gap:3px; }
+.cd-stat-label { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
+.cd-stat-val { font-family:'Playfair Display',serif; font-size:18px; color:#edeae3; font-variant-numeric:tabular-nums; }
+.cd-stat-val em { font-style:normal; color:#c8f09a; }
+.cd-stat-sub { font-size:10px; color:#5a5a72; font-weight:300; }
 `;
 
 function wordCount(s: string): number {
