@@ -91,6 +91,8 @@ Deno.serve(async (req) => {
       extra = "",
       bannedWords = [],
       requiredWords = [],
+      bannedHashtags = [],
+      requiredHashtags = [],
       post,
       siblings = [],
       newTopic,
@@ -99,6 +101,9 @@ Deno.serve(async (req) => {
 
     const cleanBanned = (bannedWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
     const cleanRequired = (requiredWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 10);
+    const normTag = (s: string) => `#${String(s || "").trim().replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase()}`;
+    const cleanBannedTags = (bannedHashtags || []).map(normTag).filter(t => t.length > 1).slice(0, 30);
+    const cleanRequiredTags = (requiredHashtags || []).map(normTag).filter(t => t.length > 1).slice(0, 10);
 
     if (!post || typeof post.day !== "number" || !post.dow) {
       return new Response(
