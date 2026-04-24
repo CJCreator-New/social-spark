@@ -234,6 +234,17 @@ export default function MyCalendars() {
               >
                 {favOnly ? "★ Starred only" : "☆ Starred only"}
               </button>
+              <select
+                className="mc-sort"
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                aria-label="Sort calendars"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="title">Title A–Z</option>
+                <option value="favorites">Favorites first</option>
+              </button>
             </div>
           )}
 
