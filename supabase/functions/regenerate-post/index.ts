@@ -126,9 +126,16 @@ Deno.serve(async (req) => {
     const tweakInstr = (tweak && TWEAK_INSTRUCTIONS[tweak]) || "";
 
     const longFormPlatform = platform === "Newsletter" || platform === "Blog";
-    const hashtagInstr = longFormPlatform
+    const baseHashtagInstr = longFormPlatform
       ? `HASHTAGS: This is a ${platform} post — return an EMPTY string ("") for hashtags.`
       : `HASHTAGS: Provide 3–6 platform-native hashtags as a single space-separated string (e.g. "#AI #ProductOps #SaaS").`;
+    const bannedTagInstr = !longFormPlatform && cleanBannedTags.length
+      ? `\n  HASHTAG BAN — NEVER use these hashtags or close variants: ${cleanBannedTags.join(" ")}`
+      : "";
+    const requiredTagInstr = !longFormPlatform && cleanRequiredTags.length
+      ? `\n  HASHTAG REQUIREMENT — INCLUDE at least one of these brand hashtags: ${cleanRequiredTags.join(" ")}`
+      : "";
+    const hashtagInstr = baseHashtagInstr + bannedTagInstr + requiredTagInstr;
 
     const siblingSummary = siblings
       .filter(s => s && s.day !== post.day)
