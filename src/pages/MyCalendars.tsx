@@ -60,6 +60,8 @@ const css = `
 .mc-search:focus { border-color:rgba(200,240,154,0.32); }
 .mc-chip { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:8px 14px; border-radius:99px; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
 .mc-chip.on { background:rgba(200,240,154,0.1); border-color:rgba(200,240,154,0.32); color:#c8f09a; }
+.mc-sort { background:#0d0f18; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 28px 8px 12px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; appearance:none; cursor:pointer; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 11 11' fill='none' stroke='%237a7a8e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M2.5 4l3 3 3-3'/></svg>"); background-repeat:no-repeat; background-position:right 9px center; }
+.mc-sort:focus { border-color:rgba(200,240,154,0.32); }
 .mc-star { background:transparent; border:none; cursor:pointer; font-size:18px; color:#3a3a50; padding:4px 6px; transition:color .15s; line-height:1; }
 .mc-star.on { color:#c8f09a; }
 .mc-star:hover { color:#c8f09a; }
@@ -78,6 +80,8 @@ export default function MyCalendars() {
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [favOnly, setFavOnly] = useState(false);
+  type SortKey = "newest" | "oldest" | "title" | "favorites";
+  const [sortBy, setSortBy] = useState<SortKey>("newest");
 
   useEffect(() => {
     if (!user) return;
@@ -103,19 +107,29 @@ export default function MyCalendars() {
     }
   }
 
-  const filteredItems = items.filter(it => {
-    if (favOnly && !it.is_favorite) return false;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      return (
-        it.title.toLowerCase().includes(q) ||
-        (it.industry_label || "").toLowerCase().includes(q) ||
-        (it.platform || "").toLowerCase().includes(q) ||
-        (it.core_idea || "").toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const filteredItems = items
+    .filter(it => {
+      if (favOnly && !it.is_favorite) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        return (
+          it.title.toLowerCase().includes(q) ||
+          (it.industry_label || "").toLowerCase().includes(q) ||
+          (it.platform || "").toLowerCase().includes(q) ||
+          (it.core_idea || "").toLowerCase().includes(q)
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "favorites") {
+        if (!!b.is_favorite !== !!a.is_favorite) return b.is_favorite ? 1 : -1;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      if (sortBy === "title") return a.title.localeCompare(b.title);
+      if (sortBy === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
   async function confirmDelete() {
     if (!pendingDelete) return;
@@ -220,6 +234,17 @@ export default function MyCalendars() {
               >
                 {favOnly ? "★ Starred only" : "☆ Starred only"}
               </button>
+              <select
+                className="mc-sort"
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                aria-label="Sort calendars"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="title">Title A–Z</option>
+                <option value="favorites">Favorites first</option>
+              </select>
             </div>
           )}
 

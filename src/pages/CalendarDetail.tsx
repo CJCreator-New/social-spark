@@ -111,6 +111,12 @@ const css = `
 .cd-copy-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:200; background:#181a26; border:1px solid rgba(255,255,255,0.1); border-radius:10px; overflow:hidden; min-width:200px; box-shadow:0 6px 24px rgba(0,0,0,.45); }
 .cd-copy-menu-opt { padding:9px 13px; font-size:12px; color:#7a7a8e; cursor:pointer; font-family:'Sora',sans-serif; font-weight:300; border:none; background:transparent; width:100%; text-align:left; display:block; }
 .cd-copy-menu-opt:hover { background:rgba(200,240,154,.06); color:#c8f09a; }
+.cd-stats { background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:12px; padding:14px 18px; margin-bottom:14px; display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; }
+.cd-stat { display:flex; flex-direction:column; gap:3px; }
+.cd-stat-label { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
+.cd-stat-val { font-family:'Playfair Display',serif; font-size:18px; color:#edeae3; font-variant-numeric:tabular-nums; }
+.cd-stat-val em { font-style:normal; color:#c8f09a; }
+.cd-stat-sub { font-size:10px; color:#5a5a72; font-weight:300; }
 `;
 
 function wordCount(s: string): number {
@@ -384,6 +390,35 @@ export default function CalendarDetail() {
     lengthTarget === "mixed" ? "varies (80–380)" :
     "target 160–230";
 
+  // K4 — calendar analytics (client-computed, no backend)
+  const analytics = useMemo(() => {
+    if (!posts.length) return null;
+    let totalChars = 0;
+    let totalHashtags = 0;
+    let withinLimit = 0;
+    const formats = new Map<string, number>();
+    for (const post of posts) {
+      const f = formatForPlatform(post, platform);
+      totalChars += f.charCount;
+      if (f.charCount <= f.limit) withinLimit += 1;
+      const tagCount = String(post.hashtags || "")
+        .split(/[\s,]+/).filter(t => t.trim().length > 1).length;
+      totalHashtags += tagCount;
+      const fmt = (post.format || "—").trim();
+      formats.set(fmt, (formats.get(fmt) || 0) + 1);
+    }
+    const topFormat = [...formats.entries()].sort((a, b) => b[1] - a[1])[0];
+    return {
+      total: posts.length,
+      avgChars: Math.round(totalChars / posts.length),
+      totalChars,
+      avgHashtags: Math.round((totalHashtags / posts.length) * 10) / 10,
+      withinPct: Math.round((withinLimit / posts.length) * 100),
+      topFormat: topFormat ? `${topFormat[0]} ×${topFormat[1]}` : "—",
+      platformLabel: niceLabelFor(platform),
+    };
+  }, [posts, platform]);
+
   if (loading) return <div className="cd-app"><div className="cd-inner">Loading…</div></div>;
 
   return (
@@ -405,6 +440,38 @@ export default function CalendarDetail() {
           </div>
           <h1 className="cd-title">{title}</h1>
           <div className="cd-meta">{meta}</div>
+
+          {analytics && (
+            <div className="cd-stats" aria-label="Calendar analytics">
+              <div className="cd-stat">
+                <span className="cd-stat-label">Posts</span>
+                <span className="cd-stat-val">{analytics.total}</span>
+                <span className="cd-stat-sub">this week</span>
+              </div>
+              <div className="cd-stat">
+                <span className="cd-stat-label">Avg length</span>
+                <span className="cd-stat-val">{analytics.avgChars.toLocaleString()}</span>
+                <span className="cd-stat-sub">chars / post</span>
+              </div>
+              <div className="cd-stat">
+                <span className="cd-stat-label">Avg hashtags</span>
+                <span className="cd-stat-val">{analytics.avgHashtags}</span>
+                <span className="cd-stat-sub">per post</span>
+              </div>
+              <div className="cd-stat">
+                <span className="cd-stat-label">Within limit</span>
+                <span className="cd-stat-val">
+                  <em>{analytics.withinPct}%</em>
+                </span>
+                <span className="cd-stat-sub">on {analytics.platformLabel}</span>
+              </div>
+              <div className="cd-stat">
+                <span className="cd-stat-label">Top format</span>
+                <span className="cd-stat-val" style={{ fontSize: 14, lineHeight: 1.4 }}>{analytics.topFormat}</span>
+                <span className="cd-stat-sub">most-used</span>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
             <span style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#7a7a8e" }}>Week starting</span>

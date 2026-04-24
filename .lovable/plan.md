@@ -1,48 +1,49 @@
 
+# ContentForge — Round 7 Enhancement Plan
 
-# ContentForge — Round 6 Enhancement Plan
+Building on what's shipped (per-platform copy, budget badges, locks, sample walkthrough, recent strip, banned/required words). All ideas below are **additive** — no behavior change to existing flows, no schema migrations that break what we have.
 
-Round 5 just shipped per-platform copy. Here's what to tackle next, grouped by user impact.
+## Theme J — Library management
+The library grows fast; users need to find, group, and revisit work.
 
-## Theme G — Live platform awareness
-The "Copy for [Platform]" formatter exists but users only see results after clicking. Surface it earlier.
+1. **Favorite / star calendars** — toggle ⭐ on My Calendars rows. `is_favorite` column already exists on `saved_calendars` (referenced in current code but unused). Add a "Favorites" filter chip at top of list.
+2. **Search + sort on My Calendars** — search box already styled (`.mc-search`) but not wired. Filter by title/industry/core idea; sort by Newest, Oldest, Title A–Z, Favorites first.
+3. **Calendar comparison view** — "Compare" toggle on My Calendars to pick 2 calendars and view them side-by-side (read-only) for picking a winner before publishing.
 
-1. **Live char-budget badge on every post card** — small chip showing `412 / 3000` (LinkedIn), turning amber at 90% and red over limit. Uses `formatForPlatform` to compute the *post-format* length, not raw text.
-2. **Reformat calendar for another platform** — dropdown on saved calendar header: "Reformat for X / Instagram / LinkedIn / Facebook". Re-runs `regenerate-post` for all 7 days with new platform context, then updates `platform` on save.
-3. **Per-card "Copy as plain" vs "Copy as markdown"** — split button: primary = platform-formatted, secondary in dropdown = raw markdown (current behavior, for users who want to paste into Notion / Buffer).
+## Theme K — Insight & analytics
+Help users understand what they're producing without adding tracking infra.
 
-## Theme H — Power-user generation control
-Round 4 plan flagged these; still high-leverage.
+4. **Calendar analytics summary card** — at top of `CalendarDetail`, show: total chars, avg chars/post, hashtag count, % posts within platform limit, voice/structure mix. All client-computed from current posts. ~No backend.
+5. **Best-day suggestion** — small note per post: "Tuesday 9–11am performs best on LinkedIn". Static lookup table by platform + day-of-week. No data collection, just expert defaults.
 
-4. **Voice + style preview on Step 1** — 2-line static sample rendered live as the user picks tone × structure. No API call, just a lookup table. Prevents wasted generations.
-5. **Banned / required words on Step 2** — two optional inputs ("never say:", "must mention:"). Fed into both `generate-calendar` and `regenerate-post` prompts as hard constraints. Persisted on the saved calendar so regenerates honor them too.
-6. **Lock + regenerate-unlocked** — pin icon on each post card. "Regenerate unlocked" button re-rolls only unpinned posts. Pairs well with banned/required words.
+## Theme L — Generation depth
+6. **Idea brainstorm mode (single-shot)** — new "Brainstorm 10 hooks" button on Step 2 that calls a lightweight new edge function `brainstorm-hooks`. Returns 10 one-line hook ideas the user can pick from before generating the full 7-day calendar. Drastically improves first-attempt quality.
+7. **Per-post variations (A/B)** — on a post card, "Generate alternative" button creates a sibling variant stored alongside the original. User picks A or B before exporting. Uses existing `regenerate-post`; just stores both temporarily in component state.
+8. **Hashtag suggester** — small "Suggest more" button beside hashtags input that calls AI for 8 niche-relevant tags. Tiny prompt, fast.
 
-## Theme I — Onboarding & retention
-First-run is bare; returning users start from scratch each time.
-
-7. **Sample calendar walkthrough** — "See an example" button on Step 1 loads a pre-baked Newsletter calendar into Step 4 (read-only banner, "Start your own" CTA). No auth, no API call.
-8. **Recent calendars strip on Index** — 3 most recent saved calendars above Step 1 with Open / Duplicate. Returning users skip the wizard.
-9. **Empty state on My Calendars** — illustrated empty card + "Generate your first calendar" CTA when list is empty.
+## Theme M — Safety & history
+9. **Edit history (last 5 versions per post)** — every Tweak/Regenerate stores prior version in component state (and on save, into the calendar's JSON `posts` field as a `_history[]` array, capped at 5). "Undo" button on each card reverts to previous version. No schema change.
+10. **Auto-save draft of in-flight wizard** — persist Step 1–3 form to `localStorage` on every change so a refresh mid-wizard doesn't wipe input. Cleared on successful generation. Pure client-side.
 
 ## Recommended bundles
 
-- **Quick polish (G1+I9)** — live budget badges + empty state. ~1h. Smallest scope.
-- **Power user (H4+H5+H6)** — voice preview, banned/required words, lock-and-regenerate. ~2.5h.
-- **Onboarding focus (I7+I8+I9)** — sample calendar, recent strip, empty state. ~2h. Best for new-user activation.
-- **Balanced (G1+H5+I8+I9)** — live budgets, banned/required words, recent strip, empty state. ~2–3h. Recommended.
-- **Per-platform deep dive (G1+G2+G3)** — live budgets, reformat, copy split-button. ~2h. Best if platform polish is the priority.
+- **Library polish (J1+J2+M10)** — favorites, search/sort, autosave draft. ~1.5h. Lowest risk, highest daily-use value.
+- **Insight (K4+K5+L8)** — analytics card, best-day hint, hashtag suggester. ~2h. Adds intelligence without restructuring.
+- **Generation depth (L6+L7+M9)** — brainstorm hooks, A/B variants, edit history. ~3h. Most impactful for power users; needs one new edge function.
+- **Balanced (J1+J2+K4+M10)** — favorites, search/sort, analytics, autosave. ~2h. Recommended — all UI/client work, zero new edge functions.
+- **Everything (J1+J2+K4+L6+L8+M9+M10)** — ~4–5h. Comprehensive.
 
 ## Out of scope (still deferred)
-- Folders / tags on My Calendars
-- Streaming generation, team collab, direct social publishing
+- Folders / nested tags
+- Real social publishing / scheduling integrations
+- Team collaboration & shared workspaces
 - AI image generation per post
+- Streaming generation
 - Tailwind token refactor
 
 ## Decisions needed
-1. Which bundle — Quick polish, Power user, Onboarding, Balanced, Per-platform, or custom mix?
-2. For H5 (banned/required words): persist on the saved calendar so all future regenerates enforce them, or apply per-generation only?
-3. For G2 (reformat for another platform): regenerate in place (overwrite current calendar) or save as a new calendar so the original is preserved?
+1. Which bundle — Library polish, Insight, Generation depth, Balanced, Everything, or custom?
+2. For M9 (edit history): persist history in `posts` JSON on save, or keep purely in-memory (lost on refresh)?
+3. For L6 (brainstorm hooks): create the new `brainstorm-hooks` edge function, or reuse `generate-calendar` with a "hooks-only" flag?
 
 Reply with the bundle and decisions and I'll switch to default mode and implement.
-
