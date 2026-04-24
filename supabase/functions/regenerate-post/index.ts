@@ -34,6 +34,8 @@ interface Payload {
   extra?: string;
   bannedWords?: string[];
   requiredWords?: string[];
+  bannedHashtags?: string[];
+  requiredHashtags?: string[];
   // Single-post context
   post: ExistingPost;
   // Other 6 posts so AI doesn't duplicate angles/openers
