@@ -244,7 +244,7 @@ export default function MyCalendars() {
                 <option value="oldest">Oldest first</option>
                 <option value="title">Title A–Z</option>
                 <option value="favorites">Favorites first</option>
-              </button>
+              </select>
             </div>
           )}
 
