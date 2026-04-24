@@ -441,6 +441,38 @@ export default function CalendarDetail() {
           <h1 className="cd-title">{title}</h1>
           <div className="cd-meta">{meta}</div>
 
+          {analytics && (
+            <div className="cd-stats" aria-label="Calendar analytics">
+              <div className="cd-stat">
+                <span className="cd-stat-label">Posts</span>
+                <span className="cd-stat-val">{analytics.total}</span>
+                <span className="cd-stat-sub">this week</span>
+              </div>
+              <div className="cd-stat">
+                <span className="cd-stat-label">Avg length</span>
+                <span className="cd-stat-val">{analytics.avgChars.toLocaleString()}</span>
+                <span className="cd-stat-sub">chars / post</span>
+              </div>
+              <div className="cd-stat">
+                <span className="cd-stat-label">Avg hashtags</span>
+                <span className="cd-stat-val">{analytics.avgHashtags}</span>
+                <span className="cd-stat-sub">per post</span>
+              </div>
+              <div className="cd-stat">
+                <span className="cd-stat-label">Within limit</span>
+                <span className="cd-stat-val">
+                  <em>{analytics.withinPct}%</em>
+                </span>
+                <span className="cd-stat-sub">on {analytics.platformLabel}</span>
+              </div>
+              <div className="cd-stat">
+                <span className="cd-stat-label">Top format</span>
+                <span className="cd-stat-val" style={{ fontSize: 14, lineHeight: 1.4 }}>{analytics.topFormat}</span>
+                <span className="cd-stat-sub">most-used</span>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
             <span style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#7a7a8e" }}>Week starting</span>
             <input
