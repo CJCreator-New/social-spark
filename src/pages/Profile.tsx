@@ -267,6 +267,58 @@ export default function Profile() {
                 ))}
               </div>
 
+              <div style={{ height: 8 }} />
+              <h2 className="pf-section-h" style={{ marginTop: 14 }}>Hashtag policy</h2>
+              <div className="pf-section-sub">
+                Banned tags are stripped from every generated post. Required tags are appended automatically (up to each platform's natural limit).
+              </div>
+
+              <div className="pf-label">Banned hashtags ({bannedHashtags.length}/30)</div>
+              <div className="pf-tagrow" role="list" aria-label="Banned hashtags">
+                {bannedHashtags.length === 0
+                  ? <span className="pf-tagrow-empty">No banned tags yet</span>
+                  : bannedHashtags.map(t => (
+                    <span key={t} className="pf-tag" role="listitem" style={{ background: "rgba(240,154,154,0.1)", borderColor: "rgba(240,154,154,0.3)", color: "#f09a9a" }}>
+                      {displayTag(t)}
+                      <button className="pf-tag-x" onClick={() => removeTag("ban", t)} aria-label={`Remove ${displayTag(t)}`} style={{ color: "rgba(240,154,154,0.6)" }}>×</button>
+                    </span>
+                  ))}
+              </div>
+              <div className="pf-add-row">
+                <input
+                  className="pf-input"
+                  placeholder="+ ban a tag, e.g. growthhacks"
+                  value={bannedTagInput}
+                  onChange={e => setBannedTagInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addTag("ban"))}
+                  aria-label="New banned hashtag"
+                />
+                <button className="pf-add-btn" onClick={() => addTag("ban")}>Ban</button>
+              </div>
+
+              <div className="pf-label">Required hashtags ({requiredHashtags.length}/10)</div>
+              <div className="pf-tagrow" role="list" aria-label="Required hashtags">
+                {requiredHashtags.length === 0
+                  ? <span className="pf-tagrow-empty">No required tags yet</span>
+                  : requiredHashtags.map(t => (
+                    <span key={t} className="pf-tag" role="listitem">
+                      {displayTag(t)}
+                      <button className="pf-tag-x" onClick={() => removeTag("req", t)} aria-label={`Remove ${displayTag(t)}`}>×</button>
+                    </span>
+                  ))}
+              </div>
+              <div className="pf-add-row">
+                <input
+                  className="pf-input"
+                  placeholder="+ require a brand tag, e.g. acmeai"
+                  value={requiredTagInput}
+                  onChange={e => setRequiredTagInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addTag("req"))}
+                  aria-label="New required hashtag"
+                />
+                <button className="pf-add-btn" onClick={() => addTag("req")}>Require</button>
+              </div>
+
               <button className="pf-btn" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
             </div>
           )}
