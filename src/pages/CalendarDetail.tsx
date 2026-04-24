@@ -390,6 +390,35 @@ export default function CalendarDetail() {
     lengthTarget === "mixed" ? "varies (80–380)" :
     "target 160–230";
 
+  // K4 — calendar analytics (client-computed, no backend)
+  const analytics = useMemo(() => {
+    if (!posts.length) return null;
+    let totalChars = 0;
+    let totalHashtags = 0;
+    let withinLimit = 0;
+    const formats = new Map<string, number>();
+    for (const post of posts) {
+      const f = formatForPlatform(post, platform);
+      totalChars += f.charCount;
+      if (f.charCount <= f.limit) withinLimit += 1;
+      const tagCount = String(post.hashtags || "")
+        .split(/[\s,]+/).filter(t => t.trim().length > 1).length;
+      totalHashtags += tagCount;
+      const fmt = (post.format || "—").trim();
+      formats.set(fmt, (formats.get(fmt) || 0) + 1);
+    }
+    const topFormat = [...formats.entries()].sort((a, b) => b[1] - a[1])[0];
+    return {
+      total: posts.length,
+      avgChars: Math.round(totalChars / posts.length),
+      totalChars,
+      avgHashtags: Math.round((totalHashtags / posts.length) * 10) / 10,
+      withinPct: Math.round((withinLimit / posts.length) * 100),
+      topFormat: topFormat ? `${topFormat[0]} ×${topFormat[1]}` : "—",
+      platformLabel: niceLabelFor(platform),
+    };
+  }, [posts, platform]);
+
   if (loading) return <div className="cd-app"><div className="cd-inner">Loading…</div></div>;
 
   return (
