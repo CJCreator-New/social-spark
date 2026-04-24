@@ -107,19 +107,29 @@ export default function MyCalendars() {
     }
   }
 
-  const filteredItems = items.filter(it => {
-    if (favOnly && !it.is_favorite) return false;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      return (
-        it.title.toLowerCase().includes(q) ||
-        (it.industry_label || "").toLowerCase().includes(q) ||
-        (it.platform || "").toLowerCase().includes(q) ||
-        (it.core_idea || "").toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const filteredItems = items
+    .filter(it => {
+      if (favOnly && !it.is_favorite) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        return (
+          it.title.toLowerCase().includes(q) ||
+          (it.industry_label || "").toLowerCase().includes(q) ||
+          (it.platform || "").toLowerCase().includes(q) ||
+          (it.core_idea || "").toLowerCase().includes(q)
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "favorites") {
+        if (!!b.is_favorite !== !!a.is_favorite) return b.is_favorite ? 1 : -1;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      if (sortBy === "title") return a.title.localeCompare(b.title);
+      if (sortBy === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
   async function confirmDelete() {
     if (!pendingDelete) return;
