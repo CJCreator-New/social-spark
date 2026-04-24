@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { normalizeTag, displayTag, parsePolicyList } from "@/lib/hashtagPolicy";
 
 const VOICE_OPTIONS = ["Technical & analytical", "Conversational & warm", "PM / product thinking", "Opinionated & bold", "Data-driven", "Storytelling-first", "Educational & clear", "Contrarian / challenger", "Founder POV", "Academic & research-backed", "Humorous & witty", "Inspirational & motivating"];
 const STYLE_OPTIONS = ["Short punchy lines", "Long-form narrative", "Lists & frameworks", "Thread-style breakdown", "Stats-led", "Case study format", "Question-led", "First-person story", "Industry insight", "Myth-busting", "How-to guide", "Behind-the-scenes"];
@@ -61,13 +62,17 @@ export default function Profile() {
   const [defaultAudiences, setDefaultAudiences] = useState<string[]>([]);
   const [defaultGoals, setDefaultGoals] = useState<string[]>([]);
   const [audienceInput, setAudienceInput] = useState("");
+  const [bannedHashtags, setBannedHashtags] = useState<string[]>([]);
+  const [requiredHashtags, setRequiredHashtags] = useState<string[]>([]);
+  const [bannedTagInput, setBannedTagInput] = useState("");
+  const [requiredTagInput, setRequiredTagInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("display_name, avatar_url, default_voice, default_style, default_audiences, default_goals").eq("user_id", user.id).maybeSingle()
+    supabase.from("profiles").select("display_name, avatar_url, default_voice, default_style, default_audiences, default_goals, banned_hashtags, required_hashtags").eq("user_id", user.id).maybeSingle()
       .then(({ data }) => {
         setDisplayName(data?.display_name || "");
         setAvatarUrl(data?.avatar_url || "");
@@ -75,6 +80,9 @@ export default function Profile() {
         setDefaultStyle(data?.default_style || "");
         setDefaultAudiences(data?.default_audiences || []);
         setDefaultGoals(data?.default_goals || []);
+        const d = data as { banned_hashtags?: string[] | null; required_hashtags?: string[] | null } | null;
+        setBannedHashtags(parsePolicyList(d?.banned_hashtags));
+        setRequiredHashtags(parsePolicyList(d?.required_hashtags));
         setLoading(false);
       });
   }, [user]);
@@ -126,6 +134,26 @@ export default function Profile() {
     setDefaultAudiences(p => p.filter(x => x !== a));
   }
 
+  function addTag(kind: "ban" | "req") {
+    const raw = kind === "ban" ? bannedTagInput : requiredTagInput;
+    const tag = normalizeTag(raw);
+    if (!tag) return;
+    if (kind === "ban") {
+      if (bannedHashtags.includes(tag) || bannedHashtags.length >= 30) return;
+      setBannedHashtags(p => [...p, tag]);
+      setBannedTagInput("");
+    } else {
+      if (requiredHashtags.includes(tag) || requiredHashtags.length >= 10) return;
+      setRequiredHashtags(p => [...p, tag]);
+      setRequiredTagInput("");
+    }
+  }
+
+  function removeTag(kind: "ban" | "req", tag: string) {
+    if (kind === "ban") setBannedHashtags(p => p.filter(t => t !== tag));
+    else setRequiredHashtags(p => p.filter(t => t !== tag));
+  }
+
   async function handleSave() {
     if (!user) return;
     setSaving(true);
@@ -137,6 +165,8 @@ export default function Profile() {
         default_style: defaultStyle || null,
         default_audiences: defaultAudiences.length ? defaultAudiences : null,
         default_goals: defaultGoals.length ? defaultGoals : null,
+        banned_hashtags: bannedHashtags.length ? bannedHashtags : null,
+        required_hashtags: requiredHashtags.length ? requiredHashtags : null,
       })
       .eq("user_id", user.id);
     setSaving(false);
