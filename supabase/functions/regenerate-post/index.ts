@@ -34,6 +34,8 @@ interface Payload {
   extra?: string;
   bannedWords?: string[];
   requiredWords?: string[];
+  bannedHashtags?: string[];
+  requiredHashtags?: string[];
   // Single-post context
   post: ExistingPost;
   // Other 6 posts so AI doesn't duplicate angles/openers
@@ -89,6 +91,8 @@ Deno.serve(async (req) => {
       extra = "",
       bannedWords = [],
       requiredWords = [],
+      bannedHashtags = [],
+      requiredHashtags = [],
       post,
       siblings = [],
       newTopic,
@@ -97,6 +101,9 @@ Deno.serve(async (req) => {
 
     const cleanBanned = (bannedWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
     const cleanRequired = (requiredWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 10);
+    const normTag = (s: string) => `#${String(s || "").trim().replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase()}`;
+    const cleanBannedTags = (bannedHashtags || []).map(normTag).filter(t => t.length > 1).slice(0, 30);
+    const cleanRequiredTags = (requiredHashtags || []).map(normTag).filter(t => t.length > 1).slice(0, 10);
 
     if (!post || typeof post.day !== "number" || !post.dow) {
       return new Response(
@@ -119,9 +126,16 @@ Deno.serve(async (req) => {
     const tweakInstr = (tweak && TWEAK_INSTRUCTIONS[tweak]) || "";
 
     const longFormPlatform = platform === "Newsletter" || platform === "Blog";
-    const hashtagInstr = longFormPlatform
+    const baseHashtagInstr = longFormPlatform
       ? `HASHTAGS: This is a ${platform} post — return an EMPTY string ("") for hashtags.`
       : `HASHTAGS: Provide 3–6 platform-native hashtags as a single space-separated string (e.g. "#AI #ProductOps #SaaS").`;
+    const bannedTagInstr = !longFormPlatform && cleanBannedTags.length
+      ? `\n  HASHTAG BAN — NEVER use these hashtags or close variants: ${cleanBannedTags.join(" ")}`
+      : "";
+    const requiredTagInstr = !longFormPlatform && cleanRequiredTags.length
+      ? `\n  HASHTAG REQUIREMENT — INCLUDE at least one of these brand hashtags: ${cleanRequiredTags.join(" ")}`
+      : "";
+    const hashtagInstr = baseHashtagInstr + bannedTagInstr + requiredTagInstr;
 
     const siblingSummary = siblings
       .filter(s => s && s.day !== post.day)

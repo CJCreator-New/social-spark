@@ -22,6 +22,8 @@ interface Payload {
   extra?: string;
   bannedWords?: string[];
   requiredWords?: string[];
+  bannedHashtags?: string[];
+  requiredHashtags?: string[];
 }
 
 const LENGTH_GUIDE: Record<string, string> = {
@@ -62,10 +64,15 @@ Deno.serve(async (req) => {
       extra = "",
       bannedWords = [],
       requiredWords = [],
+      bannedHashtags = [],
+      requiredHashtags = [],
     } = body;
 
     const cleanBanned = (bannedWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
     const cleanRequired = (requiredWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 10);
+    const normTag = (s: string) => `#${String(s || "").trim().replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase()}`;
+    const cleanBannedTags = (bannedHashtags || []).map(normTag).filter(t => t.length > 1).slice(0, 30);
+    const cleanRequiredTags = (requiredHashtags || []).map(normTag).filter(t => t.length > 1).slice(0, 10);
 
     if (!coreIdea.trim() || topics.length === 0) {
       return new Response(
@@ -86,9 +93,16 @@ Deno.serve(async (req) => {
     const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
 
     const longFormPlatform = platform === "Newsletter" || platform === "Blog";
-    const hashtagInstr = longFormPlatform
+    const baseHashtagInstr = longFormPlatform
       ? `HASHTAGS: This is a ${platform} post — return an EMPTY string ("") for the hashtags field. Do NOT invent hashtags.`
       : `HASHTAGS: Provide 3–6 platform-native hashtags as a single space-separated string (e.g. "#AI #ProductOps #SaaS"). Mix one broad, two niche, and one trending where relevant.`;
+    const bannedTagInstr = !longFormPlatform && cleanBannedTags.length
+      ? `\n  HASHTAG BAN — NEVER use these hashtags or close variants in any post: ${cleanBannedTags.join(" ")}`
+      : "";
+    const requiredTagInstr = !longFormPlatform && cleanRequiredTags.length
+      ? `\n  HASHTAG REQUIREMENT — INCLUDE at least one of these brand hashtags in EVERY post: ${cleanRequiredTags.join(" ")}`
+      : "";
+    const hashtagInstr = baseHashtagInstr + bannedTagInstr + requiredTagInstr;
 
     const prompt = `You are a world-class ${platform} content strategist specialising in ${industryLabel || industry} content.
 

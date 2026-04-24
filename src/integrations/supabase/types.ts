@@ -17,6 +17,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          banned_hashtags: string[] | null
           created_at: string
           default_audiences: string[] | null
           default_goals: string[] | null
@@ -24,11 +25,13 @@ export type Database = {
           default_voice: string | null
           display_name: string | null
           id: string
+          required_hashtags: string[] | null
           updated_at: string
           user_id: string
         }
         Insert: {
           avatar_url?: string | null
+          banned_hashtags?: string[] | null
           created_at?: string
           default_audiences?: string[] | null
           default_goals?: string[] | null
@@ -36,11 +39,13 @@ export type Database = {
           default_voice?: string | null
           display_name?: string | null
           id?: string
+          required_hashtags?: string[] | null
           updated_at?: string
           user_id: string
         }
         Update: {
           avatar_url?: string | null
+          banned_hashtags?: string[] | null
           created_at?: string
           default_audiences?: string[] | null
           default_goals?: string[] | null
@@ -48,6 +53,7 @@ export type Database = {
           default_voice?: string | null
           display_name?: string | null
           id?: string
+          required_hashtags?: string[] | null
           updated_at?: string
           user_id?: string
         }
@@ -103,6 +109,56 @@ export type Database = {
           week_start_date?: string | null
         }
         Relationships: []
+      }
+      scheduled_posts: {
+        Row: {
+          calendar_id: string
+          copy_text: string | null
+          created_at: string
+          id: string
+          platform: string | null
+          post_day: number
+          post_snapshot: Json
+          scheduled_at: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calendar_id: string
+          copy_text?: string | null
+          created_at?: string
+          id?: string
+          platform?: string | null
+          post_day: number
+          post_snapshot: Json
+          scheduled_at: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          calendar_id?: string
+          copy_text?: string | null
+          created_at?: string
+          id?: string
+          platform?: string | null
+          post_day?: number
+          post_snapshot?: Json
+          scheduled_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_calendar_id_fkey"
+            columns: ["calendar_id"]
+            isOneToOne: false
+            referencedRelation: "saved_calendars"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
