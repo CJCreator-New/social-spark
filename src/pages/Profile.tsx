@@ -213,6 +213,15 @@ export default function Profile() {
 
                 <label className="pf-label" htmlFor="pf-email">Email</label>
                 <input id="pf-email" className="pf-input" value={user?.email || ""} disabled />
+
+                <label className="pf-label" htmlFor="pf-tz">Default timezone</label>
+                <select id="pf-tz" className="pf-select" value={defaultTimezone} onChange={e => setDefaultTimezone(e.target.value)}>
+                  <option value="">— Browser default ({browserTimezone()}) —</option>
+                  {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
+                </select>
+                <div className="pf-meta" style={{ marginTop: -8, marginBottom: 8 }}>
+                  Used as the fallback when scheduling. Each calendar can override this.
+                </div>
               </>
             )}
           </div>
