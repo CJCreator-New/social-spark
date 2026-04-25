@@ -62,6 +62,7 @@ export function applyPolicy(
   rawHashtags: string | string[] | null | undefined,
   platformInput: string | null | undefined,
   policy: HashtagPolicy,
+  lockedTags: string[] = [],
 ): string {
   if (isLongForm(platformInput)) return "";
 
@@ -70,28 +71,44 @@ export function applyPolicy(
 
   const bannedSet = new Set(policy.banned.map(normalizeTag).filter(Boolean));
   const requiredList = policy.required.map(normalizeTag).filter(Boolean);
+  const lockedList = lockedTags.map(normalizeTag).filter(Boolean);
 
-  // Parse + dedupe existing tags
-  const existing: string[] = [];
+  const out: string[] = [];
   const seen = new Set<string>();
+
+  // 1) Locked tags ALWAYS appear first (and override the ban list — user explicit choice).
+  for (const tag of lockedList) {
+    if (out.length >= max) break;
+    if (seen.has(tag)) continue;
+    seen.add(tag);
+    out.push(tag);
+  }
+
+  // 2) Existing AI-generated tags, dropping banned + already-locked.
   const sourceParts = Array.isArray(rawHashtags)
     ? rawHashtags.join(" ")
     : (rawHashtags || "");
   for (const part of sourceParts.split(/[\s,]+/)) {
+    if (out.length >= max) break;
     const tag = normalizeTag(part);
     if (!tag || seen.has(tag) || bannedSet.has(tag)) continue;
     seen.add(tag);
-    existing.push(tag);
+    out.push(tag);
   }
 
-  // Append required tags not already present (until we hit the platform max).
+  // 3) Append required tags not already present (until we hit the platform max).
   for (const tag of requiredList) {
-    if (existing.length >= max) break;
+    if (out.length >= max) break;
     if (seen.has(tag)) continue;
     seen.add(tag);
-    existing.push(tag);
+    out.push(tag);
   }
 
-  // Trim to platform max
-  return existing.slice(0, max).map(displayTag).join(" ");
+  return out.slice(0, max).map(displayTag).join(" ");
 }
+
+/** Parse the rendered hashtag string back into normalized tokens. */
+export function parseHashtagsString(input: string | null | undefined): string[] {
+  return parsePolicyList(input);
+}
+
