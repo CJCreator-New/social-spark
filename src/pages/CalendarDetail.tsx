@@ -715,8 +715,24 @@ export default function CalendarDetail() {
                         aria-label={`${f.charCount} of ${f.limit} characters used for ${niceLabel}`}
                       >
                         <span className="cd-budget-dot" aria-hidden="true" />
-                        {f.charCount.toLocaleString()} / {f.limit.toLocaleString()}
+                        {f.charCount.toLocaleString()} / {f.limit.toLocaleString()} ({Math.round(ratio * 100)}%)
                       </span>
+                      {(() => {
+                        const ins = insightFor(p, platform);
+                        const tagCls = ins.hashtagState === "sweet" ? "good" : ins.hashtagState === "na" ? "" : ins.hashtagState === "dense" ? "bad" : "warn";
+                        const healthCls = ins.health === "good" ? "good" : ins.health === "warn" ? "warn" : "bad";
+                        const healthLabel = ins.health === "good" ? "✓ ready" : ins.health === "warn" ? "⚠ review" : "✕ fix";
+                        return (
+                          <>
+                            <span className={`cd-chip ${tagCls}`} title={`Hashtag density for ${niceLabel}`}>
+                              # {ins.hashtagLabel}
+                            </span>
+                            <span className={`cd-chip ${healthCls}`} title="Overall health (length + hashtags)">
+                              {healthLabel}
+                            </span>
+                          </>
+                        );
+                      })()}
                       <button
                         className="cd-btn cd-btn-p"
                         disabled={regenerating}
