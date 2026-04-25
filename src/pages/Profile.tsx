@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { normalizeTag, displayTag, parsePolicyList } from "@/lib/hashtagPolicy";
+import { listTimezones, browserTimezone, tzLabel } from "@/lib/timezones";
 
 const VOICE_OPTIONS = ["Technical & analytical", "Conversational & warm", "PM / product thinking", "Opinionated & bold", "Data-driven", "Storytelling-first", "Educational & clear", "Contrarian / challenger", "Founder POV", "Academic & research-backed", "Humorous & witty", "Inspirational & motivating"];
 const STYLE_OPTIONS = ["Short punchy lines", "Long-form narrative", "Lists & frameworks", "Thread-style breakdown", "Stats-led", "Case study format", "Question-led", "First-person story", "Industry insight", "Myth-busting", "How-to guide", "Behind-the-scenes"];
@@ -66,13 +67,15 @@ export default function Profile() {
   const [requiredHashtags, setRequiredHashtags] = useState<string[]>([]);
   const [bannedTagInput, setBannedTagInput] = useState("");
   const [requiredTagInput, setRequiredTagInput] = useState("");
+  const [defaultTimezone, setDefaultTimezone] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const tzList = listTimezones();
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("display_name, avatar_url, default_voice, default_style, default_audiences, default_goals, banned_hashtags, required_hashtags").eq("user_id", user.id).maybeSingle()
+    supabase.from("profiles").select("display_name, avatar_url, default_voice, default_style, default_audiences, default_goals, banned_hashtags, required_hashtags, default_timezone").eq("user_id", user.id).maybeSingle()
       .then(({ data }) => {
         setDisplayName(data?.display_name || "");
         setAvatarUrl(data?.avatar_url || "");
@@ -80,9 +83,10 @@ export default function Profile() {
         setDefaultStyle(data?.default_style || "");
         setDefaultAudiences(data?.default_audiences || []);
         setDefaultGoals(data?.default_goals || []);
-        const d = data as { banned_hashtags?: string[] | null; required_hashtags?: string[] | null } | null;
+        const d = data as { banned_hashtags?: string[] | null; required_hashtags?: string[] | null; default_timezone?: string | null } | null;
         setBannedHashtags(parsePolicyList(d?.banned_hashtags));
         setRequiredHashtags(parsePolicyList(d?.required_hashtags));
+        setDefaultTimezone(d?.default_timezone || browserTimezone());
         setLoading(false);
       });
   }, [user]);
@@ -167,6 +171,7 @@ export default function Profile() {
         default_goals: defaultGoals.length ? defaultGoals : null,
         banned_hashtags: bannedHashtags.length ? bannedHashtags : null,
         required_hashtags: requiredHashtags.length ? requiredHashtags : null,
+        default_timezone: defaultTimezone || null,
       })
       .eq("user_id", user.id);
     setSaving(false);
