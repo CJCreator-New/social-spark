@@ -401,6 +401,92 @@ export default function CalendarDetail() {
     downloadIcs({ calendarTitle: title, weekStart: ws, postTimes, platform }, posts);
   }
 
+  async function regenerateAllUnlocked() {
+    if (!id || regenerating || bulkRegenerating || editing) return;
+    const targets = posts.map((p, i) => ({ p, i })).filter(({ p }) => !lockedDays.has(p.day));
+    if (targets.length === 0) { toast.error("All posts are pinned. Nothing to regenerate."); return; }
+    const ok = window.confirm(`Regenerate ${targets.length} unlocked post${targets.length === 1 ? "" : "s"} for ${niceLabelFor(platform)}? Pinned posts stay untouched.`);
+    if (!ok) return;
+    setBulkRegenerating(true);
+    setBulkProgress({ done: 0, total: targets.length });
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const next: Post[] = [...posts];
+      let done = 0;
+      for (const { p: target, i } of targets) {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}` },
+          body: JSON.stringify({
+            industry: formPayload.industry || "", industryLabel,
+            platform: platform || formPayload.platform || "LinkedIn",
+            coreIdea: formPayload.coreIdea || title, audiences: formPayload.audiences || [],
+            voice: formPayload.voice || "", style: formPayload.style || "", goals: formPayload.goals || [],
+            format: formPayload.format || "Balanced mix", cta: formPayload.cta || "Share & repost bait",
+            length: formPayload.length || "medium", structure: formPayload.structure || "mixed",
+            extra: formPayload.extra || "", bannedWords: formPayload.bannedWords || [], requiredWords: formPayload.requiredWords || [],
+            post: target, siblings: next,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.post) next[i] = data.post as Post;
+        done += 1;
+        setBulkProgress({ done, total: targets.length });
+        setPosts([...next]);
+      }
+      const { error: updErr } = await supabase.from("saved_calendars")
+        .update({ posts: next as unknown as never })
+        .eq("id", id);
+      if (updErr) { toast.error(updErr.message); return; }
+      toast.success(`Regenerated ${targets.length} post${targets.length === 1 ? "" : "s"} ✓`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Bulk regenerate failed");
+    } finally {
+      setBulkRegenerating(false);
+      setBulkProgress(null);
+    }
+  }
+
+  async function scheduleWeek() {
+    if (!id || scheduling) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error("Sign in required"); return; }
+    setScheduling(true);
+    try {
+      const ws = parseLocalDate(weekStart) || nextMonday();
+      const rows = posts.map(post => {
+        const d = dateForDow(ws, post.dow);
+        const t = postTimes[String(post.day)] || "09:00";
+        const [hh, mm] = t.split(":").map(n => parseInt(n, 10));
+        const when = new Date(d);
+        when.setHours(hh || 9, mm || 0, 0, 0);
+        const f = formatForPlatform(post, platform);
+        return {
+          user_id: user.id,
+          calendar_id: id,
+          post_day: post.day,
+          platform: platform || null,
+          scheduled_at: when.toISOString(),
+          status: "scheduled",
+          copy_text: f.text,
+          post_snapshot: post as unknown as never,
+        };
+      });
+      // Replace any existing scheduled rows for this calendar (idempotent week scheduling)
+      await supabase.from("scheduled_posts").delete().eq("calendar_id", id).eq("status", "scheduled");
+      const { error } = await supabase.from("scheduled_posts").insert(rows as never);
+      if (error) { toast.error(error.message); return; }
+      toast.success(`Scheduled ${rows.length} posts ✓`);
+      setScheduleOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not schedule");
+    } finally {
+      setScheduling(false);
+    }
+  }
+
   const weekStartDate = useMemo(() => parseLocalDate(weekStart) || nextMonday(), [weekStart]);
 
   const p = posts[active];
