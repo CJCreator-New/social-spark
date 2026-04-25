@@ -852,6 +852,40 @@ export default function CalendarDetail() {
           )}
         </div>
       </div>
+      {scheduleOpen && (
+        <div className="cd-modal-bg" onClick={() => !scheduling && setScheduleOpen(false)}>
+          <div className="cd-modal" onClick={e => e.stopPropagation()}>
+            <h3>Schedule this week</h3>
+            <p>
+              Queues all 7 posts to your schedule using the times below. Existing scheduled
+              entries for this calendar will be replaced. Adjust times in the per-day cards if needed.
+            </p>
+            {posts.map(post => {
+              const d = dateForDow(weekStartDate, post.dow);
+              return (
+                <div key={post.day} className="cd-modal-row">
+                  <span className="cd-modal-day">{shortDateLabel(d)}</span>
+                  <input
+                    type="time"
+                    className="cd-modal-time"
+                    value={postTimes[String(post.day)] || "09:00"}
+                    onChange={e => updatePostTime(post.day, e.target.value)}
+                  />
+                  <span style={{ fontSize: 11, color: "#7a7a8e", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {post.title}
+                  </span>
+                </div>
+              );
+            })}
+            <div className="cd-modal-actions">
+              <button className="cd-bulk-btn" onClick={() => setScheduleOpen(false)} disabled={scheduling}>Cancel</button>
+              <button className="cd-bulk-btn primary" onClick={scheduleWeek} disabled={scheduling}>
+                {scheduling ? "Scheduling…" : `Schedule ${posts.length} posts`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
