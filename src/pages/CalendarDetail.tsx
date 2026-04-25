@@ -763,6 +763,28 @@ export default function CalendarDetail() {
             <span style={{ fontSize: 11, color: "#7a7a8e" }}>Day 1 = {shortDateLabel(weekStartDate)}</span>
           </div>
 
+          <div className="cd-tz-bar">
+            <span className="cd-reformat-label">Timezone</span>
+            <select
+              className="cd-tz-sel"
+              value={timezone}
+              onChange={e => updateTimezone(e.target.value)}
+              style={{ maxWidth: 240 }}
+              title={`Workspace default: ${profileTimezone || browserTimezone()}`}
+            >
+              {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
+            </select>
+            <span className="cd-reformat-label" style={{ marginLeft: 4 }}>Tracking URL</span>
+            <input
+              className="cd-tz-input"
+              type="url"
+              placeholder="https://yoursite.com/launch"
+              value={trackingUrl}
+              onChange={e => setTrackingUrl(e.target.value)}
+              onBlur={e => updateTrackingUrl(e.target.value.trim())}
+            />
+          </div>
+
           <div className="cd-reformat-bar">
             <span className="cd-reformat-label">Reformat for</span>
             <select
