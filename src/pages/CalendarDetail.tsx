@@ -262,7 +262,12 @@ export default function CalendarDetail() {
 
   useEffect(() => {
     if (!id) return;
-    supabase.from("saved_calendars").select("*").eq("id", id).maybeSingle().then(({ data, error }) => {
+    (async () => {
+      const [{ data, error }, { data: pr }, { data: sched }] = await Promise.all([
+        supabase.from("saved_calendars").select("*").eq("id", id).maybeSingle(),
+        supabase.from("profiles").select("default_timezone, banned_hashtags, required_hashtags").maybeSingle(),
+        supabase.from("scheduled_posts").select("post_day, workflow_status").eq("calendar_id", id).neq("status", "cancelled"),
+      ]);
       if (error || !data) { toast.error("Calendar not found"); navigate("/my-calendars"); return; }
       const loadedPosts = (data.posts as unknown as Post[]) || [];
       setPosts(loadedPosts);
@@ -270,7 +275,10 @@ export default function CalendarDetail() {
       setPlatform(data.platform || "");
       setIndustryLabel(data.industry_label || "");
       setFormPayload((data.form_payload as unknown as FormPayload) || {});
-      setIsFavorite(!!(data as { is_favorite?: boolean }).is_favorite);
+      const dx = data as { is_favorite?: boolean; timezone?: string | null; tracking_url?: string | null; locked_hashtags?: Record<string, string[]> | null };
+      setIsFavorite(!!dx.is_favorite);
+      setTrackingUrl(dx.tracking_url || "");
+      setLockedHashtags(dx.locked_hashtags || {});
       const fp = (data.form_payload as { weekStart?: string } | null);
       const ws = (data as { week_start_date?: string | null }).week_start_date
         || fp?.weekStart
@@ -284,9 +292,22 @@ export default function CalendarDetail() {
         for (const p of loadedPosts) seed[String(p.day)] = "09:00";
         setPostTimes(seed);
       }
+      const profTz = (pr as { default_timezone?: string | null } | null)?.default_timezone || browserTimezone();
+      setProfileTimezone(profTz);
+      setTimezone(dx.timezone || profTz);
+      const prof = pr as { banned_hashtags?: string[] | null; required_hashtags?: string[] | null } | null;
+      setProfilePolicy({
+        banned: parsePolicyList(prof?.banned_hashtags),
+        required: parsePolicyList(prof?.required_hashtags),
+      });
+      const statusMap: Record<number, "drafted" | "approved" | "published" | "failed"> = {};
+      for (const r of (sched as { post_day: number; workflow_status: "drafted" | "approved" | "published" | "failed" }[]) || []) {
+        statusMap[r.post_day] = r.workflow_status;
+      }
+      setStatusByDay(statusMap);
       setMeta(`${data.industry_label || ""} · ${data.platform || ""} · ${new Date(data.created_at).toLocaleDateString()}`);
       setLoading(false);
-    });
+    })();
   }, [id, navigate]);
 
   function startEdit() {
