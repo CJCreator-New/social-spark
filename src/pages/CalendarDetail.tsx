@@ -176,6 +176,15 @@ export default function CalendarDetail() {
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduling, setScheduling] = useState(false);
+  const [timezone, setTimezone] = useState<string>(browserTimezone());
+  const [profileTimezone, setProfileTimezone] = useState<string>("");
+  const [trackingUrl, setTrackingUrl] = useState<string>("");
+  const [lockedHashtags, setLockedHashtags] = useState<Record<string, string[]>>({});
+  const [profilePolicy, setProfilePolicy] = useState<HashtagPolicy>({ banned: [], required: [] });
+  const [statusByDay, setStatusByDay] = useState<Record<number, "drafted" | "approved" | "published" | "failed">>({});
+  const [tagPopover, setTagPopover] = useState<{ day: number; tag: string } | null>(null);
+  const [tagReplacement, setTagReplacement] = useState("");
+  const tzList = listTimezones();
 
   useEffect(() => {
     if (!tweakOpen) return;
