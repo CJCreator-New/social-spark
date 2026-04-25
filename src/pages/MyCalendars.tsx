@@ -212,6 +212,7 @@ export default function MyCalendars() {
               <div className="mc-meta" style={{ marginTop: 6 }}>{user?.email}</div>
             </div>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <Link to="/schedule" className="mc-back">📅 Schedule</Link>
               <Link to="/" className="mc-back">← New calendar</Link>
               <button className="mc-act" onClick={async () => { await signOut(); navigate("/auth"); }}>Sign out</button>
             </div>
