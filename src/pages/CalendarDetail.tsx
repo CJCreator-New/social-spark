@@ -668,6 +668,8 @@ export default function CalendarDetail() {
               📅 Schedule week →
             </button>
           </div>
+
+          {p && !editing && (
             <div className="cd-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
                 <span className="cd-date-pill">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
