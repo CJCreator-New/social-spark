@@ -170,6 +170,10 @@ export default function CalendarDetail() {
   const [reformatting, setReformatting] = useState(false);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const copyMenuRef = useRef<HTMLDivElement>(null);
+  const [bulkRegenerating, setBulkRegenerating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
 
   useEffect(() => {
     if (!tweakOpen) return;
