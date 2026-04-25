@@ -428,6 +428,116 @@ export default function CalendarDetail() {
     }
   }
 
+  async function updateTimezone(tz: string) {
+    setTimezone(tz);
+    if (!id) return;
+    const { error } = await supabase.from("saved_calendars").update({ timezone: tz || null }).eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  async function updateTrackingUrl(url: string) {
+    setTrackingUrl(url);
+    if (!id) return;
+    const { error } = await supabase.from("saved_calendars").update({ tracking_url: url || null }).eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  async function persistLockedHashtags(next: Record<string, string[]>) {
+    setLockedHashtags(next);
+    if (!id) return;
+    const { error } = await supabase.from("saved_calendars").update({ locked_hashtags: next as never }).eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  async function persistPostHashtags(day: number, newHashtags: string) {
+    if (!id) return;
+    const updated = posts.map(po => po.day === day ? { ...po, hashtags: newHashtags } : po);
+    setPosts(updated);
+    const { error } = await supabase.from("saved_calendars")
+      .update({ posts: updated as unknown as never })
+      .eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  // Re-render a post's hashtag string by applying workspace policy + this post's locks.
+  function rebuildHashtagsForDay(day: number, currentTags: string[], lockedForDay: string[]): string {
+    return applyPolicy(currentTags.join(" "), platform, profilePolicy, lockedForDay);
+  }
+
+  async function lockTagOnPost(day: number, tag: string) {
+    const norm = normalizeTag(tag);
+    if (!norm) return;
+    const cur = lockedHashtags[String(day)] || [];
+    if (cur.includes(norm)) return;
+    const nextLocks = { ...lockedHashtags, [String(day)]: [...cur, norm] };
+    await persistLockedHashtags(nextLocks);
+    toast.success(`#${norm} pinned for Day ${day}`);
+  }
+
+  async function unlockTagOnPost(day: number, tag: string) {
+    const norm = normalizeTag(tag);
+    const cur = lockedHashtags[String(day)] || [];
+    if (!cur.includes(norm)) return;
+    const nextLocks = { ...lockedHashtags, [String(day)]: cur.filter(t => t !== norm) };
+    if (nextLocks[String(day)].length === 0) delete nextLocks[String(day)];
+    await persistLockedHashtags(nextLocks);
+    toast.success(`#${norm} unpinned`);
+  }
+
+  async function banTagWorkspaceWide(day: number, tag: string) {
+    const norm = normalizeTag(tag);
+    if (!norm) return;
+    if (!window.confirm(`Ban #${norm} from EVERY future post across all calendars? You can undo from Profile → Hashtag policy.`)) return;
+    // 1) Add to workspace banned list
+    const nextBanned = profilePolicy.banned.includes(norm) ? profilePolicy.banned : [...profilePolicy.banned, norm];
+    setProfilePolicy({ ...profilePolicy, banned: nextBanned });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { error } = await supabase.from("profiles").update({ banned_hashtags: nextBanned }).eq("user_id", user.id);
+      if (error) toast.error(error.message);
+    }
+    // 2) Strip the tag from this post immediately + unlock it if locked
+    const cur = lockedHashtags[String(day)] || [];
+    if (cur.includes(norm)) {
+      const nextLocks = { ...lockedHashtags, [String(day)]: cur.filter(t => t !== norm) };
+      if (nextLocks[String(day)].length === 0) delete nextLocks[String(day)];
+      await persistLockedHashtags(nextLocks);
+    }
+    const post = posts.find(po => po.day === day);
+    if (post) {
+      const tagsNow = parseHashtagsString(post.hashtags).filter(t => t !== norm);
+      const newStr = rebuildHashtagsForDay(day, tagsNow, (lockedHashtags[String(day)] || []).filter(t => t !== norm));
+      await persistPostHashtags(day, newStr);
+    }
+    toast.success(`#${norm} banned workspace-wide ✓`);
+    setTagPopover(null);
+  }
+
+  async function replaceTagOnPost(day: number, oldTag: string, replacementRaw: string) {
+    const oldNorm = normalizeTag(oldTag);
+    const newNorm = normalizeTag(replacementRaw);
+    if (!oldNorm || !newNorm) return toast.error("Enter a valid replacement tag");
+    if (oldNorm === newNorm) return setTagPopover(null);
+    const post = posts.find(po => po.day === day);
+    if (!post) return;
+    const tagsNow = parseHashtagsString(post.hashtags);
+    const idx = tagsNow.indexOf(oldNorm);
+    if (idx === -1) return;
+    tagsNow[idx] = newNorm;
+    // Update locks too if old was locked
+    const cur = lockedHashtags[String(day)] || [];
+    let nextLocks = lockedHashtags;
+    if (cur.includes(oldNorm)) {
+      nextLocks = { ...lockedHashtags, [String(day)]: cur.map(t => t === oldNorm ? newNorm : t) };
+      await persistLockedHashtags(nextLocks);
+    }
+    const newStr = rebuildHashtagsForDay(day, tagsNow, nextLocks[String(day)] || []);
+    await persistPostHashtags(day, newStr);
+    toast.success(`#${oldNorm} → #${newNorm}`);
+    setTagPopover(null);
+    setTagReplacement("");
+  }
+
   function exportIcs() {
     const ws = parseLocalDate(weekStart) || nextMonday();
     downloadIcs({ calendarTitle: title, weekStart: ws, postTimes, platform }, posts);
