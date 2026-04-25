@@ -22,6 +22,7 @@ export type Database = {
           default_audiences: string[] | null
           default_goals: string[] | null
           default_style: string | null
+          default_timezone: string | null
           default_voice: string | null
           display_name: string | null
           id: string
@@ -36,6 +37,7 @@ export type Database = {
           default_audiences?: string[] | null
           default_goals?: string[] | null
           default_style?: string | null
+          default_timezone?: string | null
           default_voice?: string | null
           display_name?: string | null
           id?: string
@@ -50,6 +52,7 @@ export type Database = {
           default_audiences?: string[] | null
           default_goals?: string[] | null
           default_style?: string | null
+          default_timezone?: string | null
           default_voice?: string | null
           display_name?: string | null
           id?: string
@@ -68,10 +71,13 @@ export type Database = {
           industry: string | null
           industry_label: string | null
           is_favorite: boolean
+          locked_hashtags: Json
           platform: string | null
           post_times: Json | null
           posts: Json
+          timezone: string | null
           title: string
+          tracking_url: string | null
           updated_at: string
           user_id: string
           week_start_date: string | null
@@ -84,10 +90,13 @@ export type Database = {
           industry?: string | null
           industry_label?: string | null
           is_favorite?: boolean
+          locked_hashtags?: Json
           platform?: string | null
           post_times?: Json | null
           posts: Json
+          timezone?: string | null
           title: string
+          tracking_url?: string | null
           updated_at?: string
           user_id: string
           week_start_date?: string | null
@@ -100,10 +109,13 @@ export type Database = {
           industry?: string | null
           industry_label?: string | null
           is_favorite?: boolean
+          locked_hashtags?: Json
           platform?: string | null
           post_times?: Json | null
           posts?: Json
+          timezone?: string | null
           title?: string
+          tracking_url?: string | null
           updated_at?: string
           user_id?: string
           week_start_date?: string | null
@@ -115,40 +127,49 @@ export type Database = {
           calendar_id: string
           copy_text: string | null
           created_at: string
+          failure_reason: string | null
           id: string
           platform: string | null
           post_day: number
           post_snapshot: Json
+          published_at: string | null
           scheduled_at: string
           status: string
           updated_at: string
           user_id: string
+          workflow_status: Database["public"]["Enums"]["scheduled_post_status"]
         }
         Insert: {
           calendar_id: string
           copy_text?: string | null
           created_at?: string
+          failure_reason?: string | null
           id?: string
           platform?: string | null
           post_day: number
           post_snapshot: Json
+          published_at?: string | null
           scheduled_at: string
           status?: string
           updated_at?: string
           user_id: string
+          workflow_status?: Database["public"]["Enums"]["scheduled_post_status"]
         }
         Update: {
           calendar_id?: string
           copy_text?: string | null
           created_at?: string
+          failure_reason?: string | null
           id?: string
           platform?: string | null
           post_day?: number
           post_snapshot?: Json
+          published_at?: string | null
           scheduled_at?: string
           status?: string
           updated_at?: string
           user_id?: string
+          workflow_status?: Database["public"]["Enums"]["scheduled_post_status"]
         }
         Relationships: [
           {
@@ -196,6 +217,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      scheduled_post_status: "drafted" | "approved" | "published" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -324,6 +346,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      scheduled_post_status: ["drafted", "approved", "published", "failed"],
     },
   },
 } as const
