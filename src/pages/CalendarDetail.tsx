@@ -643,7 +643,31 @@ export default function CalendarDetail() {
             <button type="button" className="cd-export-btn" onClick={exportIcs} title="Export to Google Calendar / Outlook / Apple Cal">📅 .ics</button>
           </div>
 
-          {p && !editing && (
+          <div className="cd-bulk-bar">
+            <span className="cd-bulk-label">
+              Bulk actions · {posts.length - lockedDays.size} unlocked / {lockedDays.size} pinned
+            </span>
+            <button
+              type="button"
+              className="cd-bulk-btn"
+              onClick={regenerateAllUnlocked}
+              disabled={bulkRegenerating || regenerating || reformatting || editing}
+              title="Re-rolls every unpinned post with the same constraints"
+            >
+              {bulkRegenerating
+                ? `↻ Regenerating ${bulkProgress?.done ?? 0}/${bulkProgress?.total ?? 0}…`
+                : `↻ Regenerate all unlocked`}
+            </button>
+            <button
+              type="button"
+              className="cd-bulk-btn primary"
+              onClick={() => setScheduleOpen(true)}
+              disabled={bulkRegenerating || regenerating || editing}
+              title="Queue all 7 posts at the times shown"
+            >
+              📅 Schedule week →
+            </button>
+          </div>
             <div className="cd-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
                 <span className="cd-date-pill">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
