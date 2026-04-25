@@ -1100,6 +1100,7 @@ ${postText(p)}
             >
               📅 My calendars
             </Link>
+            <Link to="/schedule" style={{ color: "#7a7a8e", textDecoration: "none", padding: "6px 10px" }}>Schedule</Link>
             <Link to="/profile" style={{ color: "#7a7a8e", textDecoration: "none", padding: "6px 10px" }}>Profile</Link>
             <span style={{ color: "#3a3a50" }}>·</span>
             <span style={{ color: "#9a9aae", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email}</span>

@@ -119,6 +119,25 @@ const css = `
 .cd-stat-val { font-family:'Playfair Display',serif; font-size:18px; color:#edeae3; font-variant-numeric:tabular-nums; }
 .cd-stat-val em { font-style:normal; color:#c8f09a; }
 .cd-stat-sub { font-size:10px; color:#5a5a72; font-weight:300; }
+.cd-chip { display:inline-flex; align-items:center; gap:5px; font-size:10px; letter-spacing:.04em; padding:3px 9px; border-radius:99px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,.02); color:#7a7a8e; font-family:'Sora',sans-serif; font-weight:400; white-space:nowrap; }
+.cd-chip.good { color:#c8f09a; border-color:rgba(200,240,154,.32); background:rgba(200,240,154,.06); }
+.cd-chip.warn { color:#f0d49a; border-color:rgba(240,212,154,.32); background:rgba(240,212,154,.06); }
+.cd-chip.bad { color:#f09a9a; border-color:rgba(240,154,154,.35); background:rgba(240,154,154,.08); }
+.cd-bulk-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; padding:10px 14px; background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:12px; }
+.cd-bulk-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; flex:1; }
+.cd-bulk-btn { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#9a9aae; padding:7px 14px; border-radius:8px; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
+.cd-bulk-btn:hover { border-color:rgba(200,240,154,.32); color:#c8f09a; }
+.cd-bulk-btn.primary { background:rgba(200,240,154,.12); border-color:rgba(200,240,154,.32); color:#c8f09a; }
+.cd-bulk-btn:disabled { opacity:.5; cursor:not-allowed; }
+.cd-modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:300; display:flex; align-items:center; justify-content:center; padding:20px; }
+.cd-modal { background:#0d0f18; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:26px; max-width:520px; width:100%; max-height:90vh; overflow:auto; }
+.cd-modal h3 { font-family:'Playfair Display',serif; font-size:22px; font-weight:400; margin:0 0 6px; color:#edeae3; }
+.cd-modal p { font-size:12px; color:#7a7a8e; margin:0 0 16px; line-height:1.6; }
+.cd-modal-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+.cd-modal-row:last-of-type { border-bottom:none; }
+.cd-modal-day { font-size:11px; color:#9a9aae; min-width:90px; }
+.cd-modal-time { background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px 9px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; color-scheme:dark; }
+.cd-modal-actions { display:flex; gap:8px; margin-top:18px; justify-content:flex-end; }
 `;
 
 function wordCount(s: string): number {
@@ -151,6 +170,10 @@ export default function CalendarDetail() {
   const [reformatting, setReformatting] = useState(false);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const copyMenuRef = useRef<HTMLDivElement>(null);
+  const [bulkRegenerating, setBulkRegenerating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
 
   useEffect(() => {
     if (!tweakOpen) return;
@@ -378,6 +401,92 @@ export default function CalendarDetail() {
     downloadIcs({ calendarTitle: title, weekStart: ws, postTimes, platform }, posts);
   }
 
+  async function regenerateAllUnlocked() {
+    if (!id || regenerating || bulkRegenerating || editing) return;
+    const targets = posts.map((p, i) => ({ p, i })).filter(({ p }) => !lockedDays.has(p.day));
+    if (targets.length === 0) { toast.error("All posts are pinned. Nothing to regenerate."); return; }
+    const ok = window.confirm(`Regenerate ${targets.length} unlocked post${targets.length === 1 ? "" : "s"} for ${niceLabelFor(platform)}? Pinned posts stay untouched.`);
+    if (!ok) return;
+    setBulkRegenerating(true);
+    setBulkProgress({ done: 0, total: targets.length });
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const next: Post[] = [...posts];
+      let done = 0;
+      for (const { p: target, i } of targets) {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}` },
+          body: JSON.stringify({
+            industry: formPayload.industry || "", industryLabel,
+            platform: platform || formPayload.platform || "LinkedIn",
+            coreIdea: formPayload.coreIdea || title, audiences: formPayload.audiences || [],
+            voice: formPayload.voice || "", style: formPayload.style || "", goals: formPayload.goals || [],
+            format: formPayload.format || "Balanced mix", cta: formPayload.cta || "Share & repost bait",
+            length: formPayload.length || "medium", structure: formPayload.structure || "mixed",
+            extra: formPayload.extra || "", bannedWords: formPayload.bannedWords || [], requiredWords: formPayload.requiredWords || [],
+            post: target, siblings: next,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.post) next[i] = data.post as Post;
+        done += 1;
+        setBulkProgress({ done, total: targets.length });
+        setPosts([...next]);
+      }
+      const { error: updErr } = await supabase.from("saved_calendars")
+        .update({ posts: next as unknown as never })
+        .eq("id", id);
+      if (updErr) { toast.error(updErr.message); return; }
+      toast.success(`Regenerated ${targets.length} post${targets.length === 1 ? "" : "s"} ✓`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Bulk regenerate failed");
+    } finally {
+      setBulkRegenerating(false);
+      setBulkProgress(null);
+    }
+  }
+
+  async function scheduleWeek() {
+    if (!id || scheduling) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error("Sign in required"); return; }
+    setScheduling(true);
+    try {
+      const ws = parseLocalDate(weekStart) || nextMonday();
+      const rows = posts.map(post => {
+        const d = dateForDow(ws, post.dow);
+        const t = postTimes[String(post.day)] || "09:00";
+        const [hh, mm] = t.split(":").map(n => parseInt(n, 10));
+        const when = new Date(d);
+        when.setHours(hh || 9, mm || 0, 0, 0);
+        const f = formatForPlatform(post, platform);
+        return {
+          user_id: user.id,
+          calendar_id: id,
+          post_day: post.day,
+          platform: platform || null,
+          scheduled_at: when.toISOString(),
+          status: "scheduled",
+          copy_text: f.text,
+          post_snapshot: post as unknown as never,
+        };
+      });
+      // Replace any existing scheduled rows for this calendar (idempotent week scheduling)
+      await supabase.from("scheduled_posts").delete().eq("calendar_id", id).eq("status", "scheduled");
+      const { error } = await supabase.from("scheduled_posts").insert(rows as never);
+      if (error) { toast.error(error.message); return; }
+      toast.success(`Scheduled ${rows.length} posts ✓`);
+      setScheduleOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not schedule");
+    } finally {
+      setScheduling(false);
+    }
+  }
+
   const weekStartDate = useMemo(() => parseLocalDate(weekStart) || nextMonday(), [weekStart]);
 
   const p = posts[active];
@@ -534,6 +643,32 @@ export default function CalendarDetail() {
             <button type="button" className="cd-export-btn" onClick={exportIcs} title="Export to Google Calendar / Outlook / Apple Cal">📅 .ics</button>
           </div>
 
+          <div className="cd-bulk-bar">
+            <span className="cd-bulk-label">
+              Bulk actions · {posts.length - lockedDays.size} unlocked / {lockedDays.size} pinned
+            </span>
+            <button
+              type="button"
+              className="cd-bulk-btn"
+              onClick={regenerateAllUnlocked}
+              disabled={bulkRegenerating || regenerating || reformatting || editing}
+              title="Re-rolls every unpinned post with the same constraints"
+            >
+              {bulkRegenerating
+                ? `↻ Regenerating ${bulkProgress?.done ?? 0}/${bulkProgress?.total ?? 0}…`
+                : `↻ Regenerate all unlocked`}
+            </button>
+            <button
+              type="button"
+              className="cd-bulk-btn primary"
+              onClick={() => setScheduleOpen(true)}
+              disabled={bulkRegenerating || regenerating || editing}
+              title="Queue all 7 posts at the times shown"
+            >
+              📅 Schedule week →
+            </button>
+          </div>
+
           {p && !editing && (
             <div className="cd-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
@@ -580,8 +715,24 @@ export default function CalendarDetail() {
                         aria-label={`${f.charCount} of ${f.limit} characters used for ${niceLabel}`}
                       >
                         <span className="cd-budget-dot" aria-hidden="true" />
-                        {f.charCount.toLocaleString()} / {f.limit.toLocaleString()}
+                        {f.charCount.toLocaleString()} / {f.limit.toLocaleString()} ({Math.round(ratio * 100)}%)
                       </span>
+                      {(() => {
+                        const ins = insightFor(p, platform);
+                        const tagCls = ins.hashtagState === "sweet" ? "good" : ins.hashtagState === "na" ? "" : ins.hashtagState === "dense" ? "bad" : "warn";
+                        const healthCls = ins.health === "good" ? "good" : ins.health === "warn" ? "warn" : "bad";
+                        const healthLabel = ins.health === "good" ? "✓ ready" : ins.health === "warn" ? "⚠ review" : "✕ fix";
+                        return (
+                          <>
+                            <span className={`cd-chip ${tagCls}`} title={`Hashtag density for ${niceLabel}`}>
+                              # {ins.hashtagLabel}
+                            </span>
+                            <span className={`cd-chip ${healthCls}`} title="Overall health (length + hashtags)">
+                              {healthLabel}
+                            </span>
+                          </>
+                        );
+                      })()}
                       <button
                         className="cd-btn cd-btn-p"
                         disabled={regenerating}
@@ -701,6 +852,40 @@ export default function CalendarDetail() {
           )}
         </div>
       </div>
+      {scheduleOpen && (
+        <div className="cd-modal-bg" onClick={() => !scheduling && setScheduleOpen(false)}>
+          <div className="cd-modal" onClick={e => e.stopPropagation()}>
+            <h3>Schedule this week</h3>
+            <p>
+              Queues all 7 posts to your schedule using the times below. Existing scheduled
+              entries for this calendar will be replaced. Adjust times in the per-day cards if needed.
+            </p>
+            {posts.map(post => {
+              const d = dateForDow(weekStartDate, post.dow);
+              return (
+                <div key={post.day} className="cd-modal-row">
+                  <span className="cd-modal-day">{shortDateLabel(d)}</span>
+                  <input
+                    type="time"
+                    className="cd-modal-time"
+                    value={postTimes[String(post.day)] || "09:00"}
+                    onChange={e => updatePostTime(post.day, e.target.value)}
+                  />
+                  <span style={{ fontSize: 11, color: "#7a7a8e", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {post.title}
+                  </span>
+                </div>
+              );
+            })}
+            <div className="cd-modal-actions">
+              <button className="cd-bulk-btn" onClick={() => setScheduleOpen(false)} disabled={scheduling}>Cancel</button>
+              <button className="cd-bulk-btn primary" onClick={scheduleWeek} disabled={scheduling}>
+                {scheduling ? "Scheduling…" : `Schedule ${posts.length} posts`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
