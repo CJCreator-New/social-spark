@@ -894,8 +894,53 @@ export default function CalendarDetail() {
               <div className="cd-body">{p.body}</div>
               <div className="cd-blabel"><span>CTA</span></div>
               <div className="cd-cta">{p.cta}</div>
-              <div className="cd-blabel"><span>Hashtags</span></div>
-              <div className="cd-tags">{p.hashtags}</div>
+              <div className="cd-blabel"><span>Hashtags</span><span className="cd-blabel-count">click a tag to lock, ban, or replace</span></div>
+              <div className="cd-tags-row">
+                {(() => {
+                  const tags = parseHashtagsString(p.hashtags);
+                  const locks = lockedHashtags[String(p.day)] || [];
+                  if (tags.length === 0) return <span className="cd-tags" style={{ color: "#3a3a50" }}>— none —</span>;
+                  return tags.map(t => {
+                    const isLocked = locks.includes(t);
+                    const open = tagPopover && tagPopover.day === p.day && tagPopover.tag === t;
+                    return (
+                      <span key={t} className="cd-tag-wrap">
+                        <button
+                          type="button"
+                          className={`cd-tag-chip ${isLocked ? "locked" : ""}`}
+                          onClick={() => { setTagPopover(open ? null : { day: p.day, tag: t }); setTagReplacement(""); }}
+                          title={isLocked ? "Pinned — survives regenerates" : "Click for actions"}
+                        >
+                          {isLocked ? "📌 " : ""}{displayTag(t)}
+                        </button>
+                        {open && (
+                          <div className="cd-tag-pop" style={{ top: "calc(100% + 4px)", left: 0 }}>
+                            <div className="cd-tag-pop-h">{displayTag(t)}</div>
+                            {isLocked ? (
+                              <button className="cd-tag-pop-btn" onClick={() => unlockTagOnPost(p.day, t)}>📍 Unpin</button>
+                            ) : (
+                              <button className="cd-tag-pop-btn" onClick={() => lockTagOnPost(p.day, t)}>📌 Lock on this post</button>
+                            )}
+                            <button className="cd-tag-pop-btn danger" onClick={() => banTagWorkspaceWide(p.day, t)}>✕ Ban workspace-wide</button>
+                            <div className="cd-tag-pop-row">
+                              <input
+                                className="cd-tag-pop-input"
+                                placeholder="replace with…"
+                                value={tagReplacement}
+                                onChange={e => setTagReplacement(e.target.value)}
+                                onKeyDown={e => e.key === "Enter" && replaceTagOnPost(p.day, t, tagReplacement)}
+                                autoFocus
+                              />
+                              <button className="cd-tag-pop-btn" style={{ flex: "0 0 auto" }} onClick={() => replaceTagOnPost(p.day, t, tagReplacement)}>↻</button>
+                            </div>
+                            <button className="cd-tag-pop-btn" onClick={() => setTagPopover(null)} style={{ borderColor: "transparent", color: "#5a5a72" }}>Close</button>
+                          </div>
+                        )}
+                      </span>
+                    );
+                  });
+                })()}
+              </div>
               <div className="cd-actions">
                 {(() => {
                   const f = formatForPlatform(p, platform);
