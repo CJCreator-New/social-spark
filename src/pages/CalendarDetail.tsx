@@ -488,20 +488,20 @@ export default function CalendarDetail() {
     setScheduling(true);
     try {
       const ws = parseLocalDate(weekStart) || nextMonday();
+      const tz = timezone || profileTimezone || browserTimezone();
       const rows = posts.map(post => {
         const d = dateForDow(ws, post.dow);
-        const t = postTimes[String(post.day)] || "09:00";
-        const [hh, mm] = t.split(":").map(n => parseInt(n, 10));
-        const when = new Date(d);
-        when.setHours(hh || 9, mm || 0, 0, 0);
+        const dateStr = toDateInputValue(d);
+        const time = postTimes[String(post.day)] || "09:00";
         const f = formatForPlatform(post, platform);
         return {
           user_id: user.id,
           calendar_id: id,
           post_day: post.day,
           platform: platform || null,
-          scheduled_at: when.toISOString(),
+          scheduled_at: zonedToUtcIso(dateStr, time, tz),
           status: "scheduled",
+          workflow_status: "drafted",
           copy_text: f.text,
           post_snapshot: post as unknown as never,
         };
@@ -510,7 +510,10 @@ export default function CalendarDetail() {
       await supabase.from("scheduled_posts").delete().eq("calendar_id", id).eq("status", "scheduled");
       const { error } = await supabase.from("scheduled_posts").insert(rows as never);
       if (error) { toast.error(error.message); return; }
-      toast.success(`Scheduled ${rows.length} posts ✓`);
+      const newStatus: typeof statusByDay = {};
+      for (const p of posts) newStatus[p.day] = "drafted";
+      setStatusByDay(newStatus);
+      toast.success(`Scheduled ${rows.length} posts in ${tz} ✓`);
       setScheduleOpen(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not schedule");
