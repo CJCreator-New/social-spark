@@ -12,8 +12,10 @@ import {
   shortDateLabel,
 } from "@/lib/calendarSchedule";
 import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor, buildRawMarkdown, PLATFORM_LABELS } from "@/lib/platformCopy";
-import { applyPolicy, parsePolicyList, HashtagPolicy } from "@/lib/hashtagPolicy";
+import { applyPolicy, parsePolicyList, parseHashtagsString, normalizeTag, displayTag, HashtagPolicy } from "@/lib/hashtagPolicy";
 import { insightFor } from "@/lib/postInsights";
+import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
+import { buildTrackingUrl } from "@/lib/utm";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
@@ -138,6 +140,29 @@ const css = `
 .cd-modal-day { font-size:11px; color:#9a9aae; min-width:90px; }
 .cd-modal-time { background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px 9px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; color-scheme:dark; }
 .cd-modal-actions { display:flex; gap:8px; margin-top:18px; justify-content:flex-end; }
+.cd-tz-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; padding:10px 14px; background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:12px; }
+.cd-tz-input, .cd-tz-sel { background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px 10px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; }
+.cd-tz-input:focus, .cd-tz-sel:focus { border-color:rgba(200,240,154,0.4); }
+.cd-tz-input { flex:1; min-width:200px; }
+.cd-tag-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; background:rgba(200,240,154,0.06); border:1px solid rgba(200,240,154,0.15); color:rgba(200,240,154,0.78); font-size:12px; cursor:pointer; transition:all .12s; font-family:'Sora',sans-serif; }
+.cd-tag-chip:hover { background:rgba(200,240,154,0.14); border-color:rgba(200,240,154,0.32); color:#c8f09a; }
+.cd-tag-chip.locked { background:rgba(200,240,154,0.18); border-color:rgba(200,240,154,0.45); color:#c8f09a; }
+.cd-tag-pop { position:absolute; z-index:300; background:#181a26; border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:10px; min-width:240px; box-shadow:0 8px 28px rgba(0,0,0,.55); display:flex; flex-direction:column; gap:6px; }
+.cd-tag-pop-h { font-size:11px; color:#7a7a8e; padding-bottom:4px; border-bottom:1px solid rgba(255,255,255,.05); margin-bottom:2px; }
+.cd-tag-pop-row { display:flex; gap:6px; align-items:center; }
+.cd-tag-pop-btn { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#9a9aae; padding:6px 10px; border-radius:6px; font-size:11px; cursor:pointer; font-family:'Sora',sans-serif; flex:1; text-align:left; }
+.cd-tag-pop-btn:hover { border-color:rgba(200,240,154,.32); color:#c8f09a; }
+.cd-tag-pop-btn.danger:hover { border-color:rgba(240,154,154,.4); color:#f09a9a; }
+.cd-tag-pop-input { flex:1; background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:5px 8px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; }
+.cd-tag-pop-input:focus { border-color:rgba(200,240,154,.4); }
+.cd-tag-wrap { position:relative; display:inline-block; margin-right:4px; margin-bottom:4px; }
+.cd-tags-row { display:flex; flex-wrap:wrap; align-items:center; }
+.cd-status-dot { width:6px; height:6px; border-radius:50%; display:inline-block; margin-right:4px; }
+.cd-status-dot.drafted { background:#9a9aae; }
+.cd-status-dot.approved { background:#9ab5f0; }
+.cd-status-dot.published { background:#c8f09a; }
+.cd-status-dot.failed { background:#f09a9a; }
+.cd-tab-status { position:absolute; top:3px; left:4px; width:5px; height:5px; border-radius:50%; }
 `;
 
 function wordCount(s: string): number {
@@ -174,6 +199,15 @@ export default function CalendarDetail() {
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduling, setScheduling] = useState(false);
+  const [timezone, setTimezone] = useState<string>(browserTimezone());
+  const [profileTimezone, setProfileTimezone] = useState<string>("");
+  const [trackingUrl, setTrackingUrl] = useState<string>("");
+  const [lockedHashtags, setLockedHashtags] = useState<Record<string, string[]>>({});
+  const [profilePolicy, setProfilePolicy] = useState<HashtagPolicy>({ banned: [], required: [] });
+  const [statusByDay, setStatusByDay] = useState<Record<number, "drafted" | "approved" | "published" | "failed">>({});
+  const [tagPopover, setTagPopover] = useState<{ day: number; tag: string } | null>(null);
+  const [tagReplacement, setTagReplacement] = useState("");
+  const tzList = listTimezones();
 
   useEffect(() => {
     if (!tweakOpen) return;
@@ -251,7 +285,12 @@ export default function CalendarDetail() {
 
   useEffect(() => {
     if (!id) return;
-    supabase.from("saved_calendars").select("*").eq("id", id).maybeSingle().then(({ data, error }) => {
+    (async () => {
+      const [{ data, error }, { data: pr }, { data: sched }] = await Promise.all([
+        supabase.from("saved_calendars").select("*").eq("id", id).maybeSingle(),
+        supabase.from("profiles").select("default_timezone, banned_hashtags, required_hashtags").maybeSingle(),
+        supabase.from("scheduled_posts").select("post_day, workflow_status").eq("calendar_id", id).neq("status", "cancelled"),
+      ]);
       if (error || !data) { toast.error("Calendar not found"); navigate("/my-calendars"); return; }
       const loadedPosts = (data.posts as unknown as Post[]) || [];
       setPosts(loadedPosts);
@@ -259,7 +298,10 @@ export default function CalendarDetail() {
       setPlatform(data.platform || "");
       setIndustryLabel(data.industry_label || "");
       setFormPayload((data.form_payload as unknown as FormPayload) || {});
-      setIsFavorite(!!(data as { is_favorite?: boolean }).is_favorite);
+      const dx = data as { is_favorite?: boolean; timezone?: string | null; tracking_url?: string | null; locked_hashtags?: Record<string, string[]> | null };
+      setIsFavorite(!!dx.is_favorite);
+      setTrackingUrl(dx.tracking_url || "");
+      setLockedHashtags(dx.locked_hashtags || {});
       const fp = (data.form_payload as { weekStart?: string } | null);
       const ws = (data as { week_start_date?: string | null }).week_start_date
         || fp?.weekStart
@@ -273,9 +315,22 @@ export default function CalendarDetail() {
         for (const p of loadedPosts) seed[String(p.day)] = "09:00";
         setPostTimes(seed);
       }
+      const profTz = (pr as { default_timezone?: string | null } | null)?.default_timezone || browserTimezone();
+      setProfileTimezone(profTz);
+      setTimezone(dx.timezone || profTz);
+      const prof = pr as { banned_hashtags?: string[] | null; required_hashtags?: string[] | null } | null;
+      setProfilePolicy({
+        banned: parsePolicyList(prof?.banned_hashtags),
+        required: parsePolicyList(prof?.required_hashtags),
+      });
+      const statusMap: Record<number, "drafted" | "approved" | "published" | "failed"> = {};
+      for (const r of (sched as { post_day: number; workflow_status: "drafted" | "approved" | "published" | "failed" }[]) || []) {
+        statusMap[r.post_day] = r.workflow_status;
+      }
+      setStatusByDay(statusMap);
       setMeta(`${data.industry_label || ""} · ${data.platform || ""} · ${new Date(data.created_at).toLocaleDateString()}`);
       setLoading(false);
-    });
+    })();
   }, [id, navigate]);
 
   function startEdit() {
@@ -396,6 +451,116 @@ export default function CalendarDetail() {
     }
   }
 
+  async function updateTimezone(tz: string) {
+    setTimezone(tz);
+    if (!id) return;
+    const { error } = await supabase.from("saved_calendars").update({ timezone: tz || null }).eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  async function updateTrackingUrl(url: string) {
+    setTrackingUrl(url);
+    if (!id) return;
+    const { error } = await supabase.from("saved_calendars").update({ tracking_url: url || null }).eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  async function persistLockedHashtags(next: Record<string, string[]>) {
+    setLockedHashtags(next);
+    if (!id) return;
+    const { error } = await supabase.from("saved_calendars").update({ locked_hashtags: next as never }).eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  async function persistPostHashtags(day: number, newHashtags: string) {
+    if (!id) return;
+    const updated = posts.map(po => po.day === day ? { ...po, hashtags: newHashtags } : po);
+    setPosts(updated);
+    const { error } = await supabase.from("saved_calendars")
+      .update({ posts: updated as unknown as never })
+      .eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  // Re-render a post's hashtag string by applying workspace policy + this post's locks.
+  function rebuildHashtagsForDay(day: number, currentTags: string[], lockedForDay: string[]): string {
+    return applyPolicy(currentTags.join(" "), platform, profilePolicy, lockedForDay);
+  }
+
+  async function lockTagOnPost(day: number, tag: string) {
+    const norm = normalizeTag(tag);
+    if (!norm) return;
+    const cur = lockedHashtags[String(day)] || [];
+    if (cur.includes(norm)) return;
+    const nextLocks = { ...lockedHashtags, [String(day)]: [...cur, norm] };
+    await persistLockedHashtags(nextLocks);
+    toast.success(`#${norm} pinned for Day ${day}`);
+  }
+
+  async function unlockTagOnPost(day: number, tag: string) {
+    const norm = normalizeTag(tag);
+    const cur = lockedHashtags[String(day)] || [];
+    if (!cur.includes(norm)) return;
+    const nextLocks = { ...lockedHashtags, [String(day)]: cur.filter(t => t !== norm) };
+    if (nextLocks[String(day)].length === 0) delete nextLocks[String(day)];
+    await persistLockedHashtags(nextLocks);
+    toast.success(`#${norm} unpinned`);
+  }
+
+  async function banTagWorkspaceWide(day: number, tag: string) {
+    const norm = normalizeTag(tag);
+    if (!norm) return;
+    if (!window.confirm(`Ban #${norm} from EVERY future post across all calendars? You can undo from Profile → Hashtag policy.`)) return;
+    // 1) Add to workspace banned list
+    const nextBanned = profilePolicy.banned.includes(norm) ? profilePolicy.banned : [...profilePolicy.banned, norm];
+    setProfilePolicy({ ...profilePolicy, banned: nextBanned });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { error } = await supabase.from("profiles").update({ banned_hashtags: nextBanned }).eq("user_id", user.id);
+      if (error) toast.error(error.message);
+    }
+    // 2) Strip the tag from this post immediately + unlock it if locked
+    const cur = lockedHashtags[String(day)] || [];
+    if (cur.includes(norm)) {
+      const nextLocks = { ...lockedHashtags, [String(day)]: cur.filter(t => t !== norm) };
+      if (nextLocks[String(day)].length === 0) delete nextLocks[String(day)];
+      await persistLockedHashtags(nextLocks);
+    }
+    const post = posts.find(po => po.day === day);
+    if (post) {
+      const tagsNow = parseHashtagsString(post.hashtags).filter(t => t !== norm);
+      const newStr = rebuildHashtagsForDay(day, tagsNow, (lockedHashtags[String(day)] || []).filter(t => t !== norm));
+      await persistPostHashtags(day, newStr);
+    }
+    toast.success(`#${norm} banned workspace-wide ✓`);
+    setTagPopover(null);
+  }
+
+  async function replaceTagOnPost(day: number, oldTag: string, replacementRaw: string) {
+    const oldNorm = normalizeTag(oldTag);
+    const newNorm = normalizeTag(replacementRaw);
+    if (!oldNorm || !newNorm) return toast.error("Enter a valid replacement tag");
+    if (oldNorm === newNorm) return setTagPopover(null);
+    const post = posts.find(po => po.day === day);
+    if (!post) return;
+    const tagsNow = parseHashtagsString(post.hashtags);
+    const idx = tagsNow.indexOf(oldNorm);
+    if (idx === -1) return;
+    tagsNow[idx] = newNorm;
+    // Update locks too if old was locked
+    const cur = lockedHashtags[String(day)] || [];
+    let nextLocks = lockedHashtags;
+    if (cur.includes(oldNorm)) {
+      nextLocks = { ...lockedHashtags, [String(day)]: cur.map(t => t === oldNorm ? newNorm : t) };
+      await persistLockedHashtags(nextLocks);
+    }
+    const newStr = rebuildHashtagsForDay(day, tagsNow, nextLocks[String(day)] || []);
+    await persistPostHashtags(day, newStr);
+    toast.success(`#${oldNorm} → #${newNorm}`);
+    setTagPopover(null);
+    setTagReplacement("");
+  }
+
   function exportIcs() {
     const ws = parseLocalDate(weekStart) || nextMonday();
     downloadIcs({ calendarTitle: title, weekStart: ws, postTimes, platform }, posts);
@@ -456,20 +621,20 @@ export default function CalendarDetail() {
     setScheduling(true);
     try {
       const ws = parseLocalDate(weekStart) || nextMonday();
+      const tz = timezone || profileTimezone || browserTimezone();
       const rows = posts.map(post => {
         const d = dateForDow(ws, post.dow);
-        const t = postTimes[String(post.day)] || "09:00";
-        const [hh, mm] = t.split(":").map(n => parseInt(n, 10));
-        const when = new Date(d);
-        when.setHours(hh || 9, mm || 0, 0, 0);
+        const dateStr = toDateInputValue(d);
+        const time = postTimes[String(post.day)] || "09:00";
         const f = formatForPlatform(post, platform);
         return {
           user_id: user.id,
           calendar_id: id,
           post_day: post.day,
           platform: platform || null,
-          scheduled_at: when.toISOString(),
+          scheduled_at: zonedToUtcIso(dateStr, time, tz),
           status: "scheduled",
+          workflow_status: "drafted",
           copy_text: f.text,
           post_snapshot: post as unknown as never,
         };
@@ -478,7 +643,10 @@ export default function CalendarDetail() {
       await supabase.from("scheduled_posts").delete().eq("calendar_id", id).eq("status", "scheduled");
       const { error } = await supabase.from("scheduled_posts").insert(rows as never);
       if (error) { toast.error(error.message); return; }
-      toast.success(`Scheduled ${rows.length} posts ✓`);
+      const newStatus: typeof statusByDay = {};
+      for (const p of posts) newStatus[p.day] = "drafted";
+      setStatusByDay(newStatus);
+      toast.success(`Scheduled ${rows.length} posts in ${tz} ✓`);
       setScheduleOpen(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not schedule");
@@ -595,6 +763,28 @@ export default function CalendarDetail() {
             <span style={{ fontSize: 11, color: "#7a7a8e" }}>Day 1 = {shortDateLabel(weekStartDate)}</span>
           </div>
 
+          <div className="cd-tz-bar">
+            <span className="cd-reformat-label">Timezone</span>
+            <select
+              className="cd-tz-sel"
+              value={timezone}
+              onChange={e => updateTimezone(e.target.value)}
+              style={{ maxWidth: 240 }}
+              title={`Workspace default: ${profileTimezone || browserTimezone()}`}
+            >
+              {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
+            </select>
+            <span className="cd-reformat-label" style={{ marginLeft: 4 }}>Tracking URL</span>
+            <input
+              className="cd-tz-input"
+              type="url"
+              placeholder="https://yoursite.com/launch"
+              value={trackingUrl}
+              onChange={e => setTrackingUrl(e.target.value)}
+              onBlur={e => updateTrackingUrl(e.target.value.trim())}
+            />
+          </div>
+
           <div className="cd-reformat-bar">
             <span className="cd-reformat-label">Reformat for</span>
             <select
@@ -620,21 +810,26 @@ export default function CalendarDetail() {
           </div>
 
           <div className="cd-strip" role="tablist" aria-label="Days of the week">
-            {posts.map((post, i) => (
-              <button
-                key={i}
-                type="button"
-                role="tab"
-                aria-selected={i === active}
-                disabled={editing}
-                className={`cd-tab ${i === active ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
-                onClick={() => { if (!editing) setActive(i); }}
-              >
-                <div className="cd-tab-dow">{post.dow}</div>
-                <div className="cd-tab-n">{i + 1}</div>
-                <div className="cd-tab-date">{shortDateLabel(dateForDow(weekStartDate, post.dow)).split(" · ")[1]}</div>
-              </button>
-            ))}
+            {posts.map((post, i) => {
+              const st = statusByDay[post.day];
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === active}
+                  disabled={editing}
+                  className={`cd-tab ${i === active ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
+                  onClick={() => { if (!editing) setActive(i); }}
+                  title={st ? `Status: ${st}` : "Not scheduled"}
+                >
+                  {st && <span className={`cd-tab-status ${st}`} aria-hidden="true" style={{ background: st === "published" ? "#c8f09a" : st === "approved" ? "#9ab5f0" : st === "failed" ? "#f09a9a" : "#9a9aae" }} />}
+                  <div className="cd-tab-dow">{post.dow}</div>
+                  <div className="cd-tab-n">{i + 1}</div>
+                  <div className="cd-tab-date">{shortDateLabel(dateForDow(weekStartDate, post.dow)).split(" · ")[1]}</div>
+                </button>
+              );
+            })}
           </div>
 
           <div className="cd-export-row" aria-label="Export options">
@@ -699,8 +894,53 @@ export default function CalendarDetail() {
               <div className="cd-body">{p.body}</div>
               <div className="cd-blabel"><span>CTA</span></div>
               <div className="cd-cta">{p.cta}</div>
-              <div className="cd-blabel"><span>Hashtags</span></div>
-              <div className="cd-tags">{p.hashtags}</div>
+              <div className="cd-blabel"><span>Hashtags</span><span className="cd-blabel-count">click a tag to lock, ban, or replace</span></div>
+              <div className="cd-tags-row">
+                {(() => {
+                  const tags = parseHashtagsString(p.hashtags);
+                  const locks = lockedHashtags[String(p.day)] || [];
+                  if (tags.length === 0) return <span className="cd-tags" style={{ color: "#3a3a50" }}>— none —</span>;
+                  return tags.map(t => {
+                    const isLocked = locks.includes(t);
+                    const open = tagPopover && tagPopover.day === p.day && tagPopover.tag === t;
+                    return (
+                      <span key={t} className="cd-tag-wrap">
+                        <button
+                          type="button"
+                          className={`cd-tag-chip ${isLocked ? "locked" : ""}`}
+                          onClick={() => { setTagPopover(open ? null : { day: p.day, tag: t }); setTagReplacement(""); }}
+                          title={isLocked ? "Pinned — survives regenerates" : "Click for actions"}
+                        >
+                          {isLocked ? "📌 " : ""}{displayTag(t)}
+                        </button>
+                        {open && (
+                          <div className="cd-tag-pop" style={{ top: "calc(100% + 4px)", left: 0 }}>
+                            <div className="cd-tag-pop-h">{displayTag(t)}</div>
+                            {isLocked ? (
+                              <button className="cd-tag-pop-btn" onClick={() => unlockTagOnPost(p.day, t)}>📍 Unpin</button>
+                            ) : (
+                              <button className="cd-tag-pop-btn" onClick={() => lockTagOnPost(p.day, t)}>📌 Lock on this post</button>
+                            )}
+                            <button className="cd-tag-pop-btn danger" onClick={() => banTagWorkspaceWide(p.day, t)}>✕ Ban workspace-wide</button>
+                            <div className="cd-tag-pop-row">
+                              <input
+                                className="cd-tag-pop-input"
+                                placeholder="replace with…"
+                                value={tagReplacement}
+                                onChange={e => setTagReplacement(e.target.value)}
+                                onKeyDown={e => e.key === "Enter" && replaceTagOnPost(p.day, t, tagReplacement)}
+                                autoFocus
+                              />
+                              <button className="cd-tag-pop-btn" style={{ flex: "0 0 auto" }} onClick={() => replaceTagOnPost(p.day, t, tagReplacement)}>↻</button>
+                            </div>
+                            <button className="cd-tag-pop-btn" onClick={() => setTagPopover(null)} style={{ borderColor: "transparent", color: "#5a5a72" }}>Close</button>
+                          </div>
+                        )}
+                      </span>
+                    );
+                  });
+                })()}
+              </div>
               <div className="cd-actions">
                 {(() => {
                   const f = formatForPlatform(p, platform);
