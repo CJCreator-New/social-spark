@@ -1058,7 +1058,11 @@ ${postText(p)}
   async function saveCalendar() {
     if (!user || posts.length === 0) return;
     setSaving(true);
-    const title = form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`;
+    const isDay = form.mode === "day" && posts.length === 1;
+    const baseTitle = form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`;
+    const title = isDay
+      ? `${(form.topics[0] || baseTitle).slice(0, 60)} · ${form.platform} · ${form.targetDate}`
+      : baseTitle;
     const { data, error: insErr } = await supabase
       .from("saved_calendars")
       .insert([{
