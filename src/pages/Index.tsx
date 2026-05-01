@@ -1074,7 +1074,7 @@ ${postText(p)}
         core_idea: form.coreIdea,
         form_payload: form as never,
         posts: posts as never,
-        week_start_date: form.weekStart || null,
+        week_start_date: (isDay ? form.targetDate : form.weekStart) || null,
         post_times: postTimes as never,
       }])
       .select("id")
