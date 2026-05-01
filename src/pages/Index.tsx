@@ -1293,17 +1293,61 @@ ${postText(p)}
           {/* ── STEP 2 ── */}
           <div className={`screen ${step === 2 ? "active" : ""}`}>
             <div className="card">
-              <div className="sh">Pick your <span>weekly topics</span></div>
+              <div className="sh">Pick your <span>{form.mode === "day" ? "single-day topic" : "weekly topics"}</span></div>
+
+              {/* NEW: mode toggle */}
+              <div className="csect">
+                <div className="flabel">Generation mode</div>
+                <div className="plat-grid" role="radiogroup" aria-label="Generation mode" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={form.mode === "week"}
+                    className={`plat-card ${form.mode === "week" ? "on" : ""}`}
+                    onClick={() => setForm(f => ({ ...f, mode: "week", topics: f.topics.slice(0, 7) }))}
+                  >
+                    <div className="plat-name">Full week</div>
+                    <div className="plat-hint">7 posts, Mon → Sun</div>
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={form.mode === "day"}
+                    className={`plat-card ${form.mode === "day" ? "on" : ""}`}
+                    onClick={() => setForm(f => ({ ...f, mode: "day", topics: f.topics.slice(0, 1) }))}
+                  >
+                    <div className="plat-name">Single day</div>
+                    <div className="plat-hint">Just 1 post for a chosen date</div>
+                  </button>
+                </div>
+              </div>
+
+              {/* NEW: date picker (single-day mode only) */}
+              {form.mode === "day" && (
+                <div className="csect">
+                  <div className="flabel">Date for this post</div>
+                  <input
+                    type="date"
+                    className="date-input"
+                    value={form.targetDate}
+                    onChange={e => upd("targetDate", e.target.value)}
+                  />
+                  <div className="time-hint" style={{ marginTop: 6 }}>
+                    Your post will be written for <strong style={{ color: "rgba(200,240,154,.85)" }}>{shortDateLabel(parseLocalDate(form.targetDate) || nextMonday())}</strong>.
+                  </div>
+                </div>
+              )}
+
               <div className="csect">
                 <MultiSelect
-                  label="Topics to cover"
-                  hint="(pick up to 7 — 1 per day)"
+                  label={form.mode === "day" ? "Topic for this post" : "Topics to cover"}
+                  hint={form.mode === "day" ? "(pick exactly 1)" : "(pick up to 7 — 1 per day)"}
                   options={topicPool.length > 0 ? topicPool : ["Add custom topics below ↓"]}
                   disabledOptions={topicPool.length > 0 ? [] : ["Add custom topics below ↓"]}
                   value={form.topics}
-                  onChange={v => upd("topics", v)}
+                  onChange={v => upd("topics", form.mode === "day" ? v.slice(-1) : v)}
                   placeholder={form.industry ? "Select topics…" : "Select industry first"}
-                  max={7}
+                  max={form.mode === "day" ? 1 : 7}
                 />
                 <div className="add-row">
                   <input type="text" className="ti" placeholder="+ add a custom topic, press Enter or click Add"
