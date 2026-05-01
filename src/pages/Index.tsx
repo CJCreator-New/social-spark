@@ -1519,7 +1519,7 @@ ${postText(p)}
                       onClick={() => reformatAllForPlatform(reformatTarget)}
                       title={!user ? "Sign in — saved as a new calendar" : "Re-runs all 7 posts; saved as a new calendar"}
                     >
-                      {reformatting ? `Reformatting… ${regenIdx !== null ? `(${regenIdx + 1}/7)` : ""}` : "Reformat all 7 →"}
+                      {reformatting ? `Reformatting… ${regenIdx !== null ? `(${regenIdx + 1}/${posts.length})` : ""}` : `Reformat all ${posts.length} →`}
                     </button>
                     <span style={{ flex: 1 }} />
                     <button
