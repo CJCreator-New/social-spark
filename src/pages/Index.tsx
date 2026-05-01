@@ -1368,7 +1368,7 @@ ${postText(p)}
               <div className="csect">
                 <div className="flabel" id="cf-length-label">Post length</div>
                 <div className="plat-grid" role="radiogroup" aria-labelledby="cf-length-label">
-                  {LENGTH_OPTIONS.map(o => (
+                  {LENGTH_OPTIONS.filter(o => !(form.mode === "day" && o.id === "mixed")).map(o => (
                     <button
                       key={o.id}
                       type="button"
