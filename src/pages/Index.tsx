@@ -634,7 +634,15 @@ const Index = () => {
       if (!form.industry) { setError("Please select your industry / niche."); return false; }
       if (!form.coreIdea.trim()) { setError("Please describe your core idea."); return false; }
     }
-    if (s === 2 && form.topics.length === 0) { setError("Please select at least 1 topic."); return false; }
+    if (s === 2) {
+      if (form.mode === "day") {
+        if (!form.targetDate) { setError("Please pick a date for your post."); return false; }
+        if (form.topics.length === 0) { setError("Please pick (or add) one topic for this post."); return false; }
+      } else if (form.topics.length === 0) {
+        setError("Please select at least 1 topic.");
+        return false;
+      }
+    }
     setError(""); return true;
   }
 
