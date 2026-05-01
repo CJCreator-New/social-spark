@@ -676,31 +676,45 @@ const Index = () => {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-calendar`, {
+
+      const isDay = form.mode === "day";
+      const endpoint = isDay ? "generate-single-post" : "generate-calendar";
+
+      // Derive dow ("Mon".."Sun") from chosen date for single-day mode.
+      const DOW_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const targetDateObj = isDay ? (parseLocalDate(form.targetDate) || new Date()) : null;
+      const targetDow = targetDateObj ? DOW_NAMES[targetDateObj.getDay()] : "Mon";
+
+      const baseBody = {
+        industry: form.industry,
+        industryLabel: selectedIndustry?.label || form.industry,
+        platform: form.platform,
+        coreIdea: form.coreIdea,
+        audiences: form.audiences,
+        voice: form.voice,
+        style: form.style,
+        goals: form.goals,
+        format: form.format,
+        cta: form.cta,
+        length: form.length,
+        structure: form.structure,
+        extra: form.extra,
+        bannedWords: form.bannedWords,
+        requiredWords: form.requiredWords,
+      };
+
+      const body = isDay
+        ? { ...baseBody, topic: form.topics[0] || form.coreIdea, dow: targetDow, date: form.targetDate }
+        : { ...baseBody, topics: form.topics };
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           apikey: SUPABASE_KEY,
           Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
         },
-        body: JSON.stringify({
-          industry: form.industry,
-          industryLabel: selectedIndustry?.label || form.industry,
-          platform: form.platform,
-          coreIdea: form.coreIdea,
-          audiences: form.audiences,
-          voice: form.voice,
-          style: form.style,
-          goals: form.goals,
-          topics: form.topics,
-          format: form.format,
-          cta: form.cta,
-          length: form.length,
-          structure: form.structure,
-          extra: form.extra,
-          bannedWords: form.bannedWords,
-          requiredWords: form.requiredWords,
-        }),
+        body: JSON.stringify(body),
         signal: ac.signal,
       });
 
@@ -713,7 +727,10 @@ const Index = () => {
         return;
       }
 
-      const result: Post[] = Array.isArray(data?.posts) ? data.posts : [];
+      // Normalize: single-post endpoint returns { post }, week endpoint returns { posts }
+      const result: Post[] = isDay
+        ? (data?.post ? [data.post as Post] : [])
+        : (Array.isArray(data?.posts) ? data.posts : []);
       if (result.length === 0) { setStep(2); setError("Empty response. Please try again."); return; }
 
       setGenStep(GEN_LABELS.length);
