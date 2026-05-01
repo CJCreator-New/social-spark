@@ -297,6 +297,7 @@ export default function MyCalendars() {
                       </Link>
                     )}
                     <div className="mc-meta" style={{ marginTop: 4 }}>
+                      {Array.isArray(it.posts) && it.posts.length === 1 && <span className="mc-tag">1-day</span>}
                       {it.industry_label && <span className="mc-tag">{it.industry_label}</span>}
                       {it.platform && <span className="mc-tag">{it.platform}</span>}
                       <span>{new Date(it.created_at).toLocaleDateString()}</span>
