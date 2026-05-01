@@ -1461,7 +1461,7 @@ ${postText(p)}
                   <path d="M12 2l3 7.5L22 12l-7.5 3L12 22l-3-7.5L2 12l7.5-3z" strokeLinejoin="round" />
                 </svg>
               </div>
-              <div className="gen-title">Writing your week</div>
+              <div className="gen-title">{form.mode === "day" ? "Writing your post" : "Writing your week"}</div>
               <div className="gen-msg">{genMsg}</div>
               <div className="prog-track">
                 <div className="prog-indet" />
