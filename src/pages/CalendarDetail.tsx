@@ -841,29 +841,46 @@ export default function CalendarDetail() {
           </div>
 
           <div className="cd-bulk-bar">
-            <span className="cd-bulk-label">
-              Bulk actions · {posts.length - lockedDays.size} unlocked / {lockedDays.size} pinned
-            </span>
-            <button
-              type="button"
-              className="cd-bulk-btn"
-              onClick={regenerateAllUnlocked}
-              disabled={bulkRegenerating || regenerating || reformatting || editing}
-              title="Re-rolls every unpinned post with the same constraints"
-            >
-              {bulkRegenerating
-                ? `↻ Regenerating ${bulkProgress?.done ?? 0}/${bulkProgress?.total ?? 0}…`
-                : `↻ Regenerate all unlocked`}
-            </button>
-            <button
-              type="button"
-              className="cd-bulk-btn primary"
-              onClick={() => setScheduleOpen(true)}
-              disabled={bulkRegenerating || regenerating || editing}
-              title="Queue all 7 posts at the times shown"
-            >
-              📅 Schedule week →
-            </button>
+            {posts.length > 1 ? (
+              <>
+                <span className="cd-bulk-label">
+                  Bulk actions · {posts.length - lockedDays.size} unlocked / {lockedDays.size} pinned
+                </span>
+                <button
+                  type="button"
+                  className="cd-bulk-btn"
+                  onClick={regenerateAllUnlocked}
+                  disabled={bulkRegenerating || regenerating || reformatting || editing}
+                  title="Re-rolls every unpinned post with the same constraints"
+                >
+                  {bulkRegenerating
+                    ? `↻ Regenerating ${bulkProgress?.done ?? 0}/${bulkProgress?.total ?? 0}…`
+                    : `↻ Regenerate all unlocked`}
+                </button>
+                <button
+                  type="button"
+                  className="cd-bulk-btn primary"
+                  onClick={() => setScheduleOpen(true)}
+                  disabled={bulkRegenerating || regenerating || editing}
+                  title="Queue all posts at the times shown"
+                >
+                  📅 Schedule week →
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="cd-bulk-label">Single-day post</span>
+                <button
+                  type="button"
+                  className="cd-bulk-btn primary"
+                  onClick={() => setScheduleOpen(true)}
+                  disabled={bulkRegenerating || regenerating || editing}
+                  title="Schedule this post"
+                >
+                  📅 Schedule this post →
+                </button>
+              </>
+            )}
           </div>
 
           {p && !editing && (
