@@ -1449,7 +1449,7 @@ ${postText(p)}
             {error && <div className="err-box">{error}</div>}
             <div className="brow">
               <button className="btn btn-g" onClick={() => { setError(""); setStep(1); }}>← Back</button>
-              <button className="btn btn-p" onClick={generate}>Generate my week →</button>
+              <button className="btn btn-p" onClick={generate}>{form.mode === "day" ? "Generate this post →" : "Generate my week →"}</button>
             </div>
           </div>
 
