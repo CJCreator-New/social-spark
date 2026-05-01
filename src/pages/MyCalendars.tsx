@@ -88,7 +88,7 @@ export default function MyCalendars() {
     if (!user) return;
     supabase
       .from("saved_calendars")
-      .select("id, title, industry_label, platform, core_idea, created_at, is_favorite")
+      .select("id, title, industry_label, platform, core_idea, created_at, is_favorite, posts")
       .order("is_favorite", { ascending: false })
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
