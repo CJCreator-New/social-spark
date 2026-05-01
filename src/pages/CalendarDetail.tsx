@@ -809,28 +809,30 @@ export default function CalendarDetail() {
             </button>
           </div>
 
-          <div className="cd-strip" role="tablist" aria-label="Days of the week">
-            {posts.map((post, i) => {
-              const st = statusByDay[post.day];
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  role="tab"
-                  aria-selected={i === active}
-                  disabled={editing}
-                  className={`cd-tab ${i === active ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
-                  onClick={() => { if (!editing) setActive(i); }}
-                  title={st ? `Status: ${st}` : "Not scheduled"}
-                >
-                  {st && <span className={`cd-tab-status ${st}`} aria-hidden="true" style={{ background: st === "published" ? "#c8f09a" : st === "approved" ? "#9ab5f0" : st === "failed" ? "#f09a9a" : "#9a9aae" }} />}
-                  <div className="cd-tab-dow">{post.dow}</div>
-                  <div className="cd-tab-n">{i + 1}</div>
-                  <div className="cd-tab-date">{shortDateLabel(dateForDow(weekStartDate, post.dow)).split(" · ")[1]}</div>
-                </button>
-              );
-            })}
-          </div>
+          {posts.length > 1 && (
+            <div className="cd-strip" role="tablist" aria-label="Days of the week">
+              {posts.map((post, i) => {
+                const st = statusByDay[post.day];
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === active}
+                    disabled={editing}
+                    className={`cd-tab ${i === active ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
+                    onClick={() => { if (!editing) setActive(i); }}
+                    title={st ? `Status: ${st}` : "Not scheduled"}
+                  >
+                    {st && <span className={`cd-tab-status ${st}`} aria-hidden="true" style={{ background: st === "published" ? "#c8f09a" : st === "approved" ? "#9ab5f0" : st === "failed" ? "#f09a9a" : "#9a9aae" }} />}
+                    <div className="cd-tab-dow">{post.dow}</div>
+                    <div className="cd-tab-n">{i + 1}</div>
+                    <div className="cd-tab-date">{shortDateLabel(dateForDow(weekStartDate, post.dow)).split(" · ")[1]}</div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <div className="cd-export-row" aria-label="Export options">
             <button type="button" className="cd-export-btn" onClick={() => downloadMd({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts)}>↓ .md</button>
@@ -839,29 +841,46 @@ export default function CalendarDetail() {
           </div>
 
           <div className="cd-bulk-bar">
-            <span className="cd-bulk-label">
-              Bulk actions · {posts.length - lockedDays.size} unlocked / {lockedDays.size} pinned
-            </span>
-            <button
-              type="button"
-              className="cd-bulk-btn"
-              onClick={regenerateAllUnlocked}
-              disabled={bulkRegenerating || regenerating || reformatting || editing}
-              title="Re-rolls every unpinned post with the same constraints"
-            >
-              {bulkRegenerating
-                ? `↻ Regenerating ${bulkProgress?.done ?? 0}/${bulkProgress?.total ?? 0}…`
-                : `↻ Regenerate all unlocked`}
-            </button>
-            <button
-              type="button"
-              className="cd-bulk-btn primary"
-              onClick={() => setScheduleOpen(true)}
-              disabled={bulkRegenerating || regenerating || editing}
-              title="Queue all 7 posts at the times shown"
-            >
-              📅 Schedule week →
-            </button>
+            {posts.length > 1 ? (
+              <>
+                <span className="cd-bulk-label">
+                  Bulk actions · {posts.length - lockedDays.size} unlocked / {lockedDays.size} pinned
+                </span>
+                <button
+                  type="button"
+                  className="cd-bulk-btn"
+                  onClick={regenerateAllUnlocked}
+                  disabled={bulkRegenerating || regenerating || reformatting || editing}
+                  title="Re-rolls every unpinned post with the same constraints"
+                >
+                  {bulkRegenerating
+                    ? `↻ Regenerating ${bulkProgress?.done ?? 0}/${bulkProgress?.total ?? 0}…`
+                    : `↻ Regenerate all unlocked`}
+                </button>
+                <button
+                  type="button"
+                  className="cd-bulk-btn primary"
+                  onClick={() => setScheduleOpen(true)}
+                  disabled={bulkRegenerating || regenerating || editing}
+                  title="Queue all posts at the times shown"
+                >
+                  📅 Schedule week →
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="cd-bulk-label">Single-day post</span>
+                <button
+                  type="button"
+                  className="cd-bulk-btn primary"
+                  onClick={() => setScheduleOpen(true)}
+                  disabled={bulkRegenerating || regenerating || editing}
+                  title="Schedule this post"
+                >
+                  📅 Schedule this post →
+                </button>
+              </>
+            )}
           </div>
 
           {p && !editing && (

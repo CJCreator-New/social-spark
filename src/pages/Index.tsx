@@ -491,6 +491,8 @@ const Index = () => {
     bannedWords: [] as string[],
     requiredWords: [] as string[],
     weekStart: toDateInputValue(nextMonday()), // YYYY-MM-DD, defaults to next Monday
+    mode: "week" as "week" | "day", // NEW: full-week vs single-day generation
+    targetDate: toDateInputValue(nextMonday()), // NEW: chosen day in single-day mode (YYYY-MM-DD)
   });
   const [customTopic, setCustomTopic] = useState("");
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
@@ -632,7 +634,15 @@ const Index = () => {
       if (!form.industry) { setError("Please select your industry / niche."); return false; }
       if (!form.coreIdea.trim()) { setError("Please describe your core idea."); return false; }
     }
-    if (s === 2 && form.topics.length === 0) { setError("Please select at least 1 topic."); return false; }
+    if (s === 2) {
+      if (form.mode === "day") {
+        if (!form.targetDate) { setError("Please pick a date for your post."); return false; }
+        if (form.topics.length === 0) { setError("Please pick (or add) one topic for this post."); return false; }
+      } else if (form.topics.length === 0) {
+        setError("Please select at least 1 topic.");
+        return false;
+      }
+    }
     setError(""); return true;
   }
 
@@ -666,31 +676,45 @@ const Index = () => {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-calendar`, {
+
+      const isDay = form.mode === "day";
+      const endpoint = isDay ? "generate-single-post" : "generate-calendar";
+
+      // Derive dow ("Mon".."Sun") from chosen date for single-day mode.
+      const DOW_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const targetDateObj = isDay ? (parseLocalDate(form.targetDate) || new Date()) : null;
+      const targetDow = targetDateObj ? DOW_NAMES[targetDateObj.getDay()] : "Mon";
+
+      const baseBody = {
+        industry: form.industry,
+        industryLabel: selectedIndustry?.label || form.industry,
+        platform: form.platform,
+        coreIdea: form.coreIdea,
+        audiences: form.audiences,
+        voice: form.voice,
+        style: form.style,
+        goals: form.goals,
+        format: form.format,
+        cta: form.cta,
+        length: form.length,
+        structure: form.structure,
+        extra: form.extra,
+        bannedWords: form.bannedWords,
+        requiredWords: form.requiredWords,
+      };
+
+      const body = isDay
+        ? { ...baseBody, topic: form.topics[0] || form.coreIdea, dow: targetDow, date: form.targetDate }
+        : { ...baseBody, topics: form.topics };
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           apikey: SUPABASE_KEY,
           Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
         },
-        body: JSON.stringify({
-          industry: form.industry,
-          industryLabel: selectedIndustry?.label || form.industry,
-          platform: form.platform,
-          coreIdea: form.coreIdea,
-          audiences: form.audiences,
-          voice: form.voice,
-          style: form.style,
-          goals: form.goals,
-          topics: form.topics,
-          format: form.format,
-          cta: form.cta,
-          length: form.length,
-          structure: form.structure,
-          extra: form.extra,
-          bannedWords: form.bannedWords,
-          requiredWords: form.requiredWords,
-        }),
+        body: JSON.stringify(body),
         signal: ac.signal,
       });
 
@@ -703,7 +727,10 @@ const Index = () => {
         return;
       }
 
-      const result: Post[] = Array.isArray(data?.posts) ? data.posts : [];
+      // Normalize: single-post endpoint returns { post }, week endpoint returns { posts }
+      const result: Post[] = isDay
+        ? (data?.post ? [data.post as Post] : [])
+        : (Array.isArray(data?.posts) ? data.posts : []);
       if (result.length === 0) { setStep(2); setError("Empty response. Please try again."); return; }
 
       setGenStep(GEN_LABELS.length);
@@ -1031,7 +1058,11 @@ ${postText(p)}
   async function saveCalendar() {
     if (!user || posts.length === 0) return;
     setSaving(true);
-    const title = form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`;
+    const isDay = form.mode === "day" && posts.length === 1;
+    const baseTitle = form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`;
+    const title = isDay
+      ? `${(form.topics[0] || baseTitle).slice(0, 60)} · ${form.platform} · ${form.targetDate}`
+      : baseTitle;
     const { data, error: insErr } = await supabase
       .from("saved_calendars")
       .insert([{
@@ -1043,7 +1074,7 @@ ${postText(p)}
         core_idea: form.coreIdea,
         form_payload: form as never,
         posts: posts as never,
-        week_start_date: form.weekStart || null,
+        week_start_date: (isDay ? form.targetDate : form.weekStart) || null,
         post_times: postTimes as never,
       }])
       .select("id")
@@ -1262,17 +1293,61 @@ ${postText(p)}
           {/* ── STEP 2 ── */}
           <div className={`screen ${step === 2 ? "active" : ""}`}>
             <div className="card">
-              <div className="sh">Pick your <span>weekly topics</span></div>
+              <div className="sh">Pick your <span>{form.mode === "day" ? "single-day topic" : "weekly topics"}</span></div>
+
+              {/* NEW: mode toggle */}
+              <div className="csect">
+                <div className="flabel">Generation mode</div>
+                <div className="plat-grid" role="radiogroup" aria-label="Generation mode" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={form.mode === "week"}
+                    className={`plat-card ${form.mode === "week" ? "on" : ""}`}
+                    onClick={() => setForm(f => ({ ...f, mode: "week", topics: f.topics.slice(0, 7) }))}
+                  >
+                    <div className="plat-name">Full week</div>
+                    <div className="plat-hint">7 posts, Mon → Sun</div>
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={form.mode === "day"}
+                    className={`plat-card ${form.mode === "day" ? "on" : ""}`}
+                    onClick={() => setForm(f => ({ ...f, mode: "day", topics: f.topics.slice(0, 1) }))}
+                  >
+                    <div className="plat-name">Single day</div>
+                    <div className="plat-hint">Just 1 post for a chosen date</div>
+                  </button>
+                </div>
+              </div>
+
+              {/* NEW: date picker (single-day mode only) */}
+              {form.mode === "day" && (
+                <div className="csect">
+                  <div className="flabel">Date for this post</div>
+                  <input
+                    type="date"
+                    className="date-input"
+                    value={form.targetDate}
+                    onChange={e => upd("targetDate", e.target.value)}
+                  />
+                  <div className="time-hint" style={{ marginTop: 6 }}>
+                    Your post will be written for <strong style={{ color: "rgba(200,240,154,.85)" }}>{shortDateLabel(parseLocalDate(form.targetDate) || nextMonday())}</strong>.
+                  </div>
+                </div>
+              )}
+
               <div className="csect">
                 <MultiSelect
-                  label="Topics to cover"
-                  hint="(pick up to 7 — 1 per day)"
+                  label={form.mode === "day" ? "Topic for this post" : "Topics to cover"}
+                  hint={form.mode === "day" ? "(pick exactly 1)" : "(pick up to 7 — 1 per day)"}
                   options={topicPool.length > 0 ? topicPool : ["Add custom topics below ↓"]}
                   disabledOptions={topicPool.length > 0 ? [] : ["Add custom topics below ↓"]}
                   value={form.topics}
-                  onChange={v => upd("topics", v)}
+                  onChange={v => upd("topics", form.mode === "day" ? v.slice(-1) : v)}
                   placeholder={form.industry ? "Select topics…" : "Select industry first"}
-                  max={7}
+                  max={form.mode === "day" ? 1 : 7}
                 />
                 <div className="add-row">
                   <input type="text" className="ti" placeholder="+ add a custom topic, press Enter or click Add"
@@ -1293,7 +1368,7 @@ ${postText(p)}
               <div className="csect">
                 <div className="flabel" id="cf-length-label">Post length</div>
                 <div className="plat-grid" role="radiogroup" aria-labelledby="cf-length-label">
-                  {LENGTH_OPTIONS.map(o => (
+                  {LENGTH_OPTIONS.filter(o => !(form.mode === "day" && o.id === "mixed")).map(o => (
                     <button
                       key={o.id}
                       type="button"
@@ -1328,19 +1403,20 @@ ${postText(p)}
                 </div>
               </div>
 
-              <div className="csect">
-                <div className="flabel">Week starting <span className="fhint">(used for dates + .ics export)</span></div>
-                <input
-                  type="date"
-                  className="date-input"
-                  value={form.weekStart}
-                  onChange={e => upd("weekStart", e.target.value)}
-                />
-                <div className="time-hint" style={{ marginTop: 6 }}>
-                  Day 1 will be <strong style={{ color: "rgba(200,240,154,.85)" }}>{shortDateLabel(weekStartDate)}</strong>. Each post defaults to 9:00 AM — you can adjust per post on the next screen.
+              {form.mode === "week" && (
+                <div className="csect">
+                  <div className="flabel">Week starting <span className="fhint">(used for dates + .ics export)</span></div>
+                  <input
+                    type="date"
+                    className="date-input"
+                    value={form.weekStart}
+                    onChange={e => upd("weekStart", e.target.value)}
+                  />
+                  <div className="time-hint" style={{ marginTop: 6 }}>
+                    Day 1 will be <strong style={{ color: "rgba(200,240,154,.85)" }}>{shortDateLabel(weekStartDate)}</strong>. Each post defaults to 9:00 AM — you can adjust per post on the next screen.
+                  </div>
                 </div>
-              </div>
-
+              )}
               <div className="csect">
                 <div className="flabel">Extra context <span className="fhint">(optional)</span></div>
                 <textarea rows={2} placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
@@ -1373,7 +1449,7 @@ ${postText(p)}
             {error && <div className="err-box">{error}</div>}
             <div className="brow">
               <button className="btn btn-g" onClick={() => { setError(""); setStep(1); }}>← Back</button>
-              <button className="btn btn-p" onClick={generate}>Generate my week →</button>
+              <button className="btn btn-p" onClick={generate}>{form.mode === "day" ? "Generate this post →" : "Generate my week →"}</button>
             </div>
           </div>
 
@@ -1385,7 +1461,7 @@ ${postText(p)}
                   <path d="M12 2l3 7.5L22 12l-7.5 3L12 22l-3-7.5L2 12l7.5-3z" strokeLinejoin="round" />
                 </svg>
               </div>
-              <div className="gen-title">Writing your week</div>
+              <div className="gen-title">{form.mode === "day" ? "Writing your post" : "Writing your week"}</div>
               <div className="gen-msg">{genMsg}</div>
               <div className="prog-track">
                 <div className="prog-indet" />
@@ -1443,7 +1519,7 @@ ${postText(p)}
                       onClick={() => reformatAllForPlatform(reformatTarget)}
                       title={!user ? "Sign in — saved as a new calendar" : "Re-runs all 7 posts; saved as a new calendar"}
                     >
-                      {reformatting ? `Reformatting… ${regenIdx !== null ? `(${regenIdx + 1}/7)` : ""}` : "Reformat all 7 →"}
+                      {reformatting ? `Reformatting… ${regenIdx !== null ? `(${regenIdx + 1}/${posts.length})` : ""}` : `Reformat all ${posts.length} →`}
                     </button>
                     <span style={{ flex: 1 }} />
                     <button
@@ -1459,22 +1535,23 @@ ${postText(p)}
                   </div>
                 )}
 
-                <div className="week-strip" role="tablist" aria-label="Days of the week">
-                  {posts.map((post, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      role="tab"
-                      aria-selected={i === activeDay}
-                      className={`dtab ${i === activeDay ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
-                      onClick={() => setActiveDay(i)}
-                    >
-                      <div className="dtab-dow">{post.dow}</div>
-                      <div className="dtab-n">{i + 1}</div>
-                    </button>
-                  ))}
-                </div>
-
+                {posts.length > 1 && (
+                  <div className="week-strip" role="tablist" aria-label="Days of the week">
+                    {posts.map((post, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        role="tab"
+                        aria-selected={i === activeDay}
+                        className={`dtab ${i === activeDay ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
+                        onClick={() => setActiveDay(i)}
+                      >
+                        <div className="dtab-dow">{post.dow}</div>
+                        <div className="dtab-n">{i + 1}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {p && (
                   <div className="pcard">
                     <div className="ph">

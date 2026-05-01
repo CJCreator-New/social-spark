@@ -22,6 +22,7 @@ interface SavedCalendar {
   core_idea: string | null;
   created_at: string;
   is_favorite?: boolean;
+  posts?: unknown[];
 }
 
 const css = `
@@ -87,7 +88,7 @@ export default function MyCalendars() {
     if (!user) return;
     supabase
       .from("saved_calendars")
-      .select("id, title, industry_label, platform, core_idea, created_at, is_favorite")
+      .select("id, title, industry_label, platform, core_idea, created_at, is_favorite, posts")
       .order("is_favorite", { ascending: false })
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
@@ -296,6 +297,7 @@ export default function MyCalendars() {
                       </Link>
                     )}
                     <div className="mc-meta" style={{ marginTop: 4 }}>
+                      {Array.isArray(it.posts) && it.posts.length === 1 && <span className="mc-tag">1-day</span>}
                       {it.industry_label && <span className="mc-tag">{it.industry_label}</span>}
                       {it.platform && <span className="mc-tag">{it.platform}</span>}
                       <span>{new Date(it.created_at).toLocaleDateString()}</span>
