@@ -491,6 +491,8 @@ const Index = () => {
     bannedWords: [] as string[],
     requiredWords: [] as string[],
     weekStart: toDateInputValue(nextMonday()), // YYYY-MM-DD, defaults to next Monday
+    mode: "week" as "week" | "day", // NEW: full-week vs single-day generation
+    targetDate: toDateInputValue(nextMonday()), // NEW: chosen day in single-day mode (YYYY-MM-DD)
   });
   const [customTopic, setCustomTopic] = useState("");
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
