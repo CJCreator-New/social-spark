@@ -22,6 +22,7 @@ interface SavedCalendar {
   core_idea: string | null;
   created_at: string;
   is_favorite?: boolean;
+  posts?: unknown[];
 }
 
 const css = `
