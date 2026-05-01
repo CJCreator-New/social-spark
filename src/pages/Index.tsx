@@ -1535,22 +1535,23 @@ ${postText(p)}
                   </div>
                 )}
 
-                <div className="week-strip" role="tablist" aria-label="Days of the week">
-                  {posts.map((post, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      role="tab"
-                      aria-selected={i === activeDay}
-                      className={`dtab ${i === activeDay ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
-                      onClick={() => setActiveDay(i)}
-                    >
-                      <div className="dtab-dow">{post.dow}</div>
-                      <div className="dtab-n">{i + 1}</div>
-                    </button>
-                  ))}
-                </div>
-
+                {posts.length > 1 && (
+                  <div className="week-strip" role="tablist" aria-label="Days of the week">
+                    {posts.map((post, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        role="tab"
+                        aria-selected={i === activeDay}
+                        className={`dtab ${i === activeDay ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
+                        onClick={() => setActiveDay(i)}
+                      >
+                        <div className="dtab-dow">{post.dow}</div>
+                        <div className="dtab-n">{i + 1}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {p && (
                   <div className="pcard">
                     <div className="ph">
