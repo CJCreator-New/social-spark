@@ -552,8 +552,19 @@ const Index = () => {
         const saved = JSON.parse(raw) as { form?: typeof form; step?: number; extraTopics?: string[] };
         if (saved.form) { setForm(f => ({ ...f, ...saved.form })); restoredFromDraft = true; }
         if (saved.extraTopics) setExtraTopics(saved.extraTopics);
-        // Don't restore step 3 (mid-generation) or 4 (no posts persisted).
+        // Don't restore step 3 (mid-generation) — but restore step 4 if posts draft exists.
         if (saved.step === 1 || saved.step === 2) setStep(saved.step);
+      }
+      // Restore generated posts so step 4 survives reloads
+      const rawPosts = localStorage.getItem(POSTS_DRAFT_KEY);
+      if (rawPosts) {
+        const savedPosts = JSON.parse(rawPosts) as { posts?: Post[]; activeDay?: number; postTimes?: Record<string, string> };
+        if (Array.isArray(savedPosts.posts) && savedPosts.posts.length > 0) {
+          setPosts(savedPosts.posts);
+          if (typeof savedPosts.activeDay === "number") setActiveDay(savedPosts.activeDay);
+          if (savedPosts.postTimes) setPostTimes(savedPosts.postTimes);
+          setStep(4);
+        }
       }
     } catch (e) {
       console.warn("Failed to hydrate draft", e);
