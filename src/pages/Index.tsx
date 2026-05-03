@@ -616,8 +616,25 @@ const Index = () => {
     }
   }, [form, step, extraTopics]);
 
+  // Persist generated posts (step 4) so a tab close/reload doesn't lose them
+  useEffect(() => {
+    if (!hydrated.current) return;
+    try {
+      if (posts.length > 0) {
+        localStorage.setItem(POSTS_DRAFT_KEY, JSON.stringify({ posts, activeDay, postTimes }));
+      } else {
+        localStorage.removeItem(POSTS_DRAFT_KEY);
+      }
+    } catch (e) {
+      console.warn("Failed to persist posts draft", e);
+    }
+  }, [posts, activeDay, postTimes]);
+
   const clearDraft = () => {
-    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(POSTS_DRAFT_KEY);
+    } catch { /* ignore */ }
   };
 
   const upd = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm(f => ({ ...f, [k]: v }));
