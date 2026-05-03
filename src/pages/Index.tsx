@@ -471,6 +471,7 @@ interface Post {
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
 const DRAFT_KEY = "contentforge:draft:v1";
+const POSTS_DRAFT_KEY = "contentforge:posts-draft:v1";
 
 const Index = () => {
   const [step, setStep] = useState(1);
