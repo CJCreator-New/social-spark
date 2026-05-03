@@ -639,9 +639,10 @@ export default function CalendarDetail() {
           post_snapshot: post as unknown as never,
         };
       });
-      // Replace any existing scheduled rows for this calendar (idempotent week scheduling)
-      await supabase.from("scheduled_posts").delete().eq("calendar_id", id).eq("status", "scheduled");
-      const { error } = await supabase.from("scheduled_posts").insert(rows as never);
+      // Idempotent upsert keyed on (calendar_id, post_day) — preserves existing rows on partial failure
+      const { error } = await supabase
+        .from("scheduled_posts")
+        .upsert(rows as never, { onConflict: "calendar_id,post_day" });
       if (error) { toast.error(error.message); return; }
       const newStatus: typeof statusByDay = {};
       for (const p of posts) newStatus[p.day] = "drafted";
