@@ -166,7 +166,7 @@ function fileSlug(s: string) {
 }
 
 export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
-  const { calendarTitle, weekStart, postTimes, durationMin = 30, platform } = opts;
+  const { calendarTitle, weekStart, postTimes, durationMin = 30, platform, timezone } = opts;
   const stamp = toIcsUtcStamp(new Date());
 
   const lines: string[] = [
@@ -178,11 +178,33 @@ export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
     `X-WR-CALNAME:${icsEscape(calendarTitle)}`,
   ];
 
+  // Lazy-import to avoid circular deps in tests
+  let zonedToUtcIso: ((d: string, t: string, tz: string) => string) | null = null;
+  if (timezone) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      zonedToUtcIso = require("./timezones").zonedToUtcIso;
+    } catch { /* ignore */ }
+  }
+
   for (const p of posts) {
     const time = postTimes[String(p.day)] || "09:00";
-    const start = postDateTime(weekStart, p.dow, time);
-    const end = new Date(start.getTime() + durationMin * 60 * 1000);
-    const uid = `cf-${fileSlug(calendarTitle)}-d${p.day}-${start.getTime()}@contentforge`;
+    const localStart = postDateTime(weekStart, p.dow, time);
+
+    let dtStart: string;
+    let dtEnd: string;
+    if (timezone && zonedToUtcIso) {
+      const dateStr = toDateInputValue(dateForDow(weekStart, p.dow));
+      const startUtc = new Date(zonedToUtcIso(dateStr, time, timezone));
+      const endUtc = new Date(startUtc.getTime() + durationMin * 60 * 1000);
+      dtStart = `DTSTART:${toIcsUtcStamp(startUtc)}`;
+      dtEnd = `DTEND:${toIcsUtcStamp(endUtc)}`;
+    } else {
+      const end = new Date(localStart.getTime() + durationMin * 60 * 1000);
+      dtStart = `DTSTART:${toIcsLocal(localStart)}`;
+      dtEnd = `DTEND:${toIcsLocal(end)}`;
+    }
+    const uid = `cf-${fileSlug(calendarTitle)}-d${p.day}-${localStart.getTime()}@contentforge`;
 
     const summary = platform
       ? `[${platform}] Day ${p.day} — ${p.title || p.topic}`
@@ -199,8 +221,8 @@ export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
       "BEGIN:VEVENT",
       foldLine(`UID:${uid}`),
       `DTSTAMP:${stamp}`,
-      `DTSTART:${toIcsLocal(start)}`,
-      `DTEND:${toIcsLocal(end)}`,
+      dtStart,
+      dtEnd,
       foldLine(`SUMMARY:${icsEscape(summary)}`),
       foldLine(`DESCRIPTION:${icsEscape(description)}`),
       foldLine(`CATEGORIES:${icsEscape(p.topic || "")}`),
