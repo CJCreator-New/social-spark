@@ -563,7 +563,8 @@ export default function CalendarDetail() {
 
   function exportIcs() {
     const ws = parseLocalDate(weekStart) || nextMonday();
-    downloadIcs({ calendarTitle: title, weekStart: ws, postTimes, platform }, posts);
+    const tz = timezone || profileTimezone || browserTimezone();
+    downloadIcs({ calendarTitle: title, weekStart: ws, postTimes, platform, timezone: tz }, posts);
   }
 
   async function regenerateAllUnlocked() {
