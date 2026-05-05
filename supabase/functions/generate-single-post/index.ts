@@ -105,12 +105,7 @@ HARD RULES:
 5. In the "format" field, append the structure used (e.g. "How-to — hybrid").
 6. Include at least one concrete number, percentage, year, or named statistic in the body or hook (realistic, defensible).
 
-BANNED PHRASES — do NOT use these or close variants:
-- "in today's fast-paced world" / "in the ever-evolving landscape"
-- "game-changer" / "revolutionize" / "unlock the power of"
-- "take it to the next level" / "leverage synergies"
-- "let's dive in" / "let's dive into" / "at the end of the day"
-Open with a specific observation, number, or contrarian claim — not hype.`;
+${bannedPhrasesBlock()}`;
 
     const tool = {
       type: "function",
