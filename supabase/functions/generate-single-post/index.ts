@@ -1,10 +1,15 @@
 // Generate a SINGLE post (one chosen day) via Lovable AI Gateway.
-// Mirrors generate-calendar but returns one post for a specific dow + date.
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import {
+  corsHeaders,
+  VALID_DOW,
+  LENGTH_GUIDE_SINGLE as LENGTH_GUIDE,
+  STRUCTURE_GUIDE,
+  bannedPhrasesBlock,
+  cleanList,
+  cleanTagList,
+  buildHashtagInstr,
+  jsonResponse,
+} from "../_shared/promptHelpers.ts";
 
 interface Payload {
   industry?: string;
@@ -16,8 +21,8 @@ interface Payload {
   style?: string;
   goals?: string[];
   topic?: string;
-  dow?: string; // Mon..Sun
-  date?: string; // YYYY-MM-DD (for context only)
+  dow?: string;
+  date?: string;
   format?: string;
   cta?: string;
   length?: string;
@@ -29,21 +34,6 @@ interface Payload {
   requiredHashtags?: string[];
 }
 
-const VALID_DOW = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
-
-const LENGTH_GUIDE: Record<string, string> = {
-  short: "80–120 words (tight, punchy)",
-  medium: "160–230 words (balanced depth)",
-  long: "280–380 words (deep, substantive)",
-  mixed: "160–230 words (balanced depth)", // single post — no week-level mixing
-};
-
-const STRUCTURE_GUIDE: Record<string, string> = {
-  paragraphs: "Use flowing paragraphs only. No bullet points or numbered lists in the body.",
-  bullets: "Structure the body primarily as bullet points or short numbered items. Minimal prose connective tissue.",
-  mixed: "MIX paragraphs and bullet points — paragraph hook, bullets for the meat, paragraph close. Use '→' or '•' markers.",
-  perPost: "Pick the best structure for this single post — prose, bullets, or hybrid — based on the topic.",
-};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
