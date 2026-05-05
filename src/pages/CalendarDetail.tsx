@@ -581,32 +581,73 @@ export default function CalendarDetail() {
       const { data: { session } } = await supabase.auth.getSession();
       const next: Post[] = [...posts];
       let done = 0;
-      for (const { p: target, i } of targets) {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}` },
-          body: JSON.stringify({
-            industry: formPayload.industry || "", industryLabel,
-            platform: platform || formPayload.platform || "LinkedIn",
-            coreIdea: formPayload.coreIdea || title, audiences: formPayload.audiences || [],
-            voice: formPayload.voice || "", style: formPayload.style || "", goals: formPayload.goals || [],
-            format: formPayload.format || "Balanced mix", cta: formPayload.cta || "Share & repost bait",
-            length: formPayload.length || "medium", structure: formPayload.structure || "mixed",
-            extra: formPayload.extra || "", bannedWords: formPayload.bannedWords || [], requiredWords: formPayload.requiredWords || [],
-            post: target, siblings: next,
-          }),
+      const failures: { day: number; reason: string }[] = [];
+
+      const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+      async function runOne({ p: target, i }: { p: Post; i: number }) {
+        const body = JSON.stringify({
+          industry: formPayload.industry || "", industryLabel,
+          platform: platform || formPayload.platform || "LinkedIn",
+          coreIdea: formPayload.coreIdea || title, audiences: formPayload.audiences || [],
+          voice: formPayload.voice || "", style: formPayload.style || "", goals: formPayload.goals || [],
+          format: formPayload.format || "Balanced mix", cta: formPayload.cta || "Share & repost bait",
+          length: formPayload.length || "medium", structure: formPayload.structure || "mixed",
+          extra: formPayload.extra || "", bannedWords: formPayload.bannedWords || [], requiredWords: formPayload.requiredWords || [],
+          post: target, siblings: next,
         });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data?.post) next[i] = data.post as Post;
-        done += 1;
-        setBulkProgress({ done, total: targets.length });
-        setPosts([...next]);
+        const maxAttempts = 3;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}` },
+              body,
+            });
+            if (res.status === 429 || res.status >= 500) {
+              if (attempt < maxAttempts) { await sleep(400 * Math.pow(2, attempt - 1)); continue; }
+              failures.push({ day: target.day, reason: `HTTP ${res.status}` });
+              return;
+            }
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data?.post) { next[i] = data.post as Post; return; }
+            failures.push({ day: target.day, reason: data?.error || `HTTP ${res.status}` });
+            return;
+          } catch (e) {
+            if (attempt < maxAttempts) { await sleep(400 * Math.pow(2, attempt - 1)); continue; }
+            failures.push({ day: target.day, reason: e instanceof Error ? e.message : "network" });
+            return;
+          }
+        }
       }
+
+      // Concurrency = 2 worker pool
+      const queue = [...targets];
+      async function worker() {
+        while (queue.length) {
+          const job = queue.shift();
+          if (!job) return;
+          await runOne(job);
+          done += 1;
+          setBulkProgress({ done, total: targets.length });
+          setPosts([...next]);
+        }
+      }
+      await Promise.all([worker(), worker()]);
+
       const { error: updErr } = await supabase.from("saved_calendars")
         .update({ posts: next as unknown as never })
         .eq("id", id);
       if (updErr) { toast.error(updErr.message); return; }
-      toast.success(`Regenerated ${targets.length} post${targets.length === 1 ? "" : "s"} ✓`);
+
+      const okCount = targets.length - failures.length;
+      if (failures.length === 0) {
+        toast.success(`Regenerated ${okCount} post${okCount === 1 ? "" : "s"} ✓`);
+      } else if (okCount === 0) {
+        toast.error(`All ${failures.length} regenerations failed. ${failures[0].reason}`);
+      } else {
+        toast.warning(`${okCount} regenerated, ${failures.length} failed (days ${failures.map(f => f.day).join(", ")})`);
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Bulk regenerate failed");
     } finally {
