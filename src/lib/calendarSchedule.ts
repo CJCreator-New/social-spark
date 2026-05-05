@@ -94,6 +94,8 @@ interface IcsOptions {
   durationMin?: number;
   /** Optional platform label for the event title prefix. */
   platform?: string;
+  /** IANA timezone (e.g. "America/New_York"). When set, times are emitted as UTC instants. */
+  timezone?: string;
 }
 
 function pad(n: number): string {
