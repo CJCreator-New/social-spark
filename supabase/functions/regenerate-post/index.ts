@@ -92,43 +92,23 @@ Deno.serve(async (req) => {
       tweak,
     } = body;
 
-    const cleanBanned = (bannedWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
-    const cleanRequired = (requiredWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 10);
-    const normTag = (s: string) => `#${String(s || "").trim().replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase()}`;
-    const cleanBannedTags = (bannedHashtags || []).map(normTag).filter(t => t.length > 1).slice(0, 30);
-    const cleanRequiredTags = (requiredHashtags || []).map(normTag).filter(t => t.length > 1).slice(0, 10);
+    const cleanBanned = cleanList(bannedWords, 20);
+    const cleanRequired = cleanList(requiredWords, 10);
+    const cleanBannedTags = cleanTagList(bannedHashtags, 30);
+    const cleanRequiredTags = cleanTagList(requiredHashtags, 10);
 
     if (!post || typeof post.day !== "number" || !post.dow) {
-      return new Response(
-        JSON.stringify({ error: "Missing post context (day/dow required)." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse({ error: "Missing post context (day/dow required)." }, 400);
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "AI is not configured." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
+    if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI is not configured." }, 500);
 
     const targetTopic = (newTopic && newTopic.trim()) || post.topic || "general topic";
     const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
     const tweakInstr = (tweak && TWEAK_INSTRUCTIONS[tweak]) || "";
-
-    const longFormPlatform = platform === "Newsletter" || platform === "Blog";
-    const baseHashtagInstr = longFormPlatform
-      ? `HASHTAGS: This is a ${platform} post — return an EMPTY string ("") for hashtags.`
-      : `HASHTAGS: Provide 3–6 platform-native hashtags as a single space-separated string (e.g. "#AI #ProductOps #SaaS").`;
-    const bannedTagInstr = !longFormPlatform && cleanBannedTags.length
-      ? `\n  HASHTAG BAN — NEVER use these hashtags or close variants: ${cleanBannedTags.join(" ")}`
-      : "";
-    const requiredTagInstr = !longFormPlatform && cleanRequiredTags.length
-      ? `\n  HASHTAG REQUIREMENT — INCLUDE at least one of these brand hashtags: ${cleanRequiredTags.join(" ")}`
-      : "";
-    const hashtagInstr = baseHashtagInstr + bannedTagInstr + requiredTagInstr;
+    const hashtagInstr = buildHashtagInstr(platform, cleanBannedTags, cleanRequiredTags, { every: false });
 
     const siblingSummary = siblings
       .filter(s => s && s.day !== post.day)
