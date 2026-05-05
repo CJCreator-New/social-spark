@@ -1,9 +1,15 @@
 // Regenerate a single post in a 7-day calendar via Lovable AI Gateway.
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import {
+  corsHeaders,
+  LENGTH_GUIDE_SINGLE as LENGTH_GUIDE,
+  STRUCTURE_GUIDE,
+  bannedPhrasesBlock,
+  cleanList,
+  cleanTagList,
+  buildHashtagInstr,
+  jsonResponse,
+} from "../_shared/promptHelpers.ts";
+
 
 interface ExistingPost {
   day: number;
