@@ -105,18 +105,7 @@ HARD RULES (follow strictly):
 6. AT LEAST 3 of the 7 posts must include a concrete number, percentage, year, dollar figure, or named statistic embedded in the body or hook (not made-up — use realistic, defensible figures from the ${industryLabel || industry} space).
 7. The "dow" field MUST be exactly one of: "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" — and the 7 posts must be ordered Mon → Sun, with "day" 1..7 matching that order.
 
-BANNED PHRASES — do NOT use any of these or close variants:
-- "in today's fast-paced world"
-- "in the ever-evolving landscape"
-- "game-changer" / "game changer"
-- "revolutionize" / "revolutionary"
-- "unlock the power of"
-- "take it to the next level"
-- "leverage synergies"
-- "in this day and age"
-- "at the end of the day"
-- "let's dive in" / "let's dive into"
-Avoid empty hype openers. Open with a specific observation, number, or contrarian claim instead.`;
+${bannedPhrasesBlock()}`;
 
     const tool = {
       type: "function",
