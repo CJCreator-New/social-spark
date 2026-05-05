@@ -187,7 +187,7 @@ export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
 
     let dtStart: string;
     let dtEnd: string;
-    if (timezone && zonedToUtcIso) {
+    if (useTz && timezone) {
       const dateStr = toDateInputValue(dateForDow(weekStart, p.dow));
       const startUtc = new Date(zonedToUtcIso(dateStr, time, timezone));
       const endUtc = new Date(startUtc.getTime() + durationMin * 60 * 1000);
