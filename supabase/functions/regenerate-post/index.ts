@@ -1,9 +1,15 @@
 // Regenerate a single post in a 7-day calendar via Lovable AI Gateway.
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import {
+  corsHeaders,
+  LENGTH_GUIDE_SINGLE as LENGTH_GUIDE,
+  STRUCTURE_GUIDE,
+  bannedPhrasesBlock,
+  cleanList,
+  cleanTagList,
+  buildHashtagInstr,
+  jsonResponse,
+} from "../_shared/promptHelpers.ts";
+
 
 interface ExistingPost {
   day: number;
@@ -54,19 +60,6 @@ const TWEAK_INSTRUCTIONS: Record<string, string> = {
   "more-personal": "TWEAK: Keep the same angle, but rewrite in first-person with a small, specific personal anecdote or observation in the hook. Make it feel like a human wrote it, not a brand.",
 };
 
-const LENGTH_GUIDE: Record<string, string> = {
-  short: "80–120 words (tight, punchy)",
-  medium: "160–230 words (balanced depth)",
-  long: "280–380 words (deep, substantive)",
-  mixed: "160–230 words (balanced depth)",
-};
-
-const STRUCTURE_GUIDE: Record<string, string> = {
-  paragraphs: "Use flowing paragraphs only. No bullet points or numbered lists in the body.",
-  bullets: "Structure the body primarily as bullet points or short numbered items.",
-  mixed: "MIX paragraphs and bullet points — paragraph hook, bullets for the meat, paragraph close. Use '→' or '•' markers.",
-  perPost: "Pick the best structure for this single post — prose, bullets, or hybrid.",
-};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -99,43 +92,23 @@ Deno.serve(async (req) => {
       tweak,
     } = body;
 
-    const cleanBanned = (bannedWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
-    const cleanRequired = (requiredWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 10);
-    const normTag = (s: string) => `#${String(s || "").trim().replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase()}`;
-    const cleanBannedTags = (bannedHashtags || []).map(normTag).filter(t => t.length > 1).slice(0, 30);
-    const cleanRequiredTags = (requiredHashtags || []).map(normTag).filter(t => t.length > 1).slice(0, 10);
+    const cleanBanned = cleanList(bannedWords, 20);
+    const cleanRequired = cleanList(requiredWords, 10);
+    const cleanBannedTags = cleanTagList(bannedHashtags, 30);
+    const cleanRequiredTags = cleanTagList(requiredHashtags, 10);
 
     if (!post || typeof post.day !== "number" || !post.dow) {
-      return new Response(
-        JSON.stringify({ error: "Missing post context (day/dow required)." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse({ error: "Missing post context (day/dow required)." }, 400);
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "AI is not configured." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
+    if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI is not configured." }, 500);
 
     const targetTopic = (newTopic && newTopic.trim()) || post.topic || "general topic";
     const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
     const tweakInstr = (tweak && TWEAK_INSTRUCTIONS[tweak]) || "";
-
-    const longFormPlatform = platform === "Newsletter" || platform === "Blog";
-    const baseHashtagInstr = longFormPlatform
-      ? `HASHTAGS: This is a ${platform} post — return an EMPTY string ("") for hashtags.`
-      : `HASHTAGS: Provide 3–6 platform-native hashtags as a single space-separated string (e.g. "#AI #ProductOps #SaaS").`;
-    const bannedTagInstr = !longFormPlatform && cleanBannedTags.length
-      ? `\n  HASHTAG BAN — NEVER use these hashtags or close variants: ${cleanBannedTags.join(" ")}`
-      : "";
-    const requiredTagInstr = !longFormPlatform && cleanRequiredTags.length
-      ? `\n  HASHTAG REQUIREMENT — INCLUDE at least one of these brand hashtags: ${cleanRequiredTags.join(" ")}`
-      : "";
-    const hashtagInstr = baseHashtagInstr + bannedTagInstr + requiredTagInstr;
+    const hashtagInstr = buildHashtagInstr(platform, cleanBannedTags, cleanRequiredTags, { every: false });
 
     const siblingSummary = siblings
       .filter(s => s && s.day !== post.day)
@@ -179,12 +152,7 @@ HARD RULES:
 5. The "dow" field MUST be "${post.dow}" and "day" MUST be ${post.day}.
 6. In the "format" field, append the structure used (e.g. "How-to — hybrid").
 
-BANNED PHRASES — do NOT use these or close variants:
-- "in today's fast-paced world" / "in the ever-evolving landscape"
-- "game-changer" / "revolutionize" / "unlock the power of"
-- "take it to the next level" / "leverage synergies"
-- "let's dive in" / "let's dive into" / "at the end of the day"
-Open with a specific observation, number, or contrarian claim — not hype.`;
+${bannedPhrasesBlock()}`;
 
     const tool = {
       type: "function",

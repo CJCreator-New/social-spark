@@ -1,9 +1,14 @@
 // Generate a 7-day content calendar via Lovable AI Gateway
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import {
+  corsHeaders,
+  LENGTH_GUIDE_WEEK as LENGTH_GUIDE,
+  STRUCTURE_GUIDE,
+  bannedPhrasesBlock,
+  cleanList,
+  cleanTagList,
+  buildHashtagInstr,
+  jsonResponse,
+} from "../_shared/promptHelpers.ts";
 
 interface Payload {
   industry?: string;
@@ -26,19 +31,6 @@ interface Payload {
   requiredHashtags?: string[];
 }
 
-const LENGTH_GUIDE: Record<string, string> = {
-  short: "80–120 words per post (tight, punchy)",
-  medium: "160–230 words per post (balanced depth)",
-  long: "280–380 words per post (deep, substantive)",
-  mixed: "VARY length across the week — at least 2 short (80–120w), 3 medium (160–230w), and 2 long (280–380w) posts. Distribute deliberately.",
-};
-
-const STRUCTURE_GUIDE: Record<string, string> = {
-  paragraphs: "Use flowing paragraphs only. No bullet points or numbered lists in the body.",
-  bullets: "Structure the body primarily as bullet points or short numbered items. Minimal prose connective tissue.",
-  mixed: "Within each post, MIX paragraphs and bullet points — typically a paragraph hook, then bullets for the meat, then a paragraph close. Use line breaks and '→' or '•' markers.",
-  perPost: "Pick the best structure per post based on its topic and format — some all-prose, some all-bullets, some hybrid. Vary deliberately across the week.",
-};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -68,41 +60,23 @@ Deno.serve(async (req) => {
       requiredHashtags = [],
     } = body;
 
-    const cleanBanned = (bannedWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
-    const cleanRequired = (requiredWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 10);
-    const normTag = (s: string) => `#${String(s || "").trim().replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase()}`;
-    const cleanBannedTags = (bannedHashtags || []).map(normTag).filter(t => t.length > 1).slice(0, 30);
-    const cleanRequiredTags = (requiredHashtags || []).map(normTag).filter(t => t.length > 1).slice(0, 10);
+    const cleanBanned = cleanList(bannedWords, 20);
+    const cleanRequired = cleanList(requiredWords, 10);
+    const cleanBannedTags = cleanTagList(bannedHashtags, 30);
+    const cleanRequiredTags = cleanTagList(requiredHashtags, 10);
 
     if (!coreIdea.trim() || topics.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "Missing core idea or topics." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse({ error: "Missing core idea or topics." }, 400);
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "AI is not configured." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse({ error: "AI is not configured." }, 500);
     }
 
     const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
-
-    const longFormPlatform = platform === "Newsletter" || platform === "Blog";
-    const baseHashtagInstr = longFormPlatform
-      ? `HASHTAGS: This is a ${platform} post — return an EMPTY string ("") for the hashtags field. Do NOT invent hashtags.`
-      : `HASHTAGS: Provide 3–6 platform-native hashtags as a single space-separated string (e.g. "#AI #ProductOps #SaaS"). Mix one broad, two niche, and one trending where relevant.`;
-    const bannedTagInstr = !longFormPlatform && cleanBannedTags.length
-      ? `\n  HASHTAG BAN — NEVER use these hashtags or close variants in any post: ${cleanBannedTags.join(" ")}`
-      : "";
-    const requiredTagInstr = !longFormPlatform && cleanRequiredTags.length
-      ? `\n  HASHTAG REQUIREMENT — INCLUDE at least one of these brand hashtags in EVERY post: ${cleanRequiredTags.join(" ")}`
-      : "";
-    const hashtagInstr = baseHashtagInstr + bannedTagInstr + requiredTagInstr;
+    const hashtagInstr = buildHashtagInstr(platform, cleanBannedTags, cleanRequiredTags, { every: true });
 
     const prompt = `You are a world-class ${platform} content strategist specialising in ${industryLabel || industry} content.
 
@@ -131,18 +105,7 @@ HARD RULES (follow strictly):
 6. AT LEAST 3 of the 7 posts must include a concrete number, percentage, year, dollar figure, or named statistic embedded in the body or hook (not made-up — use realistic, defensible figures from the ${industryLabel || industry} space).
 7. The "dow" field MUST be exactly one of: "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" — and the 7 posts must be ordered Mon → Sun, with "day" 1..7 matching that order.
 
-BANNED PHRASES — do NOT use any of these or close variants:
-- "in today's fast-paced world"
-- "in the ever-evolving landscape"
-- "game-changer" / "game changer"
-- "revolutionize" / "revolutionary"
-- "unlock the power of"
-- "take it to the next level"
-- "leverage synergies"
-- "in this day and age"
-- "at the end of the day"
-- "let's dive in" / "let's dive into"
-Avoid empty hype openers. Open with a specific observation, number, or contrarian claim instead.`;
+${bannedPhrasesBlock()}`;
 
     const tool = {
       type: "function",

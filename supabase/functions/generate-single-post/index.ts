@@ -1,10 +1,15 @@
 // Generate a SINGLE post (one chosen day) via Lovable AI Gateway.
-// Mirrors generate-calendar but returns one post for a specific dow + date.
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import {
+  corsHeaders,
+  VALID_DOW,
+  LENGTH_GUIDE_SINGLE as LENGTH_GUIDE,
+  STRUCTURE_GUIDE,
+  bannedPhrasesBlock,
+  cleanList,
+  cleanTagList,
+  buildHashtagInstr,
+  jsonResponse,
+} from "../_shared/promptHelpers.ts";
 
 interface Payload {
   industry?: string;
@@ -16,8 +21,8 @@ interface Payload {
   style?: string;
   goals?: string[];
   topic?: string;
-  dow?: string; // Mon..Sun
-  date?: string; // YYYY-MM-DD (for context only)
+  dow?: string;
+  date?: string;
   format?: string;
   cta?: string;
   length?: string;
@@ -29,21 +34,6 @@ interface Payload {
   requiredHashtags?: string[];
 }
 
-const VALID_DOW = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
-
-const LENGTH_GUIDE: Record<string, string> = {
-  short: "80–120 words (tight, punchy)",
-  medium: "160–230 words (balanced depth)",
-  long: "280–380 words (deep, substantive)",
-  mixed: "160–230 words (balanced depth)", // single post — no week-level mixing
-};
-
-const STRUCTURE_GUIDE: Record<string, string> = {
-  paragraphs: "Use flowing paragraphs only. No bullet points or numbered lists in the body.",
-  bullets: "Structure the body primarily as bullet points or short numbered items. Minimal prose connective tissue.",
-  mixed: "MIX paragraphs and bullet points — paragraph hook, bullets for the meat, paragraph close. Use '→' or '•' markers.",
-  perPost: "Pick the best structure for this single post — prose, bullets, or hybrid — based on the topic.",
-};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -73,41 +63,21 @@ Deno.serve(async (req) => {
       requiredHashtags = [],
     } = body;
 
-    if (!coreIdea.trim()) {
-      return new Response(JSON.stringify({ error: "Missing core idea." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (!topic.trim()) {
-      return new Response(JSON.stringify({ error: "Missing topic." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (!VALID_DOW.has(dow)) {
-      return new Response(JSON.stringify({ error: "Invalid day-of-week." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    if (!coreIdea.trim()) return jsonResponse({ error: "Missing core idea." }, 400);
+    if (!topic.trim()) return jsonResponse({ error: "Missing topic." }, 400);
+    if (!VALID_DOW.has(dow)) return jsonResponse({ error: "Invalid day-of-week." }, 400);
 
-    const cleanBanned = (bannedWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
-    const cleanRequired = (requiredWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 10);
-    const normTag = (s: string) => `#${String(s || "").trim().replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase()}`;
-    const cleanBannedTags = (bannedHashtags || []).map(normTag).filter((t) => t.length > 1).slice(0, 30);
-    const cleanRequiredTags = (requiredHashtags || []).map(normTag).filter((t) => t.length > 1).slice(0, 10);
+    const cleanBanned = cleanList(bannedWords, 20);
+    const cleanRequired = cleanList(requiredWords, 10);
+    const cleanBannedTags = cleanTagList(bannedHashtags, 30);
+    const cleanRequiredTags = cleanTagList(requiredHashtags, 10);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "AI is not configured." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI is not configured." }, 500);
 
     const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
-
-    const longFormPlatform = platform === "Newsletter" || platform === "Blog";
-    const baseHashtagInstr = longFormPlatform
-      ? `HASHTAGS: This is a ${platform} post — return an EMPTY string ("") for the hashtags field.`
-      : `HASHTAGS: Provide 3–6 platform-native hashtags as a single space-separated string (e.g. "#AI #ProductOps #SaaS"). Mix one broad, two niche, and one trending where relevant.`;
-    const bannedTagInstr = !longFormPlatform && cleanBannedTags.length
-      ? `\n  HASHTAG BAN — NEVER use these hashtags or close variants: ${cleanBannedTags.join(" ")}`
-      : "";
-    const requiredTagInstr = !longFormPlatform && cleanRequiredTags.length
-      ? `\n  HASHTAG REQUIREMENT — INCLUDE at least one of these brand hashtags: ${cleanRequiredTags.join(" ")}`
-      : "";
-    const hashtagInstr = baseHashtagInstr + bannedTagInstr + requiredTagInstr;
+    const hashtagInstr = buildHashtagInstr(platform, cleanBannedTags, cleanRequiredTags, { every: false });
 
     const prompt = `You are a world-class ${platform} content strategist specialising in ${industryLabel || industry} content.
 
@@ -135,12 +105,7 @@ HARD RULES:
 5. In the "format" field, append the structure used (e.g. "How-to — hybrid").
 6. Include at least one concrete number, percentage, year, or named statistic in the body or hook (realistic, defensible).
 
-BANNED PHRASES — do NOT use these or close variants:
-- "in today's fast-paced world" / "in the ever-evolving landscape"
-- "game-changer" / "revolutionize" / "unlock the power of"
-- "take it to the next level" / "leverage synergies"
-- "let's dive in" / "let's dive into" / "at the end of the day"
-Open with a specific observation, number, or contrarian claim — not hype.`;
+${bannedPhrasesBlock()}`;
 
     const tool = {
       type: "function",
