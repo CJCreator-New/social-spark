@@ -63,41 +63,21 @@ Deno.serve(async (req) => {
       requiredHashtags = [],
     } = body;
 
-    if (!coreIdea.trim()) {
-      return new Response(JSON.stringify({ error: "Missing core idea." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (!topic.trim()) {
-      return new Response(JSON.stringify({ error: "Missing topic." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (!VALID_DOW.has(dow)) {
-      return new Response(JSON.stringify({ error: "Invalid day-of-week." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    if (!coreIdea.trim()) return jsonResponse({ error: "Missing core idea." }, 400);
+    if (!topic.trim()) return jsonResponse({ error: "Missing topic." }, 400);
+    if (!VALID_DOW.has(dow)) return jsonResponse({ error: "Invalid day-of-week." }, 400);
 
-    const cleanBanned = (bannedWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
-    const cleanRequired = (requiredWords || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 10);
-    const normTag = (s: string) => `#${String(s || "").trim().replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase()}`;
-    const cleanBannedTags = (bannedHashtags || []).map(normTag).filter((t) => t.length > 1).slice(0, 30);
-    const cleanRequiredTags = (requiredHashtags || []).map(normTag).filter((t) => t.length > 1).slice(0, 10);
+    const cleanBanned = cleanList(bannedWords, 20);
+    const cleanRequired = cleanList(requiredWords, 10);
+    const cleanBannedTags = cleanTagList(bannedHashtags, 30);
+    const cleanRequiredTags = cleanTagList(requiredHashtags, 10);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "AI is not configured." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI is not configured." }, 500);
 
     const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
-
-    const longFormPlatform = platform === "Newsletter" || platform === "Blog";
-    const baseHashtagInstr = longFormPlatform
-      ? `HASHTAGS: This is a ${platform} post — return an EMPTY string ("") for the hashtags field.`
-      : `HASHTAGS: Provide 3–6 platform-native hashtags as a single space-separated string (e.g. "#AI #ProductOps #SaaS"). Mix one broad, two niche, and one trending where relevant.`;
-    const bannedTagInstr = !longFormPlatform && cleanBannedTags.length
-      ? `\n  HASHTAG BAN — NEVER use these hashtags or close variants: ${cleanBannedTags.join(" ")}`
-      : "";
-    const requiredTagInstr = !longFormPlatform && cleanRequiredTags.length
-      ? `\n  HASHTAG REQUIREMENT — INCLUDE at least one of these brand hashtags: ${cleanRequiredTags.join(" ")}`
-      : "";
-    const hashtagInstr = baseHashtagInstr + bannedTagInstr + requiredTagInstr;
+    const hashtagInstr = buildHashtagInstr(platform, cleanBannedTags, cleanRequiredTags, { every: false });
 
     const prompt = `You are a world-class ${platform} content strategist specialising in ${industryLabel || industry} content.
 
