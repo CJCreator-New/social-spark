@@ -152,12 +152,7 @@ HARD RULES:
 5. The "dow" field MUST be "${post.dow}" and "day" MUST be ${post.day}.
 6. In the "format" field, append the structure used (e.g. "How-to — hybrid").
 
-BANNED PHRASES — do NOT use these or close variants:
-- "in today's fast-paced world" / "in the ever-evolving landscape"
-- "game-changer" / "revolutionize" / "unlock the power of"
-- "take it to the next level" / "leverage synergies"
-- "let's dive in" / "let's dive into" / "at the end of the day"
-Open with a specific observation, number, or contrarian claim — not hype.`;
+${bannedPhrasesBlock()}`;
 
     const tool = {
       type: "function",
