@@ -179,14 +179,7 @@ export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
     `X-WR-CALNAME:${icsEscape(calendarTitle)}`,
   ];
 
-  // Lazy-import to avoid circular deps in tests
-  let zonedToUtcIso: ((d: string, t: string, tz: string) => string) | null = null;
-  if (timezone) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      zonedToUtcIso = require("./timezones").zonedToUtcIso;
-    } catch { /* ignore */ }
-  }
+  const useTz = !!timezone;
 
   for (const p of posts) {
     const time = postTimes[String(p.day)] || "09:00";
