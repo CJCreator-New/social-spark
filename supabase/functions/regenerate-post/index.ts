@@ -60,19 +60,6 @@ const TWEAK_INSTRUCTIONS: Record<string, string> = {
   "more-personal": "TWEAK: Keep the same angle, but rewrite in first-person with a small, specific personal anecdote or observation in the hook. Make it feel like a human wrote it, not a brand.",
 };
 
-const LENGTH_GUIDE: Record<string, string> = {
-  short: "80–120 words (tight, punchy)",
-  medium: "160–230 words (balanced depth)",
-  long: "280–380 words (deep, substantive)",
-  mixed: "160–230 words (balanced depth)",
-};
-
-const STRUCTURE_GUIDE: Record<string, string> = {
-  paragraphs: "Use flowing paragraphs only. No bullet points or numbered lists in the body.",
-  bullets: "Structure the body primarily as bullet points or short numbered items.",
-  mixed: "MIX paragraphs and bullet points — paragraph hook, bullets for the meat, paragraph close. Use '→' or '•' markers.",
-  perPost: "Pick the best structure for this single post — prose, bullets, or hybrid.",
-};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
