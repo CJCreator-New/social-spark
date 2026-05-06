@@ -1,8 +1,11 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { createScopedLogger } from "@/lib/logger";
+import { getUserFriendlyMessage } from "@/lib/errors";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
 import { downloadIcs, nextMonday, toDateInputValue, parseLocalDate, dateForDow, shortDateLabel } from "@/lib/calendarSchedule";
 import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform, niceLabelFor, buildRawMarkdown } from "@/lib/platformCopy";
@@ -504,6 +507,8 @@ const Index = () => {
   const [genMsg, setGenMsg] = useState("");
   const [genStep, setGenStep] = useState(0);
   const [error, setError] = useState("");
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [lastGenerationError, setLastGenerationError] = useState<unknown>(null);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [regenIdx, setRegenIdx] = useState<number | null>(null);
@@ -543,6 +548,38 @@ const Index = () => {
     return () => document.removeEventListener("mousedown", h);
   }, [copyMenuOpen]);
 
+  // Keyboard shortcuts: arrow keys navigate between days (only on step 4 when week-strip visible)
+  useEffect(() => {
+    if (step !== 4 || posts.length <= 1) return;
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setActiveDay(d => (d + 1) % posts.length);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setActiveDay(d => (d - 1 + posts.length) % posts.length);
+      }
+    };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [step, posts.length]);
+
+  // Load user profile with React Query
+  const { data: profileData } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("default_voice, default_style, default_audiences, default_goals")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   // Hydrate from localStorage once on mount, then layer profile brand defaults on top of an empty form.
   useEffect(() => {
     let restoredFromDraft = false;
@@ -570,40 +607,47 @@ const Index = () => {
       console.warn("Failed to hydrate draft", e);
     }
 
-    // Only pre-fill from profile when there's no in-progress draft AND we have a user.
-    if (!restoredFromDraft && user) {
-      supabase.from("profiles")
-        .select("default_voice, default_style, default_audiences, default_goals")
-        .eq("user_id", user.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (!data) { hydrated.current = true; return; }
-          setForm(f => ({
-            ...f,
-            voice: f.voice || data.default_voice || "",
-            style: f.style || data.default_style || "",
-            audiences: f.audiences.length ? f.audiences : (data.default_audiences || []),
-            goals: data.default_goals && data.default_goals.length ? data.default_goals : f.goals,
-          }));
-          hydrated.current = true;
-        });
-    } else {
-      hydrated.current = true;
-    }
   }, [user]);
 
-  // Fetch 3 most recent saved calendars for the recent strip on Step 1.
+  // Pre-fill form with profile defaults when profile data loads and no draft was restored
   useEffect(() => {
-    if (!user) { setRecentCalendars([]); return; }
-    supabase
-      .from("saved_calendars")
-      .select("id, title, platform, industry_label, created_at")
-      .order("created_at", { ascending: false })
-      .limit(3)
-      .then(({ data }) => {
-        if (data) setRecentCalendars(data);
-      });
-  }, [user]);
+    if (!profileData || hydrated.current) return;
+    // Only pre-fill if we haven't restored from draft (check if form has been modified from defaults)
+    const isDefaultForm = !form.voice && !form.style && form.audiences.length === 0 && form.goals.length === 0;
+    if (isDefaultForm) {
+      setForm(f => ({
+        ...f,
+        voice: f.voice || profileData.default_voice || "",
+        style: f.style || profileData.default_style || "",
+        audiences: f.audiences.length ? f.audiences : (profileData.default_audiences || []),
+        goals: profileData.default_goals && profileData.default_goals.length ? profileData.default_goals : f.goals,
+      }));
+    }
+    hydrated.current = true;
+  }, [profileData]);
+
+  // Fetch recent calendars with React Query
+  const { data: recentCalendarsData } = useQuery({
+    queryKey: ["recent-calendars", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data } = await supabase
+        .from("saved_calendars")
+        .select("id, title, platform, industry_label, created_at")
+        .order("created_at", { ascending: false })
+        .limit(3);
+      return data || [];
+    },
+    enabled: !!user,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
+  // Update recent calendars state when data changes
+  useEffect(() => {
+    if (recentCalendarsData) {
+      setRecentCalendars(recentCalendarsData);
+    }
+  }, [recentCalendarsData]);
 
   // Persist form/step/extraTopics whenever they change (only on steps 1–2)
   useEffect(() => {
@@ -637,7 +681,7 @@ const Index = () => {
     } catch { /* ignore */ }
   };
 
-  const upd = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm(f => ({ ...f, [k]: v }));
+  const upd = useCallback(<K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm(f => ({ ...f, [k]: v })), []);
   const toggleChip = (k: "goals", v: string) =>
     setForm(f => ({ ...f, [k]: f[k].includes(v) ? f[k].filter(x => x !== v) : [...f[k], v] }));
 
@@ -678,8 +722,13 @@ const Index = () => {
   const GEN_MSGS = ["Analysing your niche…", "Mapping topics to days…", "Writing hooks…", "Drafting post bodies…", "Adding CTAs & hashtags…"];
   const GEN_LABELS = ["Niche analysis", "Topic mapping", "Hook writing", "Body drafting", "CTA & hashtags"];
 
-  async function generate() {
+  const log = createScopedLogger('Index-Generate');
+
+  async function generate(isRetry: boolean = false) {
     if (!validate(2)) return;
+    
+    setIsGenerating(true);
+    setLastGenerationError(null);
     setStep(3); setGenStep(0); setGenMsg(GEN_MSGS[0]); setSavedId(null);
 
     // Cycle the friendly status messages on a steady cadence; the bar itself is indeterminate.
@@ -699,6 +748,7 @@ const Index = () => {
       if (msgRef.current) clearInterval(msgRef.current);
       clearTimeout(timeoutId);
       abortRef.current = null;
+      setIsGenerating(false);
     };
 
     try {
@@ -708,6 +758,7 @@ const Index = () => {
 
       const isDay = form.mode === "day";
       const endpoint = isDay ? "generate-single-post" : "generate-calendar";
+      const mode = isDay ? "single-day" : "full-week";
 
       // Derive dow ("Mon".."Sun") from chosen date for single-day mode.
       const DOW_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -736,6 +787,8 @@ const Index = () => {
         ? { ...baseBody, topic: form.topics[0] || form.coreIdea, dow: targetDow, date: form.targetDate }
         : { ...baseBody, topics: form.topics };
 
+      log.info(`Starting generation (${mode}, ${isRetry ? 'retry' : 'first attempt'})`, { mode, platform: form.platform, industry: form.industry });
+
       const res = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
         method: "POST",
         headers: {
@@ -752,7 +805,10 @@ const Index = () => {
 
       if (!res.ok || data?.error) {
         setStep(2);
-        setError(data?.error || `Generation failed (${res.status}).`);
+        const errorMsg = data?.error || `Generation failed (${res.status}).`;
+        log.warn(`Generation failed`, new Error(errorMsg), { mode, status: res.status, endpoint });
+        setError(errorMsg);
+        setLastGenerationError(new Error(errorMsg));
         return;
       }
 
@@ -760,7 +816,14 @@ const Index = () => {
       const result: Post[] = isDay
         ? (data?.post ? [data.post as Post] : [])
         : (Array.isArray(data?.posts) ? data.posts : []);
-      if (result.length === 0) { setStep(2); setError("Empty response. Please try again."); return; }
+      if (result.length === 0) {
+        const emptyError = "Empty response. Please try again.";
+        log.warn(`Empty generation response`, new Error(emptyError), { mode });
+        setStep(2);
+        setError(emptyError);
+        setLastGenerationError(new Error(emptyError));
+        return;
+      }
 
       setGenStep(GEN_LABELS.length);
       setPosts(result); setActiveDay(0);
@@ -769,17 +832,25 @@ const Index = () => {
       for (const r of result) seedTimes[String(r.day)] = "09:00";
       setPostTimes(seedTimes);
       setTimeout(() => setStep(4), 350);
+      log.info(`Generation completed successfully`, { mode, postCount: result.length });
+      toast.success(`${isRetry ? 'Regenerated' : 'Generated'} ${isDay ? 'post' : 'week'} successfully`);
     } catch (err) {
       cleanup();
       const aborted = err instanceof DOMException && err.name === "AbortError";
       const reason = (ac.signal as AbortSignal & { reason?: unknown }).reason;
       setStep(2);
+      
+      const userMessage = getUserFriendlyMessage(err);
+      setError(userMessage);
+      setLastGenerationError(err);
+      log.error(`Generation error`, err, { mode, aborted, reason });
+
       if (aborted && reason === "timeout") {
-        setError("Generation timed out after 90 seconds. Please try again.");
+        setError("Generation timed out. Please try again.");
       } else if (aborted) {
-        setError("Generation cancelled.");
+        setError("Generation was cancelled.");
       } else {
-        setError(`Connection error: ${err instanceof Error ? err.message : "Unknown"}`);
+        setError(userMessage);
       }
     }
   }
@@ -1475,10 +1546,44 @@ ${postText(p)}
               </div>
             </div>
 
-            {error && <div className="err-box">{error}</div>}
+            {error && (
+              <div className="err-box">
+                {error}
+                {lastGenerationError && (
+                  <div style={{ marginTop: '10px', fontSize: '12px', opacity: 0.8 }}>
+                    <button
+                      onClick={() => generate(true)}
+                      disabled={isGenerating}
+                      style={{
+                        background: 'rgba(200,240,154,.2)',
+                        border: '1px solid rgba(200,240,154,.3)',
+                        color: '#c8f09a',
+                        padding: '5px 10px',
+                        borderRadius: '4px',
+                        cursor: isGenerating ? 'not-allowed' : 'pointer',
+                        opacity: isGenerating ? 0.6 : 1,
+                        fontSize: '12px',
+                        fontFamily: '"Sora", sans-serif',
+                        transition: 'all 0.15s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isGenerating) {
+                          (e.target as HTMLButtonElement).style.background = 'rgba(200,240,154,.3)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.target as HTMLButtonElement).style.background = 'rgba(200,240,154,.2)';
+                      }}
+                    >
+                      {isGenerating ? '⏳ Retrying...' : '🔄 Try again'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="brow">
               <button className="btn btn-g" onClick={() => { setError(""); setStep(1); }}>← Back</button>
-              <button className="btn btn-p" onClick={generate}>{form.mode === "day" ? "Generate this post →" : "Generate my week →"}</button>
+              <button className="btn btn-p" onClick={() => generate(false)} disabled={isGenerating} style={{ opacity: isGenerating ? 0.6 : 1, cursor: isGenerating ? 'not-allowed' : 'pointer' }}>{isGenerating ? `⏳ ${genMsg || 'Generating...'}` : (form.mode === "day" ? "Generate this post →" : "Generate my week →")}</button>
             </div>
           </div>
 

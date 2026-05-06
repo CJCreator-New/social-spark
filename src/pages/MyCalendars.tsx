@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { createScopedLogger } from "@/lib/logger";
+import { SkeletonList } from "@/components/SkeletonList";
+import { VirtualizedList } from "@/components/VirtualizedList";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +28,9 @@ interface SavedCalendar {
   is_favorite?: boolean;
   posts?: unknown[];
 }
+
+type SortKey = "newest" | "oldest" | "title" | "favorites";
+const PAGE_SIZE = 20;
 
 const css = `
 .mc-app { min-height:100vh; background:#07080d; color:#edeae3; font-family:'Sora',sans-serif; padding:52px 24px 100px; }
@@ -52,10 +59,7 @@ const css = `
 .mc-del { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:6px 12px; border-radius:6px; font-size:11px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; flex-shrink:0; }
 .mc-del:hover { border-color:rgba(240,154,154,0.3); color:#f09a9a; }
 .mc-rename-input { width:100%; background:#07080d; border:1px solid rgba(200,240,154,0.32); border-radius:6px; padding:8px 10px; font-size:14px; color:#edeae3; font-family:'Playfair Display',serif; outline:none; box-sizing:border-box; }
-.mc-dialog-action { background:#c8f09a !important; color:#07080d !important; border:1px solid #c8f09a !important; }
-.mc-dialog-action:hover { background:#b9e289 !important; }
 .mc-dialog-danger { background:#f09a9a !important; color:#07080d !important; border:1px solid #f09a9a !important; }
-.mc-dialog-danger:hover { background:#e88a8a !important; }
 .mc-filter-row { display:flex; gap:8px; align-items:center; margin-bottom:18px; flex-wrap:wrap; }
 .mc-search { flex:1; min-width:200px; background:#0d0f18; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:9px 13px; font-size:13px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; }
 .mc-search:focus { border-color:rgba(200,240,154,0.32); }
@@ -71,8 +75,7 @@ const css = `
 export default function MyCalendars() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [items, setItems] = useState<SavedCalendar[]>([]);
-  const [loading, setLoading] = useState(true);
+  const log = createScopedLogger("MyCalendars");
   const [pendingDelete, setPendingDelete] = useState<SavedCalendar | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -81,68 +84,104 @@ export default function MyCalendars() {
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [favOnly, setFavOnly] = useState(false);
-  type SortKey = "newest" | "oldest" | "title" | "favorites";
   const [sortBy, setSortBy] = useState<SortKey>("newest");
 
+  const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["saved-calendars", user?.id],
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    queryFn: async ({ pageParam }) => {
+      if (!user) return [] as SavedCalendar[];
+
+      log.debug("Loading calendars for user", { userId: user.id, cursor: pageParam });
+      let query = supabase
+        .from("saved_calendars")
+        .select("id, title, industry_label, platform, core_idea, created_at, is_favorite, posts")
+        .order("is_favorite", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(PAGE_SIZE);
+
+      if (pageParam) {
+        query = query.lt("created_at", pageParam);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        log.error("Failed to load calendars", error, { userId: user.id });
+        throw error;
+      }
+
+      log.info(`Loaded ${data?.length || 0} calendars`, { count: data?.length });
+      const items = (data as SavedCalendar[]) || [];
+      const nextCursor = items.length === PAGE_SIZE ? items[items.length - 1]?.created_at : null;
+      return { items, nextCursor };
+    },
+  });
+
   useEffect(() => {
-    if (!user) return;
-    supabase
-      .from("saved_calendars")
-      .select("id, title, industry_label, platform, core_idea, created_at, is_favorite, posts")
-      .order("is_favorite", { ascending: false })
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) toast.error(error.message);
-        else setItems((data as SavedCalendar[]) || []);
-        setLoading(false);
+    if (error instanceof Error) toast.error(error.message);
+  }, [error]);
+
+  const items = useMemo(() => data?.pages.flatMap((page) => page.items) || [], [data]);
+
+  const filteredItems = useMemo(() => {
+    return items
+      .filter((it) => {
+        if (favOnly && !it.is_favorite) return false;
+        if (search.trim()) {
+          const q = search.toLowerCase();
+          return (
+            it.title.toLowerCase().includes(q) ||
+            (it.industry_label || "").toLowerCase().includes(q) ||
+            (it.platform || "").toLowerCase().includes(q) ||
+            (it.core_idea || "").toLowerCase().includes(q)
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === "favorites") {
+          if (!!b.is_favorite !== !!a.is_favorite) return b.is_favorite ? 1 : -1;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+        if (sortBy === "title") return a.title.localeCompare(b.title);
+        if (sortBy === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
-  }, [user]);
+  }, [items, favOnly, search, sortBy]);
 
   async function toggleFavorite(it: SavedCalendar) {
     const next = !it.is_favorite;
-    setItems(p => p.map(i => i.id === it.id ? { ...i, is_favorite: next } : i));
     const { error } = await supabase.from("saved_calendars").update({ is_favorite: next }).eq("id", it.id);
     if (error) {
-      setItems(p => p.map(i => i.id === it.id ? { ...i, is_favorite: !next } : i));
+      log.error("Failed to toggle favorite", error, { calendarId: it.id });
       toast.error(error.message);
+      return;
     }
-  }
 
-  const filteredItems = items
-    .filter(it => {
-      if (favOnly && !it.is_favorite) return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        return (
-          it.title.toLowerCase().includes(q) ||
-          (it.industry_label || "").toLowerCase().includes(q) ||
-          (it.platform || "").toLowerCase().includes(q) ||
-          (it.core_idea || "").toLowerCase().includes(q)
-        );
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      if (sortBy === "favorites") {
-        if (!!b.is_favorite !== !!a.is_favorite) return b.is_favorite ? 1 : -1;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      }
-      if (sortBy === "title") return a.title.localeCompare(b.title);
-      if (sortBy === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
+    log.info("Calendar favorite updated", { calendarId: it.id, isFavorite: next });
+    await refetch();
+  }
 
   async function confirmDelete() {
     if (!pendingDelete) return;
     setDeleting(true);
     const { error } = await supabase.from("saved_calendars").delete().eq("id", pendingDelete.id);
     setDeleting(false);
+
     if (error) {
+      log.error("Failed to delete calendar", error, { calendarId: pendingDelete.id });
       toast.error(error.message);
     } else {
-      setItems(p => p.filter(i => i.id !== pendingDelete.id));
+      log.info("Calendar deleted", { calendarId: pendingDelete.id });
+      await refetch();
       toast.success("Deleted");
     }
+
     setPendingDelete(null);
   }
 
@@ -154,36 +193,41 @@ export default function MyCalendars() {
   async function saveRename() {
     if (!renamingId) return;
     const value = renameValue.trim();
-    if (!value) { toast.error("Title cannot be empty"); return; }
+    if (!value) {
+      toast.error("Title cannot be empty");
+      return;
+    }
+
     setRenameSaving(true);
-    const { error } = await supabase.from("saved_calendars")
-      .update({ title: value })
-      .eq("id", renamingId);
+    const { error } = await supabase.from("saved_calendars").update({ title: value }).eq("id", renamingId);
     setRenameSaving(false);
-    if (error) { toast.error(error.message); return; }
-    setItems(p => p.map(i => i.id === renamingId ? { ...i, title: value } : i));
+
+    if (error) {
+      log.error("Failed to rename calendar", error, { calendarId: renamingId });
+      toast.error(error.message);
+      return;
+    }
+
+    log.info("Calendar renamed", { calendarId: renamingId, newTitle: value });
     setRenamingId(null);
+    await refetch();
     toast.success("Renamed");
   }
 
   async function duplicate(it: SavedCalendar) {
     if (!user || duplicatingId) return;
     setDuplicatingId(it.id);
-    // Fetch full row including posts + form_payload
-    const { data: full, error: fetchErr } = await supabase
-      .from("saved_calendars")
-      .select("*")
-      .eq("id", it.id)
-      .maybeSingle();
+
+    const { data: full, error: fetchErr } = await supabase.from("saved_calendars").select("*").eq("id", it.id).maybeSingle();
     if (fetchErr || !full) {
       setDuplicatingId(null);
       toast.error(fetchErr?.message || "Failed to load source");
       return;
     }
+
     const newTitle = `${full.title} (copy)`.slice(0, 80);
-    const { data: inserted, error: insErr } = await supabase
-      .from("saved_calendars")
-      .insert([{
+    const { error: insErr } = await supabase.from("saved_calendars").insert([
+      {
         user_id: user.id,
         title: newTitle,
         industry: full.industry,
@@ -193,13 +237,86 @@ export default function MyCalendars() {
         form_payload: full.form_payload as never,
         posts: full.posts as never,
         is_favorite: false,
-      }])
-      .select("id, title, industry_label, platform, core_idea, created_at, is_favorite")
-      .single();
+      },
+    ]);
     setDuplicatingId(null);
-    if (insErr || !inserted) { toast.error(insErr?.message || "Duplicate failed"); return; }
-    setItems(p => [inserted as SavedCalendar, ...p]);
+
+    if (insErr) {
+      toast.error(insErr.message || "Duplicate failed");
+      return;
+    }
+
+    log.info("Calendar duplicated", { sourceCalendarId: it.id });
+    await refetch();
     toast.success("Duplicated");
+  }
+
+  function renderCalendarItem(it: SavedCalendar, index: number) {
+    return (
+      <div key={it.id} className="mc-item">
+        <button
+          type="button"
+          className={`mc-star ${it.is_favorite ? "on" : ""}`}
+          onClick={() => toggleFavorite(it)}
+          aria-pressed={!!it.is_favorite}
+          aria-label={it.is_favorite ? "Unstar" : "Star"}
+          title={it.is_favorite ? "Unstar" : "Star"}
+        >
+          {it.is_favorite ? "★" : "☆"}
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {renamingId === it.id ? (
+            <input
+              className="mc-rename-input"
+              autoFocus
+              value={renameValue}
+              disabled={renameSaving}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  saveRename();
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setRenamingId(null);
+                }
+              }}
+              onBlur={saveRename}
+            />
+          ) : (
+            <Link to={`/calendar/${it.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+              <h3 className="mc-item-title">{it.title}</h3>
+            </Link>
+          )}
+          <div className="mc-meta" style={{ marginTop: 4 }}>
+            {Array.isArray(it.posts) && it.posts.length === 1 && <span className="mc-tag">1-day</span>}
+            {it.industry_label && <span className="mc-tag">{it.industry_label}</span>}
+            {it.platform && <span className="mc-tag">{it.platform}</span>}
+            <span>{new Date(it.created_at).toLocaleDateString()}</span>
+          </div>
+        </div>
+        <div className="mc-actions">
+          {renamingId === it.id ? (
+            <button className="mc-act" onClick={() => setRenamingId(null)} disabled={renameSaving}>
+              {renameSaving ? "Saving…" : "Cancel"}
+            </button>
+          ) : (
+            <>
+              <button className="mc-act" onClick={() => startRename(it)}>
+                Rename
+              </button>
+              <button className="mc-act" onClick={() => duplicate(it)} disabled={duplicatingId === it.id}>
+                {duplicatingId === it.id ? "Copying…" : "Duplicate"}
+              </button>
+              <button className="mc-del" onClick={() => setPendingDelete(it)}>
+                Delete
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -210,28 +327,36 @@ export default function MyCalendars() {
           <div className="mc-head">
             <div>
               <h1 className="mc-title">My <em>calendars</em></h1>
-              <div className="mc-meta" style={{ marginTop: 6 }}>{user?.email}</div>
+              <div className="mc-meta" style={{ marginTop: 6 }}>
+                {user?.email}
+              </div>
             </div>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <Link to="/schedule" className="mc-back">📅 Schedule</Link>
-              <Link to="/" className="mc-back">← New calendar</Link>
-              <button className="mc-act" onClick={async () => { await signOut(); navigate("/auth"); }}>Sign out</button>
+              <Link to="/schedule" className="mc-back">
+                📅 Schedule
+              </Link>
+              <Link to="/" className="mc-back">
+                ← New calendar
+              </Link>
+              <button className="mc-act" onClick={async () => { await signOut(); navigate("/auth"); }}>
+                Sign out
+              </button>
             </div>
           </div>
 
-          {!loading && items.length > 0 && (
+          {!isLoading && items.length > 0 && (
             <div className="mc-filter-row">
               <input
                 type="search"
                 className="mc-search"
                 placeholder="Search by title, industry, or platform…"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={(e) => setSearch(e.target.value)}
               />
               <button
                 type="button"
                 className={`mc-chip ${favOnly ? "on" : ""}`}
-                onClick={() => setFavOnly(f => !f)}
+                onClick={() => setFavOnly((f) => !f)}
                 aria-pressed={favOnly}
               >
                 {favOnly ? "★ Starred only" : "☆ Starred only"}
@@ -239,7 +364,7 @@ export default function MyCalendars() {
               <select
                 className="mc-sort"
                 value={sortBy}
-                onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                onChange={(e) => setSortBy(e.target.value as SortKey)}
                 aria-label="Sort calendars"
               >
                 <option value="newest">Newest first</option>
@@ -250,23 +375,34 @@ export default function MyCalendars() {
             </div>
           )}
 
-          {loading ? (
-            <div className="mc-empty">Loading…</div>
+          {isLoading ? (
+            <SkeletonList rows={4} />
           ) : items.length === 0 ? (
             <div className="mc-empty" style={{ padding: "72px 24px" }}>
-              <div className="mc-empty-illus" aria-hidden="true">✦</div>
-              <h2 className="mc-empty-title">No <em>calendars</em> yet</h2>
+              <div className="mc-empty-illus" aria-hidden="true">
+                ✦
+              </div>
+              <h2 className="mc-empty-title">
+                No <em>calendars</em> yet
+              </h2>
               <p className="mc-empty-sub">
                 Generate a full week of platform-native posts tailored to your niche, voice, and audience — saved here for quick access.
               </p>
-              <Link to="/" className="mc-empty-cta">Generate your first calendar →</Link>
+              <Link to="/" className="mc-empty-cta">
+                Generate your first calendar →
+              </Link>
             </div>
           ) : filteredItems.length === 0 ? (
             <div className="mc-empty">No calendars match your filters.</div>
           ) : (
+            <>
             <div className="mc-list">
-              {filteredItems.map(it => (
-                <div key={it.id} className="mc-item">
+              <VirtualizedList
+                items={filteredItems}
+                renderItem={renderCalendarItem}
+                height={600}
+                estimatedItemHeight={90}
+              />
                   <button
                     type="button"
                     className={`mc-star ${it.is_favorite ? "on" : ""}`}
@@ -284,10 +420,16 @@ export default function MyCalendars() {
                         autoFocus
                         value={renameValue}
                         disabled={renameSaving}
-                        onChange={e => setRenameValue(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter") { e.preventDefault(); saveRename(); }
-                          if (e.key === "Escape") { e.preventDefault(); setRenamingId(null); }
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            saveRename();
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            setRenamingId(null);
+                          }
                         }}
                         onBlur={saveRename}
                       />
@@ -310,17 +452,31 @@ export default function MyCalendars() {
                       </button>
                     ) : (
                       <>
-                        <button className="mc-act" onClick={() => startRename(it)}>Rename</button>
+                        <button className="mc-act" onClick={() => startRename(it)}>
+                          Rename
+                        </button>
                         <button className="mc-act" onClick={() => duplicate(it)} disabled={duplicatingId === it.id}>
                           {duplicatingId === it.id ? "Copying…" : "Duplicate"}
                         </button>
-                        <button className="mc-del" onClick={() => setPendingDelete(it)}>Delete</button>
+                        <button className="mc-del" onClick={() => setPendingDelete(it)}>
+                          Delete
+                        </button>
                       </>
                     )}
                   </div>
-                </div>
-              ))}
             </div>
+            {hasNextPage && (
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+                <button
+                  className="mc-act"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                >
+                  {isFetchingNextPage ? "Loading more…" : "Load more"}
+                </button>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>

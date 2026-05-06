@@ -4,12 +4,13 @@ import {
   LENGTH_GUIDE_SINGLE as LENGTH_GUIDE,
   STRUCTURE_GUIDE,
   bannedPhrasesBlock,
-  cleanList,
-  cleanTagList,
+  isLongFormPlatform,
   buildHashtagInstr,
   jsonResponse,
+  checkRateLimit,
+  cleanPayload,
+  normalizePost,
 } from "../_shared/promptHelpers.ts";
-
 
 interface ExistingPost {
   day: number;
@@ -24,34 +25,6 @@ interface ExistingPost {
   rationale?: string;
 }
 
-interface Payload {
-  industry?: string;
-  industryLabel?: string;
-  platform?: string;
-  coreIdea?: string;
-  audiences?: string[];
-  voice?: string;
-  style?: string;
-  goals?: string[];
-  format?: string;
-  cta?: string;
-  length?: string;
-  structure?: string;
-  extra?: string;
-  bannedWords?: string[];
-  requiredWords?: string[];
-  bannedHashtags?: string[];
-  requiredHashtags?: string[];
-  // Single-post context
-  post: ExistingPost;
-  // Other 6 posts so AI doesn't duplicate angles/openers
-  siblings?: ExistingPost[];
-  // Optional override topic (defaults to post.topic)
-  newTopic?: string;
-  // Optional tweak directive — keeps the angle, applies a small transform
-  tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal";
-}
-
 const TWEAK_INSTRUCTIONS: Record<string, string> = {
   "shorter": "TWEAK: Keep the same angle, hook, and CTA, but cut the body length by ~35%. Tighten every sentence. Remove anything not load-bearing.",
   "punchier": "TWEAK: Keep the same angle, but rewrite for more impact — shorter sentences, stronger verbs, sharper opener. No fluff.",
@@ -60,79 +33,72 @@ const TWEAK_INSTRUCTIONS: Record<string, string> = {
   "more-personal": "TWEAK: Keep the same angle, but rewrite in first-person with a small, specific personal anecdote or observation in the hook. Make it feel like a human wrote it, not a brand.",
 };
 
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const body: Payload = await req.json();
-    const {
-      industry = "",
-      industryLabel = "",
-      platform = "LinkedIn",
-      coreIdea = "",
-      audiences = [],
-      voice = "",
-      style = "",
-      goals = [],
-      format = "Balanced mix",
-      cta = "Share & repost bait",
-      length = "medium",
-      structure = "mixed",
-      extra = "",
-      bannedWords = [],
-      requiredWords = [],
-      bannedHashtags = [],
-      requiredHashtags = [],
-      post,
-      siblings = [],
-      newTopic,
-      tweak,
-    } = body;
+    const body = await req.json();
+    const payload = cleanPayload(body);
 
-    const cleanBanned = cleanList(bannedWords, 20);
-    const cleanRequired = cleanList(requiredWords, 10);
-    const cleanBannedTags = cleanTagList(bannedHashtags, 30);
-    const cleanRequiredTags = cleanTagList(requiredHashtags, 10);
+    // Extract post-specific fields
+    const post = body.post as ExistingPost | undefined;
+    const siblings = (body.siblings as ExistingPost[] | undefined) || [];
+    const newTopic = body.newTopic as string | undefined;
+    const tweak = body.tweak as "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | undefined;
 
     if (!post || typeof post.day !== "number" || !post.dow) {
       return jsonResponse({ error: "Missing post context (day/dow required)." }, 400);
     }
 
+    // Rate limiting: 30 requests per minute per user (regenerate is frequent)
+    const authHeader = req.headers.get("authorization") || "anonymous";
+    const userId = authHeader.replace("Bearer ", "").slice(0, 32) || "anonymous";
+    const rateLimitCheck = await checkRateLimit(userId, "regenerate-post", {
+      maxRequests: 30,
+      windowMs: 60 * 1000,
+    });
+    if (!rateLimitCheck.allowed) {
+      return jsonResponse(
+        { error: "Rate limit exceeded. Please wait a moment before trying again." },
+        429
+      );
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI is not configured." }, 500);
 
+    const longFormPlatform = isLongFormPlatform(payload.platform);
     const targetTopic = (newTopic && newTopic.trim()) || post.topic || "general topic";
-    const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
-    const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
+    const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
+    const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
     const tweakInstr = (tweak && TWEAK_INSTRUCTIONS[tweak]) || "";
-    const hashtagInstr = buildHashtagInstr(platform, cleanBannedTags, cleanRequiredTags, { every: false });
+    const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: false });
 
     const siblingSummary = siblings
       .filter(s => s && s.day !== post.day)
       .map(s => `- Day ${s.day} (${s.dow}) · "${s.topic}" — opener: "${(s.hook || s.title || "").slice(0, 100)}"`)
       .join("\n");
 
-    const prompt = `You are a world-class ${platform} content strategist specialising in ${industryLabel || industry} content.
+    const prompt = `You are a world-class ${payload.platform} content strategist specialising in ${payload.industryLabel || payload.industry} content.
 
-Re-write a SINGLE post (Day ${post.day} — ${post.dow}) in an existing 7-day ${platform} content calendar. The other 6 posts are unchanged — your post must feel fresh and complementary, not duplicative.
+Re-write a SINGLE post (Day ${post.day} — ${post.dow}) in an existing 7-day ${payload.platform} content calendar. The other 6 posts are unchanged — your post must feel fresh and complementary, not duplicative.
 
 CONTEXT:
-- Industry / niche: ${industryLabel || industry}
-- Core idea: ${coreIdea}
-- Audience: ${audiences.length ? audiences.join(", ") : "industry professionals"}
-- Voice / tone: ${voice || "conversational and professional"}
-- Writing style: ${style || "balanced"}
-- Goals: ${goals.join(", ") || "Awareness, Engagement"}
-- Post format mix: ${format}
-- CTA approach: ${cta}
+- Industry / niche: ${payload.industryLabel || payload.industry}
+- Core idea: ${payload.coreIdea}
+- Audience: ${payload.audiences.length ? payload.audiences.join(", ") : "industry professionals"}
+- Voice / tone: ${payload.voice || "conversational and professional"}
+- Writing style: ${payload.style || "balanced"}
+- Goals: ${payload.goals.join(", ") || "Awareness, Engagement"}
+- Post format mix: ${payload.format}
+- CTA approach: ${payload.cta}
 - POST LENGTH: ${lengthInstr}
 - POST STRUCTURE: ${structureInstr}
-${extra ? `- Extra instructions: ${extra}` : ""}
-${cleanBanned.length ? `- NEVER SAY (hard ban — do not use these words or close variants): ${cleanBanned.join(", ")}` : ""}
-${cleanRequired.length ? `- TRY TO MENTION (prefer naturally weaving in at least one of these if it fits the topic): ${cleanRequired.join(", ")}` : ""}
+${payload.extra ? `- Extra instructions: ${payload.extra}` : ""}
+${payload.bannedWords.length ? `- NEVER SAY (hard ban — do not use these words or close variants): ${payload.bannedWords.join(", ")}` : ""}
+${payload.requiredWords.length ? `- TRY TO MENTION (prefer naturally weaving in at least one of these if it fits the topic): ${payload.requiredWords.join(", ")}` : ""}
 
 THIS POST:
 - Day: ${post.day} (${post.dow})
@@ -146,7 +112,7 @@ ${siblingSummary || "(none provided)"}
 
 HARD RULES:
 1. ${tweakInstr ? `Apply the TWEAK above to the current version. Keep the same core angle and topic.` : `Write a genuinely fresh take on "${targetTopic}" that does NOT repeat the previous title/hook above.`}
-2. Stay specific to the ${industryLabel || industry} space — real terminology, real platforms, real trends.
+2. Stay specific to the ${payload.industryLabel || payload.industry} space — real terminology, real platforms, real trends.
 3. Follow the POST LENGTH and POST STRUCTURE rules exactly${tweakInstr === TWEAK_INSTRUCTIONS.shorter ? " (the 'shorter' tweak overrides the length target)" : ""}.
 4. ${hashtagInstr}
 5. The "dow" field MUST be "${post.dow}" and "day" MUST be ${post.day}.
@@ -184,59 +150,31 @@ ${bannedPhrasesBlock()}`;
       },
     };
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "user", content: prompt }],
-        tools: [tool],
-        tool_choice: { type: "function", function: { name: "return_post" } },
-      }),
-    });
-
-    if (aiRes.status === 429) {
-      return new Response(JSON.stringify({ error: "Rate limit hit. Please wait a moment and try again." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (aiRes.status === 402) {
-      return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits in Settings → Workspace → Usage." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (!aiRes.ok) {
-      const t = await aiRes.text();
-      console.error("AI gateway error", aiRes.status, t);
-      return new Response(JSON.stringify({ error: `AI error: ${aiRes.status}` }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const aiRes = await callAIGateway(prompt, tool, LOVABLE_API_KEY);
+    if (aiRes.status !== 200) {
+      return jsonResponse({ error: aiRes.error }, aiRes.status);
     }
 
-    const data = await aiRes.json();
-    const toolCall = data?.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall?.function?.arguments) {
-      console.error("No tool call in response", JSON.stringify(data));
-      return new Response(JSON.stringify({ error: "AI returned no structured output." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const parseResult = parseAIResponse(aiRes.data || {}, "return_post");
+    if (!parseResult.success) {
+      return jsonResponse({ error: parseResult.error }, 500);
     }
 
-    let parsed: ExistingPost;
-    try {
-      parsed = JSON.parse(toolCall.function.arguments);
-    } catch (e) {
-      console.error("Failed to parse tool args", e);
-      return new Response(JSON.stringify({ error: "Failed to parse AI output." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const parsed = parseResult.parsed as Record<string, unknown>;
+    const regenerated = normalizePost(parsed, post.dow);
+    if (!regenerated) {
+      return jsonResponse({ error: "Failed to normalize post response." }, 500);
     }
 
-    // Force day/dow to match the slot (defensive)
-    parsed.day = post.day;
-    parsed.dow = post.dow;
+    // Force day to match the original slot
+    regenerated.day = post.day;
 
-    return new Response(JSON.stringify({ post: parsed }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ post: regenerated });
   } catch (e) {
     console.error("regenerate-post error", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    return jsonResponse(
+      { error: e instanceof Error ? e.message : "Unknown error" },
+      500
     );
   }
 });

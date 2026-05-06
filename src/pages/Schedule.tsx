@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { createScopedLogger } from "@/lib/logger";
+import { SkeletonList } from "@/components/SkeletonList";
+import { VirtualizedList } from "@/components/VirtualizedList";
 import { writeToClipboard, niceLabelFor } from "@/lib/platformCopy";
 import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
 import { downloadScheduleCsv } from "@/lib/exportSchedule";
@@ -10,6 +14,7 @@ import { buildTrackingUrl } from "@/lib/utm";
 
 type WorkflowStatus = "drafted" | "approved" | "published" | "failed";
 type SortKey = "date-asc" | "date-desc" | "platform" | "status";
+const PAGE_SIZE = 25;
 
 interface ScheduledRow {
   id: string;
@@ -89,7 +94,6 @@ export default function Schedule() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<ScheduledRow[]>([]);
   const [calendars, setCalendars] = useState<Map<string, CalendarMeta>>(new Map());
-  const [loading, setLoading] = useState(true);
   const [profileTz, setProfileTz] = useState<string>("");
   const [viewTz, setViewTz] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortKey>("date-asc");
@@ -97,10 +101,25 @@ export default function Schedule() {
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const tzList = listTimezones();
+  const log = createScopedLogger('Schedule');
 
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
+  const { data: scheduleData, isLoading: loading, error: scheduleError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["schedule", user?.id],
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    queryFn: async ({ pageParam }) => {
+      if (!user) {
+        return {
+          rows: [] as ScheduledRow[],
+          calendars: new Map<string, CalendarMeta>(),
+          profileTz: browserTimezone(),
+          nextCursor: null as string | null,
+        };
+      }
+
+      log.debug(`Loading scheduled posts for user`, { userId: user.id, cursor: pageParam });
       const [{ data: pr }, { data: schedData }, { data: calData }] = await Promise.all([
         supabase.from("profiles").select("default_timezone").eq("user_id", user.id).maybeSingle(),
         supabase.from("scheduled_posts")
@@ -109,16 +128,46 @@ export default function Schedule() {
           .order("scheduled_at", { ascending: true }),
         supabase.from("saved_calendars").select("id, title, timezone, tracking_url"),
       ]);
+
       const profTz = (pr as { default_timezone?: string | null } | null)?.default_timezone || browserTimezone();
-      setProfileTz(profTz);
-      setViewTz(profTz);
-      setRows((schedData as ScheduledRow[]) || []);
       const map = new Map<string, CalendarMeta>();
       for (const c of (calData as CalendarMeta[]) || []) map.set(c.id, c);
-      setCalendars(map);
-      setLoading(false);
-    })();
-  }, [user]);
+
+      if (!schedData) {
+        return {
+          rows: [],
+          calendars: map,
+          profileTz: profTz,
+          nextCursor: null,
+        };
+      }
+
+      const items = (schedData as ScheduledRow[]) || [];
+      const nextCursor = items.length === PAGE_SIZE ? items[items.length - 1]?.scheduled_at : null;
+
+      log.info(`Loaded ${items.length || 0} scheduled posts`, { count: items.length });
+      return {
+        rows: items,
+        calendars: map,
+        profileTz: profTz,
+        nextCursor,
+      };
+    },
+  });
+
+  useEffect(() => {
+    if (!scheduleData) return;
+    const pages = scheduleData.pages;
+    const firstPage = pages[0];
+    setProfileTz(firstPage.profileTz);
+    setViewTz(firstPage.profileTz);
+    setRows(pages.flatMap(page => page.rows));
+    setCalendars(firstPage.calendars);
+  }, [scheduleData]);
+
+  useEffect(() => {
+    if (scheduleError instanceof Error) toast.error(scheduleError.message);
+  }, [scheduleError]);
 
   const sorted = useMemo(() => {
     const arr = [...rows];
@@ -142,20 +191,30 @@ export default function Schedule() {
   }, [sorted, sortBy, viewTz]);
 
   async function setStatus(row: ScheduledRow, status: WorkflowStatus) {
+    const log = createScopedLogger('Schedule-SetStatus');
     const patch: Record<string, unknown> = { workflow_status: status };
     if (status === "published") patch.published_at = new Date().toISOString();
     if (status !== "failed") patch.failure_reason = null;
     const { error } = await supabase.from("scheduled_posts").update(patch).eq("id", row.id);
-    if (error) return toast.error(error.message);
+    if (error) {
+      log.error(`Failed to set status`, error, { postId: row.id, newStatus: status });
+      return toast.error(error.message);
+    }
     setRows(p => p.map(r => r.id === row.id ? { ...r, ...patch, workflow_status: status } as ScheduledRow : r));
+    log.info(`Post status updated`, { postId: row.id, newStatus: status });
     toast.success(`Marked ${STATUS_LABEL[status].toLowerCase()}`);
   }
 
   async function cancelRow(row: ScheduledRow) {
+    const log = createScopedLogger('Schedule-Cancel');
     if (!window.confirm("Cancel this scheduled post?")) return;
     const { error } = await supabase.from("scheduled_posts").update({ status: "cancelled" }).eq("id", row.id);
-    if (error) return toast.error(error.message);
+    if (error) {
+      log.error(`Failed to cancel post`, error, { postId: row.id });
+      return toast.error(error.message);
+    }
     setRows(p => p.filter(r => r.id !== row.id));
+    log.info(`Post cancelled`, { postId: row.id });
     toast.success("Cancelled");
   }
 
@@ -174,14 +233,19 @@ export default function Schedule() {
   }
 
   async function saveEdit(row: ScheduledRow) {
+    const log = createScopedLogger('Schedule-SaveEdit');
     if (!editDate || !editTime) return;
     const cal = calendars.get(row.calendar_id);
     const tz = cal?.timezone || profileTz || browserTimezone();
     const newIso = zonedToUtcIso(editDate, editTime, tz);
     const { error } = await supabase.from("scheduled_posts").update({ scheduled_at: newIso }).eq("id", row.id);
-    if (error) return toast.error(error.message);
+    if (error) {
+      log.error(`Failed to save edit`, error, { postId: row.id, newTime: newIso });
+      return toast.error(error.message);
+    }
     setRows(p => p.map(r => r.id === row.id ? { ...r, scheduled_at: newIso } : r));
     setEditId(null);
+    log.info(`Post time updated`, { postId: row.id, newTime: newIso, timezone: tz });
     toast.success("Time updated");
   }
 
@@ -230,7 +294,7 @@ export default function Schedule() {
           )}
 
           {loading ? (
-            <div className="sc-empty">Loading…</div>
+            <SkeletonList rows={5} />
           ) : rows.length === 0 ? (
             <div className="sc-empty">
               No scheduled posts yet. Open a calendar and click <strong style={{ color: "#c8f09a" }}>Schedule week</strong>.
@@ -243,7 +307,22 @@ export default function Schedule() {
               </div>
             ))
           ) : (
-            <div className="sc-group">{sorted.map(row => renderRow(row))}</div>
+            <div className="sc-group">
+              <VirtualizedList
+                items={sorted}
+                renderItem={renderRow}
+                height={600}
+                estimatedItemHeight={100}
+              />
+            </div>
+          )}
+
+          {hasNextPage && (
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+              <button className="sc-act" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                {isFetchingNextPage ? "Loading more…" : "Load more"}
+              </button>
+            </div>
           )}
         </div>
       </div>

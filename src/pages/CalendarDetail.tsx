@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { createScopedLogger } from "@/lib/logger";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
 import {
   downloadIcs,
@@ -209,23 +211,92 @@ export default function CalendarDetail() {
   const [tagReplacement, setTagReplacement] = useState("");
   const tzList = listTimezones();
 
+  // Load calendar data with React Query
+  const { data: calendarData, isLoading: calendarLoading, error: calendarError } = useQuery({
+    queryKey: ["calendar", id],
+    queryFn: async () => {
+      if (!id) throw new Error("No calendar ID");
+      const { data, error } = await supabase
+        .from("saved_calendars")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("Calendar not found");
+      return data;
+    },
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Load profile data with React Query
+  const { data: profileData } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("default_timezone, banned_hashtags, required_hashtags")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Load scheduled posts status with React Query
+  const { data: scheduledPostsData } = useQuery({
+    queryKey: ["scheduled-posts-status", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data } = await supabase
+        .from("scheduled_posts")
+        .select("post_day, workflow_status")
+        .eq("calendar_id", id)
+        .neq("status", "cancelled");
+      return data || [];
+    },
+    enabled: !!id,
+    staleTime: 30 * 1000, // 30 seconds - more frequent updates for status
+  });
+
+  const handleTweakClickOutside = useCallback((e: MouseEvent) => {
+    if (tweakRef.current && !tweakRef.current.contains(e.target as Node)) setTweakOpen(false);
+  }, []);
+
+  const handleCopyMenuClickOutside = useCallback((e: MouseEvent) => {
+    if (copyMenuRef.current && !copyMenuRef.current.contains(e.target as Node)) setCopyMenuOpen(false);
+  }, []);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (posts.length <= 1) return;
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      setActive(i => (i + 1) % posts.length);
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      setActive(i => (i - 1 + posts.length) % posts.length);
+    }
+  }, [posts.length]);
+
   useEffect(() => {
     if (!tweakOpen) return;
-    const h = (e: MouseEvent) => {
-      if (tweakRef.current && !tweakRef.current.contains(e.target as Node)) setTweakOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [tweakOpen]);
+    document.addEventListener("mousedown", handleTweakClickOutside);
+    return () => document.removeEventListener("mousedown", handleTweakClickOutside);
+  }, [tweakOpen, handleTweakClickOutside]);
 
   useEffect(() => {
     if (!copyMenuOpen) return;
-    const h = (e: MouseEvent) => {
-      if (copyMenuRef.current && !copyMenuRef.current.contains(e.target as Node)) setCopyMenuOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [copyMenuOpen]);
+    document.addEventListener("mousedown", handleCopyMenuClickOutside);
+    return () => document.removeEventListener("mousedown", handleCopyMenuClickOutside);
+  }, [copyMenuOpen, handleCopyMenuClickOutside]);
+
+  // Keyboard shortcuts: arrow keys navigate between days
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   function toggleLock(day: number) {
     setLockedDays(prev => {
@@ -283,55 +354,74 @@ export default function CalendarDetail() {
     }
   }
 
+  // Handle calendar data loading
   useEffect(() => {
-    if (!id) return;
-    (async () => {
-      const [{ data, error }, { data: pr }, { data: sched }] = await Promise.all([
-        supabase.from("saved_calendars").select("*").eq("id", id).maybeSingle(),
-        supabase.from("profiles").select("default_timezone, banned_hashtags, required_hashtags").maybeSingle(),
-        supabase.from("scheduled_posts").select("post_day, workflow_status").eq("calendar_id", id).neq("status", "cancelled"),
-      ]);
-      if (error || !data) { toast.error("Calendar not found"); navigate("/my-calendars"); return; }
-      const loadedPosts = (data.posts as unknown as Post[]) || [];
-      setPosts(loadedPosts);
-      setTitle(data.title);
-      setPlatform(data.platform || "");
-      setIndustryLabel(data.industry_label || "");
-      setFormPayload((data.form_payload as unknown as FormPayload) || {});
-      const dx = data as { is_favorite?: boolean; timezone?: string | null; tracking_url?: string | null; locked_hashtags?: Record<string, string[]> | null };
-      setIsFavorite(!!dx.is_favorite);
-      setTrackingUrl(dx.tracking_url || "");
-      setLockedHashtags(dx.locked_hashtags || {});
-      const fp = (data.form_payload as { weekStart?: string } | null);
-      const ws = (data as { week_start_date?: string | null }).week_start_date
-        || fp?.weekStart
-        || toDateInputValue(nextMonday());
-      setWeekStart(ws);
-      const storedTimes = (data as { post_times?: Record<string, string> | null }).post_times;
-      if (storedTimes && typeof storedTimes === "object") {
-        setPostTimes(storedTimes);
-      } else {
-        const seed: Record<string, string> = {};
-        for (const p of loadedPosts) seed[String(p.day)] = "09:00";
-        setPostTimes(seed);
-      }
-      const profTz = (pr as { default_timezone?: string | null } | null)?.default_timezone || browserTimezone();
-      setProfileTimezone(profTz);
-      setTimezone(dx.timezone || profTz);
-      const prof = pr as { banned_hashtags?: string[] | null; required_hashtags?: string[] | null } | null;
-      setProfilePolicy({
-        banned: parsePolicyList(prof?.banned_hashtags),
-        required: parsePolicyList(prof?.required_hashtags),
-      });
-      const statusMap: Record<number, "drafted" | "approved" | "published" | "failed"> = {};
-      for (const r of (sched as { post_day: number; workflow_status: "drafted" | "approved" | "published" | "failed" }[]) || []) {
-        statusMap[r.post_day] = r.workflow_status;
-      }
-      setStatusByDay(statusMap);
-      setMeta(`${data.industry_label || ""} · ${data.platform || ""} · ${new Date(data.created_at).toLocaleDateString()}`);
-      setLoading(false);
-    })();
-  }, [id, navigate]);
+    if (!calendarData) return;
+    if (calendarError) {
+      toast.error("Calendar not found");
+      navigate("/my-calendars");
+      return;
+    }
+
+    const loadedPosts = (calendarData.posts as unknown as Post[]) || [];
+    setPosts(loadedPosts);
+    setTitle(calendarData.title);
+    setPlatform(calendarData.platform || "");
+    setIndustryLabel(calendarData.industry_label || "");
+    setFormPayload((calendarData.form_payload as unknown as FormPayload) || {});
+    setMeta(`${calendarData.industry_label || ""} · ${calendarData.platform || ""} · ${new Date(calendarData.created_at).toLocaleDateString()}`);
+    const dx = calendarData as { is_favorite?: boolean; timezone?: string | null; tracking_url?: string | null; locked_hashtags?: Record<string, string[]> | null };
+    setIsFavorite(!!dx.is_favorite);
+    setTrackingUrl(dx.tracking_url || "");
+    setLockedHashtags(dx.locked_hashtags || {});
+    const fp = (calendarData.form_payload as { weekStart?: string } | null);
+    const ws = (calendarData as { week_start_date?: string | null }).week_start_date
+      || fp?.weekStart
+      || toDateInputValue(nextMonday());
+    setWeekStart(ws);
+    const storedTimes = (calendarData as { post_times?: Record<string, string> | null }).post_times;
+    if (storedTimes && typeof storedTimes === "object") {
+      setPostTimes(storedTimes);
+    } else {
+      const seed: Record<string, string> = {};
+      for (const p of loadedPosts) seed[String(p.day)] = "09:00";
+      setPostTimes(seed);
+    }
+  }, [calendarData, calendarError, navigate]);
+
+  // Handle profile data loading
+  useEffect(() => {
+    if (!profileData) return;
+    const profTz = profileData.default_timezone || browserTimezone();
+    setProfileTimezone(profTz);
+    setProfilePolicy({
+      banned: parsePolicyList(profileData.banned_hashtags),
+      required: parsePolicyList(profileData.required_hashtags),
+    });
+  }, [profileData]);
+
+  // Handle scheduled posts status loading
+  useEffect(() => {
+    if (!scheduledPostsData) return;
+    const statusMap: Record<number, "drafted" | "approved" | "published" | "failed"> = {};
+    for (const r of scheduledPostsData) {
+      statusMap[r.post_day] = r.workflow_status;
+    }
+    setStatusByDay(statusMap);
+  }, [scheduledPostsData]);
+
+  // Set timezone when both calendar and profile data are loaded
+  useEffect(() => {
+    if (!calendarData || !profileData) return;
+    const dx = calendarData as { timezone?: string | null };
+    const profTz = profileData.default_timezone || browserTimezone();
+    setTimezone(dx.timezone || profTz);
+  }, [calendarData, profileData]);
+
+  // Set loading state based on queries
+  useEffect(() => {
+    setLoading(calendarLoading);
+  }, [calendarLoading]);
 
   function startEdit() {
     setDraft({ ...posts[active] });
@@ -359,6 +449,7 @@ export default function CalendarDetail() {
   }
 
   async function regenerateDay(tweak?: TweakKind) {
+    const log = createScopedLogger('CalendarDetail-RegenerateDay');
     if (!id || regenerating || editing) return;
     const target = posts[active];
     if (!target) return;
@@ -398,6 +489,8 @@ export default function CalendarDetail() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.error || !data?.post) {
+        const errorMsg = data?.error || `Regenerate failed (${res.status}).`;
+        log.warn(`Regenerate failed for day ${target.day}`, new Error(errorMsg), { status: res.status, day: target.day, tweak });
         toast.error(data?.error || `Regenerate failed (${res.status}).`);
         return;
       }
@@ -406,13 +499,16 @@ export default function CalendarDetail() {
         .update({ posts: updated as unknown as never })
         .eq("id", id);
       if (updErr) {
+        log.error(`Failed to save updated post`, updErr, { calendarId: id, day: target.day });
         toast.error(updErr.message);
         return;
       }
       setPosts(updated);
       const tweakLabel = tweak ? ` (${tweak.replace("-", " ")})` : "";
+      log.info(`Day ${target.day} regenerated successfully`, { day: target.day, tweak });
       toast.success(`Day ${target.day} regenerated${tweakLabel}`);
     } catch (e) {
+      log.error(`Regenerate exception`, e, { day: target.day, tweak });
       toast.error(e instanceof Error ? e.message : "Regenerate failed");
     } finally {
       setRegenerating(false);
@@ -568,6 +664,7 @@ export default function CalendarDetail() {
   }
 
   async function regenerateAllUnlocked() {
+    const log = createScopedLogger('CalendarDetail-BulkRegenerate');
     if (!id || regenerating || bulkRegenerating || editing) return;
     const targets = posts.map((p, i) => ({ p, i })).filter(({ p }) => !lockedDays.has(p.day));
     if (targets.length === 0) { toast.error("All posts are pinned. Nothing to regenerate."); return; }
@@ -576,6 +673,7 @@ export default function CalendarDetail() {
     setBulkRegenerating(true);
     setBulkProgress({ done: 0, total: targets.length });
     try {
+      log.info(`Starting bulk regenerate`, { count: targets.length, platform, calendarId: id });
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const { data: { session } } = await supabase.auth.getSession();
@@ -642,13 +740,17 @@ export default function CalendarDetail() {
 
       const okCount = targets.length - failures.length;
       if (failures.length === 0) {
+        log.info(`Bulk regenerate completed successfully`, { count: okCount, calendarId: id });
         toast.success(`Regenerated ${okCount} post${okCount === 1 ? "" : "s"} ✓`);
       } else if (okCount === 0) {
+        log.warn(`All bulk regenerations failed`, new Error(failures[0].reason), { totalCount: targets.length, failureReasons: failures });
         toast.error(`All ${failures.length} regenerations failed. ${failures[0].reason}`);
       } else {
+        log.warn(`Partial bulk regenerate failure`, new Error(`${failures.length} of ${targets.length} failed`), { okCount, failureCount: failures.length, failedDays: failures.map(f => f.day) });
         toast.warning(`${okCount} regenerated, ${failures.length} failed (days ${failures.map(f => f.day).join(", ")})`);
       }
     } catch (e) {
+      log.error(`Bulk regenerate exception`, e, { calendarId: id });
       toast.error(e instanceof Error ? e.message : "Bulk regenerate failed");
     } finally {
       setBulkRegenerating(false);

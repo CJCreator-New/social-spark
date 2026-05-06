@@ -5,103 +5,69 @@ import {
   LENGTH_GUIDE_SINGLE as LENGTH_GUIDE,
   STRUCTURE_GUIDE,
   bannedPhrasesBlock,
-  cleanList,
-  cleanTagList,
+  isLongFormPlatform,
   buildHashtagInstr,
   jsonResponse,
+  checkRateLimit,
+  cleanPayload,
+  buildPromptContext,
+  callAIGateway,
+  parseAIResponse,
+  normalizePost,
 } from "../_shared/promptHelpers.ts";
-
-interface Payload {
-  industry?: string;
-  industryLabel?: string;
-  platform?: string;
-  coreIdea?: string;
-  audiences?: string[];
-  voice?: string;
-  style?: string;
-  goals?: string[];
-  topic?: string;
-  dow?: string;
-  date?: string;
-  format?: string;
-  cta?: string;
-  length?: string;
-  structure?: string;
-  extra?: string;
-  bannedWords?: string[];
-  requiredWords?: string[];
-  bannedHashtags?: string[];
-  requiredHashtags?: string[];
-}
-
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const body: Payload = await req.json();
-    const {
-      industry = "",
-      industryLabel = "",
-      platform = "LinkedIn",
-      coreIdea = "",
-      audiences = [],
-      voice = "",
-      style = "",
-      goals = [],
-      topic = "",
-      dow = "Mon",
-      date = "",
-      format = "Balanced mix",
-      cta = "Share & repost bait",
-      length = "medium",
-      structure = "mixed",
-      extra = "",
-      bannedWords = [],
-      requiredWords = [],
-      bannedHashtags = [],
-      requiredHashtags = [],
-    } = body;
+    const body = await req.json();
+    const payload = cleanPayload(body);
 
-    if (!coreIdea.trim()) return jsonResponse({ error: "Missing core idea." }, 400);
-    if (!topic.trim()) return jsonResponse({ error: "Missing topic." }, 400);
-    if (!VALID_DOW.has(dow)) return jsonResponse({ error: "Invalid day-of-week." }, 400);
+    // Validate required fields
+    if (!payload.coreIdea?.trim()) return jsonResponse({ error: "Missing core idea." }, 400);
+    if (!payload.topic?.trim()) return jsonResponse({ error: "Missing topic." }, 400);
+    if (!VALID_DOW.has(payload.dow)) return jsonResponse({ error: "Invalid day-of-week." }, 400);
 
-    const cleanBanned = cleanList(bannedWords, 20);
-    const cleanRequired = cleanList(requiredWords, 10);
-    const cleanBannedTags = cleanTagList(bannedHashtags, 30);
-    const cleanRequiredTags = cleanTagList(requiredHashtags, 10);
+    // Rate limiting: 20 requests per minute per user (higher for single-post as it's faster)
+    const authHeader = req.headers.get("authorization") || "anonymous";
+    const userId = authHeader.replace("Bearer ", "").slice(0, 32) || "anonymous";
+    const rateLimitCheck = await checkRateLimit(userId, "generate-single-post", {
+      maxRequests: 20,
+      windowMs: 60 * 1000,
+    });
+    if (!rateLimitCheck.allowed) {
+      return jsonResponse(
+        { error: "Rate limit exceeded. Please wait a moment before trying again." },
+        429
+      );
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI is not configured." }, 500);
 
-    const lengthInstr = LENGTH_GUIDE[length] || LENGTH_GUIDE.medium;
-    const structureInstr = STRUCTURE_GUIDE[structure] || STRUCTURE_GUIDE.mixed;
-    const hashtagInstr = buildHashtagInstr(platform, cleanBannedTags, cleanRequiredTags, { every: false });
+    const longFormPlatform = isLongFormPlatform(payload.platform);
+    const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
+    const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
+    const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: false });
 
-    const prompt = `You are a world-class ${platform} content strategist specialising in ${industryLabel || industry} content.
+    const dateNote = payload.date ? ` (${payload.date})` : "";
+    const contextLines = buildPromptContext(payload, { isSinglePost: true });
 
-Write a SINGLE high-impact ${platform} post for ${dow}${date ? ` (${date})` : ""}.
-- Industry / niche: ${industryLabel || industry}
-- Core idea: ${coreIdea}
-- Audience: ${audiences.length ? audiences.join(", ") : "industry professionals"}
-- Voice / tone: ${voice || "conversational and professional"}
-- Writing style: ${style || "balanced"}
-- Goals: ${goals.join(", ") || "Awareness, Engagement"}
-- Topic for this post: ${topic}
-- Post format: ${format}
-- CTA approach: ${cta}
+    const prompt = `You are a world-class ${payload.platform} content strategist specialising in ${payload.industryLabel || payload.industry} content.
+
+Write a SINGLE high-impact ${payload.platform} post for ${payload.dow}${dateNote}.
+${contextLines}
 - POST LENGTH: ${lengthInstr}
 - POST STRUCTURE: ${structureInstr}
-${extra ? `- Extra instructions: ${extra}` : ""}
-${cleanBanned.length ? `- NEVER SAY (hard ban — do not use these words or close variants): ${cleanBanned.join(", ")}` : ""}
-${cleanRequired.length ? `- TRY TO MENTION (weave in naturally if it fits): ${cleanRequired.join(", ")}` : ""}
+${payload.extra ? `- Extra instructions: ${payload.extra}` : ""}
+${payload.bannedWords.length ? `- NEVER SAY (hard ban — do not use these words or close variants): ${payload.bannedWords.join(", ")}` : ""}
+${payload.requiredWords.length ? `- TRY TO MENTION (weave in naturally if it fits): ${payload.requiredWords.join(", ")}` : ""}
 
 HARD RULES:
-1. Stay specific to the ${industryLabel || industry} space — real terminology, real platforms, real trends.
+1. Stay specific to the ${payload.industryLabel || payload.industry} space — real terminology, real platforms, real trends.
 2. Follow the POST LENGTH and POST STRUCTURE rules exactly.
 3. ${hashtagInstr}
-4. The "dow" field MUST be exactly "${dow}" and "day" MUST be 1.
+4. The "dow" field MUST be exactly "${payload.dow}" and "day" MUST be 1.
 5. In the "format" field, append the structure used (e.g. "How-to — hybrid").
 6. Include at least one concrete number, percentage, year, or named statistic in the body or hook (realistic, defensible).
 
@@ -135,56 +101,28 @@ ${bannedPhrasesBlock()}`;
       },
     };
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "user", content: prompt }],
-        tools: [tool],
-        tool_choice: { type: "function", function: { name: "return_post" } },
-      }),
-    });
-
-    if (aiRes.status === 429) {
-      return new Response(JSON.stringify({ error: "Rate limit hit. Please wait a moment and try again." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (aiRes.status === 402) {
-      return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits in Settings → Workspace → Usage." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (!aiRes.ok) {
-      const t = await aiRes.text();
-      console.error("AI gateway error", aiRes.status, t);
-      return new Response(JSON.stringify({ error: `AI error: ${aiRes.status}` }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const aiRes = await callAIGateway(prompt, tool, LOVABLE_API_KEY);
+    if (aiRes.status !== 200) {
+      return jsonResponse({ error: aiRes.error }, aiRes.status);
     }
 
-    const data = await aiRes.json();
-    const toolCall = data?.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall?.function?.arguments) {
-      console.error("No tool call in response", JSON.stringify(data));
-      return new Response(JSON.stringify({ error: "AI returned no structured output." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const parseResult = parseAIResponse(aiRes.data || {}, "return_post");
+    if (!parseResult.success) {
+      return jsonResponse({ error: parseResult.error }, 500);
     }
 
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(toolCall.function.arguments);
-    } catch (e) {
-      console.error("Failed to parse tool args", e);
-      return new Response(JSON.stringify({ error: "Failed to parse AI output." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const parsed = parseResult.parsed as Record<string, unknown>;
+    const post = normalizePost(parsed, payload.dow);
+    if (!post) {
+      return jsonResponse({ error: "Failed to normalize post response." }, 500);
     }
 
-    // Defensive: force day=1 and dow to caller's choice.
-    parsed.day = 1;
-    parsed.dow = dow;
-
-    return new Response(JSON.stringify({ post: parsed }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ post });
   } catch (e) {
     console.error("generate-single-post error", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse(
+      { error: e instanceof Error ? e.message : "Unknown error" },
+      500
+    );
   }
 });
