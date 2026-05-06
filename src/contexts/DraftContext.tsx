@@ -26,7 +26,6 @@ import {
   type DraftVersion,
   type DraftVersionSummary,
   isIndexedDBAvailable,
-  formatTimestamp,
 } from "@/lib/draftHistory";
 
 // ============================================================================
@@ -104,12 +103,8 @@ interface DraftProviderProps {
  * // In App.tsx or main.tsx
  * import { DraftProvider } from '@/contexts/DraftContext';
  *
- * export default function App() {
- *   return (
- *     <DraftProvider>
- *       {/* App routes and components */}
- *     </DraftProvider>
- *   );
+ * export default function App({ children }: { children: React.ReactNode }) {
+ *   return <DraftProvider>{children}</DraftProvider>;
  * }
  * ```
  *

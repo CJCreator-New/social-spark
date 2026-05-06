@@ -31,6 +31,7 @@ describe('StorageService', () => {
     localStorageMock.removeItem.mockImplementation(() => {})
     localStorageMock.clear.mockImplementation(() => {})
     localStorageMock.key.mockImplementation(() => null)
+    localStorageMock.length = 0
   })
 
   afterEach(() => {
@@ -128,7 +129,8 @@ describe('StorageService', () => {
 
       localStorageMock.getItem.mockReturnValue(JSON.stringify(storedPayload))
 
-      const validator = (data: any) => data.count > 10
+      const validator = (data: unknown) =>
+        typeof data === 'object' && data !== null && 'count' in data && Number((data as { count: unknown }).count) > 10
       const result = StorageService.get('validated', validator)
 
       expect(result).toBeNull()
@@ -145,7 +147,8 @@ describe('StorageService', () => {
 
       localStorageMock.getItem.mockReturnValue(JSON.stringify(storedPayload))
 
-      const validator = (data: any) => data.count > 10
+      const validator = (data: unknown) =>
+        typeof data === 'object' && data !== null && 'count' in data && Number((data as { count: unknown }).count) > 10
       const result = StorageService.get('validated', validator)
 
       expect(result).toEqual(testData)
@@ -160,7 +163,9 @@ describe('StorageService', () => {
     })
 
     it('should check if key exists', () => {
-      localStorageMock.getItem.mockReturnValue('{"version":1,"data":"test","timestamp":1234567890}')
+      localStorageMock.getItem.mockImplementation((key: string) =>
+        key === 'existing' ? '{"version":1,"data":"test","timestamp":1234567890}' : null
+      )
 
       expect(StorageService.has('existing')).toBe(true)
       expect(StorageService.has('non-existing')).toBe(false)
@@ -190,6 +195,7 @@ describe('StorageService', () => {
         .mockReturnValueOnce('expired-key')
         .mockReturnValueOnce('valid-key')
         .mockReturnValueOnce(null)
+      localStorageMock.length = 2
 
       localStorageMock.getItem
         .mockImplementation((key: string) => {

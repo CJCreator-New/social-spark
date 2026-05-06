@@ -475,6 +475,59 @@ interface Post {
 
 const DRAFT_KEY = "contentforge:draft:v1";
 const POSTS_DRAFT_KEY = "contentforge:posts-draft:v1";
+const DRAFT_VERSION = 1;
+const DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+type DraftEnvelope<T> = {
+  version: number;
+  savedAt: number;
+  data: T;
+};
+
+function readDraft<T>(key: string): T | null {
+  const raw = localStorage.getItem(key);
+  if (!raw) return null;
+  const parsed = JSON.parse(raw) as DraftEnvelope<T> | T;
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    !("version" in parsed) ||
+    !("savedAt" in parsed) ||
+    !("data" in parsed)
+  ) {
+    localStorage.removeItem(key);
+    return null;
+  }
+  const envelope = parsed as DraftEnvelope<T>;
+  if (envelope.version !== DRAFT_VERSION || Date.now() - envelope.savedAt > DRAFT_MAX_AGE_MS) {
+    localStorage.removeItem(key);
+    return null;
+  }
+  return envelope.data;
+}
+
+function writeDraft<T>(key: string, data: T) {
+  localStorage.setItem(key, JSON.stringify({ version: DRAFT_VERSION, savedAt: Date.now(), data }));
+}
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function fetchWithGenerationRetry(input: RequestInfo | URL, init: RequestInit, maxRetries = 2): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(input, init);
+      if ((res.status === 429 || res.status >= 500) && attempt < maxRetries) {
+        await sleep(400 * Math.pow(2, attempt));
+        continue;
+      }
+      return res;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") throw error;
+      if (attempt >= maxRetries) throw error;
+      await sleep(400 * Math.pow(2, attempt));
+    }
+  }
+}
 
 const Index = () => {
   const [step, setStep] = useState(1);
@@ -524,6 +577,7 @@ const Index = () => {
   const [reformatting, setReformatting] = useState(false);
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const generatingRef = useRef(false);
   const hydrated = useRef(false);
   const tweakRef = useRef<HTMLDivElement>(null);
   const copyMenuRef = useRef<HTMLDivElement>(null);
@@ -584,18 +638,16 @@ const Index = () => {
   useEffect(() => {
     let restoredFromDraft = false;
     try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) as { form?: typeof form; step?: number; extraTopics?: string[] };
+      const saved = readDraft<{ form?: typeof form; step?: number; extraTopics?: string[] }>(DRAFT_KEY);
+      if (saved) {
         if (saved.form) { setForm(f => ({ ...f, ...saved.form })); restoredFromDraft = true; }
         if (saved.extraTopics) setExtraTopics(saved.extraTopics);
         // Don't restore step 3 (mid-generation) — but restore step 4 if posts draft exists.
         if (saved.step === 1 || saved.step === 2) setStep(saved.step);
       }
       // Restore generated posts so step 4 survives reloads
-      const rawPosts = localStorage.getItem(POSTS_DRAFT_KEY);
-      if (rawPosts) {
-        const savedPosts = JSON.parse(rawPosts) as { posts?: Post[]; activeDay?: number; postTimes?: Record<string, string> };
+      const savedPosts = readDraft<{ posts?: Post[]; activeDay?: number; postTimes?: Record<string, string> }>(POSTS_DRAFT_KEY);
+      if (savedPosts) {
         if (Array.isArray(savedPosts.posts) && savedPosts.posts.length > 0) {
           setPosts(savedPosts.posts);
           if (typeof savedPosts.activeDay === "number") setActiveDay(savedPosts.activeDay);
@@ -654,7 +706,7 @@ const Index = () => {
     if (!hydrated.current) return;
     if (step > 2) return;
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, step, extraTopics }));
+      writeDraft(DRAFT_KEY, { form, step, extraTopics });
     } catch (e) {
       console.warn("Failed to persist draft", e);
     }
@@ -665,7 +717,7 @@ const Index = () => {
     if (!hydrated.current) return;
     try {
       if (posts.length > 0) {
-        localStorage.setItem(POSTS_DRAFT_KEY, JSON.stringify({ posts, activeDay, postTimes }));
+        writeDraft(POSTS_DRAFT_KEY, { posts, activeDay, postTimes });
       } else {
         localStorage.removeItem(POSTS_DRAFT_KEY);
       }
@@ -725,8 +777,10 @@ const Index = () => {
   const log = createScopedLogger('Index-Generate');
 
   async function generate(isRetry: boolean = false) {
+    if (generatingRef.current) return;
     if (!validate(2)) return;
     
+    generatingRef.current = true;
     setIsGenerating(true);
     setLastGenerationError(null);
     setStep(3); setGenStep(0); setGenMsg(GEN_MSGS[0]); setSavedId(null);
@@ -748,6 +802,7 @@ const Index = () => {
       if (msgRef.current) clearInterval(msgRef.current);
       clearTimeout(timeoutId);
       abortRef.current = null;
+      generatingRef.current = false;
       setIsGenerating(false);
     };
 
@@ -789,7 +844,7 @@ const Index = () => {
 
       log.info(`Starting generation (${mode}, ${isRetry ? 'retry' : 'first attempt'})`, { mode, platform: form.platform, industry: form.industry });
 
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
+      const res = await fetchWithGenerationRetry(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1099,7 +1154,7 @@ const Index = () => {
     const ta = document.createElement("textarea");
     ta.value = text; ta.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0;";
     document.body.appendChild(ta); ta.focus(); ta.select();
-    try { document.execCommand("copy"); cb && cb(); } catch (e) { console.error(e); }
+    try { document.execCommand("copy"); cb(); } catch (e) { console.error(e); }
     document.body.removeChild(ta);
   }
 

@@ -87,6 +87,41 @@ export function buildHashtagInstr(
   return base + banned + required;
 }
 
+export function applyHashtagPolicy(
+  rawHashtags: unknown,
+  platform: string,
+  cleanBannedTags: string[],
+  cleanRequiredTags: string[],
+  max = 6,
+): string {
+  if (isLongFormPlatform(platform)) return "";
+
+  const banned = new Set(cleanBannedTags.map(t => normTag(t).toLowerCase()));
+  const required = cleanRequiredTags.map(t => normTag(t)).filter(t => t.length > 1);
+  const source = Array.isArray(rawHashtags) ? rawHashtags.join(" ") : String(rawHashtags || "");
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  for (const part of source.split(/[\s,]+/)) {
+    if (out.length >= max) break;
+    const tag = normTag(part);
+    const key = tag.toLowerCase();
+    if (tag.length <= 1 || seen.has(key) || banned.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+  }
+
+  for (const tag of required) {
+    if (out.length >= max) break;
+    const key = tag.toLowerCase();
+    if (seen.has(key) || banned.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+  }
+
+  return out.join(" ");
+}
+
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -372,7 +407,8 @@ export function parseAIResponse(
  */
 export function normalizePost(
   post: unknown,
-  overrideDow?: string
+  overrideDow?: string,
+  payload?: Pick<GenerationPayload, "platform" | "bannedHashtags" | "requiredHashtags">,
 ): Record<string, unknown> | null {
   if (!post || typeof post !== "object") {
     return null;
@@ -388,7 +424,9 @@ export function normalizePost(
     hook: p.hook || "",
     body: p.body || "",
     cta: p.cta || "",
-    hashtags: p.hashtags || "",
+    hashtags: payload
+      ? applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags)
+      : p.hashtags || "",
     rationale: p.rationale || "",
   };
 }

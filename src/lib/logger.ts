@@ -22,6 +22,15 @@ interface LogEntry {
   timestamp: number;
 }
 
+interface SentryLike {
+  captureException: (error: unknown, options?: { contexts?: { app?: LogContext } }) => void;
+  captureMessage: (message: string, level?: 'warning' | 'info') => void;
+}
+
+type WindowWithSentry = Window & {
+  Sentry?: SentryLike;
+};
+
 class Logger {
   private logs: LogEntry[] = [];
   private maxLogs = 100;
@@ -31,7 +40,7 @@ class Logger {
    */
   private isErrorTrackingConfigured(): boolean {
     // Check for Sentry or similar
-    return typeof window !== 'undefined' && !!(window as any).Sentry;
+    return typeof window !== 'undefined' && !!(window as WindowWithSentry).Sentry;
   }
 
   /**
@@ -39,7 +48,7 @@ class Logger {
    */
   private sendToExternalService(level: LogLevel, message: string, error?: unknown, context?: LogContext) {
     try {
-      const Sentry = (window as any).Sentry;
+      const Sentry = (window as WindowWithSentry).Sentry;
       if (!Sentry) return;
 
       const messageStr = `${message}${error ? ` - ${getDeveloperMessage(error)}` : ''}`;

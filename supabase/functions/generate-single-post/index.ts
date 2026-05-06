@@ -112,7 +112,7 @@ ${bannedPhrasesBlock()}`;
     }
 
     const parsed = parseResult.parsed as Record<string, unknown>;
-    const post = normalizePost(parsed, payload.dow);
+    const post = normalizePost(parsed, payload.dow, payload);
     if (!post) {
       return jsonResponse({ error: "Failed to normalize post response." }, 500);
     }

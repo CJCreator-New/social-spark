@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ApiClient } from '@/lib/api'
 
+type MockResponse = {
+  ok: boolean
+  status: number
+  statusText: string
+  json: () => Promise<unknown>
+  clone: () => MockResponse
+  headers: Headers
+}
+
 // Mock fetch globally
 const fetchMock = vi.fn()
 global.fetch = fetchMock
@@ -16,7 +25,7 @@ describe('ApiClient', () => {
   })
 
   // Helper to create mock Response
-  const createMockResponse = (body: any, options: { status?: number; ok?: boolean } = {}) => {
+  const createMockResponse = (body: unknown, options: { status?: number; ok?: boolean } = {}): MockResponse => {
     const { status = 200, ok = true } = options
     return {
       ok,

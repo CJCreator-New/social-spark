@@ -12,6 +12,7 @@ import {
   buildPromptContext,
   callAIGateway,
   parseAIResponse,
+  applyHashtagPolicy,
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req) => {
@@ -131,7 +132,16 @@ ${bannedPhrasesBlock()}`;
     }
 
     const parsed = parseResult.parsed as Record<string, unknown>;
-    const posts = Array.isArray(parsed.posts) ? parsed.posts : [];
+    const posts = Array.isArray(parsed.posts)
+      ? parsed.posts.map(post => {
+          if (!post || typeof post !== "object") return post;
+          const p = post as Record<string, unknown>;
+          return {
+            ...p,
+            hashtags: applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags),
+          };
+        })
+      : [];
     if (posts.length === 0) {
       return jsonResponse({ error: "AI returned an empty calendar." }, 500);
     }

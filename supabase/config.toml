@@ -1,7 +1,4 @@
 project_id = "mbxlvsftyifovbkpsvyw"
 
-[functions.generate-captions]
-verify_jwt = false
-
 [functions.generate-calendar]
 verify_jwt = false

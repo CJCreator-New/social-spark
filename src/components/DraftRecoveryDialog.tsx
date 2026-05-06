@@ -9,12 +9,7 @@
  * import { DraftRecoveryDialog } from '@/components/DraftRecoveryDialog';
  *
  * export function Index() {
- *   return (
- *     <>
- *       <DraftRecoveryDialog />
- *       {/* Rest of form */}
- *     </>
- *   );
+ *   return <DraftRecoveryDialog />;
  * }
  * ```
  */
@@ -94,9 +89,7 @@ export function DraftRecoveryDialog({ onRestore, onDismiss }: DraftRecoveryDialo
 
     setIsRestoring(true);
     try {
-      const version = await (await import("@/lib/draftHistory")).draftHistoryService.restoreVersion(
-        selectedVersionId
-      );
+      await (await import("@/lib/draftHistory")).draftHistoryService.restoreVersion(selectedVersionId);
       onRestore?.(selectedVersionId);
 
       // Close dialog after successful restore
@@ -258,7 +251,10 @@ export function DraftRecoveryBanner({
         <Button
           size="sm"
           variant="outline"
-          onClick={() => setIsVisible(false)}
+          onClick={() => {
+            setIsVisible(false);
+            onDismiss?.();
+          }}
           className="border-amber-200 text-amber-700 hover:bg-amber-100"
         >
           Dismiss

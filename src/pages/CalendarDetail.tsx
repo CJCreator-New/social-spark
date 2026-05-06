@@ -149,6 +149,7 @@ const css = `
 .cd-tag-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; background:rgba(200,240,154,0.06); border:1px solid rgba(200,240,154,0.15); color:rgba(200,240,154,0.78); font-size:12px; cursor:pointer; transition:all .12s; font-family:'Sora',sans-serif; }
 .cd-tag-chip:hover { background:rgba(200,240,154,0.14); border-color:rgba(200,240,154,0.32); color:#c8f09a; }
 .cd-tag-chip.locked { background:rgba(200,240,154,0.18); border-color:rgba(200,240,154,0.45); color:#c8f09a; }
+.cd-tag-policy-warn { display:inline-flex; align-items:center; margin-left:4px; padding:2px 6px; border-radius:6px; border:1px solid rgba(240,212,154,.32); background:rgba(240,212,154,.06); color:#f0d49a; font-size:10px; line-height:1.3; vertical-align:middle; }
 .cd-tag-pop { position:absolute; z-index:300; background:#181a26; border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:10px; min-width:240px; box-shadow:0 8px 28px rgba(0,0,0,.55); display:flex; flex-direction:column; gap:6px; }
 .cd-tag-pop-h { font-size:11px; color:#7a7a8e; padding-bottom:4px; border-bottom:1px solid rgba(255,255,255,.05); margin-bottom:2px; }
 .cd-tag-pop-row { display:flex; gap:6px; align-items:center; }
@@ -1066,6 +1067,7 @@ export default function CalendarDetail() {
                   if (tags.length === 0) return <span className="cd-tags" style={{ color: "#3a3a50" }}>— none —</span>;
                   return tags.map(t => {
                     const isLocked = locks.includes(t);
+                    const overridesBan = isLocked && profilePolicy.banned.includes(t);
                     const open = tagPopover && tagPopover.day === p.day && tagPopover.tag === t;
                     return (
                       <span key={t} className="cd-tag-wrap">
@@ -1077,6 +1079,11 @@ export default function CalendarDetail() {
                         >
                           {isLocked ? "📌 " : ""}{displayTag(t)}
                         </button>
+                        {overridesBan && (
+                          <span className="cd-tag-policy-warn" title="Locked tag overrides the workspace ban list">
+                            overrides ban
+                          </span>
+                        )}
                         {open && (
                           <div className="cd-tag-pop" style={{ top: "calc(100% + 4px)", left: 0 }}>
                             <div className="cd-tag-pop-h">{displayTag(t)}</div>

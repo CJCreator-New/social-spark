@@ -146,7 +146,12 @@ export const StorageService = {
    */
   keys(): string[] {
     try {
-      return Object.keys(localStorage);
+      const keys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) keys.push(key);
+      }
+      return keys;
     } catch {
       return [];
     }
@@ -158,7 +163,7 @@ export const StorageService = {
   getSize(): number {
     try {
       let size = 0;
-      for (let key of StorageService.keys()) {
+      for (const key of StorageService.keys()) {
         const item = localStorage.getItem(key);
         if (item) {
           size += item.length + key.length;
@@ -227,7 +232,7 @@ export const StorageService = {
   getStats() {
     try {
       const keys = StorageService.keys();
-      let totalSize = StorageService.getSize();
+      const totalSize = StorageService.getSize();
       let expiredCount = 0;
       let validCount = 0;
 

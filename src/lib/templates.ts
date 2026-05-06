@@ -24,6 +24,25 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+type TemplateRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  config: TemplateConfig;
+  is_shared: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type SharedTemplateRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  config: TemplateConfig;
+  created_at: string;
+};
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -183,11 +202,11 @@ class TemplatesService {
       throw new Error(`Failed to list templates: ${error.message}`);
     }
 
-    return (templates || []).map((t) => ({
+    return ((templates as TemplateRow[] | null) || []).map((t) => ({
       id: t.id,
       name: t.name,
       description: t.description,
-      industry: (t.config as any)?.industry || "Unknown",
+      industry: t.config?.industry || "Unknown",
       createdAt: new Date(t.created_at),
       isShared: t.is_shared,
     }));
@@ -208,11 +227,11 @@ class TemplatesService {
       throw new Error(`Failed to list shared templates: ${error.message}`);
     }
 
-    return (templates || []).map((t) => ({
+    return ((templates as SharedTemplateRow[] | null) || []).map((t) => ({
       id: t.id,
       name: t.name,
       description: t.description,
-      industry: (t.config as any)?.industry || "Unknown",
+      industry: t.config?.industry || "Unknown",
       createdAt: new Date(t.created_at),
       isShared: true,
     }));
@@ -369,7 +388,7 @@ class TemplatesService {
    * Map database template to Template interface.
    * @private
    */
-  private mapTemplate(dbTemplate: any): Template {
+  private mapTemplate(dbTemplate: TemplateRow): Template {
     return {
       id: dbTemplate.id,
       userId: dbTemplate.user_id,

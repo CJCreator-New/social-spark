@@ -179,49 +179,6 @@ export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
     `X-WR-CALNAME:${icsEscape(calendarTitle)}`,
   ];
 
-  // Add VTIMEZONE component when timezone is specified
-  if (timezone) {
-    // Standard VTIMEZONE for common IANA zones (simplified; UTC offset may vary by date)
-    // In production, consider using a library like `ical-generator` or `rrule.js` for full accuracy.
-    const tzOffsets: Record<string, { utcOffset: string; tzName: string }> = {
-      "America/New_York": { utcOffset: "-0500", tzName: "EST" },
-      "America/Los_Angeles": { utcOffset: "-0800", tzName: "PST" },
-      "Europe/London": { utcOffset: "+0000", tzName: "GMT" },
-      "Europe/Paris": { utcOffset: "+0100", tzName: "CET" },
-      "Asia/Tokyo": { utcOffset: "+0900", tzName: "JST" },
-      "Australia/Sydney": { utcOffset: "+1000", tzName: "AEDT" },
-      "Asia/Shanghai": { utcOffset: "+0800", tzName: "CST" },
-      "Asia/Singapore": { utcOffset: "+0800", tzName: "SGT" },
-      "Asia/Hong_Kong": { utcOffset: "+0800", tzName: "HKT" },
-      "Asia/Bangkok": { utcOffset: "+0700", tzName: "ICT" },
-      "Asia/Dubai": { utcOffset: "+0400", tzName: "GST" },
-      "Asia/Kolkata": { utcOffset: "+0530", tzName: "IST" },
-      "America/Chicago": { utcOffset: "-0600", tzName: "CST" },
-      "America/Denver": { utcOffset: "-0700", tzName: "MST" },
-      "Europe/Berlin": { utcOffset: "+0100", tzName: "CET" },
-      "Europe/Amsterdam": { utcOffset: "+0100", tzName: "CET" },
-      "Europe/Zurich": { utcOffset: "+0100", tzName: "CET" },
-      "Europe/Vienna": { utcOffset: "+0100", tzName: "CET" },
-      "Europe/Prague": { utcOffset: "+0100", tzName: "CET" },
-      "Europe/Madrid": { utcOffset: "+0100", tzName: "CET" },
-      "Europe/Rome": { utcOffset: "+0100", tzName: "CET" },
-      "Europe/Istanbul": { utcOffset: "+0300", tzName: "EET" },
-    };
-    
-    const tzInfo = tzOffsets[timezone] || { utcOffset: "+0000", tzName: timezone };
-    lines.push(
-      "BEGIN:VTIMEZONE",
-      `TZID:${timezone}`,
-      "BEGIN:STANDARD",
-      `TZOFFSETFROM:${tzInfo.utcOffset}`,
-      `TZOFFSETTO:${tzInfo.utcOffset}`,
-      `TZNAME:${tzInfo.tzName}`,
-      `DTSTART:19700101T000000`,
-      "END:STANDARD",
-      "END:VTIMEZONE"
-    );
-  }
-
   const useTz = !!timezone;
 
   for (const p of posts) {
@@ -231,10 +188,11 @@ export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
     let dtStart: string;
     let dtEnd: string;
     if (useTz && timezone) {
-      // Use local time with TZID parameter for proper timezone-aware events
-      const end = new Date(localStart.getTime() + durationMin * 60 * 1000);
-      dtStart = `DTSTART;TZID=${timezone}:${toIcsLocal(localStart)}`;
-      dtEnd = `DTEND;TZID=${timezone}:${toIcsLocal(end)}`;
+      const slotDate = toDateInputValue(dateForDow(weekStart, p.dow));
+      const startUtc = new Date(zonedToUtcIso(slotDate, time, timezone));
+      const endUtc = new Date(startUtc.getTime() + durationMin * 60 * 1000);
+      dtStart = `DTSTART:${toIcsUtcStamp(startUtc)}`;
+      dtEnd = `DTEND:${toIcsUtcStamp(endUtc)}`;
     } else {
       // Use floating time (no timezone) - will use importer's local time
       const end = new Date(localStart.getTime() + durationMin * 60 * 1000);
