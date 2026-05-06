@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-      const body = await req.json();
+    const body = await req.json();
     const payload = cleanPayload(body);
 
     // Validate required fields
