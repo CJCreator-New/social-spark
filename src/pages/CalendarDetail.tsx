@@ -18,6 +18,7 @@ import { applyPolicy, parsePolicyList, parseHashtagsString, normalizeTag, displa
 import { insightFor } from "@/lib/postInsights";
 import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
 import { buildTrackingUrl } from "@/lib/utm";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
@@ -176,6 +177,7 @@ function wordCount(s: string): number {
 export default function CalendarDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [title, setTitle] = useState("");
   const [meta, setMeta] = useState("");

@@ -65,7 +65,7 @@ export function AdminDashboard() {
   }, []);
 
   if (loading) {
-    return <SkeletonList count={4} />;
+    return <SkeletonList rows={4} />;
   }
 
   if (!stats) {

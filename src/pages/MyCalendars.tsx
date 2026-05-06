@@ -91,9 +91,9 @@ export default function MyCalendars() {
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage: { items: SavedCalendar[]; nextCursor: string | null }) => lastPage.nextCursor,
     queryFn: async ({ pageParam }) => {
-      if (!user) return [] as SavedCalendar[];
+      if (!user) return { items: [] as SavedCalendar[], nextCursor: null as string | null };
 
       log.debug("Loading calendars for user", { userId: user.id, cursor: pageParam });
       let query = supabase
@@ -403,67 +403,6 @@ export default function MyCalendars() {
                 height={600}
                 estimatedItemHeight={90}
               />
-                  <button
-                    type="button"
-                    className={`mc-star ${it.is_favorite ? "on" : ""}`}
-                    onClick={() => toggleFavorite(it)}
-                    aria-pressed={!!it.is_favorite}
-                    aria-label={it.is_favorite ? "Unstar" : "Star"}
-                    title={it.is_favorite ? "Unstar" : "Star"}
-                  >
-                    {it.is_favorite ? "★" : "☆"}
-                  </button>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {renamingId === it.id ? (
-                      <input
-                        className="mc-rename-input"
-                        autoFocus
-                        value={renameValue}
-                        disabled={renameSaving}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            saveRename();
-                          }
-                          if (e.key === "Escape") {
-                            e.preventDefault();
-                            setRenamingId(null);
-                          }
-                        }}
-                        onBlur={saveRename}
-                      />
-                    ) : (
-                      <Link to={`/calendar/${it.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-                        <h3 className="mc-item-title">{it.title}</h3>
-                      </Link>
-                    )}
-                    <div className="mc-meta" style={{ marginTop: 4 }}>
-                      {Array.isArray(it.posts) && it.posts.length === 1 && <span className="mc-tag">1-day</span>}
-                      {it.industry_label && <span className="mc-tag">{it.industry_label}</span>}
-                      {it.platform && <span className="mc-tag">{it.platform}</span>}
-                      <span>{new Date(it.created_at).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                  <div className="mc-actions">
-                    {renamingId === it.id ? (
-                      <button className="mc-act" onClick={() => setRenamingId(null)} disabled={renameSaving}>
-                        {renameSaving ? "Saving…" : "Cancel"}
-                      </button>
-                    ) : (
-                      <>
-                        <button className="mc-act" onClick={() => startRename(it)}>
-                          Rename
-                        </button>
-                        <button className="mc-act" onClick={() => duplicate(it)} disabled={duplicatingId === it.id}>
-                          {duplicatingId === it.id ? "Copying…" : "Duplicate"}
-                        </button>
-                        <button className="mc-del" onClick={() => setPendingDelete(it)}>
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
             </div>
             {hasNextPage && (
               <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>

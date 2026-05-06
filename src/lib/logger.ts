@@ -111,7 +111,8 @@ class Logger {
 
     // Console output (always)
     const consoleMethod = level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log';
-    console[consoleMethod as keyof Console](
+    const consoleFn = (console[consoleMethod as 'log' | 'warn' | 'error'] as (...args: unknown[]) => void).bind(console);
+    consoleFn(
       `[${level.toUpperCase()}] ${message}`,
       error ? getDeveloperMessage(error) : '',
       context || ''
