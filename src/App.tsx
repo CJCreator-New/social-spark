@@ -10,7 +10,6 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SkeletonList } from "@/components/SkeletonList";
 import { setupGlobalErrorHandlers } from "@/lib/logger";
 import Auth from "./pages/Auth";
-import Landing from "./pages/Landing";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
@@ -49,10 +48,9 @@ const App = () => {
           <ErrorBoundary>
             <AuthProvider>
               <Routes>
-                <Route path="/" element={<Landing />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/app" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Index /></Suspense></ProtectedRoute>} />
+                <Route path="/" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Index /></Suspense></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Profile /></Suspense></ProtectedRoute>} />
                 <Route path="/my-calendars" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><MyCalendars /></Suspense></ProtectedRoute>} />
                 <Route path="/calendar/:id" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><CalendarDetail /></Suspense></ProtectedRoute>} />

@@ -183,7 +183,7 @@ function DefaultErrorFallback({
           </button>
 
           <button
-            onClick={() => (window.location.href = '/app')}
+            onClick={() => (window.location.href = '/')}
             style={{
               flex: 1,
               background: 'transparent',

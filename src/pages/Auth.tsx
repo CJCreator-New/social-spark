@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
@@ -36,9 +36,7 @@ const css = `
 `;
 
 export default function AuthPage() {
-  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const requestedMode = searchParams.get("mode");
-  const [tab, setTab] = useState<"signin" | "signup" | "forgot">(requestedMode === "signup" ? "signup" : "signin");
+  const [tab, setTab] = useState<"signin" | "signup" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -46,22 +44,14 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const navigate = useNavigate();
-  const location = useLocation();
+  const routerLocation = useLocation();
   const { user } = useAuth();
 
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname || "/app";
+  const from = (routerLocation.state as { from?: { pathname: string } } | null)?.from?.pathname || "/";
 
   useEffect(() => {
     if (user) navigate(from, { replace: true });
   }, [user, navigate, from]);
-
-  useEffect(() => {
-    if (requestedMode === "signup") {
-      setTab("signup");
-      setError("");
-      setInfo("");
-    }
-  }, [requestedMode]);
 
   async function handleEmailAuth(e: React.FormEvent) {
     e.preventDefault();
@@ -71,7 +61,7 @@ export default function AuthPage() {
         const { data, error: err } = await supabase.auth.signUp({
           email, password,
           options: {
-            emailRedirectTo: `${window.location.origin}/app`,
+            emailRedirectTo: `${window.location.origin}/`,
             data: { display_name: name || email.split("@")[0] },
           },
         });

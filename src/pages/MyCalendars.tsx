@@ -335,7 +335,7 @@ export default function MyCalendars() {
               <Link to="/schedule" className="mc-back">
                 📅 Schedule
               </Link>
-              <Link to="/app" className="mc-back">
+              <Link to="/" className="mc-back">
                 ← New calendar
               </Link>
               <button className="mc-act" onClick={async () => { await signOut(); navigate("/auth"); }}>
@@ -388,7 +388,7 @@ export default function MyCalendars() {
               <p className="mc-empty-sub">
                 Generate a full week of platform-native posts tailored to your niche, voice, and audience — saved here for quick access.
               </p>
-              <Link to="/app" className="mc-empty-cta">
+              <Link to="/" className="mc-empty-cta">
                 Generate your first calendar →
               </Link>
             </div>

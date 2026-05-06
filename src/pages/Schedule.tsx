@@ -272,7 +272,7 @@ export default function Schedule() {
             <h1 className="sc-title">My <em>schedule</em></h1>
             <div style={{ display: "flex", gap: 12 }}>
               <Link to="/my-calendars" className="sc-back">My calendars</Link>
-              <Link to="/app" className="sc-back">← New calendar</Link>
+              <Link to="/" className="sc-back">← New calendar</Link>
             </div>
           </div>
 

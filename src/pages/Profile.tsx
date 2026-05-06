@@ -186,7 +186,7 @@ export default function Profile() {
       <style>{css}</style>
       <div className="pf-app">
         <div className="pf-inner">
-          <Link to="/app" className="pf-back">← Back to ContentForge</Link>
+          <Link to="/" className="pf-back">← Back to ContentForge</Link>
           <h1 className="pf-title">Your profile</h1>
           <div className="pf-sub">Update how you appear inside ContentForge and set brand defaults to pre-fill the wizard.</div>
 
