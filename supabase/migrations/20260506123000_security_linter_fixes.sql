@@ -1,6 +1,7 @@
 -- Tighten storage listing and function execution privileges flagged by Supabase lint.
 
 drop policy if exists "Avatar images are publicly accessible" on storage.objects;
+drop policy if exists "Users can list own avatars" on storage.objects;
 
 create policy "Users can list own avatars"
 on storage.objects for select
@@ -9,7 +10,11 @@ using (
   and auth.uid()::text = (storage.foldername(name))[1]
 );
 
-revoke execute on function public.handle_new_user() from anon, authenticated;
+revoke execute on function public.has_role(uuid, public.app_role) from public, anon;
+grant execute on function public.has_role(uuid, public.app_role) to authenticated;
+
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+revoke execute on function public.update_updated_at_column() from public, anon, authenticated;
 revoke execute on function public.cleanup_old_api_metrics() from anon, authenticated;
 revoke execute on function public.refresh_api_performance() from anon, authenticated;
 revoke execute on function public.cleanup_old_rate_limits() from anon, authenticated;

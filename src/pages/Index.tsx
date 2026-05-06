@@ -10,6 +10,7 @@ import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
 import { downloadIcs, nextMonday, toDateInputValue, parseLocalDate, dateForDow, shortDateLabel } from "@/lib/calendarSchedule";
 import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform, niceLabelFor, buildRawMarkdown } from "@/lib/platformCopy";
 import { getVoiceStylePreview } from "@/lib/voiceStylePreview";
+import { DraftRecoveryDialog } from "@/components/DraftRecoveryDialog";
 import { SAMPLE_FORM, SAMPLE_POSTS, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
@@ -471,12 +472,63 @@ interface Post {
   rationale: string;
 }
 
+type WizardForm = {
+  industry: string;
+  platform: string;
+  coreIdea: string;
+  audiences: string[];
+  voice: string;
+  style: string;
+  goals: string[];
+  topics: string[];
+  format: string;
+  cta: string;
+  length: string;
+  structure: string;
+  extra: string;
+  bannedWords: string[];
+  requiredWords: string[];
+  weekStart: string;
+  mode: "week" | "day";
+  targetDate: string;
+};
+
+type WizardDraftSnapshot = {
+  savedAt: number;
+  form: WizardForm;
+  step: number;
+  extraTopics: string[];
+  posts: Post[];
+  activeDay: number;
+  postTimes: Record<string, string>;
+};
+
+const INITIAL_FORM: WizardForm = {
+  industry: "",
+  platform: "LinkedIn",
+  coreIdea: "",
+  audiences: [],
+  voice: "",
+  style: "",
+  goals: ["Awareness", "Engagement"],
+  topics: [],
+  format: "Balanced mix",
+  cta: "Share & repost bait",
+  length: "medium",
+  structure: "mixed",
+  extra: "",
+  bannedWords: [],
+  requiredWords: [],
+  weekStart: toDateInputValue(nextMonday()),
+  mode: "week",
+  targetDate: toDateInputValue(nextMonday()),
+};
+
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
-const DRAFT_KEY = "contentforge:draft:v1";
-const POSTS_DRAFT_KEY = "contentforge:posts-draft:v1";
 const DRAFT_VERSION = 1;
-const DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const WIZARD_DRAFT_PREFIX = "draft:wizard:";
 
 type DraftEnvelope<T> = {
   version: number;
@@ -531,26 +583,7 @@ async function fetchWithGenerationRetry(input: RequestInfo | URL, init: RequestI
 
 const Index = () => {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({
-    industry: "",
-    platform: "LinkedIn",
-    coreIdea: "",
-    audiences: [] as string[],
-    voice: "",
-    style: "",
-    goals: ["Awareness", "Engagement"] as string[],
-    topics: [] as string[],
-    format: "Balanced mix",
-    cta: "Share & repost bait",
-    length: "medium",
-    structure: "mixed",
-    extra: "",
-    bannedWords: [] as string[],
-    requiredWords: [] as string[],
-    weekStart: toDateInputValue(nextMonday()), // YYYY-MM-DD, defaults to next Monday
-    mode: "week" as "week" | "day", // NEW: full-week vs single-day generation
-    targetDate: toDateInputValue(nextMonday()), // NEW: chosen day in single-day mode (YYYY-MM-DD)
-  });
+  const [form, setForm] = useState<WizardForm>(() => ({ ...INITIAL_FORM }));
   const [customTopic, setCustomTopic] = useState("");
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
   const [recentCalendars, setRecentCalendars] = useState<{ id: string; title: string; platform: string | null; industry_label: string | null; created_at: string }[]>([]);
@@ -575,10 +608,14 @@ const Index = () => {
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const [reformatTarget, setReformatTarget] = useState<string>("");
   const [reformatting, setReformatting] = useState(false);
+  const [recoveryDraft, setRecoveryDraft] = useState<WizardDraftSnapshot | null>(null);
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const generatingRef = useRef(false);
   const hydrated = useRef(false);
+  const draftReady = useRef(false);
+  const draftSaveTimer = useRef<number | null>(null);
   const tweakRef = useRef<HTMLDivElement>(null);
   const copyMenuRef = useRef<HTMLDivElement>(null);
 
@@ -634,50 +671,6 @@ const Index = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Hydrate from localStorage once on mount, then layer profile brand defaults on top of an empty form.
-  useEffect(() => {
-    let restoredFromDraft = false;
-    try {
-      const saved = readDraft<{ form?: typeof form; step?: number; extraTopics?: string[] }>(DRAFT_KEY);
-      if (saved) {
-        if (saved.form) { setForm(f => ({ ...f, ...saved.form })); restoredFromDraft = true; }
-        if (saved.extraTopics) setExtraTopics(saved.extraTopics);
-        // Don't restore step 3 (mid-generation) — but restore step 4 if posts draft exists.
-        if (saved.step === 1 || saved.step === 2) setStep(saved.step);
-      }
-      // Restore generated posts so step 4 survives reloads
-      const savedPosts = readDraft<{ posts?: Post[]; activeDay?: number; postTimes?: Record<string, string> }>(POSTS_DRAFT_KEY);
-      if (savedPosts) {
-        if (Array.isArray(savedPosts.posts) && savedPosts.posts.length > 0) {
-          setPosts(savedPosts.posts);
-          if (typeof savedPosts.activeDay === "number") setActiveDay(savedPosts.activeDay);
-          if (savedPosts.postTimes) setPostTimes(savedPosts.postTimes);
-          setStep(4);
-        }
-      }
-    } catch (e) {
-      console.warn("Failed to hydrate draft", e);
-    }
-
-  }, [user]);
-
-  // Pre-fill form with profile defaults when profile data loads and no draft was restored
-  useEffect(() => {
-    if (!profileData || hydrated.current) return;
-    // Only pre-fill if we haven't restored from draft (check if form has been modified from defaults)
-    const isDefaultForm = !form.voice && !form.style && form.audiences.length === 0 && form.goals.length === 0;
-    if (isDefaultForm) {
-      setForm(f => ({
-        ...f,
-        voice: f.voice || profileData.default_voice || "",
-        style: f.style || profileData.default_style || "",
-        audiences: f.audiences.length ? f.audiences : (profileData.default_audiences || []),
-        goals: profileData.default_goals && profileData.default_goals.length ? profileData.default_goals : f.goals,
-      }));
-    }
-    hydrated.current = true;
-  }, [profileData, form.voice, form.style, form.audiences.length, form.goals.length]);
-
   // Fetch recent calendars with React Query
   const { data: recentCalendarsData } = useQuery({
     queryKey: ["recent-calendars", user?.id],
@@ -701,36 +694,123 @@ const Index = () => {
     }
   }, [recentCalendarsData]);
 
-  // Persist form/step/extraTopics whenever they change (only on steps 1–2)
+  const wizardDraftKey = user ? `${WIZARD_DRAFT_PREFIX}${user.id}` : null;
+
+  // Hydrate the wizard draft once on mount and prompt the user before restoring it.
   useEffect(() => {
-    if (!hydrated.current) return;
-    if (step > 2) return;
+    draftReady.current = false;
+    setRecoveryDraft(null);
+    setShowRecoveryDialog(false);
     try {
-      writeDraft(DRAFT_KEY, { form, step, extraTopics });
+      if (!wizardDraftKey) return;
+      const saved = readDraft<WizardDraftSnapshot>(wizardDraftKey);
+      if (saved) {
+        setRecoveryDraft(saved);
+        setShowRecoveryDialog(true);
+      }
     } catch (e) {
       console.warn("Failed to persist draft", e);
     }
-  }, [form, step, extraTopics]);
+    draftReady.current = true;
+  }, [wizardDraftKey]);
 
-  // Persist generated posts (step 4) so a tab close/reload doesn't lose them
+  // Pre-fill form with profile defaults when profile data loads and no recovered draft is pending.
   useEffect(() => {
-    if (!hydrated.current) return;
-    try {
-      if (posts.length > 0) {
-        writeDraft(POSTS_DRAFT_KEY, { posts, activeDay, postTimes });
-      } else {
-        localStorage.removeItem(POSTS_DRAFT_KEY);
-      }
-    } catch (e) {
-      console.warn("Failed to persist posts draft", e);
+    if (!profileData || hydrated.current || recoveryDraft) return;
+    const isDefaultForm = !form.voice && !form.style && form.audiences.length === 0 && form.goals.length === 0;
+    if (isDefaultForm) {
+      setForm(f => ({
+        ...f,
+        voice: f.voice || profileData.default_voice || "",
+        style: f.style || profileData.default_style || "",
+        audiences: f.audiences.length ? f.audiences : (profileData.default_audiences || []),
+        goals: profileData.default_goals && profileData.default_goals.length ? profileData.default_goals : f.goals,
+      }));
     }
-  }, [posts, activeDay, postTimes]);
+    hydrated.current = true;
+  }, [profileData, form.voice, form.style, form.audiences.length, form.goals.length, recoveryDraft]);
+
+  // Persist the active wizard snapshot, with a short debounce, so reloads can recover progress.
+  useEffect(() => {
+    if (!draftReady.current || !wizardDraftKey || recoveryDraft) return;
+    if (draftSaveTimer.current) {
+      window.clearTimeout(draftSaveTimer.current);
+    }
+    draftSaveTimer.current = window.setTimeout(() => {
+      const hasMeaningfulDraft =
+        step > 1 ||
+        posts.length > 0 ||
+        form.industry !== "" ||
+        form.coreIdea.trim() !== "" ||
+        form.audiences.length > 0 ||
+        form.voice !== "" ||
+        form.style !== "" ||
+        form.topics.length > 0 ||
+        form.extra.trim() !== "" ||
+        form.bannedWords.length > 0 ||
+        form.requiredWords.length > 0 ||
+        form.format !== "Balanced mix" ||
+        form.cta !== "Share & repost bait" ||
+        form.length !== "medium" ||
+        form.structure !== "mixed" ||
+        form.mode !== "week" ||
+        form.targetDate !== toDateInputValue(nextMonday());
+
+      try {
+        if (!hasMeaningfulDraft) {
+          localStorage.removeItem(wizardDraftKey);
+          return;
+        }
+        writeDraft(wizardDraftKey, {
+          savedAt: Date.now(),
+          form,
+          step,
+          extraTopics,
+          posts,
+          activeDay,
+          postTimes,
+        });
+      } catch (e) {
+        console.warn("Failed to persist wizard draft", e);
+      }
+    }, 1000);
+
+    return () => {
+      if (draftSaveTimer.current) {
+        window.clearTimeout(draftSaveTimer.current);
+      }
+    };
+  }, [wizardDraftKey, form, step, extraTopics, posts, activeDay, postTimes, recoveryDraft]);
 
   const clearDraft = () => {
     try {
-      localStorage.removeItem(DRAFT_KEY);
-      localStorage.removeItem(POSTS_DRAFT_KEY);
-    } catch { /* ignore */ }
+      if (wizardDraftKey) localStorage.removeItem(wizardDraftKey);
+    } catch (e) {
+      console.warn("Failed to clear wizard draft", e);
+    }
+  };
+
+  const restoreDraft = () => {
+    if (!recoveryDraft) return;
+    setForm({ ...recoveryDraft.form });
+    setStep(recoveryDraft.posts.length > 0 ? 4 : recoveryDraft.step);
+    setExtraTopics([...recoveryDraft.extraTopics]);
+    setPosts([...recoveryDraft.posts]);
+    setActiveDay(recoveryDraft.activeDay);
+    setPostTimes({ ...recoveryDraft.postTimes });
+    setSavedId(null);
+    setSampleMode(false);
+    setError("");
+    setGenMsg("");
+    setGenStep(0);
+    setRecoveryDraft(null);
+    setShowRecoveryDialog(false);
+  };
+
+  const discardDraft = () => {
+    clearDraft();
+    setRecoveryDraft(null);
+    setShowRecoveryDialog(false);
   };
 
   const upd = useCallback(<K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm(f => ({ ...f, [k]: v })), []);
@@ -1260,6 +1340,17 @@ ${postText(p)}
   return (
     <>
       <style>{css}</style>
+      <DraftRecoveryDialog
+        open={showRecoveryDialog && !!recoveryDraft}
+        draft={recoveryDraft ? {
+          savedAt: recoveryDraft.savedAt,
+          step: recoveryDraft.step,
+          industry: recoveryDraft.form.industry,
+          postCount: recoveryDraft.posts.length,
+        } : null}
+        onRestore={restoreDraft}
+        onDiscard={discardDraft}
+      />
       <div className="cf-app">
         <div className="bg-grid" />
         <div className="bg-glow" />

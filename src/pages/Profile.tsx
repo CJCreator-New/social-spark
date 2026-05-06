@@ -73,6 +73,18 @@ export default function Profile() {
   const [uploading, setUploading] = useState(false);
   const tzList = listTimezones();
 
+  function getAvatarPathFromPublicUrl(publicUrl: string) {
+    try {
+      const path = new URL(publicUrl).pathname;
+      const marker = "/object/public/avatars/";
+      const index = path.indexOf(marker);
+      if (index === -1) return null;
+      return path.slice(index + marker.length);
+    } catch {
+      return null;
+    }
+  }
+
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("display_name, avatar_url, default_voice, default_style, default_audiences, default_goals, banned_hashtags, required_hashtags, default_timezone").eq("user_id", user.id).maybeSingle()
@@ -94,12 +106,21 @@ export default function Profile() {
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !user) return;
+    const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
+    if (!allowedTypes.includes(file.type)) return toast.error("Avatar must be PNG, JPEG, or WebP");
     if (file.size > 2 * 1024 * 1024) return toast.error("Image must be under 2MB");
     setUploading(true);
     const previousUrl = avatarUrl;
-    const ext = (file.name.split(".").pop() || "png").toLowerCase();
-    const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    const extByType: Record<string, string> = {
+      "image/png": "png",
+      "image/jpeg": "jpg",
+      "image/webp": "webp",
+    };
+    const path = `${user.id}/avatar.${extByType[file.type]}`;
+    const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, {
+      upsert: true,
+      contentType: file.type,
+    });
     if (upErr) { setUploading(false); return toast.error(upErr.message); }
     const { data } = supabase.storage.from("avatars").getPublicUrl(path);
     const newUrl = data.publicUrl;
@@ -111,12 +132,8 @@ export default function Profile() {
     }
     setAvatarUrl(newUrl);
     if (previousUrl) {
-      const marker = `/avatars/${user.id}/`;
-      const idx = previousUrl.indexOf(marker);
-      if (idx !== -1) {
-        const oldPath = previousUrl.slice(idx + "/avatars/".length);
-        void supabase.storage.from("avatars").remove([oldPath]);
-      }
+      const oldPath = getAvatarPathFromPublicUrl(previousUrl);
+      if (oldPath && oldPath !== path) void supabase.storage.from("avatars").remove([oldPath]);
     }
     if (fileRef.current) fileRef.current.value = "";
     setUploading(false);
@@ -161,19 +178,18 @@ export default function Profile() {
   async function handleSave() {
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase.from("profiles")
-      .update({
-        display_name: displayName,
-        avatar_url: avatarUrl,
-        default_voice: defaultVoice || null,
-        default_style: defaultStyle || null,
-        default_audiences: defaultAudiences.length ? defaultAudiences : null,
-        default_goals: defaultGoals.length ? defaultGoals : null,
-        banned_hashtags: bannedHashtags.length ? bannedHashtags : null,
-        required_hashtags: requiredHashtags.length ? requiredHashtags : null,
-        default_timezone: defaultTimezone || null,
-      })
-      .eq("user_id", user.id);
+    const updates: Record<string, unknown> = {
+      avatar_url: avatarUrl,
+      default_voice: defaultVoice || null,
+      default_style: defaultStyle || null,
+      default_audiences: defaultAudiences.length ? defaultAudiences : null,
+      default_goals: defaultGoals.length ? defaultGoals : null,
+      banned_hashtags: bannedHashtags.length ? bannedHashtags : null,
+      required_hashtags: requiredHashtags.length ? requiredHashtags : null,
+      default_timezone: defaultTimezone || null,
+    };
+    if (displayName.trim()) updates.display_name = displayName.trim();
+    const { error } = await supabase.from("profiles").update(updates).eq("user_id", user.id);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Profile updated");
@@ -202,7 +218,7 @@ export default function Profile() {
                   <div>
                     <label className="pf-uplabel">
                       {uploading ? "Uploading…" : "Upload new avatar"}
-                      <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: "none" }} disabled={uploading} aria-label="Upload new avatar" />
+                      <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} style={{ display: "none" }} disabled={uploading} aria-label="Upload new avatar" />
                     </label>
                     <div className="pf-meta">PNG or JPG, up to 2MB.</div>
                   </div>
