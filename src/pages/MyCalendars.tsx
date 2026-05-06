@@ -91,7 +91,7 @@ export default function MyCalendars() {
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage: { items: SavedCalendar[]; nextCursor: string | null }) => lastPage.nextCursor,
     queryFn: async ({ pageParam }) => {
       if (!user) return { items: [] as SavedCalendar[], nextCursor: null as string | null };
 
