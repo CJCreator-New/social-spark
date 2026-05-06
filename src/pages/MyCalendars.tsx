@@ -93,7 +93,7 @@ export default function MyCalendars() {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     queryFn: async ({ pageParam }) => {
-      if (!user) return [] as SavedCalendar[];
+      if (!user) return { items: [] as SavedCalendar[], nextCursor: null as string | null };
 
       log.debug("Loading calendars for user", { userId: user.id, cursor: pageParam });
       let query = supabase
