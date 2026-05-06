@@ -56,7 +56,7 @@ const App = () => {
                 <Route path="/my-calendars" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><MyCalendars /></Suspense></ProtectedRoute>} />
                 <Route path="/calendar/:id" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><CalendarDetail /></Suspense></ProtectedRoute>} />
                 <Route path="/schedule" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Schedule /></Suspense></ProtectedRoute>} />
-                <Route path="/admin" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Admin /></Suspense></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute><AdminRoute><Suspense fallback={<SkeletonList />}><Admin /></Suspense></AdminRoute></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </AuthProvider>
