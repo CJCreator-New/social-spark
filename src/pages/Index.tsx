@@ -676,7 +676,7 @@ const Index = () => {
       }));
     }
     hydrated.current = true;
-  }, [profileData]);
+  }, [profileData, form.voice, form.style, form.audiences.length, form.goals.length]);
 
   // Fetch recent calendars with React Query
   const { data: recentCalendarsData } = useQuery({

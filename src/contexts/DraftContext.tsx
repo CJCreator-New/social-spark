@@ -117,24 +117,6 @@ export function DraftProvider({ children }: DraftProviderProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if IndexedDB is available on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const available = await isIndexedDBAvailable();
-        setIsAvailable(available);
-
-        if (available) {
-          // Load initial versions
-          await refreshVersions();
-        }
-      } catch (err) {
-        console.error("Failed to initialize draft history:", err);
-        setIsAvailable(false);
-      }
-    })();
-  }, []);
-
   // Refresh versions list and latest version
   const refreshVersions = useCallback(async () => {
     setIsLoading(true);
@@ -156,6 +138,23 @@ export function DraftProvider({ children }: DraftProviderProps) {
       setIsLoading(false);
     }
   }, []);
+
+  // Check if IndexedDB is available on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const available = await isIndexedDBAvailable();
+        setIsAvailable(available);
+
+        if (available) {
+          await refreshVersions();
+        }
+      } catch (err) {
+        console.error("Failed to initialize draft history:", err);
+        setIsAvailable(false);
+      }
+    })();
+  }, [refreshVersions]);
 
   // Save a new version
   const saveVersion = useCallback(
