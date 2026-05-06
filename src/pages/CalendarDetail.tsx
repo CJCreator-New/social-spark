@@ -18,6 +18,7 @@ import { applyPolicy, parsePolicyList, parseHashtagsString, normalizeTag, displa
 import { insightFor } from "@/lib/postInsights";
 import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
 import { buildTrackingUrl } from "@/lib/utm";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
