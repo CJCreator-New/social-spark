@@ -898,7 +898,7 @@ const Index = () => {
       const userMessage = getUserFriendlyMessage(err);
       setError(userMessage);
       setLastGenerationError(err);
-      log.error(`Generation error`, err, { mode, aborted, reason });
+      log.error(`Generation error`, err, { mode: form.mode, aborted, reason });
 
       if (aborted && reason === "timeout") {
         setError("Generation timed out. Please try again.");
