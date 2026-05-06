@@ -108,7 +108,7 @@ export default function Schedule() {
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage: { rows: ScheduledRow[]; calendars: Map<string, CalendarMeta>; profileTz: string; nextCursor: string | null }) => lastPage.nextCursor,
     queryFn: async ({ pageParam }) => {
       if (!user) {
         return {
