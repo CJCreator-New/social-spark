@@ -176,6 +176,7 @@ function wordCount(s: string): number {
 export default function CalendarDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [title, setTitle] = useState("");
   const [meta, setMeta] = useState("");
