@@ -44,10 +44,10 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const navigate = useNavigate();
-  const location = useLocation();
+  const routerLocation = useLocation();
   const { user } = useAuth();
 
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname || "/";
+  const from = (routerLocation.state as { from?: { pathname: string } } | null)?.from?.pathname || "/";
 
   useEffect(() => {
     if (user) navigate(from, { replace: true });
