@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/AdminRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SkeletonList } from "@/components/SkeletonList";
 import { setupGlobalErrorHandlers } from "@/lib/logger";
@@ -55,7 +56,7 @@ const App = () => {
                 <Route path="/my-calendars" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><MyCalendars /></Suspense></ProtectedRoute>} />
                 <Route path="/calendar/:id" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><CalendarDetail /></Suspense></ProtectedRoute>} />
                 <Route path="/schedule" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Schedule /></Suspense></ProtectedRoute>} />
-                <Route path="/admin" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Admin /></Suspense></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute><AdminRoute><Suspense fallback={<SkeletonList />}><Admin /></Suspense></AdminRoute></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </AuthProvider>
