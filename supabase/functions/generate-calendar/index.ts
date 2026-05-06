@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const body = await req.json();
+      const body = await req.json();
     const payload = cleanPayload(body);
 
     // Validate required fields
@@ -148,7 +148,7 @@ ${bannedPhrasesBlock()}`;
 
     return jsonResponse({ posts });
   } catch (e) {
-    console.error("generate-calendar error", e);
+    console.error("generate-calendar error", e, e?.stack);
     return jsonResponse(
       { error: e instanceof Error ? e.message : "Unknown error" },
       500

@@ -52,6 +52,65 @@ const css = `
 .pf-meta { font-size:11px; color:#6a6a82; margin-top:10px; }
 `;
 
+function TemplatesList() {
+  const { user } = useAuth();
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    let mounted = true;
+    (async () => {
+      const { data } = await supabase.from('templates').select('id, name, description, config, created_at').eq('user_id', user.id).order('created_at', { ascending: false });
+      if (!mounted) return;
+      setTemplates(data || []);
+      setLoading(false);
+    })();
+    return () => { mounted = false; };
+  }, [user]);
+
+  async function handleDelete(id: string) {
+    if (!confirm('Delete this template?')) return;
+    const { error } = await supabase.from('templates').delete().eq('id', id);
+    if (error) return toast.error(error.message || 'Delete failed');
+    setTemplates(t => t.filter(x => x.id !== id));
+    toast.success('Template deleted');
+  }
+
+  function handleLoad(tpl: any) {
+    if (!user) return toast.error('Sign in to load templates');
+    const key = `draft:wizard:${user.id}`;
+    const envelope = { version: 1, savedAt: Date.now(), data: tpl.config };
+    try {
+      localStorage.setItem(key, JSON.stringify(envelope));
+      toast.success('Template loaded into wizard');
+      window.location.href = '/';
+    } catch (e) {
+      toast.error('Failed to load template');
+    }
+  }
+
+  if (loading) return <div style={{ color: '#7a7a8e' }}>Loading templates…</div>;
+  if (templates.length === 0) return <div className="pf-meta">No templates saved yet — save one from the wizard.</div>;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+      {templates.map(t => (
+        <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, border: '1px solid rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600 }}>{t.name}</div>
+            <div style={{ fontSize: 12, color: '#7a7a8e' }}>{t.description || ''} · {new Date(t.created_at).toLocaleString()}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="pf-add-btn" onClick={() => handleLoad(t)}>Load</button>
+            <button className="pf-add-btn" onClick={() => handleDelete(t.id)}>Delete</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Profile() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -349,7 +408,17 @@ export default function Profile() {
                 <button className="pf-add-btn" onClick={() => addTag("req")}>Require</button>
               </div>
 
-              <button className="pf-btn" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+              <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="pf-btn" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+                </div>
+
+                <div style={{ marginTop: 12 }}>
+                  <h3 className="pf-section-h">Saved templates</h3>
+                  <div className="pf-section-sub">Your saved templates (saved from the wizard). Load a template to pre-fill the wizard.</div>
+                  <TemplatesList />
+                </div>
+              </div>
             </div>
           )}
         </div>

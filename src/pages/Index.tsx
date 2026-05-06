@@ -1729,7 +1729,22 @@ ${postText(p)}
             )}
             <div className="brow">
               <button className="btn btn-g" onClick={() => { setError(""); setStep(1); }}>← Back</button>
-              <button className="btn btn-p" onClick={() => generate(false)} disabled={isGenerating} style={{ opacity: isGenerating ? 0.6 : 1, cursor: isGenerating ? 'not-allowed' : 'pointer' }}>{isGenerating ? `⏳ ${genMsg || 'Generating...'}` : (form.mode === "day" ? "Generate this post →" : "Generate my week →")}</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-p" onClick={() => generate(false)} disabled={isGenerating} style={{ opacity: isGenerating ? 0.6 : 1, cursor: isGenerating ? 'not-allowed' : 'pointer' }}>{isGenerating ? `⏳ ${genMsg || 'Generating...'}` : (form.mode === "day" ? "Generate this post →" : "Generate my week →")}</button>
+                <button className="btn btn-g" onClick={async () => {
+                  if (!user) { toast.error('Sign in to save templates'); return; }
+                  const name = window.prompt('Template name (short)');
+                  if (!name || !name.trim()) return;
+                  try {
+                    const payload = { user_id: user.id, name: name.trim(), description: '', config: form };
+                    const { error } = await supabase.from('templates').insert(payload).select();
+                    if (error) throw error;
+                    toast.success('Template saved');
+                  } catch (e) {
+                    toast.error(e?.message || 'Failed to save template');
+                  }
+                }}>Save as template</button>
+              </div>
             </div>
           </div>
 

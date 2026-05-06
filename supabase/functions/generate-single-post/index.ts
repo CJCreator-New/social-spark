@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const body = await req.json();
+      const body = await req.json();
     const payload = cleanPayload(body);
 
     // Validate required fields
@@ -119,7 +119,7 @@ ${bannedPhrasesBlock()}`;
 
     return jsonResponse({ post });
   } catch (e) {
-    console.error("generate-single-post error", e);
+    console.error("generate-single-post error", e, e?.stack);
     return jsonResponse(
       { error: e instanceof Error ? e.message : "Unknown error" },
       500

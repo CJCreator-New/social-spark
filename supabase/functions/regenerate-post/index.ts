@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const body = await req.json();
+      const body = await req.json();
     const payload = cleanPayload(body);
 
     // Extract post-specific fields
@@ -171,7 +171,7 @@ ${bannedPhrasesBlock()}`;
 
     return jsonResponse({ post: regenerated });
   } catch (e) {
-    console.error("regenerate-post error", e);
+    console.error("regenerate-post error", e, e?.stack);
     return jsonResponse(
       { error: e instanceof Error ? e.message : "Unknown error" },
       500
