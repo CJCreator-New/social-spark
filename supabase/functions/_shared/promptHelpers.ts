@@ -203,6 +203,42 @@ export interface GenerationPayload {
   requiredHashtags?: string[];
 }
 
+const BRITISH_TO_AMERICAN: Record<string, string> = {
+  organising: "organizing",
+  organised: "organized",
+  organisingly: "organizingly",
+  optimising: "optimizing",
+  optimised: "optimized",
+  recognising: "recognizing",
+  recognised: "recognized",
+  analysing: "analyzing",
+  analysed: "analyzed",
+  utilising: "utilizing",
+  utilised: "utilized",
+  emphasising: "emphasizing",
+  emphasised: "emphasized",
+  behaviour: "behavior",
+  colour: "color",
+  favourite: "favorite",
+};
+
+export function fixSpelling(text: string): string {
+  let result = text || "";
+  for (const [british, american] of Object.entries(BRITISH_TO_AMERICAN)) {
+    result = result.replace(new RegExp(`\\b${british}\\b`, "gi"), (match) => {
+      const replacement = american;
+      return match[0] === match[0].toUpperCase()
+        ? replacement.charAt(0).toUpperCase() + replacement.slice(1)
+        : replacement;
+    });
+  }
+  return result;
+}
+
+function buildContentRules(): string {
+  return `\nCONTENT RULES:\n- Do not use markdown syntax in post text: no **bold**, *italic*, headings, or inline code.\n- Use plain-text bullets only (• or →). Do not combine bullets with markdown formatting.\n- Rotate CTA verbs across the week; do not repeat the same CTA verb on every post.\n- Stay tightly within the user's stated topic angle; do not introduce tangential sub-topics unless requested.\n- If the topic is India-specific, use India-specific data and examples where relevant.\n- Use American English spelling: optimizing, organizing, recognizing, analyzing, utilizing, emphasizing.\n- Avoid British spellings such as organising, optimising, recognising, analysing, utilising, emphasising.`;
+}
+
 /**
  * Clean and normalize payload with sensible defaults
  */
@@ -295,7 +331,7 @@ export function buildPromptContext(
 - Writing style: ${style}
 - Goals: ${goals}
 ${topicLine}- Post format mix: ${payload.format}
-- CTA approach: ${payload.cta}`;
+- CTA approach: ${payload.cta}${buildContentRules()}`;
 
   return context;
 }
@@ -420,13 +456,13 @@ export function normalizePost(
     dow: overrideDow || p.dow || "Mon",
     topic: p.topic || "",
     format: p.format || "",
-    title: p.title || "",
-    hook: p.hook || "",
-    body: p.body || "",
-    cta: p.cta || "",
+    title: fixSpelling(String(p.title || "")),
+    hook: fixSpelling(String(p.hook || "")),
+    body: fixSpelling(String(p.body || "")),
+    cta: fixSpelling(String(p.cta || "")),
     hashtags: payload
       ? applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags)
       : p.hashtags || "",
-    rationale: p.rationale || "",
+    rationale: fixSpelling(String(p.rationale || "")),
   };
 }

@@ -400,5 +400,5 @@ function fmtInTzTimeInput(iso: string, tz: string): string {
   try {
     const dtf = new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false });
     return dtf.format(new Date(iso));
-  } catch { return "09:00"; }
+  } catch { return "08:00"; }
 }

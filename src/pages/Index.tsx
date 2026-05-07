@@ -8,10 +8,20 @@ import { createScopedLogger } from "@/lib/logger";
 import { getUserFriendlyMessage } from "@/lib/errors";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
 import { downloadIcs, nextMonday, toDateInputValue, parseLocalDate, dateForDow, shortDateLabel } from "@/lib/calendarSchedule";
-import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform, niceLabelFor, buildRawMarkdown } from "@/lib/platformCopy";
+import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform, niceLabelFor, buildRawMarkdown, stripMarkdown } from "@/lib/platformCopy";
+import { suggestedTimeForDay } from "@/lib/postingTimes";
 import { getVoiceStylePreview } from "@/lib/voiceStylePreview";
 import { DraftRecoveryDialog } from "@/components/DraftRecoveryDialog";
 import { SAMPLE_FORM, SAMPLE_POSTS, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
+
+function hasEmoji(text: string): boolean {
+  return /\p{Emoji}/u.test(text);
+}
+
+function formatBadgeForPlatform(format: string, platform: string): string {
+  if (resolvePlatform(platform) !== "twitter") return format;
+  return /list|bullet|thread/i.test(format) ? "THREAD FORMAT" : "SINGLE TWEET";
+}
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -187,7 +197,8 @@ const css = `
 .cf-app .msbox { width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r-sm);padding:9px 36px 9px 12px;font-size:13px;color:var(--text);font-family:'Sora',sans-serif;font-weight:300;cursor:pointer;transition:border-color .2s;min-height:42px;display:flex;align-items:center;flex-wrap:wrap;gap:5px;position:relative; }
 .cf-app .msbox.open { border-color:rgba(200,240,154,.28); }
 .cf-app .ms-ph { color:var(--text3);font-size:13px;font-weight:300; }
-.cf-app .ms-tag { background:var(--adim);border:1px solid rgba(200,240,154,.22);color:var(--accent);border-radius:5px;padding:2px 7px;font-size:11px;font-weight:400;display:flex;align-items:center;gap:4px; }
+.cf-app .ms-tag { background:var(--adim);border:1px solid rgba(200,240,154,.22);color:var(--accent);border-radius:5px;padding:2px 7px;font-size:11px;font-weight:400;display:inline-flex;align-items:center;gap:4px;min-width:0;max-width:100%; }
+.cf-app .ms-tag-text { display:inline-block;min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .cf-app .ms-x { cursor:pointer;color:rgba(200,240,154,.45);font-size:14px;line-height:1;transition:color .12s; }
 .cf-app .ms-x:hover { color:var(--accent); }
 .cf-app .ms-caret { position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text3);display:flex; }
@@ -412,6 +423,14 @@ function MultiSelect({ label, options, value, onChange, placeholder, max = 6, hi
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
   const toggle = (v: string) => {
     if (disabledOptions.includes(v)) return;
     if (value.includes(v)) onChange(value.filter(x => x !== v));
@@ -425,8 +444,8 @@ function MultiSelect({ label, options, value, onChange, placeholder, max = 6, hi
           {value.length === 0
             ? <span className="ms-ph">{placeholder || "Select…"}</span>
             : value.map(v => (
-              <span key={v} className="ms-tag">
-                {v}
+              <span key={v} className="ms-tag" title={v}>
+                <span className="ms-tag-text">{v}</span>
                 <span className="ms-x" onClick={e => { e.stopPropagation(); toggle(v); }}>×</span>
               </span>
             ))}
@@ -610,14 +629,50 @@ const Index = () => {
   const [reformatting, setReformatting] = useState(false);
   const [recoveryDraft, setRecoveryDraft] = useState<WizardDraftSnapshot | null>(null);
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const [showRationale, setShowRationale] = useState(false);
+  const [showSubtopicConfirm, setShowSubtopicConfirm] = useState(false);
+  const [subtopicPreview, setSubtopicPreview] = useState<string[]>([]);
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const generatingRef = useRef(false);
   const hydrated = useRef(false);
   const draftReady = useRef(false);
   const draftSaveTimer = useRef<number | null>(null);
+  const industryRef = useRef<HTMLDivElement>(null);
+  const coreIdeaRef = useRef<HTMLDivElement>(null);
+  const topicsRef = useRef<HTMLDivElement>(null);
   const tweakRef = useRef<HTMLDivElement>(null);
   const copyMenuRef = useRef<HTMLDivElement>(null);
+
+  const scrollToField = (field: "industry" | "coreIdea" | "topics") => {
+    const refMap = { industry: industryRef, coreIdea: coreIdeaRef, topics: topicsRef };
+    refMap[field].current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const buildSubtopicPreview = () => {
+    const selectedTopics = form.topics.filter(Boolean);
+    if (selectedTopics.length === 0) return [];
+    if (selectedTopics.length >= 7) return selectedTopics.slice(0, 7);
+
+    const preview = [...selectedTopics];
+    const seed = selectedTopics[0] || form.coreIdea || form.industry || "the topic";
+    const fillAngles = [
+      `Why ${seed} matters now`,
+      `A practical example of ${seed}`,
+      `Common mistakes around ${seed}`,
+      `How to apply ${seed} this week`,
+      `A sharper take on ${seed}`,
+      `What most people miss about ${seed}`,
+      `A closing lesson on ${seed}`,
+    ];
+
+    for (const angle of fillAngles) {
+      if (preview.length >= 7) break;
+      preview.push(angle);
+    }
+
+    return preview.slice(0, 7);
+  };
 
   // Close tweak menu on outside click
   useEffect(() => {
@@ -813,13 +868,17 @@ const Index = () => {
     setShowRecoveryDialog(false);
   };
 
-  const upd = useCallback(<K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm(f => ({ ...f, [k]: v })), []);
+  const upd = useCallback(<K extends keyof typeof form>(k: K, v: (typeof form)[K]) => {
+    setForm(f => ({ ...f, [k]: v }));
+    setError("");
+  }, []);
   const toggleChip = (k: "goals", v: string) =>
     setForm(f => ({ ...f, [k]: f[k].includes(v) ? f[k].filter(x => x !== v) : [...f[k], v] }));
 
   const setIndustry = (id: string) => {
     setForm(f => ({ ...f, industry: id, topics: [], audiences: [] }));
     setExtraTopics([]);
+    setError("");
   };
 
   const selectedIndustry = INDUSTRIES.find(i => i.id === form.industry);
@@ -831,20 +890,22 @@ const Index = () => {
     if (!v || topicPool.includes(v)) return;
     setExtraTopics(p => [...p, v]);
     setForm(f => ({ ...f, topics: [...f.topics, v] }));
+    setError("");
     setCustomTopic("");
   }
 
   function validate(s: number) {
     if (s === 1) {
-      if (!form.industry) { setError("Please select your industry / niche."); return false; }
-      if (!form.coreIdea.trim()) { setError("Please describe your core idea."); return false; }
+      if (!form.industry) { setError("Please select your industry / niche."); scrollToField("industry"); return false; }
+      if (!form.coreIdea.trim()) { setError("Please describe your core idea."); scrollToField("coreIdea"); return false; }
     }
     if (s === 2) {
       if (form.mode === "day") {
         if (!form.targetDate) { setError("Please pick a date for your post."); return false; }
-        if (form.topics.length === 0) { setError("Please pick (or add) one topic for this post."); return false; }
+        if (form.topics.length === 0) { setError("Please pick (or add) one topic for this post."); scrollToField("topics"); return false; }
       } else if (form.topics.length === 0) {
         setError("Please select at least 1 topic.");
+        scrollToField("topics");
         return false;
       }
     }
@@ -856,9 +917,15 @@ const Index = () => {
 
   const log = createScopedLogger('Index-Generate');
 
-  async function generate(isRetry: boolean = false) {
+  async function generate(isRetry: boolean = false, bypassSubtopicPreview: boolean = false) {
     if (generatingRef.current) return;
     if (!validate(2)) return;
+
+    if (!isRetry && form.mode !== "day" && !bypassSubtopicPreview && form.topics.length > 0 && form.topics.length < 7) {
+      setSubtopicPreview(buildSubtopicPreview());
+      setShowSubtopicConfirm(true);
+      return;
+    }
     
     generatingRef.current = true;
     setIsGenerating(true);
@@ -962,9 +1029,9 @@ const Index = () => {
 
       setGenStep(GEN_LABELS.length);
       setPosts(result); setActiveDay(0);
-      // Seed default 09:00 time per post (keyed by post.day)
+      // Seed day-optimized default times per post (keyed by post.day)
       const seedTimes: Record<string, string> = {};
-      for (const r of result) seedTimes[String(r.day)] = "09:00";
+      for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1);
       setPostTimes(seedTimes);
       setTimeout(() => setStep(4), 350);
       log.info(`Generation completed successfully`, { mode, postCount: result.length });
@@ -994,13 +1061,26 @@ const Index = () => {
     if (abortRef.current) abortRef.current.abort("user");
   }
 
-  async function regenerateDay(idx: number, tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal") {
+  async function regenerateDay(idx: number, tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting") {
     if (regenIdx !== null) return;
     const target = posts[idx];
     if (!target) return;
     setRegenIdx(idx);
     setTweakOpenIdx(null);
     try {
+      if (tweak === "clean-formatting") {
+        const cleaned: Post = {
+          ...target,
+          title: stripMarkdown(target.title),
+          hook: stripMarkdown(target.hook),
+          body: stripMarkdown(target.body),
+          cta: stripMarkdown(target.cta),
+        };
+        setPosts(prev => prev.map((p, i) => (i === idx ? cleaned : p)));
+        setSavedId(null);
+        toast.success(`Day ${target.day} formatting cleaned ✓`);
+        return;
+      }
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const { data: { session } } = await supabase.auth.getSession();
@@ -1442,7 +1522,7 @@ ${postText(p)}
                 ✨ See an example calendar (no sign-up, no API call)
               </button>
             </div>
-            <div className="card">
+            <div className="card" ref={industryRef}>
               <div className="sh">What's your <span>industry / niche?</span></div>
               <div className="ind-grid" role="radiogroup" aria-label="Industry or niche">
                 {INDUSTRIES.map(ind => (
@@ -1483,7 +1563,7 @@ ${postText(p)}
                 </div>
               </div>
 
-              <div className="csect">
+              <div className="csect" ref={coreIdeaRef}>
                 <div className="flabel">Core idea / angle</div>
                 <textarea rows={3} placeholder="What's the big idea or angle behind your content? e.g. 'helping early-stage SaaS founders ship better products faster'…" value={form.coreIdea} onChange={e => upd("coreIdea", e.target.value)} />
               </div>
@@ -1498,7 +1578,7 @@ ${postText(p)}
               </div>
 
               {(() => {
-                const preview = getVoiceStylePreview(form.voice, form.style);
+                const preview = getVoiceStylePreview(form.industry, form.voice, form.style);
                 if (!preview) {
                   return (
                     <div className="vsp">
@@ -1584,10 +1664,10 @@ ${postText(p)}
                 </div>
               )}
 
-              <div className="csect">
+              <div className="csect" ref={topicsRef}>
                 <MultiSelect
                   label={form.mode === "day" ? "Topic for this post" : "Topics to cover"}
-                  hint={form.mode === "day" ? "(pick exactly 1)" : "(pick up to 7 — 1 per day)"}
+                  hint={form.mode === "day" ? "(pick exactly 1)" : "(pick up to 7; fewer than 7 will be expanded into related angles)"}
                   options={topicPool.length > 0 ? topicPool : ["Add custom topics below ↓"]}
                   disabledOptions={topicPool.length > 0 ? [] : ["Add custom topics below ↓"]}
                   value={form.topics}
@@ -1659,7 +1739,7 @@ ${postText(p)}
                     onChange={e => upd("weekStart", e.target.value)}
                   />
                   <div className="time-hint" style={{ marginTop: 6 }}>
-                    Day 1 will be <strong style={{ color: "rgba(200,240,154,.85)" }}>{shortDateLabel(weekStartDate)}</strong>. Each post defaults to 9:00 AM — you can adjust per post on the next screen.
+                    Day 1 will be <strong style={{ color: "rgba(200,240,154,.85)" }}>{shortDateLabel(weekStartDate)}</strong>. Each post gets a day-specific default time — you can adjust per post on the next screen.
                   </div>
                 </div>
               )}
@@ -1747,6 +1827,29 @@ ${postText(p)}
               </div>
             </div>
           </div>
+
+          {showSubtopicConfirm && (
+            <div className="screen active" style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(7, 10, 18, 0.78)", display: "grid", placeItems: "center", padding: 20 }}>
+              <div className="card" style={{ width: "min(760px, 100%)", maxHeight: "86vh", overflow: "auto", margin: 0 }}>
+                <div className="sh">Your topic will be expanded into 7 posts</div>
+                <div className="time-hint" style={{ marginTop: 8 }}>
+                  You selected fewer than 7 topics, so the remaining days will be filled with related angles.
+                </div>
+                <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+                  {subtopicPreview.map((topic, index) => (
+                    <div key={index} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.08)", background: "rgba(255,255,255,.03)", color: "var(--text)" }}>
+                      <strong style={{ color: "var(--accent)", marginRight: 8 }}>Day {index + 1}</strong>
+                      {topic}
+                    </div>
+                  ))}
+                </div>
+                <div className="brow" style={{ marginTop: 20 }}>
+                  <button className="btn btn-g" onClick={() => setShowSubtopicConfirm(false)}>Edit topics</button>
+                  <button className="btn btn-p" onClick={() => { setShowSubtopicConfirm(false); void generate(false, true); }}>Looks good, generate →</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── STEP 3 ── */}
           <div className={`screen ${step === 3 ? "active" : ""}`}>
@@ -1854,7 +1957,7 @@ ${postText(p)}
                         <span className="ptag pt-day">Day {p.day} · {p.dow}</span>
                         <span className="ptag pt-date">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
                         <span className="ptag pt-topic">{p.topic}</span>
-                        <span className="ptag pt-fmt">{p.format}</span>
+                        <span className="ptag pt-fmt">{formatBadgeForPlatform(p.format, form.platform)}</span>
                       </div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", position: "relative" }} ref={tweakOpenIdx === activeDay ? tweakRef : undefined}>
                         <button
@@ -1890,7 +1993,15 @@ ${postText(p)}
                               <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "shorter")}>Make shorter</button>
                               <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "punchier")}>Make punchier</button>
                               <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "add-stat")}>Add a stat</button>
-                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "remove-emoji")}>Remove emoji</button>
+                              <button
+                                className="tweak-opt"
+                                onClick={() => regenerateDay(activeDay, "remove-emoji")}
+                                disabled={!hasEmoji(posts[activeDay].title + " " + posts[activeDay].hook + " " + posts[activeDay].body + " " + posts[activeDay].cta)}
+                                title={!hasEmoji(posts[activeDay].title + " " + posts[activeDay].hook + " " + posts[activeDay].body + " " + posts[activeDay].cta) ? "No emoji detected" : "Remove emojis from this post"}
+                              >
+                                Remove emoji
+                              </button>
+                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "clean-formatting")}>Clean formatting symbols</button>
                               <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "more-personal")}>More personal</button>
                             </div>
                           )}
@@ -1968,10 +2079,10 @@ ${postText(p)}
                       <input
                         type="time"
                         className="time-input"
-                        value={postTimes[String(p.day)] || "09:00"}
+                        value={postTimes[String(p.day)] || suggestedTimeForDay(p.day)}
                         onChange={e => setPostTimes(prev => ({ ...prev, [String(p.day)]: e.target.value }))}
                       />
-                      <span className="time-hint">{shortDateLabel(dateForDow(weekStartDate, p.dow))} at {postTimes[String(p.day)] || "09:00"}</span>
+                      <span className="time-hint">{shortDateLabel(dateForDow(weekStartDate, p.dow))} at {postTimes[String(p.day)] || suggestedTimeForDay(p.day)}</span>
                     </div>
 
                     <div className="ptitle" style={{ marginTop: 18 }}>{p.title}</div>
@@ -1989,7 +2100,15 @@ ${postText(p)}
                     <div className="htags">{p.hashtags}</div>
 
                     <div className="blabel" style={{ marginTop: 16 }}>Why this works</div>
-                    <div className="rationale">{p.rationale}</div>
+                    <button
+                      type="button"
+                      className="restart"
+                      onClick={() => setShowRationale(v => !v)}
+                      style={{ marginTop: 0 }}
+                    >
+                      {showRationale ? "Hide reasoning ↑" : "See why this works →"}
+                    </button>
+                    {showRationale && <div className="rationale">{p.rationale}</div>}
                   </div>
                 )}
 

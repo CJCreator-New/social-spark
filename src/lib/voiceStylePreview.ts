@@ -1,19 +1,39 @@
 // Static 2-line preview samples for tone × structure combinations.
 // Pure lookup, no API calls. Used on Step 1 to prevent wasted generations.
 
-const VOICE_OPENERS: Record<string, string> = {
-  "Technical & analytical": "Most teams measure velocity wrong. Story points without cycle-time context are vanity metrics.",
-  "Conversational & warm": "Okay, real talk: I rebuilt this dashboard three times before it clicked. Here's what I'd do differently.",
-  "PM / product thinking": "We shipped the feature nobody asked for, and adoption tripled. Here's what the roadmap missed.",
-  "Opinionated & bold": "Stop running standups. They're a tax on your senior engineers and a crutch for poor planning.",
-  "Data-driven": "We analysed 10,400 sign-ups across 6 months. The activation gap wasn't onboarding — it was day 7.",
-  "Storytelling-first": "It was 11pm on a Tuesday when our biggest customer churned. The post-mortem changed how we hire.",
-  "Educational & clear": "There are three ways to handle race conditions in async UIs. Most teams pick the wrong one.",
-  "Contrarian / challenger": "Everyone says 'ship fast, learn fast'. The teams I admire ship slow on purpose — and learn more.",
-  "Founder POV": "Year 2 of the company nearly killed me. Here's the one decision that flipped the trajectory.",
-  "Academic & research-backed": "A 2023 Stanford study found async-first teams shipped 23% faster — but only when documentation was non-negotiable.",
-  "Humorous & witty": "Our 'AI strategy' is three founders, one Notion doc, and a deeply concerning amount of caffeine.",
-  "Inspirational & motivating": "You don't need permission to start. The version of you in 12 months is begging you to begin today.",
+const INDUSTRY_OPENERS: Record<string, Record<string, string>> = {
+  tech: {
+    "Technical & analytical": "Most teams measure velocity wrong. Story points without cycle-time context are vanity metrics.",
+    "Conversational & warm": "Okay, real talk: I rebuilt this dashboard three times before it clicked. Here's what I'd do differently.",
+    "PM / product thinking": "We shipped the feature nobody asked for, and adoption tripled. Here's what the roadmap missed.",
+    "Opinionated & bold": "Stop running standups. They're a tax on your senior engineers and a crutch for poor planning.",
+    "Data-driven": "We analysed 10,400 sign-ups across 6 months. The activation gap wasn't onboarding — it was day 7.",
+    "Storytelling-first": "It was 11pm on a Tuesday when our biggest customer churned. The post-mortem changed how we hire.",
+  },
+  health: {
+    "Technical & analytical": "The real health gap isn't motivation. It's that patients don't get one clear next step after a visit.",
+    "Conversational & warm": "A lot of people think they need a perfect routine. Usually they just need a smaller one they can repeat.",
+    "PM / product thinking": "If healthcare is the product, then the first 5 minutes of every patient journey matter more than the brochure.",
+    "Opinionated & bold": "Wellness advice fails when it asks people to be disciplined before it becomes practical.",
+    "Data-driven": "When we looked at adherence data, the pattern was obvious: clarity beats complexity every time.",
+    "Storytelling-first": "One follow-up message changed the way a patient used the care plan. The lesson was bigger than the inbox.",
+  },
+  finance: {
+    "Technical & analytical": "Compounding works best when the system is boring. Most portfolios fail because the process is emotional, not mathematical.",
+    "Conversational & warm": "I used to think investing was about picking winners. It turned out to be about avoiding obvious mistakes.",
+    "PM / product thinking": "The best fintech products don't feel like finance. They feel like less friction.",
+    "Opinionated & bold": "If your financial advice only works for rich people, it's not advice — it's decoration.",
+    "Data-driven": "A small change in saving rate does more long-term damage than most people realise.",
+    "Storytelling-first": "I made one money mistake that took three years to unwind. The fix was embarrassingly simple.",
+  },
+  default: {
+    "Technical & analytical": "Most teams measure the wrong signal first. The real bottleneck usually shows up one step earlier.",
+    "Conversational & warm": "Okay, real talk: I tried this three different ways before the simpler version finally worked.",
+    "PM / product thinking": "The roadmaps that win are the ones that stay focused on the user problem, not the internal debate.",
+    "Opinionated & bold": "Stop optimizing for appearances. Optimize for whether the result actually changes behaviour.",
+    "Data-driven": "The numbers didn't prove what we expected. They proved what was already happening.",
+    "Storytelling-first": "It started with one awkward conversation and ended with a complete change in direction.",
+  },
 };
 
 const STYLE_TAILS: Record<string, { kind: "para" | "bullets"; lines: string[] }> = {
@@ -73,9 +93,11 @@ export interface VoiceStylePreview {
   isBullets: boolean;
 }
 
-export function getVoiceStylePreview(voice: string, style: string): VoiceStylePreview | null {
+export function getVoiceStylePreview(industry: string, voice: string, style: string): VoiceStylePreview | null {
   if (!voice && !style) return null;
-  const hook = VOICE_OPENERS[voice] || VOICE_OPENERS["Conversational & warm"];
+  const industryKey = (industry || "").toLowerCase();
+  const openerSet = INDUSTRY_OPENERS[industryKey] || INDUSTRY_OPENERS.default;
+  const hook = openerSet[voice] || openerSet["Conversational & warm"];
   const styleEntry = STYLE_TAILS[style] || STYLE_TAILS["Short punchy lines"];
   return {
     hook,

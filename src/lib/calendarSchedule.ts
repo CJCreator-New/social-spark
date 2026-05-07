@@ -1,5 +1,6 @@
 // Helpers for per-day dates + .ics export.
 import { zonedToUtcIso } from "./timezones";
+import { suggestedTimeForDay } from "./postingTimes";
 
 const DOW_TO_OFFSET: Record<string, number> = {
   Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6,
@@ -182,7 +183,7 @@ export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
   const useTz = !!timezone;
 
   for (const p of posts) {
-    const time = postTimes[String(p.day)] || "09:00";
+    const time = postTimes[String(p.day)] || suggestedTimeForDay(p.day);
     const localStart = postDateTime(weekStart, p.dow, time);
 
     let dtStart: string;

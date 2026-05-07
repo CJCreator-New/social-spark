@@ -122,6 +122,6 @@ export const SAMPLE_POST_TIMES: Record<string, string> = {
   "3": "07:30",
   "4": "08:00",
   "5": "08:00",
-  "6": "09:00",
+  "6": "10:00",
   "7": "10:00",
 };

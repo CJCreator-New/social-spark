@@ -1,3 +1,4 @@
+import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor, buildRawMarkdown, PLATFORM_LABELS, stripMarkdown } from "@/lib/platformCopy";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -14,6 +15,7 @@ import {
   shortDateLabel,
 } from "@/lib/calendarSchedule";
 import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor, buildRawMarkdown, PLATFORM_LABELS } from "@/lib/platformCopy";
+import { suggestedTimeForDay } from "@/lib/postingTimes";
 import { applyPolicy, parsePolicyList, parseHashtagsString, normalizeTag, displayTag, HashtagPolicy } from "@/lib/hashtagPolicy";
 import { insightFor } from "@/lib/postInsights";
 import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
@@ -174,6 +176,11 @@ function wordCount(s: string): number {
   return s.trim().split(/\s+/).filter(Boolean).length;
 }
 
+function hasEmoji(text: string): boolean {
+  return /\p{Emoji}/u.test(text);
+}
+type TweakKind = "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting";
+
 export default function CalendarDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -200,6 +207,7 @@ export default function CalendarDetail() {
   const [reformatting, setReformatting] = useState(false);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const copyMenuRef = useRef<HTMLDivElement>(null);
+  const [exportingFormat, setExportingFormat] = useState<"md" | "pdf" | "ics" | null>(null);
   const [bulkRegenerating, setBulkRegenerating] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -387,7 +395,7 @@ export default function CalendarDetail() {
       setPostTimes(storedTimes);
     } else {
       const seed: Record<string, string> = {};
-      for (const p of loadedPosts) seed[String(p.day)] = "09:00";
+      for (const p of loadedPosts) seed[String(p.day)] = suggestedTimeForDay(Number(p.day) || 1);
       setPostTimes(seed);
     }
   }, [calendarData, calendarError, navigate]);
@@ -459,6 +467,27 @@ export default function CalendarDetail() {
     setRegenerating(true);
     setTweakOpen(false);
     try {
+      if (tweak === "clean-formatting") {
+        const cleaned: Post = {
+          ...target,
+          title: stripMarkdown(target.title),
+          hook: stripMarkdown(target.hook),
+          body: stripMarkdown(target.body),
+          cta: stripMarkdown(target.cta),
+        };
+        const updated = posts.map((p, i) => (i === active ? cleaned : p));
+        const { error: cleanErr } = await supabase.from("saved_calendars")
+          .update({ posts: updated as unknown as never })
+          .eq("id", id);
+        if (cleanErr) {
+          log.error(`Failed to save cleaned post`, cleanErr, { calendarId: id, day: target.day });
+          toast.error(cleanErr.message);
+          return;
+        }
+        setPosts(updated);
+        toast.success(`Day ${target.day} formatting cleaned ✓`);
+        return;
+      }
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const { data: { session } } = await supabase.auth.getSession();
@@ -666,6 +695,25 @@ export default function CalendarDetail() {
     downloadIcs({ calendarTitle: title, weekStart: ws, postTimes, platform, timezone: tz }, posts);
   }
 
+  async function handleExport(format: "md" | "pdf" | "ics") {
+    if (exportingFormat) return;
+    setExportingFormat(format);
+    try {
+      if (format === "md") {
+        downloadMd({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts);
+      } else if (format === "pdf") {
+        downloadPdf({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts);
+      } else {
+        exportIcs();
+      }
+      toast.success(`Downloaded .${format} ✓`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Download .${format} failed`);
+    } finally {
+      setExportingFormat(null);
+    }
+  }
+
   async function regenerateAllUnlocked() {
     const log = createScopedLogger('CalendarDetail-BulkRegenerate');
     if (!id || regenerating || bulkRegenerating || editing) return;
@@ -772,7 +820,7 @@ export default function CalendarDetail() {
       const rows = posts.map(post => {
         const d = dateForDow(ws, post.dow);
         const dateStr = toDateInputValue(d);
-        const time = postTimes[String(post.day)] || "09:00";
+        const time = postTimes[String(post.day)] || suggestedTimeForDay(post.day);
         const f = formatForPlatform(post, platform);
         return {
           user_id: user.id,
@@ -941,7 +989,7 @@ export default function CalendarDetail() {
               onChange={(e) => setReformatTarget(e.target.value)}
               disabled={reformatting || regenerating}
             >
-              <option value="">Another platform…</option>
+              <option value="" disabled>Choose platform…</option>
               {(["LinkedIn","Twitter/X","Instagram","Facebook","Newsletter","Blog"] as const)
                 .filter(p => p !== platform)
                 .map(p => <option key={p} value={p}>{p}</option>)}
@@ -983,9 +1031,15 @@ export default function CalendarDetail() {
           )}
 
           <div className="cd-export-row" aria-label="Export options">
-            <button type="button" className="cd-export-btn" onClick={() => downloadMd({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts)}>↓ .md</button>
-            <button type="button" className="cd-export-btn" onClick={() => downloadPdf({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts)}>↓ .pdf</button>
-            <button type="button" className="cd-export-btn" onClick={exportIcs} title="Export to Google Calendar / Outlook / Apple Cal">📅 .ics</button>
+            <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("md")}>
+              {exportingFormat === "md" ? "↓ .md…" : "↓ .md"}
+            </button>
+            <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("pdf")}>
+              {exportingFormat === "pdf" ? "↓ .pdf…" : "↓ .pdf"}
+            </button>
+            <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("ics")} title="Export to Google Calendar / Outlook / Apple Cal">
+              {exportingFormat === "ics" ? "📅 .ics…" : "📅 .ics"}
+            </button>
           </div>
 
           <div className="cd-bulk-bar">
@@ -1050,7 +1104,7 @@ export default function CalendarDetail() {
                 <input
                   type="time"
                   className="cd-time-input"
-                  value={postTimes[String(p.day)] || "09:00"}
+                  value={postTimes[String(p.day)] || suggestedTimeForDay(p.day)}
                   onChange={e => updatePostTime(p.day, e.target.value)}
                 />
               </div>
@@ -1190,6 +1244,15 @@ export default function CalendarDetail() {
                       <button className="cd-tweak-opt" onClick={() => regenerateDay("punchier")}>Make punchier</button>
                       <button className="cd-tweak-opt" onClick={() => regenerateDay("add-stat")}>Add a stat</button>
                       <button className="cd-tweak-opt" onClick={() => regenerateDay("remove-emoji")}>Remove emoji</button>
+                      <button
+                        className="cd-tweak-opt"
+                        onClick={() => regenerateDay("remove-emoji")}
+                        disabled={!hasEmoji(target.title + " " + target.hook + " " + target.body + " " + target.cta)}
+                        title={!hasEmoji(target.title + " " + target.hook + " " + target.body + " " + target.cta) ? "No emoji detected" : "Remove emojis from this post"}
+                      >
+                        Remove emoji
+                      </button>
+                      <button className="cd-tweak-opt" onClick={() => regenerateDay("clean-formatting")}>Clean formatting symbols</button>
                       <button className="cd-tweak-opt" onClick={() => regenerateDay("more-personal")}>More personal</button>
                     </div>
                   )}
@@ -1281,7 +1344,7 @@ export default function CalendarDetail() {
                   <input
                     type="time"
                     className="cd-modal-time"
-                    value={postTimes[String(post.day)] || "09:00"}
+                    value={postTimes[String(post.day)] || suggestedTimeForDay(post.day)}
                     onChange={e => updatePostTime(post.day, e.target.value)}
                   />
                   <span style={{ fontSize: 11, color: "#7a7a8e", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
