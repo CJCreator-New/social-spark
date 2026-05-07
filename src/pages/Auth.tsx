@@ -47,7 +47,7 @@ export default function AuthPage() {
   const routerLocation = useLocation();
   const { user } = useAuth();
 
-  const from = (routerLocation.state as { from?: { pathname: string } } | null)?.from?.pathname || "/";
+  const from = (routerLocation.state as { from?: { pathname: string } } | null)?.from?.pathname || "/app";
 
   useEffect(() => {
     if (user) navigate(from, { replace: true });
