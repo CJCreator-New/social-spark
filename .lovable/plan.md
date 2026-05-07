@@ -1,98 +1,152 @@
-# Database audit + next-wave plan
+# App Enhancement Plan
 
-## Part A — Database issues to resolve (5 linter warnings)
-
-The linter currently reports 5 `WARN`s. None are critical, but all should be cleaned up.
-
-### A1. Public `avatars` bucket allows listing
-- The `avatars` bucket is `public = true` and has a broad `SELECT` policy on `storage.objects`, so any visitor can list every avatar.
-- Fix: keep public read of individual files, but scope the `SELECT` policy to either the file's owner folder or to objects whose path matches `auth.uid()`. List access (`storage.objects` with no name filter) gets denied.
-- Also add tight `INSERT/UPDATE/DELETE` policies restricted to `auth.uid()::text = (storage.foldername(name))[1]` if not already present.
-
-### A2–A5. `SECURITY DEFINER` functions exposed to PostgREST
-Three `SECURITY DEFINER` functions exist:
-- `public.has_role(uuid, app_role)` — intentionally callable from RLS policies.
-- `public.handle_new_user()` — trigger only, must not be callable from API.
-- `public.update_updated_at_column()` — trigger only, must not be callable from API.
-
-Fix:
-- `REVOKE EXECUTE … FROM PUBLIC, anon, authenticated` on `handle_new_user` and `update_updated_at_column`.
-- For `has_role`: keep `EXECUTE` for `authenticated` (RLS calls it), but revoke from `anon`. This silences the anon warning while preserving behavior.
-
-### A6. Auth trigger sanity check
-Network logs show a user signed up with email `…@outlook.con` (typo) and a profile row was created. Confirms `handle_new_user` trigger works. No fix needed, but worth recommending email-confirmation enforcement in a follow-up.
-
-### A7. Empty calendar list for the test user
-`saved_calendars` returns `[]` for the signed-in user. RLS is correct; user simply has no calendars yet. Not a bug.
+Building on the completed work (DB hardening, admin gating, single-day generation, scheduling, ICS export), here are the next high-impact enhancements grouped by theme.
 
 ---
 
-## Part B — App-side gaps surfaced by the audit
+## Theme 1 — User Productivity (highest ROI)
 
-| # | Area | Gap | Proposed fix |
-|---|------|-----|---------|
-| B1 | Profile | Avatar upload UI exists conceptually but no storage upload wiring | Add file input → `supabase.storage.from('avatars').upload(\`${user.id}/avatar.png\`)` → save returned public URL to `profiles.avatar_url` |
-| B2 | Profiles | `display_name` is sometimes blank-overwritten on save | Guard PATCH so empty strings don't replace existing values |
-| B3 | Scheduled posts | No UI to cancel / reschedule once "approved" | Add row-level actions in `Schedule.tsx` (cancel, reschedule, mark published) using existing `workflow_status` enum |
-| B4 | Drafts | `DraftRecoveryDialog` exists but isn't mounted on `Index.tsx` | Wire it in so unsaved generations recover after reload |
-| B5 | Calendar templates | Removed in earlier cleanup, but users want to save successful briefs as reusable presets | New table + dedicated UI (see C2) |
-| B6 | Admin page | Loads even for non-admins (just shows zeros) | Gate `/admin` route with `has_role(uid, 'admin')` check; redirect non-admins to `/` |
+### 1.1 Brief Templates ("Save & Load")
+Save successful wizard configurations as reusable presets so users don't re-type voice/audience/goals every time.
+- New `brief_templates` table (per-user, RLS-scoped)
+- "Save as template" button at wizard review step
+- "Load template" dropdown on wizard step 1
+- Manage list (rename/delete) in Profile
 
----
+### 1.2 Draft Auto-Recovery
+Wire the existing `DraftRecoveryDialog` into `Index.tsx`:
+- Debounced autosave to localStorage on form change
+- On mount, prompt to restore drafts <24h old
+- Prevents losing work after refresh/crash
 
-## Part C — New features to ship
+### 1.3 Scheduled-Post Row Actions
+Add row-level menu in `Schedule.tsx`:
+- Cancel, Reschedule, Mark Published
+- Uses existing `workflow_status` enum + `scheduled_at` column
 
-### C1. Avatar upload (small, high-impact)
-- Add file picker on `Profile.tsx`.
-- Upload to existing `avatars` bucket under `${user.id}/avatar.{ext}` (overwrite).
-- After upload, call `supabase.storage.from('avatars').getPublicUrl(...)` and PATCH `profiles.avatar_url`.
-- Show preview, 2 MB size limit, accept `image/png`/`image/jpeg`/`image/webp`.
-
-### C2. Brief templates ("Save this brief")
-New table `public.brief_templates`:
-- `id`, `user_id`, `name`, `description`, `payload jsonb`, `created_at`, `updated_at`
-- RLS: owner-only CRUD (mirror `saved_calendars`).
-
-UI:
-- "Save as template" button in the wizard's step-2 review.
-- "Load template" dropdown in step-1 that pre-fills the form via existing `setForm`.
-- Templates list inside `Profile.tsx` for rename/delete.
-
-### C3. Scheduled-post management actions
-Inside `Schedule.tsx` row menu add:
-- **Cancel** → `UPDATE scheduled_posts SET status='cancelled' WHERE id=…` (existing column).
-- **Reschedule** → opens existing date/time popover, PATCHes `scheduled_at`.
-- **Mark published** → sets `workflow_status='published'`, `published_at = now()`.
-All gated by RLS (already user-scoped).
-
-### C4. Admin role enforcement + admin promotion flow
-- New `useIsAdmin()` hook calling `has_role(user.id, 'admin')`.
-- `/admin` route uses it; non-admins → redirect to `/`.
-- Add a one-shot SQL snippet (delivered as a migration) for the project owner to seed themselves into `user_roles` as `admin`.
-
-### C5. Draft autosave recovery
-- Wire `DraftRecoveryDialog` into `Index.tsx` mount effect:
-  - On mount, check `localStorage` for `draft:wizard:<userId>`.
-  - If present and < 24 h old, open dialog offering "Restore" / "Discard".
-- Persist on every meaningful form change (debounced 1 s).
+### 1.4 Bulk Operations on Calendars/Posts
+- Multi-select on `MyCalendars` and `Schedule`
+- Bulk delete, bulk reschedule, bulk export
 
 ---
 
-## Part D — Suggested execution order
+## Theme 2 — Personalization & Profile
 
-1. **DB hardening migration** (A1 + A2–A5 in one file). No code changes needed; ship first.
-2. **Admin gating** (C4) — small, removes a real risk.
-3. **Avatar upload** (C1) — quick win, validates storage policy from step 1.
-4. **Brief templates** (C2) — biggest user value; ~1 migration + 2 UI surfaces.
-5. **Scheduled-post actions** (C3) — pure UI on existing schema.
-6. **Draft recovery wiring** (C5) — final polish.
+### 2.1 Avatar Upload
+File picker on Profile → uploads to existing `avatars` bucket → updates `profiles.avatar_url`. Image preview, 2 MB cap, png/jpeg/webp.
 
-Each step is a separate commit with build verification. After step 1 I'll re-run the linter and confirm 0 warnings before moving on.
+### 2.2 Default Preferences UX
+The `profiles` table already has `default_voice`, `default_style`, `default_audiences`, `default_goals`, `banned_hashtags`, `required_hashtags`, `default_timezone` — but the Profile UI doesn't fully expose them. Build a clean settings page so wizards pre-fill from defaults.
+
+### 2.3 Onboarding Flow
+First-login walkthrough: pick industry, voice, audience → seeds defaults → drops user into wizard with sample brief.
 
 ---
 
-## Open questions before I start
+## Theme 3 — Content Quality
 
-1. For brief templates (C2), should they be **per-user only** or also **shareable across the workspace** (would need `is_shared` + a separate read policy)?
-2. For admin promotion (C4), do you want a **UI to promote other users**, or is a **one-time SQL snippet** for yourself enough for now?
-3. For avatar upload (C1), OK to **overwrite** the previous avatar (single file per user) rather than versioning?
+### 3.1 Post Insights Panel
+`postInsights.ts` exists but isn't surfaced. Show per-post: readability, hook strength, hashtag balance, length vs target — on the CalendarDetail card.
+
+### 3.2 Regenerate-with-Feedback
+Inline thumbs-down on any post → opens a small "what to fix" prompt → calls `regenerate-post` with user feedback merged into the prompt.
+
+### 3.3 Hashtag Library
+Reuse `banned_hashtags` / `required_hashtags` from profiles, plus a "trending in your industry" suggestion list pulled from past calendars.
+
+### 3.4 Tone Preview
+`voiceStylePreview.ts` exists — show a 2-sentence sample of the chosen voice/style before generation so users can adjust before spending credits.
+
+---
+
+## Theme 4 — Landing Page & Growth
+
+### 4.1 Public Landing Page (`/`)
+Currently `/` jumps straight into the wizard. Build a marketing landing for unauthenticated visitors:
+- Hero (animated gradient, value prop, CTA)
+- Live demo (interactive sample brief → generated post)
+- Feature grid (multi-platform, scheduling, templates, insights)
+- Social proof / testimonials placeholder
+- Pricing teaser (free tier + future paid)
+- Footer with privacy/terms
+
+Authenticated users skip the landing and go straight to the wizard.
+
+### 4.2 SEO Foundations
+- Per-route meta titles/descriptions
+- JSON-LD `SoftwareApplication` on landing
+- OG image, sitemap.xml, canonical tags
+
+### 4.3 Analytics
+- Privacy-friendly event tracking (PostHog or Plausible)
+- Track: signup, wizard-complete, generate, schedule, publish
+
+---
+
+## Theme 5 — Reliability & Performance
+
+### 5.1 React Query Adoption
+Replace ad-hoc `supabase` calls in pages with `useQuery`/`useMutation` for caching, retries, and dedup.
+
+### 5.2 Pagination & Virtualization
+- Paginate `MyCalendars` and `Schedule` (already have `VirtualizedList`)
+- DB indexes on `scheduled_posts(user_id, scheduled_at)` and `saved_calendars(user_id, created_at)`
+
+### 5.3 Error Boundary Telemetry
+`ErrorBoundary.tsx` exists — wire it to `logger.ts` so client errors are captured (Sentry-style).
+
+### 5.4 Edge Function Resilience
+Add retry-with-backoff in the generation client; surface `failure_reason` in the UI.
+
+---
+
+## Theme 6 — Future / Phase 2 (deferred)
+
+- AI-generated images per post (Gemini image preview)
+- Real publishing connectors (LinkedIn, X, Meta APIs) replacing mock flow
+- Team workspaces & shared templates
+- Calendar version history / diff view
+- Stripe-based paid tiers
+
+---
+
+## Suggested Execution Order
+
+```text
+Sprint 1 (highest ROI, ~2 days)
+  ├─ 1.2 Draft auto-recovery     (wire existing component)
+  ├─ 1.3 Schedule row actions    (UI on existing schema)
+  └─ 2.1 Avatar upload           (validates storage policy)
+
+Sprint 2 (~3 days)
+  ├─ 1.1 Brief templates         (table + UI)
+  ├─ 2.2 Default preferences UI  (expose existing columns)
+  └─ 3.4 Tone preview            (use existing util)
+
+Sprint 3 (~3 days)
+  ├─ 4.1 Landing page            (marketing surface)
+  ├─ 4.2 SEO foundations
+  └─ 3.1 Post insights panel
+
+Sprint 4 (~3 days)
+  ├─ 5.1 React Query adoption
+  ├─ 5.2 Pagination + indexes
+  └─ 5.3 Error telemetry
+```
+
+---
+
+## Technical notes
+
+- New tables needed: `brief_templates` (id, user_id, name, description, payload jsonb, timestamps) with owner-only RLS.
+- New indexes: `scheduled_posts(user_id, scheduled_at DESC)`, `saved_calendars(user_id, created_at DESC)`.
+- No edge function changes required for Sprint 1–2.
+- Landing page should be a separate route component; the current `Index.tsx` (wizard) moves to `/app` or stays at `/` for authenticated users via a route guard.
+
+---
+
+## Open questions
+
+1. **Landing page scope** — full marketing site (hero + demo + pricing + testimonials) or a minimal hero + CTA for now?
+2. **Sprint 1 confirmation** — start with Draft recovery + Schedule actions + Avatar upload, or pick a different trio?
+3. **Brief templates sharing** — per-user only, or add an `is_shared` flag for workspace-wide templates?
