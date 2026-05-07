@@ -84,7 +84,7 @@ function TemplatesList() {
     try {
       localStorage.setItem(key, JSON.stringify(envelope));
       toast.success('Template loaded into wizard');
-      window.location.href = '/';
+      window.location.href = '/app';
     } catch (e) {
       toast.error('Failed to load template');
     }
@@ -261,7 +261,7 @@ export default function Profile() {
       <style>{css}</style>
       <div className="pf-app">
         <div className="pf-inner">
-          <Link to="/" className="pf-back">← Back to ContentForge</Link>
+          <Link to="/app" className="pf-back">← Back to ContentForge</Link>
           <h1 className="pf-title">Your profile</h1>
           <div className="pf-sub">Update how you appear inside ContentForge and set brand defaults to pre-fill the wizard.</div>
 

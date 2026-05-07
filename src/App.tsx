@@ -13,6 +13,7 @@ import { setupGlobalErrorHandlers } from "@/lib/logger";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import Landing from "./pages/Landing";
 
 // Lazy load pages for code splitting
 import { lazy } from "react";
@@ -51,7 +52,8 @@ const App = () => {
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Index /></Suspense></ProtectedRoute>} />
+                <Route path="/" element={<Landing />} />
+                <Route path="/app" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Index /></Suspense></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Profile /></Suspense></ProtectedRoute>} />
                 <Route path="/my-calendars" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><MyCalendars /></Suspense></ProtectedRoute>} />
                 <Route path="/calendar/:id" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><CalendarDetail /></Suspense></ProtectedRoute>} />

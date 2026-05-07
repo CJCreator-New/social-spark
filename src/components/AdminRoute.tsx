@@ -10,6 +10,6 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!isAdmin) return <Navigate to="/app" replace />;
   return <>{children}</>;
 }

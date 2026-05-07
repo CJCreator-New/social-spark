@@ -60,7 +60,7 @@ export default function ResetPassword() {
     setLoading(false);
     if (err) return setError(err.message);
     toast.success("Password updated");
-    navigate("/", { replace: true });
+    navigate("/app", { replace: true });
   }
 
   return (
