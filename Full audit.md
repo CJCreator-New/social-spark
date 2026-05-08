@@ -133,13 +133,13 @@ Recommendation:
 - `npm run lint` passes.
 - `npm run test:run` passes.
 - `npm run build` passes.
-- `npm audit --audit-level=moderate` still reports 14 vulnerabilities.
+`npm audit --audit-level=moderate` now reports 2 moderate vulnerabilities remaining (esbuild/vite); addressing them requires a breaking upgrade to `vite@8`.
 
 ## Open Risks
 
 - Dependency vulnerabilities remain open.
-- The tracked root `.env` file should be reviewed for repository hygiene.
-- Documentation still needs a repo-specific setup and verification guide.
+- Tracked root `.env` file has been untracked and added to `.gitignore`.
+- Documentation still needs a repo-specific setup and verification guide (README updated with initial steps).
 - Coverage has not yet been measured in this audit pass, so the target is not verified.
 
 ## Conclusion
@@ -150,6 +150,6 @@ The codebase is now in a much better technical state than when the audit started
 
 - Added `.env` to `.gitignore` and untracked the existing `.env` from the repository.
 - Updated `README.md` with local setup and verification steps used by this audit.
-- Ran `npm audit fix` and re-scanned dependencies (see evidence log below for current status).
+- Attempted `npm audit fix`; two moderate vulnerabilities remain related to `esbuild`/`vite`. Fixing them requires a breaking upgrade to `vite@8` (owner approval recommended).
 
 See "Open Risks" for items that still require manual review or owner decisions.
