@@ -71,3 +71,39 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Local setup & verification (for maintainers)
+
+Follow these steps to set up the project locally and verify core checks used by the audit:
+
+1. Copy environment vars into a local `.env` file (do not commit this file):
+
+```
+VITE_SUPABASE_URL=your-supabase-url
+VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+```
+
+2. Install dependencies and run dev server:
+
+```sh
+npm install
+npm run dev
+```
+
+3. Run the core verification checks used in audits:
+
+```sh
+npm run lint
+npm run test:run
+npm run build
+npm audit --audit-level=moderate
+```
+
+4. If you need to remove a tracked local `.env` from the repository:
+
+```sh
+git rm --cached .env
+git commit -m "Remove tracked .env from repository"
+```
+
+Document any additional environment variables or deployment steps in this file.

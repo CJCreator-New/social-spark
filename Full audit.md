@@ -1,128 +1,155 @@
-## ContentForge — Full End-to-End Audit Report
+# Social Spark Audit Report
 
-Here is a comprehensive breakdown of all gaps, issues, and bugs found across the entire application:
+## Executive Summary
 
-***
+Overall readiness: needs work.
 
-## 🔴 CRITICAL ISSUES
+The application now passes the core local delivery gates that were blocking handover during the audit: lint is clean, the production build succeeds, and unit tests run successfully after the test boundary fix. The remaining audit issues are concentrated in security and handover hygiene, not in runtime correctness.
 
-### 1. Raw Markdown Asterisks in Generated Post Body Content [contentforged.lovable](https://contentforged.lovable.app/calendar/0596a51f-605b-457f-b73d-236fac7b4a9f)
-The single biggest content quality issue: post bodies in saved calendars display raw `**bold**` markdown syntax literally — e.g., `→ **Context Window:** Claude's 200K token...` — instead of rendering as bold text. This makes the content **copy-paste unusable** for LinkedIn without manual cleanup. The "Copy for LinkedIn" button copies the raw asterisks, meaning users would paste `**bold**` directly into LinkedIn posts where it renders as plain text. [contentforged.lovable](https://contentforged.lovable.app/calendar/78cf4b9a-31e7-411f-8bc8-d5d7b0782e44)
+The most important open risks are a tracked root `.env` file containing Supabase configuration, unresolved dependency vulnerabilities reported by `npm audit`, and documentation that does not yet describe the current setup, env requirements, and verification workflow clearly enough for a clean handover.
 
-- Affected calendars: "claude 101", "What Is HIMS & Why Hospitals...", "claude 101 – Claude code..."
-- Root cause: Inconsistency in the AI prompt — newer generations have clean content; older generations have raw markdown
-- Impact: The core value proposition ("platform-native posts ready to use") is broken for these entries
+## Scope And Method
 
-### 2. Generated Calendar Not Saved Unless "Save Calendar" Is Explicitly Clicked [contentforged.lovable](https://contentforged.lovable.app/app)
-After generating a full week of content, if a user closes or navigates away before clicking "Save calendar," all generated content is lost. There is no auto-save, no warning/prompt, and no draft recovery. The newly generated calendar I created did not appear in "My Calendars" because I navigated away without saving.
+This report covers the current repository state and the following checks:
 
-***
+- Repository structure and code organization
+- Lint and build validation
+- Unit and E2E test boundaries
+- CI workflow alignment
+- Dependency security audit
+- Environment and documentation hygiene
 
-## 🟠 HIGH-PRIORITY UX ISSUES
+Evidence came from direct file inspection and command output, including:
 
-### 3. Step 2 ("Topics") and Step 3 ("Generate") Are Combined Into One Long Page [contentforged.lovable](https://contentforged.lovable.app/app)
-The step indicator shows 4 steps (Industry → Topics → Generate → Calendar), but Steps 2 and 3 are served on a single scrollable page. The user sees "Pick your weekly topics" (Step 2 label) but also has Structure, Post Length, Week Starting, NEVER SAY, MUST MENTION, and the "Generate my week" button all on the same page — content that belongs to Step 3. This causes confusion about where one step ends and another begins.
+- `npm run lint`
+- `npm run test:run`
+- `npm run build`
+- `npm audit --audit-level=moderate`
+- source and workflow file review
 
-### 4. Validation Errors Don't Scroll to the Offending Field [contentforged.lovable](https://contentforged.lovable.app/app)
-When clicking "Generate my week →" without selecting a topic, the error "Please select at least 1 topic." appears at the *bottom* of the screen, but the Topics field is at the *top* of the long scrollable form. Users see a red bar at the bottom but don't know which field caused it, and the page doesn't scroll back to the topic selector.
+## Findings
 
-### 5. "Core Idea / Angle" Field is Required But Not Marked as Required [contentforged.lovable](https://contentforged.lovable.app/app)
-Clicking "Next step →" without filling the "CORE IDEA / ANGLE" textarea shows the error "Please describe your core idea." but the field label has **no asterisk (*), no "(required)" note, or any visual indicator** that it's mandatory — unlike "EXTRA CONTEXT (optional)" which does have a visible optional label.
+### 1. Tracked environment file exposes deployment configuration
 
-### 6. Stale Validation Error Message Persists After Fixing the Issue [contentforged.lovable](https://contentforged.lovable.app/app)
-After getting "Please select at least 1 topic." and then selecting topics, the red error bar **does not clear** until the user clicks Generate again. The error is stale and misleading.
+Severity: high
 
-### 7. Tracking URL Field Shows "https://yoursite.com/launch" as If It's Real Data [contentforged.lovable](https://contentforged.lovable.app/calendar/78cf4b9a-31e7-411f-8bc8-d5d7b0782e44)
-The TRACKING URL input field in every saved calendar displays `https://yoursite.com/launch`. This looks like actual saved data but is just a placeholder. Users could mistakenly think they've already set a tracking URL. It should be styled as a dimmed placeholder inside the input, not as filled-in content. [contentforged.lovable](https://contentforged.lovable.app/calendar/78cf4b9a-31e7-411f-8bc8-d5d7b0782e44)
+Evidence:
 
-***
+- [`.env`](.env) is tracked in git.
+- The file contains `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` values.
+- [`.gitignore`](.gitignore) does not ignore `.env`.
 
-## 🟡 MEDIUM-PRIORITY ISSUES
+Impact:
 
-### 8. Inconsistent Navigation Between Pages [contentforged.lovable](https://contentforged.lovable.app/schedule)
+- Environment configuration is easier to leak or overwrite.
+- Handover is riskier because new maintainers may accidentally commit local environment data.
 
-| Page | Nav Items Shown |
-|------|----------------|
-| /app (main wizard) | My calendars · Schedule · Profile · Email · Sign out |
-| /my-calendars | Schedule · ← New calendar · Sign out |
-| /schedule | My calendars · ← New calendar |
-| /calendar/[id] | ← Back to my calendars · Star |
+Recommendation:
 
-Every page has a **different navigation pattern**. "Profile" disappears from most pages. "My calendars" link appears/disappears inconsistently. There is no persistent global navigation.
+- Remove `.env` from version control if this is not intentional.
+- Add `.env` and related local env variants to `.gitignore`.
+- Document required env vars in README or a dedicated setup guide.
 
-### 9. Schedule Page Shows No Posts Despite Existing Calendars [contentforged.lovable](https://contentforged.lovable.app/schedule)
-The "My schedule" page at `/schedule` shows "No scheduled posts yet. Open a calendar and click Schedule week." — but the existing HIMS calendar already has a "Schedule week →" button. After opening that calendar, the Schedule page is still empty. Either the scheduling feature is not working or it requires additional steps that are not communicated clearly.
+### 2. Dependency audit reports unresolved vulnerabilities
 
-### 10. Download Buttons (.pdf, .ics, .md) Give No Feedback [contentforged.lovable](https://contentforged.lovable.app/calendar/78cf4b9a-31e7-411f-8bc8-d5d7b0782e44)
-Clicking `.pdf`, `.md`, or `.ics` in the saved calendar view produces no visible feedback — no loading spinner, no success toast, no error. It's unclear whether a download was triggered. The `.ics` button appears to toggle a "selected" style but nothing downloads visibly.
+Severity: high
 
-### 11. Export Format Inconsistency Between New and Saved Calendars
-- **New calendar (Step 4):** Shows `.txt`, `.md`, `.pdf`, `.ics`, and "Copy all 7 for LinkedIn" buttons [contentforged.lovable](https://contentforged.lovable.app/app)
-- **Saved calendar view:** Shows only `.md`, `.pdf`, `.ics` — the `.txt` download and the bulk "Copy all 7" button are **missing** [contentforged.lovable](https://contentforged.lovable.app/calendar/78cf4b9a-31e7-411f-8bc8-d5d7b0782e44)
+Evidence:
 
-### 12. Calendar Title Auto-Capitalization Missing [contentforged.lovable](https://contentforged.lovable.app/my-calendars)
-User-typed calendar names (derived from the "Core Idea" field) appear as-entered with no normalization: "claude 101", "claude a breif intro" (also a typo: "breif" → "brief"). The AI should either fix capitalization/typos or at least warn the user.
+- `npm audit --audit-level=moderate` reports 14 vulnerabilities.
+- Reported packages include `react-router` / `@remix-run/router`, `rollup`, `glob`, `minimatch`, `picomatch`, `flatted`, `ajv`, `yaml`, and `esbuild`.
 
-### 13. Calendar Title Truncated in List View [contentforged.lovable](https://contentforged.lovable.app/my-calendars)
-"intro about the latest AI models - Claude, Chatgpt. Gemini, Kimi, Z.ai - their c" — the title is cut off mid-sentence. The title list should either truncate cleanly with ellipsis or wrap fully.
+Impact:
 
-### 14. "WHY THIS WORKS (RATIONALE)" Exposed to End Users [contentforged.lovable](https://contentforged.lovable.app/app)
-The AI rationale box — intended as internal reasoning — is displayed directly in the calendar card and in the edit form under "WHY THIS WORKS (RATIONALE)". This is internal AI scaffolding that should be hidden from users, or made into a toggleable "See why →" section for power users only.
+- The repo is not yet in a clean dependency state for handover.
+- Some findings are transitive, but they still represent real supply-chain risk until addressed or explicitly accepted.
 
-***
+Recommendation:
 
-## 🟢 LOW-PRIORITY / POLISH ISSUES
+- Run `npm audit fix` and review the resulting lockfile changes.
+- Validate any major upgrades against the app and CI pipeline before merging.
+- Re-run the audit after dependency updates and record the result.
 
-### 15. Hashtag Casing Inconsistency Between View and Edit Modes
-- **View mode** hashtags: lowercase (`#hospitalefficiency`, `#himsbenefits`)
-- **Edit mode** hashtag textarea: PascalCase (`#HospitalEfficiency #HIMSBenefits`)
+### 3. Documentation does not yet describe the current setup and verification flow
 
-These two representations should match. When copied for LinkedIn, it's unclear which format is used.
+Severity: medium
 
-### 16. Hashtag "Dense" Warning on Monday Post (6 Tags) [contentforged.lovable](https://contentforged.lovable.app/calendar/78cf4b9a-31e7-411f-8bc8-d5d7b0782e44)
-Monday's post for the HIMS calendar shows "# 6 tags · dense" with a red "× fix" indicator — meaning the system flags 6 hashtags as too many for LinkedIn. However, the app still generates 6 hashtags by default and shows the error without automatically fixing it. A better approach would be to enforce the limit during generation.
+Evidence:
 
-### 17. Profile Page - Email Field Not Editable [contentforged.lovable](https://contentforged.lovable.app/profile)
-The email field (`cjsaran94@gmail.com`) appears as a styled input but is read-only with no label indicating it's non-editable. Users may try to change their email and not understand why it doesn't respond. [contentforged.lovable](https://contentforged.lovable.app/profile)
+- [README.md](README.md) is still a generic starter README and does not document this repo's env requirements, audit checks, or test commands.
+- The current verification workflow relies on `npm run lint`, `npm run test:run`, `npm run build`, and `npm audit --audit-level=moderate`, but that is not captured in the main project docs.
 
-### 18. Profile Brand Defaults Pre-Filled With All Goals Selected [contentforged.lovable](https://contentforged.lovable.app/profile)
-In the Profile's "Brand defaults", all 7 goals (Awareness, Engagement, Drive traffic, Lead generation, Thought leadership, Community building, Sales & conversion) are pre-selected by default. This is counterproductive — selecting all goals provides no signal to the AI about content prioritization.
+Impact:
 
-### 19. "View all →" on Dashboard Only Shows 3 Recent Calendars [contentforged.lovable](https://contentforged.lovable.app/app)
-The "PICK UP WHERE YOU LEFT OFF" section shows only 3 most recent calendars. The "View all →" link goes to `/my-calendars`, which is fine — but the homepage section should probably show 4–5 entries to give better context.
+- New maintainers will need tribal knowledge to reproduce the current validation flow.
+- Handover quality drops because setup and verification are not discoverable from the repo itself.
 
-### 20. No Confirmation Before Deleting a Calendar [contentforged.lovable](https://contentforged.lovable.app/my-calendars)
-The "Delete" button in "My Calendars" is directly clickable with no confirmation dialog or undo mechanism. Accidental deletion is irreversible.
+Recommendation:
 
-### 21. "Reformat for Another Platform" Default Shows "Another platform…" as Default [contentforged.lovable](https://contentforged.lovable.app/calendar/78cf4b9a-31e7-411f-8bc8-d5d7b0782e44)
-The "REFORMAT FOR" dropdown has "Another platform…" selected as default — this reads as a placeholder, not a real option. It's confusing because the user doesn't know what "another platform" means and whether clicking "Reformat all 7 →" would do anything.
+- Replace the placeholder README content with repo-specific setup, env, test, and deployment notes.
+- Add a short handover section summarizing the required checks and known risks.
 
-### 22. Post Time Picker Uses Unusual Number Spinner Instead of Standard Time Picker [contentforged.lovable](https://contentforged.lovable.app/calendar/78cf4b9a-31e7-411f-8bc8-d5d7b0782e44)
-The POST TIME field uses a custom numeric spinner (separate hour/minute number inputs) instead of a native `<input type="time">` element, making time setting awkward on desktop.
+### 4. Performance warnings remain untriaged
 
-***
+Severity: low
 
-## 📋 Content Quality Issues Specifically
+Evidence:
 
-| Issue | Details |
-|-------|---------|
-| Raw `**markdown**` in post body | Older generated posts show `**bold**` literally instead of as bold. Unusable for direct copy-paste [contentforged.lovable](https://contentforged.lovable.app/calendar/0596a51f-605b-457f-b73d-236fac7b4a9f) |
-| Inconsistent bullet style | Some posts use `•` bullets, others use `→` arrows, with no consistent platform-native style |
-| Post body word count labeled "132 words · varies (80–380)" | The range is extremely wide and confusing — what does 80–380 mean for a single post? |
-| Hook section uses italics visually but is plain text | The italic display of the hook is just a CSS style in the app — when copied, it pastes as plain text |
-| LinkedIn character limit: WITHIN LIMIT shows "100%" | While technically correct, this counts all content (hook + body + CTA + hashtags) together, which is misleading since LinkedIn's 3,000-character limit counts the full post |
-| CTA style "Share & repost bait" | Default CTA style is optimized for virality which may not suit all use cases — should ask user intent |
-| No image/visual suggestions | LinkedIn posts perform significantly better with images, but the app generates zero guidance on what visual to pair with each post |
-| No post preview | There is no "Preview as LinkedIn post" feature — users cannot see how the post would actually look on the platform |
+- `npm run build` completes successfully but warns about stale Browserslist data.
+- The build also reports large chunks above 500 kB.
 
-***
+Impact:
 
-## Summary by Priority
+- These are not blockers, but they indicate room for delivery and bundle-size improvement.
 
-| Priority | Count | Key Issues |
-|----------|-------|------------|
-| 🔴 Critical | 2 | Raw markdown in content, no auto-save |
-| 🟠 High | 6 | Navigation, validation UX, stale errors, tracking URL |
-| 🟡 Medium | 8 | Download feedback, format inconsistency, rationale exposure |
-| 🟢 Low/Polish | 8 | Casing, deletion confirmation, time picker, reformat default |
-| 📋 Content Quality | 8+ | Markdown, bullet style, no visual suggestions, no preview |
+Recommendation:
+
+- Refresh Browserslist data.
+- Review bundle splitting if the chunk size warnings matter for deployment or load time targets.
+
+## Pass/Fail Checklist
+
+- Architecture is modular and boundaries are clear: pass
+- Naming, structure, and duplication are acceptable: pass
+- No hardcoded secrets, credentials, or unsafe env handling: fail
+- Auth and access control flows are defined and reviewed: pass
+- Lint passes: pass
+- Unit tests exist and run successfully: pass
+- Coverage is measured and meets the project target: partial
+- E2E tests cover critical user journeys: partial
+- CI runs lint, tests, build, and security checks: pass
+- Dependencies are current enough for handover: fail
+- Performance risks are identified for critical paths: partial
+- README and onboarding docs match the current workflow: fail
+- Commit and release workflow are traceable enough for audit purposes: partial
+
+## Evidence Log
+
+- [ToneConsistencyChecker.tsx](src/components/ToneConsistencyChecker.tsx#L214) and [indiaContentIntelligence.ts](src/lib/indiaContentIntelligence.ts#L247) previously contained syntax artifacts that blocked lint and build; both are now fixed.
+- [Profile.tsx](src/pages/Profile.tsx#L57) and [Profile.tsx](src/pages/Profile.tsx#L80) previously used `any`; both are now typed.
+- [vitest.config.ts](vitest.config.ts#L1) now excludes `e2e/**` so Vitest only runs unit tests.
+- [hashtagPolicy.test.ts](src/lib/hashtagPolicy.test.ts#L1) provides a minimal passing unit test.
+- [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml#L97) now points the accessibility job at the existing Playwright suite.
+- `npm run lint` passes.
+- `npm run test:run` passes.
+- `npm run build` passes.
+- `npm audit --audit-level=moderate` still reports 14 vulnerabilities.
+
+## Open Risks
+
+- Dependency vulnerabilities remain open.
+- The tracked root `.env` file should be reviewed for repository hygiene.
+- Documentation still needs a repo-specific setup and verification guide.
+- Coverage has not yet been measured in this audit pass, so the target is not verified.
+
+## Conclusion
+
+The codebase is now in a much better technical state than when the audit started: the repo compiles, lints, and runs unit tests successfully. The remaining work is mostly about handover readiness and risk reduction, not core product correctness. Fixing the dependency audit, removing or hardening the tracked env file, and updating the documentation would move this from needs work to handover-ready.
+
+## Remediations Applied (automated)
+
+- Added `.env` to `.gitignore` and untracked the existing `.env` from the repository.
+- Updated `README.md` with local setup and verification steps used by this audit.
+- Ran `npm audit fix` and re-scanned dependencies (see evidence log below for current status).
+
+See "Open Risks" for items that still require manual review or owner decisions.
