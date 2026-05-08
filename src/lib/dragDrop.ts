@@ -1,0 +1,76 @@
+/**
+ * Drag and Drop utilities for reordering posts
+ */
+
+export interface DragItem {
+  index: number;
+  day: number;
+}
+
+export interface DragState {
+  draggedIndex: number | null;
+  dropTargetIndex: number | null;
+}
+
+/**
+ * Swap two items in an array
+ */
+export function swapItems<T>(arr: T[], indexA: number, indexB: number): T[] {
+  const newArr = [...arr];
+  [newArr[indexA], newArr[indexB]] = [newArr[indexB], newArr[indexA]];
+  return newArr;
+}
+
+/**
+ * Handle drag start event
+ */
+export function handleDragStart(e: React.DragEvent<HTMLDivElement>, index: number): void {
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("application/json", JSON.stringify({ index }));
+
+  // Create a custom drag image
+  const dragImage = document.createElement("div");
+  dragImage.textContent = `Moving post`;
+  dragImage.style.position = "absolute";
+  dragImage.style.top = "-1000px";
+  dragImage.style.background = "var(--primary)";
+  dragImage.style.color = "#fff";
+  dragImage.style.padding = "8px 16px";
+  dragImage.style.borderRadius = "6px";
+  dragImage.style.fontSize = "12px";
+  document.body.appendChild(dragImage);
+  e.dataTransfer.setDragImage(dragImage, 0, 0);
+  setTimeout(() => document.body.removeChild(dragImage), 0);
+}
+
+/**
+ * Handle drag over event
+ */
+export function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+}
+
+/**
+ * Handle drop event
+ */
+export function handleDrop(e: React.DragEvent<HTMLDivElement>, targetIndex: number): number | null {
+  e.preventDefault();
+  try {
+    const data = e.dataTransfer.getData("application/json");
+    const { index } = JSON.parse(data);
+    if (index !== targetIndex) {
+      return index;
+    }
+  } catch (err) {
+    console.error("Error parsing drag data:", err);
+  }
+  return null;
+}
+
+/**
+ * Check if an element is being dragged over
+ */
+export function isDragOver(e: React.DragEvent<HTMLDivElement>): boolean {
+  return e.dataTransfer.types.includes("application/json");
+}

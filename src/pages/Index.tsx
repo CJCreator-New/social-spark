@@ -12,6 +12,14 @@ import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform, 
 import { suggestedTimeForDay } from "@/lib/postingTimes";
 import { getVoiceStylePreview } from "@/lib/voiceStylePreview";
 import { DraftRecoveryDialog } from "@/components/DraftRecoveryDialog";
+import { BatchEditModal, type BatchEditPayload } from "@/components/BatchEditModal";
+import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
+import { DiffView } from "@/components/DiffView";
+import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
+import { ToneConsistencyChecker } from "@/components/ToneConsistencyChecker";
+import { InspirationBank } from "@/components/InspirationBank";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dragDrop";
 import { SAMPLE_FORM, SAMPLE_POSTS, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
 
 function hasEmoji(text: string): boolean {
@@ -124,7 +132,7 @@ const css = `
   background:radial-gradient(circle,rgba(200,240,154,0.035) 0%,transparent 65%);
   pointer-events:none;top:-300px;left:50%;transform:translateX(-50%);z-index:0; }
 
-.cf-app .inner { position:relative;z-index:1;max-width:700px;margin:0 auto;padding:52px 24px 100px; }
+.cf-app .inner { position:relative;z-index:1;max-width:1120px;margin:0 auto;padding:52px 24px 100px; }
 
 .cf-app .brand { margin-bottom:52px; }
 .cf-app .brand-eyebrow { font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);font-weight:500;margin-bottom:12px;display:flex;align-items:center;gap:8px; }
@@ -241,6 +249,7 @@ const css = `
 .cf-app .dtab:hover { border-color:var(--border2); }
 .cf-app .dtab.on { background:var(--adim);border-color:rgba(200,240,154,.32); }
 .cf-app .dtab:focus-visible { outline:2px solid rgba(200,240,154,.7);outline-offset:2px; }
+.cf-app .dtab.dragging { opacity:.5;border-color:rgba(200,240,154,.5);background:rgba(200,240,154,.1); }
 .cf-app .dtab-dow { font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3); }
 .cf-app .dtab.on .dtab-dow { color:rgba(200,240,154,.55); }
 .cf-app .dtab-n { font-family:'Playfair Display',serif;font-size:17px;color:var(--text2);margin-top:2px; }
@@ -265,6 +274,67 @@ const css = `
 .cf-app .cta-block { background:var(--adim2);border:1px solid rgba(200,240,154,.1);border-radius:var(--r-sm);padding:13px 15px;font-size:13px;color:rgba(200,240,154,.75);line-height:1.6;font-weight:300; }
 .cf-app .htags { font-size:12px;color:rgba(200,240,154,.38);line-height:2;font-weight:300; }
 .cf-app .rationale { font-size:12px;color:var(--text3);font-style:italic;border-top:1px solid var(--border);padding-top:13px;font-weight:300;line-height:1.6; }
+
+.cf-app .step4-layout { display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:18px;align-items:start; }
+.cf-app .step4-main { min-width:0; }
+.cf-app .step4-side { position:sticky;top:18px;display:flex;flex-direction:column;gap:14px; }
+.cf-app .summary-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px; }
+.cf-app .summary-head { display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px; }
+.cf-app .summary-stat { display:flex;flex-direction:column;gap:2px; }
+.cf-app .summary-stat b { font-size:20px;color:var(--text);font-family:'Playfair Display',serif;font-weight:400; }
+.cf-app .summary-stat span { font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);font-weight:500; }
+.cf-app .summary-list { display:grid;gap:8px; }
+.cf-app .summary-row { display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--text2);padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border); }
+.cf-app .summary-row strong { color:var(--accent);font-weight:500; }
+.cf-app .summary-meta { display:flex;flex-wrap:wrap;gap:8px;margin-top:12px; }
+.cf-app .summary-pill { font-size:10px;padding:4px 8px;border-radius:99px;border:1px solid var(--border2);color:var(--text2);background:rgba(255,255,255,.02); }
+
+/* Performance Score Card */
+.cf-app .performance-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px; }
+.cf-app .perf-header { display:flex;justify-content:space-between;align-items:center;margin-bottom:16px; }
+.cf-app .perf-overall { display:flex;flex-direction:column;align-items:center;gap:6px; }
+.cf-app .perf-score-ring { width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;box-shadow:inset 0 0 0 3px var(--surface); }
+.cf-app .perf-score-inner { width:52px;height:52px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:var(--accent); }
+.cf-app .perf-metrics { display:flex;flex-direction:column;gap:12px; }
+.cf-app .perf-metric { display:flex;flex-direction:column;gap:6px; }
+.cf-app .perf-metric-label { display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text2); }
+.cf-app .perf-metric-value { font-weight:600;font-size:12px; }
+.cf-app .perf-bar { height:4px;background:var(--border);border-radius:2px;overflow:hidden; }
+.cf-app .perf-bar-fill { height:100%;border-radius:2px;transition:width .3s ease; }
+.cf-app .perf-feedback { background:var(--bg);border:1px solid var(--border2);border-radius:var(--r-md);padding:12px; }
+.cf-app .perf-tips { display:flex;flex-direction:column;gap:6px; }
+.cf-app .perf-tip { font-size:11px;color:var(--text2);line-height:1.5;padding:4px 0; }
+
+.cf-app .li-preview { background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;box-shadow:0 22px 44px rgba(0,0,0,.18); }
+.cf-app .li-head { display:flex;align-items:center;gap:10px;margin-bottom:14px; }
+.cf-app .li-avatar { width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg, rgba(200,240,154,.9), rgba(200,240,154,.3));color:#07080d;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0; }
+.cf-app .li-name { font-size:13px;color:var(--text);font-weight:500;line-height:1.2; }
+.cf-app .li-meta { font-size:11px;color:var(--text3);font-weight:300;margin-top:2px; }
+.cf-app .li-dot { width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:auto;box-shadow:0 0 0 4px rgba(200,240,154,.1); }
+.cf-app .li-body { position:relative;padding:4px 2px 0; }
+.cf-app .li-content { font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap; }
+.cf-app .li-content strong { color:var(--text);font-weight:600; }
+.cf-app .li-fade { position:absolute;left:0;right:0;bottom:0;height:92px;background:linear-gradient(180deg, rgba(13,15,24,0) 0%, rgba(13,15,24,.92) 82%); pointer-events:none; }
+.cf-app .li-more { position:relative;z-index:1;margin-top:12px;display:inline-flex;align-items:center;font-size:11px;color:var(--accent);background:var(--adim);border:1px solid rgba(200,240,154,.18);border-radius:99px;padding:5px 10px; }
+.cf-app .li-tags { display:flex;flex-wrap:wrap;gap:6px;margin-top:14px; }
+.cf-app .li-tag { font-size:11px;padding:4px 8px;border-radius:99px;border:1px solid rgba(200,240,154,.18);color:rgba(200,240,154,.8);background:rgba(200,240,154,.05); }
+
+/* Inspiration Bank */
+.cf-app .inspiration-bank { background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px; }
+.cf-app .insp-header { margin-bottom:14px; }
+.cf-app .insp-title { font-size:13px;font-weight:500;color:var(--text);margin-bottom:4px; }
+.cf-app .insp-subtitle { font-size:11px;color:var(--text3);font-weight:300;margin-bottom:6px; }
+.cf-app .insp-updated { font-size:10px;color:var(--text3);margin-top:2px; }
+.cf-app .insp-topics { display:flex;flex-direction:column;gap:8px;margin-bottom:12px; }
+.cf-app .insp-topic { background:transparent;border:1px solid var(--border2);border-radius:var(--r-sm);padding:10px 12px;text-align:left;cursor:pointer;font-family:'Sora',sans-serif;transition:all .15s;font-size:12px;color:var(--text2); }
+.cf-app .insp-topic:hover { border-color:rgba(200,240,154,.3);background:rgba(200,240,154,.05);color:var(--text); }
+.cf-app .insp-topic-main { display:flex;align-items:center;gap:8px;margin-bottom:4px; }
+.cf-app .insp-topic-name { font-weight:500;flex:1; }
+.cf-app .insp-trending-badge { font-size:11px; }
+.cf-app .insp-topic-meta { display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--text3); }
+.cf-app .insp-category { background:var(--adim);padding:2px 6px;border-radius:3px;font-weight:400; }
+.cf-app .insp-count { color:rgba(200,240,154,.6); }
+.cf-app .insp-hint { font-size:10px;color:var(--text3);font-style:italic;line-height:1.5; }
 
 .cf-app .bbar { display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:10px;flex-wrap:wrap; }
 .cf-app .bactions { display:flex;gap:8px;align-items:center; }
@@ -350,12 +420,59 @@ const css = `
 .cf-app .copy-menu-opt { padding:9px 13px;font-size:12px;color:var(--text2);cursor:pointer;font-family:'Sora',sans-serif;font-weight:300;border:none;background:transparent;width:100%;text-align:left;display:block; }
 .cf-app .copy-menu-opt:hover { background:var(--adim2);color:var(--accent); }
 
+/* Modal overlays */
+.cf-app .modal-overlay { position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000; }
+.cf-app .modal-content { background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;max-width:480px;width:calc(100% - 32px);max-height:80vh;overflow-y:auto; }
+.cf-app .modal-header { display:flex;justify-content:space-between;align-items:center;margin-bottom:20px; }
+.cf-app .modal-header h2 { font-size:18px;color:var(--text);margin:0;font-family:'Playfair Display',serif;font-weight:400; }
+.cf-app .modal-close { background:transparent;border:none;color:var(--text2);font-size:24px;cursor:pointer;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;transition:color .15s; }
+.cf-app .modal-close:hover { color:var(--text); }
+.cf-app .modal-body { display:flex;flex-direction:column;gap:16px;margin-bottom:20px; }
+.cf-app .modal-footer { display:flex;gap:8px;justify-content:flex-end; }
+
+.cf-app .form-group { display:flex;flex-direction:column;gap:6px; }
+.cf-app .form-group label { font-size:12px;color:var(--text2);font-weight:500;letter-spacing:.04em;text-transform:uppercase; }
+.cf-app .form-group input, .cf-app .form-group select { background:var(--bg);border:1px solid var(--border2);border-radius:var(--r-sm);padding:10px 12px;font-size:13px;color:var(--text);font-family:'Sora',sans-serif;outline:none; }
+.cf-app .form-group input:focus, .cf-app .form-group select:focus { border-color:rgba(200,240,154,.28); }
+.cf-app .form-group .hint { font-size:11px;color:var(--text3);margin-top:2px;font-weight:300; }
+.cf-app .form-group.checkbox { flex-direction:row;align-items:center; }
+.cf-app .form-group.checkbox label { display:flex;align-items:center;gap:8px;margin:0;font-size:13px;font-weight:400;text-transform:none; }
+.cf-app .form-group.checkbox input { margin:0;width:16px;height:16px; }
+.cf-app .char-count { font-size:11px;color:var(--text3);font-weight:300; }
+
+.cf-app .preview-box { background:var(--bg);border:1px solid var(--border2);border-radius:var(--r-sm);padding:12px;margin-top:8px; }
+.cf-app .preview-label { font-size:11px;color:var(--text3);font-weight:500;letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px; }
+.cf-app .preview-list { list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px; }
+.cf-app .preview-list li { font-size:12px;color:var(--text2); }
+.cf-app .preview-list li.empty { color:var(--text3);font-style:italic; }
+
+/* Diff view */
+.cf-app .diff-overlay { position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000; }
+.cf-app .diff-modal { background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;max-width:640px;width:calc(100% - 32px);max-height:80vh;overflow-y:auto;display:flex;flex-direction:column;gap:16px; }
+.cf-app .diff-header { display:flex;justify-content:space-between;align-items:flex-start; }
+.cf-app .diff-header h2 { font-size:18px;color:var(--text);margin:0;font-family:'Playfair Display',serif;font-weight:400; }
+.cf-app .diff-stats { display:flex;gap:8px;flex-wrap:wrap; }
+.cf-app .diff-stats .stat { font-size:11px;padding:4px 8px;border-radius:99px;border:1px solid var(--border2);color:var(--text2);background:rgba(255,255,255,.02); }
+.cf-app .diff-stats .stat.positive { border-color:rgba(152,195,121,.28);color:rgba(152,195,121,.8);background:rgba(152,195,121,.05); }
+.cf-app .diff-stats .stat.negative { border-color:rgba(240,154,154,.28);color:rgba(240,154,154,.8);background:rgba(240,154,154,.05); }
+.cf-app .diff-stats .stat.removed { border-color:rgba(240,154,154,.28);color:rgba(240,154,154,.8);background:rgba(240,154,154,.05); }
+.cf-app .diff-stats .stat.added { border-color:rgba(152,195,121,.28);color:rgba(152,195,121,.8);background:rgba(152,195,121,.05); }
+.cf-app .diff-content { flex:1;overflow-y:auto; }
+.cf-app .diff-comparison { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+.cf-app .diff-col { display:flex;flex-direction:column;gap:8px; }
+.cf-app .diff-col-label { font-size:11px;color:var(--text3);font-weight:500;letter-spacing:.04em;text-transform:uppercase; }
+.cf-app .diff-side { font-size:12px;color:var(--text2);border:1px solid var(--border2);border-radius:var(--r-sm);padding:10px;background:var(--bg);line-height:1.6;white-space:pre-wrap;word-break:break-word; }
+.cf-app .diff-line { margin-bottom:4px; }
+.cf-app .diff-actions { display:flex;gap:8px;justify-content:flex-end; }
+
 @media (max-width: 640px) {
   .cf-app .ind-grid{grid-template-columns:repeat(3,1fr);}
   .cf-app .plat-grid{grid-template-columns:repeat(2,1fr);}
   .cf-app .g2{grid-template-columns:1fr;}
   .cf-app .inner{padding:36px 16px 80px;}
   .cf-app .brand-title{font-size:30px;}
+  .cf-app .step4-layout{grid-template-columns:1fr;}
+  .cf-app .step4-side{position:static;}
   /* Hide inactive step labels on mobile but keep the active one for context. */
   .cf-app .stepper .slabel:not(.active){display:none;}
   .cf-app .stepper .slabel.active{font-size:11px;}
@@ -378,6 +495,26 @@ function Check() {
       <path d="M1.5 4.5L3.5 6.5L7.5 2.5" />
     </svg>
   );
+}
+
+function baseFormatLabel(format: string) {
+  return (format || "Unspecified").split("—")[0].split("-")[0].trim() || "Unspecified";
+}
+
+function renderLinkedInPreviewText(text: string) {
+  return text.split(/\n/).map((line, lineIndex) => {
+    const chunks = line.split(/(\*\*[^*]+\*\*)/g);
+    return (
+      <div key={lineIndex} style={{ marginBottom: lineIndex === 0 ? 0 : 8 }}>
+        {chunks.map((chunk, chunkIndex) => {
+          if (chunk.startsWith("**") && chunk.endsWith("**")) {
+            return <strong key={`${lineIndex}-${chunkIndex}`}>{chunk.slice(2, -2)}</strong>;
+          }
+          return <span key={`${lineIndex}-${chunkIndex}`}>{chunk}</span>;
+        })}
+      </div>
+    );
+  });
 }
 
 interface SelectFieldProps {
@@ -632,6 +769,10 @@ const Index = () => {
   const [showRationale, setShowRationale] = useState(false);
   const [showSubtopicConfirm, setShowSubtopicConfirm] = useState(false);
   const [subtopicPreview, setSubtopicPreview] = useState<string[]>([]);
+  const [batchEditOpen, setBatchEditOpen] = useState(false);
+  const [diffViewData, setDiffViewData] = useState<{ before: string; after: string; dayIndex: number; newPost: Post } | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [showPerformance, setShowPerformance] = useState(false);
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const generatingRef = useRef(false);
@@ -644,10 +785,71 @@ const Index = () => {
   const tweakRef = useRef<HTMLDivElement>(null);
   const copyMenuRef = useRef<HTMLDivElement>(null);
 
+  // Undo/redo hook for post history
+  const { state: postsHistory, setState: setPostsWithHistory, undo: undoChange, redo: redoChange, canUndo, canRedo } = useUndoRedo<Post[]>(posts);
+
+  // Sync posts state with undo/redo history
+  useEffect(() => {
+    if (postsHistory !== posts) {
+      setPosts(postsHistory);
+    }
+  }, [postsHistory, posts]);
+
+  // Keyboard shortcuts for undo/redo and batch edit
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Z for undo (or Cmd+Z on Mac)
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey && canUndo && step === 4) {
+        e.preventDefault();
+        undoChange();
+        toast.success("Undo ✓");
+      }
+      // Ctrl+Y (or Cmd+Shift+Z on Mac) for redo
+      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.shiftKey && e.key === "z")) && canRedo && step === 4) {
+        e.preventDefault();
+        redoChange();
+        toast.success("Redo ✓");
+      }
+      // Ctrl+Shift+E for batch edit
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "e" && step === 4) {
+        e.preventDefault();
+        setBatchEditOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [step, canUndo, canRedo, undoChange, redoChange]);
+
   const scrollToField = (field: "industry" | "coreIdea" | "topics") => {
     const refMap = { industry: industryRef, coreIdea: coreIdeaRef, topics: topicsRef };
     refMap[field].current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
+
+  const weekSummary = useMemo(() => {
+    const totalPosts = posts.length;
+    const totalChars = posts.reduce((sum, post) => sum + formatForPlatform(post, form.platform).charCount, 0);
+    const totalWithinLimit = posts.filter(post => formatForPlatform(post, form.platform).charCount <= formatForPlatform(post, form.platform).limit).length;
+    const formatCounts = posts.reduce<Record<string, number>>((counts, post) => {
+      const label = baseFormatLabel(post.format);
+      counts[label] = (counts[label] || 0) + 1;
+      return counts;
+    }, {});
+    const hashtagCounts = posts.map(post => post.hashtags.split(/\s+/).filter(Boolean).length);
+    const postingTimes = posts.map(post => ({
+      day: post.day,
+      dow: post.dow,
+      time: postTimes[String(post.day)] || suggestedTimeForDay(post.day),
+    }));
+
+    return {
+      totalPosts,
+      avgChars: totalPosts ? Math.round(totalChars / totalPosts) : 0,
+      withinLimitPct: totalPosts ? Math.round((totalWithinLimit / totalPosts) * 100) : 0,
+      formatCounts,
+      hashtagCounts,
+      postingTimes,
+    };
+  }, [posts, form.platform, postTimes]);
 
   const buildSubtopicPreview = () => {
     const selectedTopics = form.topics.filter(Boolean);
@@ -1076,7 +1278,7 @@ const Index = () => {
           body: stripMarkdown(target.body),
           cta: stripMarkdown(target.cta),
         };
-        setPosts(prev => prev.map((p, i) => (i === idx ? cleaned : p)));
+        setPostsWithHistory(prev => prev.map((p, i) => (i === idx ? cleaned : p)));
         setSavedId(null);
         toast.success(`Day ${target.day} formatting cleaned ✓`);
         return;
@@ -1117,10 +1319,16 @@ const Index = () => {
         toast.error(data?.error || `Regenerate failed (${res.status}).`);
         return;
       }
-      setPosts(prev => prev.map((p, i) => (i === idx ? data.post : p)));
-      setSavedId(null); // calendar drifted from saved version — let user re-save
-      const tweakLabel = tweak ? ` (${tweak.replace("-", " ")})` : "";
-      toast.success(`Day ${target.day} regenerated${tweakLabel}`);
+
+      const beforeText = `${target.title}\n\n${target.hook}\n\n${target.body}\n\n${target.cta}`;
+      const afterText = `${data.post.title}\n\n${data.post.hook}\n\n${data.post.body}\n\n${data.post.cta}`;
+
+      setDiffViewData({
+        before: beforeText,
+        after: afterText,
+        dayIndex: idx,
+        newPost: data.post,
+      });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Regenerate failed");
     } finally {
@@ -1305,6 +1513,53 @@ const Index = () => {
     setStep(1);
   }
 
+  function applyBatchEdit(payload: BatchEditPayload) {
+    const updated = posts.map(post => {
+      const updatedPost = { ...post };
+
+      // Apply brand mention if provided
+      if (payload.brandMention) {
+        updatedPost.cta = `${updatedPost.cta} ${payload.brandMention}`;
+      }
+
+      // Add hashtag if provided
+      if (payload.hashtag) {
+        updatedPost.hashtags = `${updatedPost.hashtags} ${payload.hashtag}`.trim();
+      }
+
+      // Replace CTA style if provided
+      if (payload.ctaStyle) {
+        updatedPost.cta = payload.ctaStyle;
+      }
+
+      return updatedPost;
+    });
+
+    setPostsWithHistory(updated);
+    setSavedId(null);
+    toast.success(`Applied batch edits to all ${posts.length} posts`);
+
+    // Reset posting times if requested
+    if (payload.updateTimes) {
+      const newTimes: Record<string, string> = {};
+      posts.forEach(post => {
+        newTimes[String(post.day)] = suggestedTimeForDay(post.day);
+      });
+      setPostTimes(newTimes);
+      toast.success("Posting times reset to platform defaults");
+    }
+  }
+
+  function handleDayDrop(draggedIdx: number | null, targetIdx: number) {
+    if (draggedIdx === null || draggedIdx === targetIdx) return;
+
+    const reorderedPosts = swapItems(posts, draggedIdx, targetIdx);
+    setPostsWithHistory(reorderedPosts);
+    setSavedId(null);
+    setDraggedIndex(null);
+    toast.success(`Reordered: Day ${posts[draggedIdx].day} ↔ Day ${posts[targetIdx].day}`);
+  }
+
   function copyText(text: string, cb: () => void) {
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(text).then(cb).catch(() => fbCopy(text, cb));
@@ -1320,6 +1575,17 @@ const Index = () => {
 
   function postText(p: Post) {
     return `${p.title}\n\n${p.hook}\n\n${p.body}\n\n${p.cta}\n\n${p.hashtags}`;
+  }
+
+  function getPostContentForDiff(p: Post): string {
+    // Full content for diff comparison
+    return [
+      `Title: ${p.title}`,
+      `Hook: ${p.hook}`,
+      `Body:\n${p.body}`,
+      `CTA: ${p.cta}`,
+      `Hashtags: ${p.hashtags}`,
+    ].join("\n\n");
   }
 
   async function copyPost(i: number) {
@@ -1684,6 +1950,21 @@ ${postText(p)}
                 </div>
               </div>
 
+              {/* Inspiration Bank - Show trending topics for quick selection */}
+              {form.industry && (
+                <div className="csect">
+                  <InspirationBank
+                    industry={form.industry}
+                    onTopicClick={(topic) => {
+                      const updated = form.mode === "day" ? [topic] : [...form.topics, topic];
+                      if (updated.length <= (form.mode === "day" ? 1 : 7)) {
+                        upd("topics", updated);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
               <div className="divider" />
 
               <div className="g2" style={{ marginBottom: 16 }}>
@@ -1884,7 +2165,9 @@ ${postText(p)}
           {/* ── STEP 4 ── */}
           <div className={`screen ${step === 4 ? "active" : ""}`}>
             {posts.length > 0 && (
-              <>
+              <div className="step4-layout">
+                <div className="step4-main">
+                  <>
                 {sampleMode && (
                   <div className="sample-banner">
                     <div className="sample-banner-text">
@@ -1941,8 +2224,22 @@ ${postText(p)}
                         type="button"
                         role="tab"
                         aria-selected={i === activeDay}
-                        className={`dtab ${i === activeDay ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
+                        className={`dtab ${i === activeDay ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""} ${draggedIndex === i ? "dragging" : ""}`}
                         onClick={() => setActiveDay(i)}
+                        draggable
+                        onDragStart={(e) => {
+                          handleDragStart(e, i);
+                          setDraggedIndex(i);
+                        }}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => {
+                          const sourcIdx = handleDrop(e, i);
+                          if (sourcIdx !== null) {
+                            handleDayDrop(sourcIdx, i);
+                          }
+                        }}
+                        onDragEnd={() => setDraggedIndex(null)}
+                        title="Drag to reorder days"
                       >
                         <div className="dtab-dow">{post.dow}</div>
                         <div className="dtab-n">{i + 1}</div>
@@ -1951,7 +2248,8 @@ ${postText(p)}
                   </div>
                 )}
                 {p && (
-                  <div className="pcard">
+                  <div>
+                    <div className="pcard">
                     <div className="ph">
                       <div className="ptags">
                         <span className="ptag pt-day">Day {p.day} · {p.dow}</span>
@@ -2109,6 +2407,11 @@ ${postText(p)}
                       {showRationale ? "Hide reasoning ↑" : "See why this works →"}
                     </button>
                     {showRationale && <div className="rationale">{p.rationale}</div>}
+
+                    <PerformanceScoreCard post={p} topic={form.coreIdea} />
+                  </div>
+
+                  <ToneConsistencyChecker posts={posts} />
                   </div>
                 )}
 
@@ -2149,15 +2452,152 @@ ${postText(p)}
                     <button className="dlbtn" onClick={exportIcs} title="Export to Google Calendar / Outlook / Apple Cal">
                       📅 .ics
                     </button>
+                    <button
+                      className="dlbtn"
+                      onClick={() => setBatchEditOpen(true)}
+                      title="Apply brand mention, hashtag, or CTA to all 7 posts at once (Ctrl+Shift+E)"
+                    >
+                      ⚙️ Batch edit
+                    </button>
                     <button className="btn btn-p" style={{ fontSize: 13 }} onClick={copyAll}>
                       {copiedAll ? "All copied ✓" : `Copy all 7 for ${niceLabelFor(form.platform)}`}
                     </button>
                   </div>
                 </div>
               </>
+                </div>
+                <div className="step4-side">
+                  {/* Toggle buttons for Summary / Performance */}
+                  <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                    <button
+                      className={`cpbtn ${!showPerformance ? "done" : ""}`}
+                      onClick={() => setShowPerformance(false)}
+                      style={{ flex: 1, textAlign: "center" }}
+                      title="Week summary and stats"
+                    >
+                      Week Summary
+                    </button>
+                    <button
+                      className={`cpbtn ${showPerformance ? "done" : ""}`}
+                      onClick={() => setShowPerformance(true)}
+                      style={{ flex: 1, textAlign: "center" }}
+                      title="Performance score for current post"
+                      disabled={!posts[activeDay]}
+                    >
+                      Performance
+                    </button>
+                  </div>
+
+                  {!showPerformance ? (
+                    <div className="summary-card">
+                      <div className="summary-head">
+                        <div>
+                          <div className="sh" style={{ marginBottom: 6 }}>Week at a glance</div>
+                          <div className="time-hint">A fast read before you copy, tweak, or save.</div>
+                        </div>
+                        <div className="summary-stat">
+                          <b>{weekSummary.totalPosts}</b>
+                          <span>Posts</span>
+                        </div>
+                      </div>
+                      <div className="summary-list">
+                        <div className="summary-row"><span>Average length</span><strong>{weekSummary.avgChars} chars</strong></div>
+                        <div className="summary-row"><span>Within platform limit</span><strong>{weekSummary.withinLimitPct}%</strong></div>
+                        <div className="summary-row"><span>Hashtags per post</span><strong>{weekSummary.hashtagCounts.length ? weekSummary.hashtagCounts.join(" · ") : "—"}</strong></div>
+                      </div>
+                      <div className="summary-meta">
+                        {Object.entries(weekSummary.formatCounts).slice(0, 4).map(([label, count]) => (
+                          <span key={label} className="summary-pill">{count} {label.toLowerCase()}</span>
+                        ))}
+                      </div>
+                      <div className="summary-list" style={{ marginTop: 14 }}>
+                        {weekSummary.postingTimes.map(slot => (
+                          <div key={slot.day} className="summary-row">
+                            <span>Day {slot.day} · {slot.dow}</span>
+                            <strong>{slot.time}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : posts[activeDay] ? (
+                    <PerformanceScoreCard post={posts[activeDay]} topic={form.coreIdea} />
+                  ) : null}
+
+                  {posts[activeDay] && (
+                    <div className="li-preview">
+                      <div className="li-head">
+                        <div className="li-avatar">{(selectedIndustry?.label || form.platform || "C").slice(0, 1)}</div>
+                        <div>
+                          <div className="li-name">{selectedIndustry?.label || "ContentForge"}</div>
+                          <div className="li-meta">{niceLabelFor(form.platform)} preview</div>
+                        </div>
+                        <div className="li-dot" />
+                      </div>
+                      <div className="li-body">
+                        {(() => {
+                          const previewSource = [posts[activeDay].title, posts[activeDay].hook, posts[activeDay].body, posts[activeDay].cta].join("\n\n");
+                          const previewPlain = stripMarkdown(previewSource);
+                          return (
+                            <>
+                              <div className="li-content">{renderLinkedInPreviewText(previewSource)}</div>
+                              {previewPlain.length > 210 && <><div className="li-fade" /><div className="li-more">See more</div></>}
+                            </>
+                          );
+                        })()}
+                      </div>
+                      <div className="li-tags">
+                        {posts[activeDay].hashtags.split(/\s+/).filter(Boolean).map(tag => <span key={tag} className="li-tag">{tag}</span>)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>
+
+        {/* Batch Edit Modal */}
+        <BatchEditModal
+          isOpen={batchEditOpen}
+          onClose={() => setBatchEditOpen(false)}
+          onApply={applyBatchEdit}
+          totalPosts={posts.length}
+          currentPlatform={form.platform}
+        />
+
+        {/* Diff View Modal */}
+        {diffViewData && (
+          <DiffView
+            before={diffViewData.before}
+            after={diffViewData.after}
+            onAccept={() => {
+              // Accept the change: apply the new post
+              setPosts(prev => prev.map((p, i) => (i === diffViewData.dayIndex ? diffViewData.newPost : p)));
+              setPostsWithHistory(prev => prev.map((p, i) => (i === diffViewData.dayIndex ? diffViewData.newPost : p)));
+              setSavedId(null);
+              setDiffViewData(null);
+              toast.success(`Day ${posts[diffViewData.dayIndex].day} updated`);
+            }}
+            onReject={() => {
+              // Reject: do not apply the change
+              setDiffViewData(null);
+              toast.info(`Changes discarded for Day ${posts[diffViewData.dayIndex].day}`);
+            }}
+            title={`Review changes for Day ${posts[diffViewData.dayIndex].day}`}
+          />
+        )}
+
+        {/* Keyboard Shortcuts Help (visible on Step 4) */}
+        {step === 4 && (
+          <div style={{ position: "fixed", bottom: 16, left: 16, fontSize: 10, color: "var(--text3)", zIndex: 999, maxWidth: 200 }}>
+            <div style={{ opacity: 0.7 }}>
+              <strong>Quick shortcuts:</strong><br/>
+              Ctrl+Z = Undo | Ctrl+Y = Redo<br/>
+              Ctrl+Shift+E = Batch edit<br/>
+              Drag days to reorder
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
