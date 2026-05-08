@@ -1,5 +1,3 @@
-import { jsPDF } from "jspdf";
-
 export interface ExportPost {
   day: number;
   dow: string;
@@ -84,6 +82,7 @@ export function downloadMd(meta: ExportMeta, posts: ExportPost[]) {
 }
 
 export function downloadPdf(meta: ExportMeta, posts: ExportPost[]) {
+  void import("jspdf").then(({ jsPDF }) => {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
@@ -172,5 +171,6 @@ export function downloadPdf(meta: ExportMeta, posts: ExportPost[]) {
     doc.text(`ContentForge  ·  ${i} / ${pageCount}`, pageW / 2, pageH - 18, { align: "center" });
   }
 
-  doc.save(`${fileSlug(meta.title)}.pdf`);
+    doc.save(`${fileSlug(meta.title)}.pdf`);
+  });
 }

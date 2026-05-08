@@ -94,7 +94,7 @@ jobs:
       run: npx playwright install
 
     - name: Run accessibility tests
-      run: npx playwright test e2e/accessibility.spec.ts
+      run: npx playwright test e2e/critical-paths.spec.ts --grep "Accessibility"
 
   security:
     runs-on: ubuntu-latest

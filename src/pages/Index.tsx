@@ -685,6 +685,7 @@ const INITIAL_FORM: WizardForm = {
 const DRAFT_VERSION = 1;
 const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const WIZARD_DRAFT_PREFIX = "draft:wizard:";
+const WIZARD_SERVER_DRAFT_TABLE = "wizard_drafts";
 
 type DraftEnvelope<T> = {
   version: number;
@@ -692,30 +693,75 @@ type DraftEnvelope<T> = {
   data: T;
 };
 
-function readDraft<T>(key: string): T | null {
+function makeDraftEnvelope<T>(data: T): DraftEnvelope<T> {
+  return { version: DRAFT_VERSION, savedAt: Date.now(), data };
+}
+
+function parseDraftEnvelope<T>(value: unknown): DraftEnvelope<T> | null {
+  if (!value || typeof value !== "object") return null;
+  const envelope = value as Partial<DraftEnvelope<T>>;
+  if (
+    typeof envelope.version !== "number" ||
+    typeof envelope.savedAt !== "number" ||
+    !("data" in envelope)
+  ) {
+    return null;
+  }
+  if (envelope.version !== DRAFT_VERSION || Date.now() - envelope.savedAt > DRAFT_MAX_AGE_MS) {
+    return null;
+  }
+  return envelope as DraftEnvelope<T>;
+}
+
+function readDraftEnvelope<T>(key: string): DraftEnvelope<T> | null {
   const raw = localStorage.getItem(key);
   if (!raw) return null;
-  const parsed = JSON.parse(raw) as DraftEnvelope<T> | T;
-  if (
-    !parsed ||
-    typeof parsed !== "object" ||
-    !("version" in parsed) ||
-    !("savedAt" in parsed) ||
-    !("data" in parsed)
-  ) {
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    const envelope = parseDraftEnvelope<T>(parsed);
+    if (!envelope) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return envelope;
+  } catch {
     localStorage.removeItem(key);
     return null;
   }
-  const envelope = parsed as DraftEnvelope<T>;
-  if (envelope.version !== DRAFT_VERSION || Date.now() - envelope.savedAt > DRAFT_MAX_AGE_MS) {
-    localStorage.removeItem(key);
-    return null;
-  }
-  return envelope.data;
+}
+
+function readDraft<T>(key: string): T | null {
+  return readDraftEnvelope<T>(key)?.data ?? null;
 }
 
 function writeDraft<T>(key: string, data: T) {
-  localStorage.setItem(key, JSON.stringify({ version: DRAFT_VERSION, savedAt: Date.now(), data }));
+  localStorage.setItem(key, JSON.stringify(makeDraftEnvelope(data)));
+}
+
+async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraftSnapshot> | null> {
+  const { data, error } = await supabase
+    .from(WIZARD_SERVER_DRAFT_TABLE)
+    .select("snapshot")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !data?.snapshot) return null;
+  return parseDraftEnvelope<WizardDraftSnapshot>(data.snapshot);
+}
+
+async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
+  await supabase.from(WIZARD_SERVER_DRAFT_TABLE).upsert(
+    {
+      user_id: userId,
+      snapshot: makeDraftEnvelope(snapshot),
+    },
+    { onConflict: "user_id" }
+  );
+}
+
+async function clearServerDraft(userId: string) {
+  await supabase.from(WIZARD_SERVER_DRAFT_TABLE).delete().eq("user_id", userId);
 }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -951,25 +997,47 @@ const Index = () => {
     }
   }, [recentCalendarsData]);
 
-  const wizardDraftKey = user ? `${WIZARD_DRAFT_PREFIX}${user.id}` : null;
+  const wizardDraftKey = `${WIZARD_DRAFT_PREFIX}${user ? user.id : "guest"}`;
 
   // Hydrate the wizard draft once on mount and prompt the user before restoring it.
   useEffect(() => {
+    let cancelled = false;
     draftReady.current = false;
     setRecoveryDraft(null);
     setShowRecoveryDialog(false);
-    try {
-      if (!wizardDraftKey) return;
-      const saved = readDraft<WizardDraftSnapshot>(wizardDraftKey);
-      if (saved) {
-        setRecoveryDraft(saved);
-        setShowRecoveryDialog(true);
+
+    const hydrateDraft = async () => {
+      try {
+        const localDraft = readDraftEnvelope<WizardDraftSnapshot>(wizardDraftKey);
+        const serverDraft = user ? await readServerDraft(user.id) : null;
+        const newestDraft = [localDraft, serverDraft]
+          .filter((item): item is DraftEnvelope<WizardDraftSnapshot> => !!item)
+          .sort((a, b) => b.savedAt - a.savedAt)[0] || null;
+
+        if (cancelled) return;
+
+        if (newestDraft) {
+          setRecoveryDraft(newestDraft.data);
+          setShowRecoveryDialog(true);
+          if (user && localDraft && localDraft.savedAt >= (serverDraft?.savedAt || 0)) {
+            void writeServerDraft(user.id, localDraft.data).catch((error) => {
+              console.warn("Failed to sync local draft to server", error);
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to load wizard draft", e);
+      } finally {
+        if (!cancelled) draftReady.current = true;
       }
-    } catch (e) {
-      console.warn("Failed to persist draft", e);
-    }
-    draftReady.current = true;
-  }, [wizardDraftKey]);
+    };
+
+    void hydrateDraft();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [wizardDraftKey, user]);
 
   // Pre-fill form with profile defaults when profile data loads and no recovered draft is pending.
   useEffect(() => {
@@ -1016,9 +1084,14 @@ const Index = () => {
       try {
         if (!hasMeaningfulDraft) {
           localStorage.removeItem(wizardDraftKey);
+          if (user) {
+            void clearServerDraft(user.id).catch((error) => {
+              console.warn("Failed to clear server draft", error);
+            });
+          }
           return;
         }
-        writeDraft(wizardDraftKey, {
+        const snapshot = {
           savedAt: Date.now(),
           form,
           step,
@@ -1026,7 +1099,13 @@ const Index = () => {
           posts,
           activeDay,
           postTimes,
-        });
+        };
+        writeDraft(wizardDraftKey, snapshot);
+        if (user) {
+          void writeServerDraft(user.id, snapshot).catch((error) => {
+            console.warn("Failed to autosave wizard draft", error);
+          });
+        }
       } catch (e) {
         console.warn("Failed to persist wizard draft", e);
       }
@@ -1037,11 +1116,16 @@ const Index = () => {
         window.clearTimeout(draftSaveTimer.current);
       }
     };
-  }, [wizardDraftKey, form, step, extraTopics, posts, activeDay, postTimes, recoveryDraft]);
+  }, [wizardDraftKey, user, form, step, extraTopics, posts, activeDay, postTimes, recoveryDraft]);
 
   const clearDraft = () => {
     try {
       if (wizardDraftKey) localStorage.removeItem(wizardDraftKey);
+      if (user) {
+        void clearServerDraft(user.id).catch((error) => {
+          console.warn("Failed to clear server draft", error);
+        });
+      }
     } catch (e) {
       console.warn("Failed to clear wizard draft", e);
     }
@@ -1634,6 +1718,7 @@ ${postText(p)}
     a.href = url; a.download = `contentforge-${form.industry}-${Date.now()}.txt`;
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
+    try { toast.success("Download started"); } catch (e) { /* noop */ }
   }
 
   async function saveCalendar() {
@@ -2429,27 +2514,41 @@ ${postText(p)}
                     </button>
                     <button
                       className="dlbtn"
-                      onClick={() => downloadMd({
-                        title: form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
-                        industryLabel: selectedIndustry?.label,
-                        platform: form.platform,
-                        coreIdea: form.coreIdea,
-                      }, posts)}
+                      onClick={() => {
+                        try {
+                          downloadMd({
+                            title: form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
+                            industryLabel: selectedIndustry?.label,
+                            platform: form.platform,
+                            coreIdea: form.coreIdea,
+                          }, posts);
+                          toast.success("Downloaded .md ✓");
+                        } catch (e) {
+                          toast.error(e instanceof Error ? e.message : "Download .md failed");
+                        }
+                      }}
                     >
                       .md
                     </button>
                     <button
                       className="dlbtn"
-                      onClick={() => downloadPdf({
-                        title: form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
-                        industryLabel: selectedIndustry?.label,
-                        platform: form.platform,
-                        coreIdea: form.coreIdea,
-                      }, posts)}
+                      onClick={() => {
+                        try {
+                          downloadPdf({
+                            title: form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
+                            industryLabel: selectedIndustry?.label,
+                            platform: form.platform,
+                            coreIdea: form.coreIdea,
+                          }, posts);
+                          toast.success("Downloaded .pdf ✓");
+                        } catch (e) {
+                          toast.error(e instanceof Error ? e.message : "Download .pdf failed");
+                        }
+                      }}
                     >
                       .pdf
                     </button>
-                    <button className="dlbtn" onClick={exportIcs} title="Export to Google Calendar / Outlook / Apple Cal">
+                    <button className="dlbtn" onClick={() => { try { exportIcs(); toast.success("Downloaded .ics ✓"); } catch (e) { toast.error(e instanceof Error ? e.message : "Download .ics failed"); } }} title="Export to Google Calendar / Outlook / Apple Cal">
                       📅 .ics
                     </button>
                     <button

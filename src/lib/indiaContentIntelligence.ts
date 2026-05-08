@@ -243,5 +243,4 @@ export function isIndiaSpecificTopic(topic: string): boolean {
 
   const lowerTopic = topic.toLowerCase();
   return indiaKeywords.some((keyword: string) => lowerTopic.includes(keyword));
-}</content>
-<parameter name="filePath">C:\Users\HP\OneDrive\Desktop\Projects\VS Code\social-spark\src\lib\indiaContentIntelligence.ts
+}

@@ -704,7 +704,9 @@ export default function CalendarDetail() {
       } else if (format === "pdf") {
         downloadPdf({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts);
       } else {
-        exportIcs();
+        const ws = parseLocalDate(weekStart) || nextMonday();
+        const tz = timezone || profileTimezone || browserTimezone();
+        downloadIcs({ calendarTitle: title, weekStart: ws, postTimes, platform, timezone: tz }, posts);
       }
       toast.success(`Downloaded .${format} ✓`);
     } catch (err) {
@@ -1112,7 +1114,7 @@ export default function CalendarDetail() {
               <div className="cd-blabel"><span>Hook</span></div>
               <div className="cd-hook">{p.hook}</div>
               <div className="cd-blabel"><span>Post body</span></div>
-              <div className="cd-body">{p.body}</div>
+              <div className="cd-body">{stripMarkdown(p.body)}</div>
               <div className="cd-blabel"><span>CTA</span></div>
               <div className="cd-cta">{p.cta}</div>
               <div className="cd-blabel"><span>Hashtags</span><span className="cd-blabel-count">click a tag to lock, ban, or replace</span></div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,8 @@ interface SavedCalendar {
   created_at: string;
   is_favorite?: boolean;
   posts?: unknown[];
+  industry?: string | null;
+  form_payload?: unknown;
 }
 
 type SortKey = "newest" | "oldest" | "title" | "favorites";
@@ -78,6 +80,8 @@ export default function MyCalendars() {
   const log = createScopedLogger("MyCalendars");
   const [pendingDelete, setPendingDelete] = useState<SavedCalendar | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [lastDeleted, setLastDeleted] = useState<SavedCalendar | null>(null);
+  const lastDeletedTimer = useRef<number | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameSaving, setRenameSaving] = useState(false);
@@ -170,19 +174,69 @@ export default function MyCalendars() {
   async function confirmDelete() {
     if (!pendingDelete) return;
     setDeleting(true);
+    // Try to fetch full record so we can offer an undo (re-insert) if deletion succeeds
+    const { data: full, error: fetchErr } = await supabase.from("saved_calendars").select("*").eq("id", pendingDelete.id).maybeSingle();
     const { error } = await supabase.from("saved_calendars").delete().eq("id", pendingDelete.id);
     setDeleting(false);
 
     if (error) {
       log.error("Failed to delete calendar", error, { calendarId: pendingDelete.id });
       toast.error(error.message);
-    } else {
-      log.info("Calendar deleted", { calendarId: pendingDelete.id });
-      await refetch();
-      toast.success("Deleted");
+      setPendingDelete(null);
+      return;
     }
 
+    log.info("Calendar deleted", { calendarId: pendingDelete.id });
+    await refetch();
+
+    if (fetchErr || !full) {
+      // No undo available
+      toast.success("Deleted");
+      setPendingDelete(null);
+      return;
+    }
+
+    // Offer undo by keeping the deleted row in memory for a short window
+    setLastDeleted(full as SavedCalendar);
+    toast.success("Deleted — undo available for 10s");
+    // Clear any existing timer
+    if (lastDeletedTimer.current) window.clearTimeout(lastDeletedTimer.current);
+    lastDeletedTimer.current = window.setTimeout(() => {
+      setLastDeleted(null);
+      lastDeletedTimer.current = null;
+    }, 10000) as unknown as number;
+
     setPendingDelete(null);
+  }
+
+  async function undoDelete() {
+    if (!lastDeleted || !user) return;
+    // Re-insert the deleted calendar for the current user
+    const payload = {
+      user_id: user.id,
+      title: lastDeleted.title,
+      industry: lastDeleted.industry || null,
+      industry_label: lastDeleted.industry_label || null,
+      platform: lastDeleted.platform || null,
+      core_idea: lastDeleted.core_idea || null,
+      form_payload: lastDeleted.form_payload || null,
+      posts: lastDeleted.posts || null,
+      is_favorite: lastDeleted.is_favorite || false,
+    };
+
+    const { error } = await supabase.from("saved_calendars").insert([payload]);
+    if (error) {
+      log.error("Failed to restore deleted calendar", error);
+      toast.error("Restore failed");
+      return;
+    }
+
+    // Clear undo state and refresh list
+    if (lastDeletedTimer.current) window.clearTimeout(lastDeletedTimer.current);
+    lastDeletedTimer.current = null;
+    setLastDeleted(null);
+    await refetch();
+    toast.success("Restored");
   }
 
   function startRename(it: SavedCalendar) {
@@ -321,6 +375,13 @@ export default function MyCalendars() {
 
   return (
     <>
+      {lastDeleted && (
+        <div style={{ maxWidth: 760, margin: '0 auto 12px', padding: 12, background: '#121218', border: '1px solid rgba(200,240,154,0.06)', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ color: '#c8f09a' }}>
+            Deleted “{lastDeleted.title}” — <button onClick={undoDelete} style={{ color: '#fff', marginLeft: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', padding: '6px 10px', borderRadius: 6 }}>Undo</button>
+          </div>
+        </div>
+      )}
       <style>{css}</style>
       <div className="mc-app">
         <div className="mc-inner">

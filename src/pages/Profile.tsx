@@ -54,7 +54,15 @@ const css = `
 
 function TemplatesList() {
   const { user } = useAuth();
-  const [templates, setTemplates] = useState<any[]>([]);
+  type TemplateRecord = {
+    id: string;
+    name: string;
+    description: string | null;
+    config: unknown;
+    created_at: string;
+  };
+
+  const [templates, setTemplates] = useState<TemplateRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -63,7 +71,7 @@ function TemplatesList() {
     (async () => {
       const { data } = await supabase.from('templates').select('id, name, description, config, created_at').eq('user_id', user.id).order('created_at', { ascending: false });
       if (!mounted) return;
-      setTemplates(data || []);
+      setTemplates((data ?? []) as TemplateRecord[]);
       setLoading(false);
     })();
     return () => { mounted = false; };
@@ -77,7 +85,7 @@ function TemplatesList() {
     toast.success('Template deleted');
   }
 
-  function handleLoad(tpl: any) {
+  function handleLoad(tpl: TemplateRecord) {
     if (!user) return toast.error('Sign in to load templates');
     const key = `draft:wizard:${user.id}`;
     const envelope = { version: 1, savedAt: Date.now(), data: tpl.config };

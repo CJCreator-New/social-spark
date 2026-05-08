@@ -211,5 +211,4 @@ export const ToneConsistencyChecker: React.FC<ToneConsistencyCheckerProps> = ({ 
       )}
     </div>
   );
-};</content>
-<parameter name="filePath">C:\Users\HP\OneDrive\Desktop\Projects\VS Code\social-spark\src\components\ToneConsistencyChecker.tsx
+};
