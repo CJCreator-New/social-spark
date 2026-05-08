@@ -8,7 +8,7 @@ export interface UndoRedoState<T> {
 
 export interface UseUndoRedoReturn<T> {
   state: T;
-  setState: (newState: T) => void;
+  setState: (newState: T | ((prev: T) => T)) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -28,10 +28,10 @@ export function useUndoRedo<T>(initialState: T): UseUndoRedoReturn<T> {
 
   const [lastAction, setLastAction] = useState<string>("");
 
-  const setState = useCallback((newState: T) => {
+  const setState = useCallback((newState: T | ((prev: T) => T)) => {
     setHistory((prev) => ({
       past: [...prev.past.slice(-MAX_HISTORY + 1), prev.present],
-      present: newState,
+      present: typeof newState === "function" ? (newState as (p: T) => T)(prev.present) : newState,
       future: [],
     }));
   }, []);

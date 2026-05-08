@@ -15,7 +15,6 @@ import { DraftRecoveryDialog } from "@/components/DraftRecoveryDialog";
 import { BatchEditModal, type BatchEditPayload } from "@/components/BatchEditModal";
 import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
 import { DiffView } from "@/components/DiffView";
-import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
 import { ToneConsistencyChecker } from "@/components/ToneConsistencyChecker";
 import { InspirationBank } from "@/components/InspirationBank";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
@@ -751,10 +750,10 @@ async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraf
 }
 
 async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
-  await supabase.from(WIZARD_SERVER_DRAFT_TABLE).upsert(
+  await (supabase.from(WIZARD_SERVER_DRAFT_TABLE) as any).upsert(
     {
       user_id: userId,
-      snapshot: makeDraftEnvelope(snapshot),
+      snapshot: makeDraftEnvelope(snapshot) as any,
     },
     { onConflict: "user_id" }
   );
@@ -2313,12 +2312,12 @@ ${postText(p)}
                         onClick={() => setActiveDay(i)}
                         draggable
                         onDragStart={(e) => {
-                          handleDragStart(e, i);
+                          handleDragStart(e as any, i);
                           setDraggedIndex(i);
                         }}
-                        onDragOver={handleDragOver}
+                        onDragOver={handleDragOver as any}
                         onDrop={(e) => {
-                          const sourcIdx = handleDrop(e, i);
+                          const sourcIdx = handleDrop(e as any, i);
                           if (sourcIdx !== null) {
                             handleDayDrop(sourcIdx, i);
                           }

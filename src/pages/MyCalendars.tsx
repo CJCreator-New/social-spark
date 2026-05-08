@@ -224,7 +224,7 @@ export default function MyCalendars() {
       is_favorite: lastDeleted.is_favorite || false,
     };
 
-    const { error } = await supabase.from("saved_calendars").insert([payload]);
+    const { error } = await supabase.from("saved_calendars").insert([payload as any]);
     if (error) {
       log.error("Failed to restore deleted calendar", error);
       toast.error("Restore failed");
