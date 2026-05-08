@@ -76,7 +76,7 @@ export function postDateTime(weekStart: Date, dow: string, time: string): Date {
 
 // ─── ICS EXPORT ───────────────────────────────────────────────────────────────
 
-interface IcsPost {
+export interface IcsPost {
   day: number;
   dow: string;
   topic: string;
@@ -86,6 +86,8 @@ interface IcsPost {
   cta: string;
   hashtags: string;
 }
+
+export type Post = IcsPost;
 
 interface IcsOptions {
   calendarTitle: string;

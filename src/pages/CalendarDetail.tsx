@@ -14,7 +14,6 @@ import {
   dateForDow,
   shortDateLabel,
 } from "@/lib/calendarSchedule";
-import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor, buildRawMarkdown, PLATFORM_LABELS } from "@/lib/platformCopy";
 import { suggestedTimeForDay } from "@/lib/postingTimes";
 import { applyPolicy, parsePolicyList, parseHashtagsString, normalizeTag, displayTag, HashtagPolicy } from "@/lib/hashtagPolicy";
 import { insightFor } from "@/lib/postInsights";
@@ -45,7 +44,7 @@ interface FormPayload {
   weekStart?: string;
 }
 
-type TweakKind = "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal";
+
 
 const css = `
 .cd-app { min-height:100vh; background:#07080d; color:#edeae3; font-family:'Sora',sans-serif; padding:40px 24px 100px; }
@@ -1246,14 +1245,20 @@ export default function CalendarDetail() {
                       <button className="cd-tweak-opt" onClick={() => regenerateDay("punchier")}>Make punchier</button>
                       <button className="cd-tweak-opt" onClick={() => regenerateDay("add-stat")}>Add a stat</button>
                       <button className="cd-tweak-opt" onClick={() => regenerateDay("remove-emoji")}>Remove emoji</button>
-                      <button
-                        className="cd-tweak-opt"
-                        onClick={() => regenerateDay("remove-emoji")}
-                        disabled={!hasEmoji(target.title + " " + target.hook + " " + target.body + " " + target.cta)}
-                        title={!hasEmoji(target.title + " " + target.hook + " " + target.body + " " + target.cta) ? "No emoji detected" : "Remove emojis from this post"}
-                      >
-                        Remove emoji
-                      </button>
+                      {(() => {
+                        const t = posts[active];
+                        const hasE = t ? hasEmoji((t.title || "") + " " + (t.hook || "") + " " + (t.body || "") + " " + (t.cta || "")) : false;
+                        return (
+                          <button
+                            className="cd-tweak-opt"
+                            onClick={() => regenerateDay("remove-emoji")}
+                            disabled={!hasE}
+                            title={!hasE ? "No emoji detected" : "Remove emojis from this post"}
+                          >
+                            Remove emoji
+                          </button>
+                        );
+                      })()}
                       <button className="cd-tweak-opt" onClick={() => regenerateDay("clean-formatting")}>Clean formatting symbols</button>
                       <button className="cd-tweak-opt" onClick={() => regenerateDay("more-personal")}>More personal</button>
                     </div>
