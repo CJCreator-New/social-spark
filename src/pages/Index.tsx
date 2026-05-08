@@ -739,8 +739,7 @@ function writeDraft<T>(key: string, data: T) {
 }
 
 async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraftSnapshot> | null> {
-  const { data, error } = await supabase
-    .from(WIZARD_SERVER_DRAFT_TABLE)
+  const { data, error } = await (supabase.from(WIZARD_SERVER_DRAFT_TABLE) as any)
     .select("snapshot")
     .eq("user_id", userId)
     .maybeSingle();
@@ -760,7 +759,7 @@ async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
 }
 
 async function clearServerDraft(userId: string) {
-  await supabase.from(WIZARD_SERVER_DRAFT_TABLE).delete().eq("user_id", userId);
+  await (supabase.from(WIZARD_SERVER_DRAFT_TABLE) as any).delete().eq("user_id", userId);
 }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
