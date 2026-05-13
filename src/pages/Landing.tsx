@@ -73,33 +73,18 @@ const css = `
 export default function Landing() {
   const { user, loading } = useAuth();
 
-  useEffect(() => {
-    document.title = "ContentForge — AI-powered weekly content calendars";
-    let desc = document.querySelector('meta[name="description"]');
-    if (!desc) {
-      desc = document.createElement("meta");
-      desc.setAttribute("name", "description");
-      document.head.appendChild(desc);
-    }
-    desc.setAttribute("content", "Turn one brief into a week of on-brand posts for LinkedIn, X, Instagram, Facebook, newsletters, and blogs. Schedule, refine, and publish — all in one place.");
-
-    // JSON-LD
-    const id = "ld-jsonld";
-    document.getElementById(id)?.remove();
-    const ld = document.createElement("script");
-    ld.type = "application/ld+json";
-    ld.id = id;
-    ld.text = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      name: "ContentForge",
-      description: "AI-powered content calendar generator for social platforms.",
-      applicationCategory: "BusinessApplication",
-      operatingSystem: "Web",
-      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-    });
-    document.head.appendChild(ld);
-  }, []);
+  const pageTitle = "ContentForge — AI-powered weekly content calendars";
+  const pageDesc = "Turn one brief into a week of on-brand posts for LinkedIn, X, Instagram, Facebook, newsletters, and blogs. Schedule, refine, and publish — all in one place.";
+  const canonical = "https://contentforged.lovable.app/";
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "ContentForge",
+    description: "AI-powered content calendar generator for social platforms.",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  };
 
   if (loading) return null;
   if (user) return <Navigate to="/app" replace />;
