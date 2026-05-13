@@ -210,7 +210,7 @@ export default function Landing() {
         <footer>
           © {new Date().getFullYear()} ContentForge · Built with care
         </footer>
-      </div>
+      </main>
     </>
   );
 }
