@@ -119,8 +119,17 @@ export default function AuthPage() {
 
   return (
     <>
+      <Helmet>
+        <title>Sign in or create an account — ContentForge</title>
+        <meta name="description" content="Sign in to ContentForge or create a free account to generate AI-powered weekly content calendars for LinkedIn, X, Instagram, and more." />
+        <link rel="canonical" href="https://contentforged.lovable.app/auth" />
+        <meta property="og:title" content="Sign in to ContentForge" />
+        <meta property="og:description" content="Access your AI-powered content calendar workspace." />
+        <meta property="og:url" content="https://contentforged.lovable.app/auth" />
+        <meta name="robots" content="noindex, follow" />
+      </Helmet>
       <style>{css}</style>
-      <div className="auth-app">
+      <main className="auth-app">
         <div className="auth-card">
           <div className="auth-eyebrow">AI content studio</div>
           <h1 className="auth-title">Content<em>Forge</em></h1>
@@ -176,7 +185,7 @@ export default function AuthPage() {
             Continue with Google
           </button>
         </div>
-      </div>
+      </main>
     </>
   );
 }
