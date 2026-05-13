@@ -1,5 +1,5 @@
-import { useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/contexts/AuthContext";
 
 const css = `
