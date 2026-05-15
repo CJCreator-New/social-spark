@@ -1,8 +1,8 @@
 import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor, buildRawMarkdown, PLATFORM_LABELS, stripMarkdown } from "@/lib/platformCopy";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCalendarQuery, useProfileQuery, useScheduledPostsQuery, useCreateCalendarMutation } from "@/hooks/useAppQueries";
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
@@ -204,6 +204,7 @@ export default function CalendarDetail() {
   const [lockedDays, setLockedDays] = useState<Set<number>>(new Set());
   const [reformatTarget, setReformatTarget] = useState<string>("");
   const [reformatting, setReformatting] = useState(false);
+  const createCalendar = useCreateCalendarMutation();
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const copyMenuRef = useRef<HTMLDivElement>(null);
   const [exportingFormat, setExportingFormat] = useState<"md" | "pdf" | "ics" | null>(null);
@@ -221,55 +222,9 @@ export default function CalendarDetail() {
   const [tagReplacement, setTagReplacement] = useState("");
   const tzList = listTimezones();
 
-  // Load calendar data with React Query
-  const { data: calendarData, isLoading: calendarLoading, error: calendarError } = useQuery({
-    queryKey: ["calendar", id],
-    queryFn: async () => {
-      if (!id) throw new Error("No calendar ID");
-      const { data, error } = await supabase
-        .from("saved_calendars")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) throw new Error("Calendar not found");
-      return data;
-    },
-    enabled: !!id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  // Load profile data with React Query
-  const { data: profileData } = useQuery({
-    queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      const { data } = await supabase
-        .from("profiles")
-        .select("default_timezone, banned_hashtags, required_hashtags")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  // Load scheduled posts status with React Query
-  const { data: scheduledPostsData } = useQuery({
-    queryKey: ["scheduled-posts-status", id],
-    queryFn: async () => {
-      if (!id) return [];
-      const { data } = await supabase
-        .from("scheduled_posts")
-        .select("post_day, workflow_status")
-        .eq("calendar_id", id)
-        .neq("status", "cancelled");
-      return data || [];
-    },
-    enabled: !!id,
-    staleTime: 30 * 1000, // 30 seconds - more frequent updates for status
-  });
+  const { data: calendarData, isLoading: calendarLoading, error: calendarError } = useCalendarQuery(id);
+  const { data: profileData } = useProfileQuery(user?.id);
+  const { data: scheduledPostsData } = useScheduledPostsQuery(id);
 
   const handleTweakClickOutside = useCallback((e: MouseEvent) => {
     if (tweakRef.current && !tweakRef.current.contains(e.target as Node)) setTweakOpen(false);
@@ -347,15 +302,26 @@ export default function CalendarDetail() {
       }
       const newTitle = `${title} — ${targetPlatform}`;
       const newForm = { ...formPayload, platform: targetPlatform };
-      const { data: ins, error: insErr } = await supabase.from("saved_calendars").insert([{
-        user_id: user.id, title: newTitle, industry: formPayload.industry || null,
-        industry_label: industryLabel || null, platform: targetPlatform, core_idea: formPayload.coreIdea || null,
-        form_payload: newForm as never, posts: next as never, week_start_date: weekStart || null,
-        post_times: postTimes as never,
-      }]).select("id").single();
-      if (insErr) { toast.error(insErr.message); return; }
-      toast.success(`Reformatted for ${niceLabelFor(targetPlatform)} ✓`);
-      navigate(`/calendar/${ins.id}`);
+      try {
+        const payload = {
+          user_id: user.id,
+          title: newTitle,
+          industry: formPayload.industry || null,
+          industry_label: industryLabel || null,
+          platform: targetPlatform,
+          core_idea: formPayload.coreIdea || null,
+          form_payload: newForm,
+          posts: next,
+          week_start_date: weekStart || null,
+          post_times: postTimes,
+        };
+        const resp = await createCalendar.mutateAsync(payload as any);
+        toast.success(`Reformatted for ${niceLabelFor(targetPlatform)} ✓`);
+        navigate(`/calendar/${(resp as any).id}`);
+      } catch (insErr) {
+        toast.error(insErr instanceof Error ? insErr.message : String(insErr));
+        return;
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Reformat failed");
     } finally {

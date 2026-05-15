@@ -1698,6 +1698,11 @@
   .cf-app .inner {
     padding: 36px 16px 80px;
   }
+  /* Slightly improved calendar responsiveness: allow grid to wrap and larger touch targets */
+  .recent-list { display: flex; flex-direction: column; gap: 12px; }
+  .gen-wrap { padding: 18px; min-height: 260px; }
+  .stepper { overflow-x: auto; padding-bottom: 8px; }
+  .slabel { font-size: 12px; }
 
   .cf-app .brand-title {
     font-size: 30px;

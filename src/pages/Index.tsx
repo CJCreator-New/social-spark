@@ -4,9 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import storageService from "@/lib/storageService";
 import { createScopedLogger } from "@/lib/logger";
 import { getUserFriendlyMessage } from "@/lib/errors";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
+import telemetry from "@/lib/telemetry";
 import { downloadIcs, nextMonday, toDateInputValue, parseLocalDate, dateForDow, shortDateLabel } from "@/lib/calendarSchedule";
 import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform, niceLabelFor, buildRawMarkdown, stripMarkdown } from "@/lib/platformCopy";
 import { suggestedTimeForDay } from "@/lib/postingTimes";
@@ -17,9 +19,12 @@ import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
 import { DiffView } from "@/components/DiffView";
 import { ToneConsistencyChecker } from "@/components/ToneConsistencyChecker";
 import { InspirationBank } from "@/components/InspirationBank";
+import GenerateSkeleton from "@/components/GenerateSkeleton";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { useCreateCalendarMutation } from "@/hooks/useAppQueries";
 import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dragDrop";
 import { SAMPLE_FORM, SAMPLE_POSTS, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
+import mediaManager from "@/lib/mediaManager";
 
 function hasEmoji(text: string): boolean {
   return /\p{Emoji}/u.test(text);
@@ -713,19 +718,12 @@ function parseDraftEnvelope<T>(value: unknown): DraftEnvelope<T> | null {
 }
 
 function readDraftEnvelope<T>(key: string): DraftEnvelope<T> | null {
-  const raw = localStorage.getItem(key);
-  if (!raw) return null;
-
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    const envelope = parseDraftEnvelope<T>(parsed);
-    if (!envelope) {
-      localStorage.removeItem(key);
-      return null;
-    }
-    return envelope;
-  } catch {
-    localStorage.removeItem(key);
+    const env = storageService.loadDraft<DraftEnvelope<T>>(key);
+    return env ?? null;
+  } catch (e) {
+    // Ensure corrupt items are removed
+    storageService.removeDraft(key);
     return null;
   }
 }
@@ -735,7 +733,53 @@ function readDraft<T>(key: string): T | null {
 }
 
 function writeDraft<T>(key: string, data: T) {
-  localStorage.setItem(key, JSON.stringify(makeDraftEnvelope(data)));
+  // Save the draft envelope with a TTL matching the page's max age
+  try {
+    storageService.saveDraft<DraftEnvelope<T>>(key, makeDraftEnvelope(data), DRAFT_MAX_AGE_MS);
+  } catch (e) {
+    console.warn("writeDraft failed", e);
+  }
+}
+
+function extractMediaUrlsFromPosts(items: Post[]): string[] {
+  const urls = new Set<string>();
+  const urlRe = /(https?:\/\/[\w\-./?=&%]+\.(?:png|jpg|jpeg|webp))(?:\)|\s|$)/gi;
+
+  for (const post of items) {
+    const haystack = `${post.title || ""} ${post.hook || ""} ${post.body || ""} ${post.cta || ""}`;
+    let match: RegExpExecArray | null;
+    while ((match = urlRe.exec(haystack))) {
+      urls.add(match[1]);
+    }
+  }
+
+  return [...urls];
+}
+
+async function upsertMediaReferences(params: {
+  userId: string;
+  referenceKey: string;
+  bucket: string;
+  posts: Post[];
+}) {
+  const { userId, referenceKey, bucket, posts } = params;
+  const urls = extractMediaUrlsFromPosts(posts);
+  if (!urls.length) return;
+
+  await Promise.all(urls.map((publicUrl) =>
+    supabase.from("media_references").upsert({
+      user_id: userId,
+      bucket,
+      storage_path: publicUrl,
+      public_url: publicUrl,
+      reference_kind: bucket === "avatars" ? "avatar" : "calendar",
+      reference_key: referenceKey,
+      reference_count: 1,
+      last_referenced_at: new Date().toISOString(),
+      orphaned_at: null,
+      deleted_at: null,
+    }, { onConflict: "bucket,storage_path" })
+  ));
 }
 
 async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraftSnapshot> | null> {
@@ -764,19 +808,61 @@ async function clearServerDraft(userId: string) {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Simple in-memory dedupe map for generation requests to prevent duplicate in-flight calls
+const _pendingGenRequests = new Map<string, Promise<Response>>();
+
 async function fetchWithGenerationRetry(input: RequestInfo | URL, init: RequestInit, maxRetries = 2): Promise<Response> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      const res = await fetch(input, init);
-      if ((res.status === 429 || res.status >= 500) && attempt < maxRetries) {
-        await sleep(400 * Math.pow(2, attempt));
-        continue;
+  // Build a cheap dedupe key from URL + method + body
+  try {
+    const url = typeof input === "string" ? input : String(input);
+    const method = (init && init.method) || "GET";
+    const bodyKey = init && (init as any).body ? String((init as any).body) : "";
+    const dedupeKey = `${method.toUpperCase()}|${url}|${bodyKey}`;
+
+    if (_pendingGenRequests.has(dedupeKey)) {
+      return _pendingGenRequests.get(dedupeKey)!;
+    }
+
+    const p = (async () => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const res = await fetch(input, init);
+          if ((res.status === 429 || res.status >= 500) && attempt < maxRetries) {
+            await sleep(400 * Math.pow(2, attempt));
+            continue;
+          }
+          return res;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") throw error;
+          if (attempt >= maxRetries) throw error;
+          await sleep(400 * Math.pow(2, attempt));
+        }
       }
+    })();
+
+    _pendingGenRequests.set(dedupeKey, p);
+    try {
+      const res = await p;
       return res;
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") throw error;
-      if (attempt >= maxRetries) throw error;
-      await sleep(400 * Math.pow(2, attempt));
+    } finally {
+      // Ensure we remove the pending promise once settled
+      _pendingGenRequests.delete(dedupeKey);
+    }
+  } catch (e) {
+    // Fallback to normal fetch loop if any error building the key
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const res = await fetch(input, init);
+        if ((res.status === 429 || res.status >= 500) && attempt < maxRetries) {
+          await sleep(400 * Math.pow(2, attempt));
+          continue;
+        }
+        return res;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") throw error;
+        if (attempt >= maxRetries) throw error;
+        await sleep(400 * Math.pow(2, attempt));
+      }
     }
   }
 }
@@ -810,6 +896,8 @@ const Index = () => {
   const [reformatting, setReformatting] = useState(false);
   const [recoveryDraft, setRecoveryDraft] = useState<WizardDraftSnapshot | null>(null);
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const autosaveClearTimer = useRef<number | null>(null);
   const [showRationale, setShowRationale] = useState(false);
   const [showSubtopicConfirm, setShowSubtopicConfirm] = useState(false);
   const [subtopicPreview, setSubtopicPreview] = useState<string[]>([]);
@@ -828,6 +916,7 @@ const Index = () => {
   const topicsRef = useRef<HTMLDivElement>(null);
   const tweakRef = useRef<HTMLDivElement>(null);
   const copyMenuRef = useRef<HTMLDivElement>(null);
+  const createCalendarMutation = useCreateCalendarMutation();
 
   // Undo/redo hook for post history
   const { state: postsHistory, setState: setPostsWithHistory, undo: undoChange, redo: redoChange, canUndo, canRedo } = useUndoRedo<Post[]>(posts);
@@ -1004,6 +1093,13 @@ const Index = () => {
     setRecoveryDraft(null);
     setShowRecoveryDialog(false);
 
+    // Remove any expired local drafts early to avoid showing stale recovery
+    try {
+      storageService.cleanupExpiredDrafts();
+    } catch (e) {
+      /* ignore */
+    }
+
     const hydrateDraft = async () => {
       try {
         const localDraft = readDraftEnvelope<WizardDraftSnapshot>(wizardDraftKey);
@@ -1098,7 +1194,35 @@ const Index = () => {
           activeDay,
           postTimes,
         };
-        writeDraft(wizardDraftKey, snapshot);
+        try {
+          setAutosaveStatus("saving");
+          writeDraft(wizardDraftKey, snapshot);
+          // Persist media references found in posts for orphan cleanup later
+          try {
+            // simple extractor for image urls in post bodies
+            const urlRe = /(https?:\/\/[\w\-./?=&%]+\.(?:png|jpg|jpeg|webp))(?:\)|\s|$)/gi;
+            for (const p of posts) {
+              const hay = `${(p.title || "")} ${(p.hook || "")} ${(p.body || "")} ${(p.cta || "")}`;
+              let m: RegExpExecArray | null;
+              while ((m = urlRe.exec(hay))) {
+                try { (await import("@/lib/mediaManager")).default.addMediaRef(wizardDraftKey, m[1]); } catch {}
+              }
+            }
+          } catch {}
+          setAutosaveStatus("saved");
+          if (autosaveClearTimer.current) window.clearTimeout(autosaveClearTimer.current);
+          autosaveClearTimer.current = window.setTimeout(() => {
+            setAutosaveStatus("idle");
+            autosaveClearTimer.current = null;
+          }, 2000);
+        } catch (e) {
+          setAutosaveStatus("error");
+          if (autosaveClearTimer.current) window.clearTimeout(autosaveClearTimer.current);
+          autosaveClearTimer.current = window.setTimeout(() => {
+            setAutosaveStatus("idle");
+            autosaveClearTimer.current = null;
+          }, 3000);
+        }
         if (user) {
           void writeServerDraft(user.id, snapshot).catch((error) => {
             console.warn("Failed to autosave wizard draft", error);
@@ -1118,7 +1242,7 @@ const Index = () => {
 
   const clearDraft = () => {
     try {
-      if (wizardDraftKey) localStorage.removeItem(wizardDraftKey);
+      if (wizardDraftKey) storageService.removeDraft(wizardDraftKey);
       if (user) {
         void clearServerDraft(user.id).catch((error) => {
           console.warn("Failed to clear server draft", error);
@@ -1214,6 +1338,7 @@ const Index = () => {
     generatingRef.current = true;
     setIsGenerating(true);
     setLastGenerationError(null);
+    if (typeof telemetry?.sendEvent === "function") telemetry.sendEvent("generate_start", { user: user?.id, mode: form.mode });
     setStep(3); setGenStep(0); setGenMsg(GEN_MSGS[0]); setSavedId(null);
 
     // Cycle the friendly status messages on a steady cadence; the bar itself is indeterminate.
@@ -1319,8 +1444,10 @@ const Index = () => {
       setPostTimes(seedTimes);
       setTimeout(() => setStep(4), 350);
       log.info(`Generation completed successfully`, { mode, postCount: result.length });
+      if (typeof telemetry?.sendEvent === "function") telemetry.sendEvent("generate_success", { user: user?.id, mode: form.mode, postCount: result.length });
       toast.success(`${isRetry ? 'Regenerated' : 'Generated'} ${isDay ? 'post' : 'week'} successfully`);
     } catch (err) {
+      if (typeof telemetry?.sendEvent === "function") telemetry.sendEvent("generate_error", { user: user?.id, mode: form.mode, error: String(err) });
       cleanup();
       const aborted = err instanceof DOMException && err.name === "AbortError";
       const reason = (ac.signal as AbortSignal & { reason?: unknown }).reason;
@@ -1545,26 +1672,23 @@ const Index = () => {
       // Save as new calendar
       const title = `${form.coreIdea.slice(0, 60) || selectedIndustry?.label || "Calendar"} — ${targetPlatform}`;
       const newForm = { ...form, platform: targetPlatform };
-      const { data: ins, error: insErr } = await supabase
-        .from("saved_calendars")
-        .insert([{
-          user_id: user.id,
-          title,
-          industry: form.industry,
-          industry_label: selectedIndustry?.label || form.industry,
-          platform: targetPlatform,
-          core_idea: form.coreIdea,
-          form_payload: newForm as never,
-          posts: next as never,
-          week_start_date: form.weekStart || null,
-          post_times: postTimes as never,
-        }])
-        .select("id")
-        .single();
-      if (insErr) {
-        toast.error(insErr.message);
-        return;
+      const ins = await createCalendarMutation.mutateAsync({
+        user_id: user.id,
+        title,
+        industry: form.industry,
+        industry_label: selectedIndustry?.label || form.industry,
+        platform: targetPlatform,
+        core_idea: form.coreIdea,
+        form_payload: newForm,
+        posts: next,
+        week_start_date: form.weekStart || null,
+        post_times: postTimes,
+      } as any);
+      if (!ins?.id) throw new Error("Reformat save failed");
+      for (const url of extractMediaUrlsFromPosts(next)) {
+        mediaManager.addMediaRef(String(ins.id), url);
       }
+      await upsertMediaReferences({ userId: user.id, referenceKey: String(ins.id), bucket: "calendars", posts: next });
       toast.success(`Reformatted for ${niceLabelFor(targetPlatform)} ✓ — opening new calendar`);
       navigate(`/calendar/${ins.id}`);
     } catch (e) {
@@ -1722,32 +1846,39 @@ ${postText(p)}
   async function saveCalendar() {
     if (!user || posts.length === 0) return;
     setSaving(true);
-    const isDay = form.mode === "day" && posts.length === 1;
-    const baseTitle = form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`;
-    const title = isDay
-      ? `${(form.topics[0] || baseTitle).slice(0, 60)} · ${form.platform} · ${form.targetDate}`
-      : baseTitle;
-    const { data, error: insErr } = await supabase
-      .from("saved_calendars")
-      .insert([{
+    try {
+      const isDay = form.mode === "day" && posts.length === 1;
+      const baseTitle = form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`;
+      const title = isDay
+        ? `${(form.topics[0] || baseTitle).slice(0, 60)} · ${form.platform} · ${form.targetDate}`
+        : baseTitle;
+      const payload = {
         user_id: user.id,
         title,
         industry: form.industry,
         industry_label: selectedIndustry?.label || form.industry,
         platform: form.platform,
         core_idea: form.coreIdea,
-        form_payload: form as never,
-        posts: posts as never,
+        form_payload: form,
+        posts,
         week_start_date: (isDay ? form.targetDate : form.weekStart) || null,
-        post_times: postTimes as never,
-      }])
-      .select("id")
-      .single();
-    setSaving(false);
-    if (insErr) { toast.error(insErr.message); return; }
-    setSavedId(data.id);
-    clearDraft();
-    toast.success("Calendar saved");
+        post_times: postTimes,
+      };
+
+      const data = await createCalendarMutation.mutateAsync(payload as any);
+      if (!data?.id) throw new Error("Calendar save failed");
+      for (const url of extractMediaUrlsFromPosts(posts)) {
+        mediaManager.addMediaRef(String(data.id), url);
+      }
+      await upsertMediaReferences({ userId: user.id, referenceKey: String(data.id), bucket: "calendars", posts });
+      setSavedId(data.id);
+      clearDraft();
+      toast.success("Calendar saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Calendar save failed");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function exportIcs() {
@@ -1810,6 +1941,11 @@ ${postText(p)}
             <Link to="/profile" style={{ color: "#7a7a8e", textDecoration: "none", padding: "6px 10px" }}>Profile</Link>
             <span style={{ color: "#3a3a50" }}>·</span>
             <span style={{ color: "#9a9aae", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email}</span>
+            {autosaveStatus !== "idle" && (
+              <span style={{ fontSize: 12, color: autosaveStatus === "error" ? "#e66" : "#9a9aae", marginLeft: 8 }}>
+                {autosaveStatus === "saving" ? "Saving draft…" : autosaveStatus === "saved" ? "Draft saved" : "Draft save failed"}
+              </span>
+            )}
             <button onClick={async () => { await signOut(); navigate("/auth"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#9a9aae", padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "Sora, sans-serif" }}>Sign out</button>
           </div>
 
@@ -2235,6 +2371,14 @@ ${postText(p)}
                     {l}
                   </div>
                 ))}
+              </div>
+              {/* Visual skeleton of calendar so users see expected output shape while waiting */}
+              <div style={{ marginTop: 18 }}>
+                {/* Lazy-load the skeleton to keep bundle small */}
+                <React.Suspense fallback={null}>
+                  {/* @ts-ignore */}
+                  <GenerateSkeleton />
+                </React.Suspense>
               </div>
               <button
                 onClick={cancelGeneration}

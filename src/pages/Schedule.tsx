@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,8 @@ import { buildTrackingUrl } from "@/lib/utm";
 type WorkflowStatus = "drafted" | "approved" | "published" | "failed";
 type SortKey = "date-asc" | "date-desc" | "platform" | "status";
 const PAGE_SIZE = 25;
+
+type ScheduleCursor = { scheduled_at: string; id: string } | null;
 
 interface ScheduledRow {
   id: string;
@@ -35,6 +37,13 @@ interface CalendarMeta {
   title: string;
   timezone: string | null;
   tracking_url: string | null;
+}
+
+interface SchedulePage {
+  rows: ScheduledRow[];
+  calendars: Map<string, CalendarMeta>;
+  profileTz: string;
+  nextCursor: ScheduleCursor;
 }
 
 const css = `
@@ -100,6 +109,7 @@ export default function Schedule() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const tzList = listTimezones();
   const log = createScopedLogger('Schedule');
 
@@ -107,15 +117,15 @@ export default function Schedule() {
     queryKey: ["schedule", user?.id],
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
-    initialPageParam: null as string | null,
-    getNextPageParam: (lastPage: { rows: ScheduledRow[]; calendars: Map<string, CalendarMeta>; profileTz: string; nextCursor: string | null }) => lastPage.nextCursor,
-    queryFn: async ({ pageParam }) => {
+    initialPageParam: null as ScheduleCursor,
+    getNextPageParam: (lastPage: SchedulePage) => lastPage.nextCursor,
+    queryFn: async ({ pageParam }): Promise<SchedulePage> => {
       if (!user) {
         return {
           rows: [] as ScheduledRow[],
           calendars: new Map<string, CalendarMeta>(),
           profileTz: browserTimezone(),
-          nextCursor: null as string | null,
+          nextCursor: null,
         };
       }
 
@@ -125,7 +135,12 @@ export default function Schedule() {
         supabase.from("scheduled_posts")
           .select("id, calendar_id, post_day, platform, scheduled_at, status, workflow_status, copy_text, post_snapshot, published_at, failure_reason")
           .neq("status", "cancelled")
-          .order("scheduled_at", { ascending: true }),
+          .order("scheduled_at", { ascending: true })
+          .order("id", { ascending: true })
+          .limit(PAGE_SIZE)
+          .or(pageParam
+            ? `scheduled_at.gt.${pageParam.scheduled_at},and(scheduled_at.eq.${pageParam.scheduled_at},id.gt.${pageParam.id})`
+            : undefined),
         supabase.from("saved_calendars").select("id, title, timezone, tracking_url"),
       ]);
 
@@ -143,7 +158,8 @@ export default function Schedule() {
       }
 
       const items = (schedData as ScheduledRow[]) || [];
-      const nextCursor = items.length === PAGE_SIZE ? items[items.length - 1]?.scheduled_at : null;
+      const lastItem = items[items.length - 1];
+      const nextCursor = items.length === PAGE_SIZE && lastItem ? { scheduled_at: lastItem.scheduled_at, id: lastItem.id } : null;
 
       log.info(`Loaded ${items.length || 0} scheduled posts`, { count: items.length });
       return {
@@ -164,6 +180,19 @@ export default function Schedule() {
     setRows(pages.flatMap(page => page.rows));
     setCalendars(firstPage.calendars);
   }, [scheduleData]);
+
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        void fetchNextPage();
+      }
+    }, { rootMargin: "400px" });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, rows.length]);
 
   useEffect(() => {
     if (scheduleError instanceof Error) toast.error(scheduleError.message);
@@ -318,7 +347,7 @@ export default function Schedule() {
           )}
 
           {hasNextPage && (
-            <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+            <div ref={loadMoreRef} style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
               <button className="sc-act" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
                 {isFetchingNextPage ? "Loading more…" : "Load more"}
               </button>

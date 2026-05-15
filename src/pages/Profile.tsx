@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import mediaManager from "@/lib/mediaManager";
+import { useProfileQuery, useProfileUpdateMutation } from "@/hooks/useAppQueries";
 import { toast } from "sonner";
 import { normalizeTag, displayTag, parsePolicyList } from "@/lib/hashtagPolicy";
 import { listTimezones, browserTimezone, tzLabel } from "@/lib/timezones";
@@ -152,23 +154,23 @@ export default function Profile() {
     }
   }
 
+  const { data: profileData } = useProfileQuery(user?.id);
+  const updateProfile = useProfileUpdateMutation(user?.id);
+
   useEffect(() => {
-    if (!user) return;
-    supabase.from("profiles").select("display_name, avatar_url, default_voice, default_style, default_audiences, default_goals, banned_hashtags, required_hashtags, default_timezone").eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => {
-        setDisplayName(data?.display_name || "");
-        setAvatarUrl(data?.avatar_url || "");
-        setDefaultVoice(data?.default_voice || "");
-        setDefaultStyle(data?.default_style || "");
-        setDefaultAudiences(data?.default_audiences || []);
-        setDefaultGoals(data?.default_goals || []);
-        const d = data as { banned_hashtags?: string[] | null; required_hashtags?: string[] | null; default_timezone?: string | null } | null;
-        setBannedHashtags(parsePolicyList(d?.banned_hashtags));
-        setRequiredHashtags(parsePolicyList(d?.required_hashtags));
-        setDefaultTimezone(d?.default_timezone || browserTimezone());
-        setLoading(false);
-      });
-  }, [user]);
+    if (!profileData) return;
+    setDisplayName(profileData.display_name || "");
+    setAvatarUrl(profileData.avatar_url || "");
+    setDefaultVoice(profileData.default_voice || "");
+    setDefaultStyle(profileData.default_style || "");
+    setDefaultAudiences(profileData.default_audiences || []);
+    setDefaultGoals(profileData.default_goals || []);
+    const d = profileData as { banned_hashtags?: string[] | null; required_hashtags?: string[] | null; default_timezone?: string | null } | null;
+    setBannedHashtags(parsePolicyList(d?.banned_hashtags));
+    setRequiredHashtags(parsePolicyList(d?.required_hashtags));
+    setDefaultTimezone(d?.default_timezone || browserTimezone());
+    setLoading(false);
+  }, [profileData]);
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -198,9 +200,28 @@ export default function Profile() {
       return toast.error(updErr.message);
     }
     setAvatarUrl(newUrl);
+    try { mediaManager.addMediaRef(user.id, newUrl); } catch {}
+    await supabase.from("media_references").upsert({
+      user_id: user.id,
+      bucket: "avatars",
+      storage_path: path,
+      public_url: newUrl,
+      reference_kind: "avatar",
+      reference_key: user.id,
+      reference_count: 1,
+      last_referenced_at: new Date().toISOString(),
+      orphaned_at: null,
+      deleted_at: null,
+    }, { onConflict: "bucket,storage_path" });
     if (previousUrl) {
       const oldPath = getAvatarPathFromPublicUrl(previousUrl);
       if (oldPath && oldPath !== path) void supabase.storage.from("avatars").remove([oldPath]);
+      if (oldPath && oldPath !== path) {
+        void supabase.from("media_references")
+          .update({ reference_count: 0, orphaned_at: new Date().toISOString(), last_referenced_at: new Date().toISOString() })
+          .eq("bucket", "avatars")
+          .eq("storage_path", oldPath);
+      }
     }
     if (fileRef.current) fileRef.current.value = "";
     setUploading(false);
@@ -256,9 +277,8 @@ export default function Profile() {
       default_timezone: defaultTimezone || null,
     };
     if (displayName.trim()) updates.display_name = displayName.trim();
-    const { error } = await supabase.from("profiles").update(updates).eq("user_id", user.id);
+    await updateProfile.mutateAsync(updates);
     setSaving(false);
-    if (error) return toast.error(error.message);
     toast.success("Profile updated");
   }
 

@@ -1,3 +1,43 @@
+import React from "react";
+import { createScopedLogger } from "@/lib/logger";
+
+const log = createScopedLogger("ErrorBoundary");
+
+type Props = { children: React.ReactNode };
+type State = { hasError: boolean; error?: Error | null };
+
+export class ErrorBoundary extends React.Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    log.error("Unhandled error caught by ErrorBoundary", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, textAlign: "center" }}>
+          <h2>Something went wrong</h2>
+          <p>We're sorry — an unexpected error occurred. You can try reloading the app.</p>
+          <div style={{ marginTop: 16 }}>
+            <button onClick={() => window.location.reload()} style={{ padding: "8px 12px", borderRadius: 6 }}>Reload</button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export default ErrorBoundary;
 import { Component, ReactNode, ErrorInfo } from 'react';
 import { logger } from '@/lib/logger';
 import { getUserFriendlyMessage } from '@/lib/errors';
