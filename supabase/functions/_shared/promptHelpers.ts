@@ -49,6 +49,40 @@ export function bannedPhrasesBlock(): string {
   return `BANNED PHRASES — do NOT use any of these or close variants:\n${BANNED_PHRASES.map(p => `- "${p}"`).join("\n")}\nAvoid empty hype openers. Open with a specific observation, number, or contrarian claim instead.`;
 }
 
+export function buildEngagementRules(platform: string): string {
+  const platformGuidance = (() => {
+    switch (platform) {
+      case "LinkedIn":
+        return "Thoughtful, credible, insight-led. Lead with a sharp point of view or a useful observation, then back it up with specifics.";
+      case "Instagram":
+        return "Punchy, visual, story-driven. Use vivid language, make the opening scroll-stopping, and keep the rhythm lively.";
+      case "X":
+        return "Concise, sharp, opinionated. Keep the post tight, direct, and easy to quote or reply to.";
+      case "Facebook":
+        return "Warm, conversational, community-first. Sound human, approachable, and easy to react to or share.";
+      default:
+        return "Native to the platform. Match the platform's expectations and keep the tone natural.";
+    }
+  })();
+
+  return `\nENGAGEMENT RULES:\n- Open with a strong hook in the first line, not a summary.\n- Focus on one clear idea only.\n- Use concrete examples, numbers, or short stories whenever possible.\n- Avoid vague hype, filler, and overused marketing phrases.\n- End with a CTA that matches the goal: question, invitation, comment prompt, save/share prompt, or next step.\n- ${platformGuidance}`;
+}
+
+export function getPlatformPreset(platform: string): string {
+  switch (platform) {
+    case "LinkedIn":
+      return `\nPLATFORM PRESCRIPT: LinkedIn posts should open with a professional insight or data point, include a short explanation, and end with a discussion prompt. Example hook: "70% of startups fail because..."`;
+    case "Instagram":
+      return `\nPLATFORM PRESCRIPT: Instagram captions should start with a scroll-stopping line, include a 1-2 sentence micro-story or vivid image, and a short CTA like "Save this" or "Share your story".`;
+    case "X":
+      return `\nPLATFORM PRESCRIPT: X posts must be concise (one to three short sentences), bold in opinion, and formatted for quick replies and retweets. Avoid long explanations.`;
+    case "Facebook":
+      return `\nPLATFORM PRESCRIPT: Facebook posts can be slightly longer, warm, and community-focused. Invite comments and sharing; include a clear question.`;
+    default:
+      return `\nPLATFORM PRESCRIPT: Match the platform's native style.`;
+  }
+}
+
 export function normTag(s: string): string {
   return `#${String(s || "").trim().replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase()}`;
 }
@@ -234,9 +268,8 @@ export function fixSpelling(text: string): string {
   }
   return result;
 }
-
-function buildContentRules(): string {
-  return `\nCONTENT RULES:\n- Do not use markdown syntax in post text: no **bold**, *italic*, headings, or inline code.\n- Use plain-text bullets only (• or →). Do not combine bullets with markdown formatting.\n- Rotate CTA verbs across the week; do not repeat the same CTA verb on every post.\n- Stay tightly within the user's stated topic angle; do not introduce tangential sub-topics unless requested.\n- If the topic is India-specific, incorporate current Indian trends (Digital India, EV adoption, startup ecosystem), regional contexts (North/South/East/West differences), and cultural references (jugaad innovation, dharma/responsibility themes) where relevant.\n- Reference upcoming festivals (Diwali, Holi, Durga Puja) and national events (Republic Day) in seasonal content.\n- Use American English spelling: optimizing, organizing, recognizing, analyzing, utilizing, emphasizing.\n- Avoid British spellings such as organising, optimising, recognising, analysing, utilising, emphasising.`;
+function buildContentRules(platform: string): string {
+  return `\nCONTENT RULES:\n- Do not use markdown syntax in post text: no **bold**, *italic*, headings, or inline code.\n- Use plain-text bullets only (• or →). Do not combine bullets with markdown formatting.\n- Rotate CTA verbs across the week; do not repeat the same CTA verb on every post.\n- Stay tightly within the user's stated topic angle; do not introduce tangential sub-topics unless requested.\n- Keep the post platform-native: LinkedIn = insight-led, Instagram = visual/story-driven, X = concise/opinionated, Facebook = warm/community-first.\n- If the topic is India-specific, incorporate current Indian trends (Digital India, EV adoption, startup ecosystem), regional contexts (South/North/East/West differences), and cultural references (jugaad innovation, dharma/responsibility themes) where relevant.\n- Reference upcoming festivals (Diwali, Holi, Durga Puja) and national events (Republic Day) in seasonal content.\n- Use American English spelling: optimizing, organizing, recognizing, analyzing, utilizing, emphasizing.\n- Avoid British spellings such as organising, optimising, recognising, analysing, utilising, emphasising.${buildEngagementRules(platform)}`;
 }
 
 /**
@@ -331,9 +364,10 @@ export function buildPromptContext(
 - Writing style: ${style}
 - Goals: ${goals}
 ${topicLine}- Post format mix: ${payload.format}
-- CTA approach: ${payload.cta}${buildContentRules()}`;
+- CTA approach: ${payload.cta}${buildContentRules(payload.platform)}`;
 
-  return context;
+  // Append a short platform preset to help the model match native conventions
+  return context + getPlatformPreset(payload.platform);
 }
 
 /**
@@ -451,15 +485,25 @@ export function normalizePost(
   }
 
   const p = post as Record<string, unknown>;
+  const rawHookOptions = Array.isArray(p.hook_options) ? (p.hook_options as unknown[]).map(h => String(h || "")) : undefined;
+  const rawCtaOptions = Array.isArray(p.cta_options) ? (p.cta_options as unknown[]).map(c => String(c || "")) : undefined;
+
+  const hookOptions = rawHookOptions ? rawHookOptions.map(h => fixSpelling(h)) : (p.hook ? [fixSpelling(String(p.hook || ""))] : []);
+  const ctaOptions = rawCtaOptions ? rawCtaOptions.map(c => fixSpelling(c)) : (p.cta ? [fixSpelling(String(p.cta || ""))] : []);
+
   return {
     day: 1,
     dow: overrideDow || p.dow || "Mon",
     topic: p.topic || "",
     format: p.format || "",
     title: fixSpelling(String(p.title || "")),
-    hook: fixSpelling(String(p.hook || "")),
+    // primary hook (first option) and full variants
+    hook: hookOptions.length ? hookOptions[0] : "",
+    hook_options: hookOptions,
     body: fixSpelling(String(p.body || "")),
-    cta: fixSpelling(String(p.cta || "")),
+    // primary CTA and full variants
+    cta: ctaOptions.length ? ctaOptions[0] : "",
+    cta_options: ctaOptions,
     hashtags: payload
       ? applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags)
       : p.hashtags || "",

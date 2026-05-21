@@ -2,7 +2,7 @@ import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor, bui
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useCalendarQuery, useProfileQuery, useScheduledPostsQuery, useCreateCalendarMutation } from "@/hooks/useAppQueries";
+import { useCalendarQuery, useProfileQuery, useProfileUpdateMutation, useScheduledPostsQuery, useCreateCalendarMutation, useRegeneratePostMutation, useUpdateSavedCalendarMutation } from "@/hooks/useAppQueries";
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
@@ -17,13 +17,17 @@ import {
 import { suggestedTimeForDay } from "@/lib/postingTimes";
 import { applyPolicy, parsePolicyList, parseHashtagsString, normalizeTag, displayTag, HashtagPolicy } from "@/lib/hashtagPolicy";
 import { insightFor } from "@/lib/postInsights";
+import PostInsights from "@/components/PostInsights";
 import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
 import { buildTrackingUrl } from "@/lib/utm";
 import { useAuth } from "@/contexts/AuthContext";
+import FeedbackModal from "@/components/FeedbackModal";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
   title: string; hook: string; body: string; cta: string; hashtags: string; rationale: string;
+  hook_options?: string[];
+  cta_options?: string[];
 }
 
 interface FormPayload {
@@ -53,6 +57,19 @@ const css = `
 .cd-back:hover { color:#c8f09a; }
 .cd-title { font-family:'Playfair Display',serif; font-size:28px; font-weight:400; margin:14px 0 6px; }
 .cd-meta { font-size:12px; color:#7a7a8e; margin-bottom:24px; }
+.cd-hero { display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);gap:14px;align-items:stretch;margin:18px 0 18px; }
+.cd-hero-main,.cd-hero-side { background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:20px; padding:20px; }
+.cd-hero-main { background:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01)); }
+.cd-hero-side { background:linear-gradient(180deg,rgba(200,240,154,0.06),rgba(255,255,255,0.01)); display:grid; gap:10px; }
+.cd-hero-kicker { font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:#c8f09a;font-weight:500;margin-bottom:12px; }
+.cd-hero-title { font-family:'Playfair Display',serif; font-size:30px; font-weight:400; line-height:1.08; letter-spacing:-.4px; margin:0 0 10px; max-width:15ch; }
+.cd-hero-copy { font-size:13px; color:#7a7a8e; line-height:1.7; margin:0 0 16px; max-width:54ch; }
+.cd-hero-chiprow { display:flex;flex-wrap:wrap;gap:8px; }
+.cd-hero-chip { display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,.02);font-size:11px;color:#9a9aae; }
+.cd-hero-card { border:1px solid rgba(255,255,255,0.08);background:#07080d;border-radius:16px;padding:14px 15px; }
+.cd-hero-card span { display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#7a7a8e;font-weight:500;margin-bottom:6px; }
+.cd-hero-card strong { display:block;font-family:'Playfair Display',serif;font-size:22px;font-weight:400;color:#edeae3;line-height:1.15;margin-bottom:3px; }
+.cd-hero-card small { display:block;font-size:11px;color:#5a5a72;line-height:1.5; }
 .cd-strip { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-bottom:18px; }
 .cd-tab { padding:10px 4px; border-radius:8px; border:1px solid rgba(255,255,255,0.055); text-align:center; cursor:pointer; background:#0d0f18; font-family:'Sora',sans-serif; color:inherit; width:100%; transition:border-color .15s; }
 .cd-tab:hover { border-color:rgba(255,255,255,0.12); }
@@ -168,6 +185,13 @@ const css = `
 .cd-status-dot.published { background:#c8f09a; }
 .cd-status-dot.failed { background:#f09a9a; }
 .cd-tab-status { position:absolute; top:3px; left:4px; width:5px; height:5px; border-radius:50%; }
+
+@media (max-width: 760px) {
+  .cd-app { padding:28px 16px 80px; }
+  .cd-hero { grid-template-columns:1fr; }
+  .cd-hero-title { font-size:26px; max-width:none; }
+  .cd-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
 `;
 
 function wordCount(s: string): number {
@@ -205,16 +229,20 @@ export default function CalendarDetail() {
   const [reformatTarget, setReformatTarget] = useState<string>("");
   const [reformatting, setReformatting] = useState(false);
   const createCalendar = useCreateCalendarMutation();
+  const regenerateMutation = useRegeneratePostMutation(id);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const copyMenuRef = useRef<HTMLDivElement>(null);
   const [exportingFormat, setExportingFormat] = useState<"md" | "pdf" | "ics" | null>(null);
   const [bulkRegenerating, setBulkRegenerating] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [timezone, setTimezone] = useState<string>(browserTimezone());
   const [profileTimezone, setProfileTimezone] = useState<string>("");
   const [trackingUrl, setTrackingUrl] = useState<string>("");
+  const [variantSaving, setVariantSaving] = useState<{ day: number; field: "hook" | "cta" } | null>(null);
   const [lockedHashtags, setLockedHashtags] = useState<Record<string, string[]>>({});
   const [profilePolicy, setProfilePolicy] = useState<HashtagPolicy>({ banned: [], required: [] });
   const [statusByDay, setStatusByDay] = useState<Record<number, "drafted" | "approved" | "published" | "failed">>({});
@@ -225,6 +253,8 @@ export default function CalendarDetail() {
   const { data: calendarData, isLoading: calendarLoading, error: calendarError } = useCalendarQuery(id);
   const { data: profileData } = useProfileQuery(user?.id);
   const { data: scheduledPostsData } = useScheduledPostsQuery(id);
+  const updateCalendarMutation = useUpdateSavedCalendarMutation(id);
+  const updateProfileMutation = useProfileUpdateMutation(user?.id);
 
   const handleTweakClickOutside = useCallback((e: MouseEvent) => {
     if (tweakRef.current && !tweakRef.current.contains(e.target as Node)) setTweakOpen(false);
@@ -413,18 +443,52 @@ export default function CalendarDetail() {
     if (!draft || !id) return;
     setSaving(true);
     const updated = posts.map((p, i) => i === active ? draft : p);
-    const { error } = await supabase.from("saved_calendars")
-      .update({ posts: updated as unknown as never })
-      .eq("id", id);
+    try {
+      await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
+    } catch (error) {
+      setSaving(false);
+      return toast.error(error instanceof Error ? error.message : "Save failed");
+    }
     setSaving(false);
-    if (error) return toast.error(error.message);
     setPosts(updated);
     setEditing(false);
     setDraft(null);
     toast.success("Post updated");
   }
 
-  async function regenerateDay(tweak?: TweakKind) {
+  async function selectHookVariant(day: number, variant: string) {
+    const previous = posts;
+    const updated = previous.map(p => p.day === day ? { ...p, hook: variant } : p);
+    setPosts(updated);
+    setVariantSaving({ day, field: "hook" });
+    try {
+      await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
+      toast.success("Hook variant saved");
+    } catch (error) {
+      setPosts(previous);
+      toast.error(error instanceof Error ? error.message : "Failed to save hook variant");
+    } finally {
+      setVariantSaving(prev => prev?.day === day && prev?.field === "hook" ? null : prev);
+    }
+  }
+
+  async function selectCtaVariant(day: number, variant: string) {
+    const previous = posts;
+    const updated = previous.map(p => p.day === day ? { ...p, cta: variant } : p);
+    setPosts(updated);
+    setVariantSaving({ day, field: "cta" });
+    try {
+      await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
+      toast.success("CTA variant saved");
+    } catch (error) {
+      setPosts(previous);
+      toast.error(error instanceof Error ? error.message : "Failed to save CTA variant");
+    } finally {
+      setVariantSaving(prev => prev?.day === day && prev?.field === "cta" ? null : prev);
+    }
+  }
+
+  async function regenerateDay(tweak?: TweakKind, feedback?: string, category?: string, rating?: number) {
     const log = createScopedLogger('CalendarDetail-RegenerateDay');
     if (!id || regenerating || editing) return;
     const target = posts[active];
@@ -441,63 +505,59 @@ export default function CalendarDetail() {
           cta: stripMarkdown(target.cta),
         };
         const updated = posts.map((p, i) => (i === active ? cleaned : p));
-        const { error: cleanErr } = await supabase.from("saved_calendars")
-          .update({ posts: updated as unknown as never })
-          .eq("id", id);
-        if (cleanErr) {
+        try {
+          await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
+        } catch (cleanErr) {
           log.error(`Failed to save cleaned post`, cleanErr, { calendarId: id, day: target.day });
-          toast.error(cleanErr.message);
+          toast.error(cleanErr instanceof Error ? cleanErr.message : "Failed to save cleaned post");
           return;
         }
         setPosts(updated);
         toast.success(`Day ${target.day} formatting cleaned ✓`);
         return;
       }
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
-        },
-        body: JSON.stringify({
-          industry: formPayload.industry || "",
-          industryLabel,
-          platform: platform || formPayload.platform || "LinkedIn",
-          coreIdea: formPayload.coreIdea || title,
-          audiences: formPayload.audiences || [],
-          voice: formPayload.voice || "",
-          style: formPayload.style || "",
-          goals: formPayload.goals || [],
-          format: formPayload.format || "Balanced mix",
-          cta: formPayload.cta || "Share & repost bait",
-          length: formPayload.length || "medium",
-          structure: formPayload.structure || "mixed",
-          extra: formPayload.extra || "",
-          bannedWords: formPayload.bannedWords || [],
-          requiredWords: formPayload.requiredWords || [],
-          post: target,
-          siblings: posts,
-          tweak,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.error || !data?.post) {
-        const errorMsg = data?.error || `Regenerate failed (${res.status}).`;
-        log.warn(`Regenerate failed for day ${target.day}`, new Error(errorMsg), { status: res.status, day: target.day, tweak });
-        toast.error(data?.error || `Regenerate failed (${res.status}).`);
+      const payload = {
+        industry: formPayload.industry || "",
+        industryLabel,
+        platform: platform || formPayload.platform || "LinkedIn",
+        coreIdea: formPayload.coreIdea || title,
+        audiences: formPayload.audiences || [],
+        voice: formPayload.voice || "",
+        style: formPayload.style || "",
+        goals: formPayload.goals || [],
+        format: formPayload.format || "Balanced mix",
+        cta: formPayload.cta || "Share & repost bait",
+        length: formPayload.length || "medium",
+        structure: formPayload.structure || "mixed",
+        extra: formPayload.extra || "",
+        bannedWords: formPayload.bannedWords || [],
+        requiredWords: formPayload.requiredWords || [],
+        post: target,
+        siblings: posts,
+        tweak,
+        feedback,
+        feedbackCategory: category,
+        feedbackRating: rating,
+        calendarId: id,
+      };
+      let data: any = {};
+      try {
+        data = await regenerateMutation.mutateAsync(payload as any);
+      } catch (e) {
+        log.warn(`Regenerate failed for day ${target.day}`, e, { day: target.day, tweak });
+        toast.error(e instanceof Error ? e.message : String(e));
+        return;
+      }
+      if (!data) {
+        toast.error("Regenerate failed: no data returned");
         return;
       }
       const updated = posts.map((p, i) => (i === active ? (data.post as Post) : p));
-      const { error: updErr } = await supabase.from("saved_calendars")
-        .update({ posts: updated as unknown as never })
-        .eq("id", id);
-      if (updErr) {
+      try {
+        await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
+      } catch (updErr) {
         log.error(`Failed to save updated post`, updErr, { calendarId: id, day: target.day });
-        toast.error(updErr.message);
+        toast.error(updErr instanceof Error ? updErr.message : "Failed to save updated post");
         return;
       }
       setPosts(updated);
@@ -516,63 +576,74 @@ export default function CalendarDetail() {
     const next = { ...postTimes, [String(day)]: time };
     setPostTimes(next);
     if (!id) return;
-    const { error } = await supabase.from("saved_calendars")
-      .update({ post_times: next as never })
-      .eq("id", id);
-    if (error) toast.error(error.message);
+    try {
+      await updateCalendarMutation.mutateAsync({ post_times: next as never });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update post time");
+    }
   }
 
   async function updateWeekStart(value: string) {
     setWeekStart(value);
     if (!id) return;
-    const { error } = await supabase.from("saved_calendars")
-      .update({ week_start_date: value || null })
-      .eq("id", id);
-    if (error) toast.error(error.message);
+    try {
+      await updateCalendarMutation.mutateAsync({ week_start_date: value || null });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update week start");
+    }
   }
 
   async function toggleFavorite() {
     if (!id) return;
     const next = !isFavorite;
     setIsFavorite(next);
-    const { error } = await supabase.from("saved_calendars")
-      .update({ is_favorite: next })
-      .eq("id", id);
-    if (error) {
+    try {
+      await updateCalendarMutation.mutateAsync({ is_favorite: next });
+    } catch (error) {
       setIsFavorite(!next);
-      toast.error(error.message);
+      toast.error(error instanceof Error ? error.message : "Failed to update favorite");
     }
   }
 
   async function updateTimezone(tz: string) {
     setTimezone(tz);
     if (!id) return;
-    const { error } = await supabase.from("saved_calendars").update({ timezone: tz || null }).eq("id", id);
-    if (error) toast.error(error.message);
+    try {
+      await updateCalendarMutation.mutateAsync({ timezone: tz || null });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update timezone");
+    }
   }
 
   async function updateTrackingUrl(url: string) {
     setTrackingUrl(url);
     if (!id) return;
-    const { error } = await supabase.from("saved_calendars").update({ tracking_url: url || null }).eq("id", id);
-    if (error) toast.error(error.message);
+    try {
+      await updateCalendarMutation.mutateAsync({ tracking_url: url || null });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update tracking URL");
+    }
   }
 
   async function persistLockedHashtags(next: Record<string, string[]>) {
     setLockedHashtags(next);
     if (!id) return;
-    const { error } = await supabase.from("saved_calendars").update({ locked_hashtags: next as never }).eq("id", id);
-    if (error) toast.error(error.message);
+    try {
+      await updateCalendarMutation.mutateAsync({ locked_hashtags: next as never });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update hashtag locks");
+    }
   }
 
   async function persistPostHashtags(day: number, newHashtags: string) {
     if (!id) return;
     const updated = posts.map(po => po.day === day ? { ...po, hashtags: newHashtags } : po);
     setPosts(updated);
-    const { error } = await supabase.from("saved_calendars")
-      .update({ posts: updated as unknown as never })
-      .eq("id", id);
-    if (error) toast.error(error.message);
+    try {
+      await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update hashtags");
+    }
   }
 
   // Re-render a post's hashtag string by applying workspace policy + this post's locks.
@@ -609,8 +680,11 @@ export default function CalendarDetail() {
     setProfilePolicy({ ...profilePolicy, banned: nextBanned });
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { error } = await supabase.from("profiles").update({ banned_hashtags: nextBanned }).eq("user_id", user.id);
-      if (error) toast.error(error.message);
+      try {
+        await updateProfileMutation.mutateAsync({ banned_hashtags: nextBanned });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to update hashtag policy");
+      }
     }
     // 2) Strip the tag from this post immediately + unlock it if locked
     const cur = lockedHashtags[String(day)] || [];
@@ -702,36 +776,28 @@ export default function CalendarDetail() {
       const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
       async function runOne({ p: target, i }: { p: Post; i: number }) {
-        const body = JSON.stringify({
-          industry: formPayload.industry || "", industryLabel,
-          platform: platform || formPayload.platform || "LinkedIn",
-          coreIdea: formPayload.coreIdea || title, audiences: formPayload.audiences || [],
-          voice: formPayload.voice || "", style: formPayload.style || "", goals: formPayload.goals || [],
-          format: formPayload.format || "Balanced mix", cta: formPayload.cta || "Share & repost bait",
-          length: formPayload.length || "medium", structure: formPayload.structure || "mixed",
-          extra: formPayload.extra || "", bannedWords: formPayload.bannedWords || [], requiredWords: formPayload.requiredWords || [],
-          post: target, siblings: next,
-        });
         const maxAttempts = 3;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           try {
-            const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}` },
-              body,
-            });
-            if (res.status === 429 || res.status >= 500) {
-              if (attempt < maxAttempts) { await sleep(400 * Math.pow(2, attempt - 1)); continue; }
-              failures.push({ day: target.day, reason: `HTTP ${res.status}` });
-              return;
-            }
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data?.post) { next[i] = data.post as Post; return; }
-            failures.push({ day: target.day, reason: data?.error || `HTTP ${res.status}` });
+            const payload = {
+              industry: formPayload.industry || "", industryLabel,
+              platform: platform || formPayload.platform || "LinkedIn",
+              coreIdea: formPayload.coreIdea || title, audiences: formPayload.audiences || [],
+              voice: formPayload.voice || "", style: formPayload.style || "", goals: formPayload.goals || [],
+              format: formPayload.format || "Balanced mix", cta: formPayload.cta || "Share & repost bait",
+              length: formPayload.length || "medium", structure: formPayload.structure || "mixed",
+              extra: formPayload.extra || "", bannedWords: formPayload.bannedWords || [], requiredWords: formPayload.requiredWords || [],
+              post: target, siblings: next,
+            };
+            const newPost = await regenerateMutation.mutateAsync(payload as any);
+            next[i] = newPost as Post;
             return;
           } catch (e) {
-            if (attempt < maxAttempts) { await sleep(400 * Math.pow(2, attempt - 1)); continue; }
-            failures.push({ day: target.day, reason: e instanceof Error ? e.message : "network" });
+            if (attempt < maxAttempts) {
+              await sleep(400 * Math.pow(2, attempt - 1));
+              continue;
+            }
+            failures.push({ day: target.day, reason: e instanceof Error ? e.message : String(e) });
             return;
           }
         }
@@ -751,10 +817,9 @@ export default function CalendarDetail() {
       }
       await Promise.all([worker(), worker()]);
 
-      const { error: updErr } = await supabase.from("saved_calendars")
-        .update({ posts: next as unknown as never })
-        .eq("id", id);
-      if (updErr) { toast.error(updErr.message); return; }
+      try {
+        await updateCalendarMutation.mutateAsync({ posts: next as unknown as never });
+      } catch (updErr) { toast.error(updErr instanceof Error ? updErr.message : "Failed to save reordered posts"); return; }
 
       const okCount = targets.length - failures.length;
       if (failures.length === 0) {
@@ -882,6 +947,35 @@ export default function CalendarDetail() {
           </div>
           <h1 className="cd-title">{title}</h1>
           <div className="cd-meta">{meta}</div>
+
+          <div className="cd-hero">
+            <div className="cd-hero-main">
+              <div className="cd-hero-kicker">Review workspace</div>
+              <div className="cd-hero-title">Polish the week, then ship it.</div>
+              <p className="cd-hero-copy">Use the active-day card for edits, keep pinned posts protected, and move to schedule only when the calendar reads clean. The workflow is set up to help you review at a glance, not hunt for controls.</p>
+              <div className="cd-hero-chiprow">
+                <span className="cd-hero-chip">{posts.length} posts</span>
+                <span className="cd-hero-chip">{lockedDays.size} pinned</span>
+                <span className="cd-hero-chip">{timezone}</span>
+                <span className="cd-hero-chip">{editing ? "Editing mode" : "Review mode"}</span>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <PostInsights post={p} platform={platform} topic={p.topic} />
+              </div>
+            </div>
+            <div className="cd-hero-side">
+              <div className="cd-hero-card">
+                <span>Active day</span>
+                <strong>Day {p?.day ?? 0} · {p?.dow ?? "—"}</strong>
+                <small>{p ? shortDateLabel(dateForDow(weekStartDate, p.dow)) : "No active post"}</small>
+              </div>
+              <div className="cd-hero-card">
+                <span>Workflow</span>
+                <strong>{sampleMode ? "Sample calendar" : "Live calendar"}</strong>
+                <small>{posts.length > 1 ? "Use the strip to jump between days" : "Single post review"}</small>
+              </div>
+            </div>
+          </div>
 
           {analytics && (
             <div className="cd-stats" aria-label="Calendar analytics">
@@ -1077,11 +1171,39 @@ export default function CalendarDetail() {
               </div>
               <div className="cd-ptitle" style={{ marginTop: 14 }}>{p.title}</div>
               <div className="cd-blabel"><span>Hook</span></div>
-              <div className="cd-hook">{p.hook}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <div className="cd-hook" style={{ flex: 1 }}>{p.hook}</div>
+                {p.hook_options && p.hook_options.length > 1 && (
+                  <select
+                    className="cd-reformat-sel"
+                    value={p.hook}
+                    onChange={e => selectHookVariant(p.day, e.target.value)}
+                    aria-label={`Choose hook variant for day ${p.day}`}
+                  >
+                    {p.hook_options.map((h, i) => (
+                      <option key={i} value={h}>{h.length > 60 ? `${h.slice(0, 60)}…` : h}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <div className="cd-blabel"><span>Post body</span></div>
               <div className="cd-body">{stripMarkdown(p.body)}</div>
               <div className="cd-blabel"><span>CTA</span></div>
-              <div className="cd-cta">{p.cta}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div className="cd-cta" style={{ flex: 1 }}>{p.cta}</div>
+                {p.cta_options && p.cta_options.length > 1 && (
+                  <select
+                    className="cd-reformat-sel"
+                    value={p.cta}
+                    onChange={e => selectCtaVariant(p.day, e.target.value)}
+                    aria-label={`Choose CTA variant for day ${p.day}`}
+                  >
+                    {p.cta_options.map((c, i) => (
+                      <option key={i} value={c}>{c.length > 60 ? `${c.slice(0, 60)}…` : c}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <div className="cd-blabel"><span>Hashtags</span><span className="cd-blabel-count">click a tag to lock, ban, or replace</span></div>
               <div className="cd-tags-row">
                 {(() => {
@@ -1194,6 +1316,14 @@ export default function CalendarDetail() {
                   title="Re-roll this day without touching the other six"
                 >
                   {regenerating ? "Regenerating…" : "↻ Regenerate"}
+                </button>
+                <button
+                  className="cd-btn"
+                  onClick={() => setFeedbackOpen(true)}
+                  disabled={regenerating}
+                  title="Regenerate and send feedback"
+                >
+                  📝 Regenerate + feedback
                 </button>
                 <div className="cd-tweak-wrap" ref={tweakOpen ? tweakRef : undefined}>
                   <button
@@ -1334,6 +1464,22 @@ export default function CalendarDetail() {
             </div>
           </div>
         </div>
+      )}
+      {feedbackOpen && (
+        <FeedbackModal
+          open={feedbackOpen}
+          submitting={feedbackSubmitting || regenerating}
+          onClose={() => { if (!feedbackSubmitting && !regenerating) setFeedbackOpen(false); }}
+          onSubmit={async ({ feedback, category, rating }) => {
+            try {
+              setFeedbackSubmitting(true);
+              await regenerateDay(undefined, feedback, category, rating);
+              setFeedbackOpen(false);
+            } finally {
+              setFeedbackSubmitting(false);
+            }
+          }}
+        />
       )}
     </>
   );

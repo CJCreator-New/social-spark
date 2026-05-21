@@ -65,6 +65,9 @@ ${payload.extra ? `- Extra instructions: ${payload.extra}` : ""}
 ${payload.bannedWords.length ? `- NEVER SAY (hard ban — do not use these words or close variants in any post): ${payload.bannedWords.join(", ")}` : ""}
 ${payload.requiredWords.length ? `- MUST MENTION (each of these terms must appear naturally in AT LEAST ONE post across the week): ${payload.requiredWords.join(", ")}` : ""}
 
+OUTPUT VARIANTS:
+- For each post, provide 3 hook options and 2 CTA variants. Place them in `hook_options` and `cta_options` within each post object. The primary `hook` and `cta` may be the first items from those arrays.
+
 HARD RULES (follow strictly):
 1. Generate content that is genuinely specific to the ${payload.industryLabel || payload.industry} space — use real terminology, real platforms, real trends, real names where relevant. Do NOT write generic content.
 2. Strictly follow the POST LENGTH and POST STRUCTURE rules above for the body of every post.
@@ -99,9 +102,11 @@ ${bannedPhrasesBlock()}`;
                   topic: { type: "string" },
                   format: { type: "string" },
                   title: { type: "string" },
-                  hook: { type: "string" },
+                    hook: { type: "string" },
+                    hook_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
                   body: { type: "string" },
-                  cta: { type: "string" },
+                    cta: { type: "string" },
+                    cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
                   hashtags: {
                     type: "string",
                     description: longFormPlatform

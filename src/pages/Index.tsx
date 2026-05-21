@@ -16,12 +16,13 @@ import { getVoiceStylePreview } from "@/lib/voiceStylePreview";
 import { DraftRecoveryDialog } from "@/components/DraftRecoveryDialog";
 import { BatchEditModal, type BatchEditPayload } from "@/components/BatchEditModal";
 import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
+import PostInsights from "@/components/PostInsights";
 import { DiffView } from "@/components/DiffView";
 import { ToneConsistencyChecker } from "@/components/ToneConsistencyChecker";
 import { InspirationBank } from "@/components/InspirationBank";
 import GenerateSkeleton from "@/components/GenerateSkeleton";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { useCreateCalendarMutation } from "@/hooks/useAppQueries";
+import { useCreateCalendarMutation, useRegeneratePostMutation } from "@/hooks/useAppQueries";
 import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dragDrop";
 import { SAMPLE_FORM, SAMPLE_POSTS, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
 import mediaManager from "@/lib/mediaManager";
@@ -144,6 +145,25 @@ const css = `
 .cf-app .brand-title { font-family:'Playfair Display',serif;font-size:38px;font-weight:400;color:var(--text);letter-spacing:-.5px;line-height:1.08;margin:0; }
 .cf-app .brand-title em { font-style:italic;color:var(--accent); }
 .cf-app .brand-sub { font-size:13px;color:var(--text2);margin-top:10px;font-weight:300;line-height:1.65;max-width:480px; }
+
+.cf-app .hero-shell { display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:16px;align-items:stretch;margin:22px 0 28px; }
+.cf-app .hero-panel { background:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01)); border:1px solid var(--border); border-radius:24px; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,.22); }
+.cf-app .hero-panel.alt { background:linear-gradient(180deg,rgba(200,240,154,0.06),rgba(255,255,255,0.01)); }
+.cf-app .hero-kicker { font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);font-weight:500;margin-bottom:12px; }
+.cf-app .hero-title { font-family:'Playfair Display',serif;font-size:34px;font-weight:400;letter-spacing:-.5px;line-height:1.06;margin:0 0 12px;max-width:14ch; }
+.cf-app .hero-copy { font-size:13px;color:var(--text2);line-height:1.75;max-width:52ch;margin:0 0 18px; }
+.cf-app .hero-badges { display:flex;flex-wrap:wrap;gap:8px; }
+.cf-app .hero-badge { display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;border:1px solid var(--border2);background:rgba(255,255,255,0.015);font-size:11px;color:var(--text2);font-weight:300; }
+.cf-app .hero-badge strong { color:var(--text);font-weight:500; }
+.cf-app .hero-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px; }
+.cf-app .hero-stat { border:1px solid var(--border);border-radius:16px;padding:14px 15px;background:rgba(7,8,13,.55);min-height:88px;display:flex;flex-direction:column;justify-content:space-between; }
+.cf-app .hero-stat span { font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--text3);font-weight:500; }
+.cf-app .hero-stat strong { font-family:'Playfair Display',serif;font-size:24px;font-weight:400;color:var(--text);line-height:1.1; }
+.cf-app .hero-note { margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(200,240,154,.06);border:1px solid rgba(200,240,154,.16);font-size:12px;color:rgba(237,234,227,.88);line-height:1.6; }
+.cf-app .hero-note strong { color:var(--accent);font-weight:500; }
+.cf-app .hero-linkrow { margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center; }
+.cf-app .hero-link { color:var(--accent);text-decoration:none;font-size:12px;letter-spacing:.04em; }
+.cf-app .hero-link:hover { text-decoration:underline; }
 
 .cf-app .stepper { display:flex;align-items:center;margin-bottom:44px; }
 .cf-app .snode { display:flex;align-items:center;gap:7px; }
@@ -475,6 +495,9 @@ const css = `
   .cf-app .g2{grid-template-columns:1fr;}
   .cf-app .inner{padding:36px 16px 80px;}
   .cf-app .brand-title{font-size:30px;}
+  .cf-app .hero-shell{grid-template-columns:1fr;}
+  .cf-app .hero-title{font-size:28px;max-width:none;}
+  .cf-app .hero-grid{grid-template-columns:1fr;}
   .cf-app .step4-layout{grid-template-columns:1fr;}
   .cf-app .step4-side{position:static;}
   /* Hide inactive step labels on mobile but keep the active one for context. */
@@ -630,6 +653,8 @@ interface Post {
   cta: string;
   hashtags: string;
   rationale: string;
+  hook_options?: string[];
+  cta_options?: string[];
 }
 
 type WizardForm = {
@@ -917,6 +942,7 @@ const Index = () => {
   const tweakRef = useRef<HTMLDivElement>(null);
   const copyMenuRef = useRef<HTMLDivElement>(null);
   const createCalendarMutation = useCreateCalendarMutation();
+  const regenerateMutation = useRegeneratePostMutation(savedId || undefined);
 
   // Undo/redo hook for post history
   const { state: postsHistory, setState: setPostsWithHistory, undo: undoChange, redo: redoChange, canUndo, canRedo } = useUndoRedo<Post[]>(posts);
@@ -1492,40 +1518,31 @@ const Index = () => {
         toast.success(`Day ${target.day} formatting cleaned ✓`);
         return;
       }
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
-        },
-        body: JSON.stringify({
-          industry: form.industry,
-          industryLabel: selectedIndustry?.label || form.industry,
-          platform: form.platform,
-          coreIdea: form.coreIdea,
-          audiences: form.audiences,
-          voice: form.voice,
-          style: form.style,
-          goals: form.goals,
-          format: form.format,
-          cta: form.cta,
-          length: form.length,
-          structure: form.structure,
-          extra: form.extra,
-          bannedWords: form.bannedWords,
-          requiredWords: form.requiredWords,
-          post: target,
-          siblings: posts,
-          tweak,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.error || !data?.post) {
-        toast.error(data?.error || `Regenerate failed (${res.status}).`);
+      const payload = {
+        industry: form.industry,
+        industryLabel: selectedIndustry?.label || form.industry,
+        platform: form.platform,
+        coreIdea: form.coreIdea,
+        audiences: form.audiences,
+        voice: form.voice,
+        style: form.style,
+        goals: form.goals,
+        format: form.format,
+        cta: form.cta,
+        length: form.length,
+        structure: form.structure,
+        extra: form.extra,
+        bannedWords: form.bannedWords,
+        requiredWords: form.requiredWords,
+        post: target,
+        siblings: posts,
+        tweak,
+      };
+      let data: any = {};
+      try {
+        data = await regenerateMutation.mutateAsync(payload as any);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : String(e));
         return;
       }
 
@@ -1568,45 +1585,38 @@ const Index = () => {
     }
     setReformatting(true);
     try {
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const { data: { session } } = await supabase.auth.getSession();
       const next = [...posts];
       let okCount = 0;
       for (const { p: target, i } of targets) {
         setRegenIdx(i);
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
-          },
-          body: JSON.stringify({
-            industry: form.industry,
-            industryLabel: selectedIndustry?.label || form.industry,
-            platform: form.platform,
-            coreIdea: form.coreIdea,
-            audiences: form.audiences,
-            voice: form.voice,
-            style: form.style,
-            goals: form.goals,
-            format: form.format,
-            cta: form.cta,
-            length: form.length,
-            structure: form.structure,
-            extra: form.extra,
-            bannedWords: form.bannedWords,
-            requiredWords: form.requiredWords,
-            post: target,
-            siblings: next,
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data?.post) {
-          next[i] = data.post;
-          setPosts([...next]);
-          okCount++;
+        const payload = {
+          industry: form.industry,
+          industryLabel: selectedIndustry?.label || form.industry,
+          platform: form.platform,
+          coreIdea: form.coreIdea,
+          audiences: form.audiences,
+          voice: form.voice,
+          style: form.style,
+          goals: form.goals,
+          format: form.format,
+          cta: form.cta,
+          length: form.length,
+          structure: form.structure,
+          extra: form.extra,
+          bannedWords: form.bannedWords,
+          requiredWords: form.requiredWords,
+          post: target,
+          siblings: next,
+        };
+        try {
+          const newPost = await regenerateMutation.mutateAsync(payload as any);
+          if (newPost) {
+            next[i] = newPost as Post;
+            setPosts([...next]);
+            okCount++;
+          }
+        } catch (e) {
+          // ignore per-item failures
         }
       }
       setSavedId(null);
@@ -1637,36 +1647,30 @@ const Index = () => {
       const next: Post[] = [...posts];
       for (let i = 0; i < posts.length; i++) {
         setRegenIdx(i);
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
-          },
-          body: JSON.stringify({
-            industry: form.industry,
-            industryLabel: selectedIndustry?.label || form.industry,
-            platform: targetPlatform,
-            coreIdea: form.coreIdea,
-            audiences: form.audiences,
-            voice: form.voice,
-            style: form.style,
-            goals: form.goals,
-            format: form.format,
-            cta: form.cta,
-            length: form.length,
-            structure: form.structure,
-            extra: form.extra,
-            bannedWords: form.bannedWords,
-            requiredWords: form.requiredWords,
-            post: posts[i],
-            siblings: next,
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data?.post) {
-          next[i] = data.post;
+        const payload = {
+          industry: form.industry,
+          industryLabel: selectedIndustry?.label || form.industry,
+          platform: targetPlatform,
+          coreIdea: form.coreIdea,
+          audiences: form.audiences,
+          voice: form.voice,
+          style: form.style,
+          goals: form.goals,
+          format: form.format,
+          cta: form.cta,
+          length: form.length,
+          structure: form.structure,
+          extra: form.extra,
+          bannedWords: form.bannedWords,
+          requiredWords: form.requiredWords,
+          post: posts[i],
+          siblings: next,
+        };
+        try {
+          const newPost = await regenerateMutation.mutateAsync(payload as any);
+          if (newPost) next[i] = newPost as Post;
+        } catch (e) {
+          // ignore per-item failures
         }
       }
       // Save as new calendar
@@ -1896,6 +1900,18 @@ ${postText(p)}
 
   const STEP_LABELS = ["Industry", "Topics", "Generate", "Calendar"];
   const p = posts[activeDay];
+  const wizardProgress = Math.round(((step - 1) / (STEP_LABELS.length - 1)) * 100);
+  const wizardStepLabel = STEP_LABELS[step - 1] || STEP_LABELS[0];
+  const wizardGuidance =
+    step === 1 ? "Choose your niche, platform, and tone before anything else." :
+    step === 2 ? "Gather the angles that will become your week or single post." :
+    step === 3 ? "Generation is running. Keep this tab open until the preview lands." :
+    "Review the output, pin the winners, and schedule when ready.";
+  const autosaveLabel =
+    autosaveStatus === "saving" ? "Saving draft" :
+    autosaveStatus === "saved" ? "Draft saved" :
+    autosaveStatus === "error" ? "Draft save failed" :
+    "Draft idle";
 
   return (
     <>
@@ -1954,6 +1970,52 @@ ${postText(p)}
             <div className="brand-eyebrow">AI content studio</div>
             <h1 className="brand-title">Content<em>Forge</em></h1>
             <div className="brand-sub">Generate a full week of platform-native posts for any niche — tailored to your voice, audience, and goals.</div>
+          </div>
+
+          <div className="hero-shell">
+            <div className="hero-panel">
+              <div className="hero-kicker">Guided creation workspace</div>
+              <div className="hero-title">Build the calendar before the scroll ever starts.</div>
+              <p className="hero-copy">The workflow below stays focused: define the brief, pick the topics, then generate and refine the calendar in one place. Autosave and recovery stay on so you can pick up where you left off.</p>
+              <div className="hero-badges">
+                <span className="hero-badge"><strong>{wizardStepLabel}</strong> step active</span>
+                <span className="hero-badge"><strong>{wizardProgress}%</strong> through the flow</span>
+                <span className="hero-badge"><strong>{posts.length || 0}</strong> posts ready</span>
+                <span className="hero-badge"><strong>{recentCalendars.length}</strong> recent calendars</span>
+              </div>
+              <div className="hero-note">
+                <strong>{autosaveLabel}</strong> · {wizardGuidance}
+              </div>
+              <div className="hero-linkrow">
+                <Link to="/my-calendars" className="hero-link">Open saved calendars →</Link>
+                <button type="button" className="hero-link" onClick={loadSample} style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>See a sample calendar</button>
+              </div>
+            </div>
+
+            <div className="hero-panel alt">
+              <div className="hero-kicker">Current setup</div>
+              <div className="hero-grid">
+                <div className="hero-stat">
+                  <span>Industry</span>
+                  <strong>{selectedIndustry?.label || "Not picked"}</strong>
+                </div>
+                <div className="hero-stat">
+                  <span>Platform</span>
+                  <strong>{form.platform || "LinkedIn"}</strong>
+                </div>
+                <div className="hero-stat">
+                  <span>Topics</span>
+                  <strong>{form.topics.length}</strong>
+                </div>
+                <div className="hero-stat">
+                  <span>Mode</span>
+                  <strong>{form.mode === "day" ? "Single day" : "Full week"}</strong>
+                </div>
+              </div>
+              <div className="hero-note">
+                <strong>{form.audiences.length || 0}</strong> audiences selected · <strong>{form.goals.length || 0}</strong> goals active · <strong>{form.voice || "default voice"}</strong> voice
+              </div>
+            </div>
           </div>
 
           {/* STEPPER */}
@@ -2636,6 +2698,9 @@ ${postText(p)}
                     {showRationale && <div className="rationale">{p.rationale}</div>}
 
                     <PerformanceScoreCard post={p} topic={form.coreIdea} />
+                    <div style={{ marginTop: 12 }}>
+                      <PostInsights post={p} platform={form.platform} topic={form.coreIdea} />
+                    </div>
                   </div>
 
                   <ToneConsistencyChecker posts={posts} />
@@ -2762,6 +2827,9 @@ ${postText(p)}
                     </div>
                   ) : posts[activeDay] ? (
                     <PerformanceScoreCard post={posts[activeDay]} topic={form.coreIdea} />
+                    <div style={{ marginTop: 12 }}>
+                      <PostInsights post={posts[activeDay]} platform={form.platform} topic={form.coreIdea} />
+                    </div>
                   ) : null}
 
                   {posts[activeDay] && (
