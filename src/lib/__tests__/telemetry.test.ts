@@ -20,7 +20,7 @@ describe("telemetry", () => {
     await sendEvent("generate_start", { mode: "week" });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as any[];
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit & { headers: Record<string, string>; body: string }];
     expect(url).toBe("https://example.supabase.co/functions/v1/telemetry");
     expect(init.method).toBe("POST");
     expect(init.headers.apikey).toBe("anon-key");

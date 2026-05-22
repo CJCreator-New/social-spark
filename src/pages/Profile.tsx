@@ -195,7 +195,11 @@ export default function Profile() {
       return toast.error(updErr.message);
     }
     setAvatarUrl(newUrl);
-    try { mediaManager.addMediaRef(user.id, newUrl); } catch {}
+    try {
+      mediaManager.addMediaRef(user.id, newUrl);
+    } catch {
+      /* media reference tracking is best effort */
+    }
     await supabase.from("media_references").upsert({
       user_id: user.id,
       bucket: "avatars",

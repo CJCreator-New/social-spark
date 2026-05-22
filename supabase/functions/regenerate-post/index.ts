@@ -105,7 +105,7 @@ ${payload.requiredWords.length ? `- TRY TO MENTION (prefer naturally weaving in 
 ${buildEngagementRules(payload.platform)}
 
 OUTPUT VARIANTS:
-- Provide 3 distinct hook options and 2 CTA variants. Place them in the structured fields `hook_options` and `cta_options`. The primary `hook` and `cta` may be the first items from those arrays.
+- Provide 3 distinct hook options and 2 CTA variants. Place them in the structured fields hook_options and cta_options. The primary hook and cta may be the first items from those arrays.
 
 THIS POST:
 - Day: ${post.day} (${post.dow})

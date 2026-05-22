@@ -24,12 +24,38 @@ import { useAuth } from "@/contexts/AuthContext";
 import { E2E_AUTH_FLAG } from "@/lib/e2eFixtures";
 import e2eStore from "@/lib/e2eStore";
 import FeedbackModal from "@/components/FeedbackModal";
+import type { Database, Json } from "@/integrations/supabase/types";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
   title: string; hook: string; body: string; cta: string; hashtags: string; rationale: string;
   hook_options?: string[];
   cta_options?: string[];
+}
+
+type SavedCalendarInsert = Database["public"]["Tables"]["saved_calendars"]["Insert"];
+
+const EMPTY_POST: Post = {
+  day: 1,
+  dow: "Mon",
+  topic: "",
+  format: "Balanced mix",
+  title: "",
+  hook: "",
+  body: "",
+  cta: "",
+  hashtags: "",
+  rationale: "",
+};
+
+function unwrapPost(value: unknown): Post | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = "post" in value ? (value as { post?: unknown }).post : value;
+  if (!candidate || typeof candidate !== "object") return null;
+  const post = candidate as Partial<Post>;
+  return typeof post.day === "number" && typeof post.dow === "string"
+    ? { ...EMPTY_POST, ...post }
+    : null;
 }
 
 interface FormPayload {
@@ -343,16 +369,15 @@ export default function CalendarDetail() {
           industry: formPayload.industry || null,
           industry_label: industryLabel || null,
           platform: targetPlatform,
-          language: formPayload.language || "English",
           core_idea: formPayload.coreIdea || null,
-          form_payload: newForm,
-          posts: next,
+          form_payload: newForm as unknown as Json,
+          posts: next as unknown as Json,
           week_start_date: weekStart || null,
           post_times: postTimes,
         };
-        const resp = await createCalendar.mutateAsync(payload as any);
+        const resp = await createCalendar.mutateAsync(payload);
         toast.success(`Reformatted for ${niceLabelFor(targetPlatform)} ✓`);
-        navigate(`/calendar/${(resp as any).id}`);
+        navigate(`/calendar/${resp.id}`);
       } catch (insErr) {
         toast.error(insErr instanceof Error ? insErr.message : String(insErr));
         return;
@@ -546,9 +571,9 @@ export default function CalendarDetail() {
         feedbackRating: rating,
         calendarId: id,
       };
-      let data: any = {};
+      let data: unknown = {};
       try {
-        data = await regenerateMutation.mutateAsync(payload as any);
+        data = await regenerateMutation.mutateAsync(payload);
       } catch (e) {
         log.warn(`Regenerate failed for day ${target.day}`, e, { day: target.day, tweak });
         toast.error(e instanceof Error ? e.message : String(e));
@@ -558,7 +583,12 @@ export default function CalendarDetail() {
         toast.error("Regenerate failed: no data returned");
         return;
       }
-      const updated = posts.map((p, i) => (i === active ? (data.post as Post) : p));
+      const regeneratedPost = unwrapPost(data);
+      if (!regeneratedPost) {
+        toast.error("Regenerate failed: no post returned");
+        return;
+      }
+      const updated = posts.map((p, i) => (i === active ? regeneratedPost : p));
       try {
         await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
       } catch (updErr) {
@@ -795,8 +825,9 @@ export default function CalendarDetail() {
               extra: formPayload.extra || "", bannedWords: formPayload.bannedWords || [], requiredWords: formPayload.requiredWords || [],
               post: target, siblings: next,
             };
-            const newPost = await regenerateMutation.mutateAsync(payload as any);
-            next[i] = newPost as Post;
+            const newPost = unwrapPost(await regenerateMutation.mutateAsync(payload));
+            if (!newPost) throw new Error("Regenerate failed: no post returned");
+            next[i] = newPost;
             return;
           } catch (e) {
             if (attempt < maxAttempts) {
@@ -891,7 +922,7 @@ export default function CalendarDetail() {
 
   const weekStartDate = useMemo(() => parseLocalDate(weekStart) || nextMonday(), [weekStart]);
 
-  const p = posts[active] ?? ({ day: 1, dow: "Mon", topic: "", title: "", hook: "", body: "", cta: "", hashtags: "", format: "Balanced mix" } as any);
+  const p = posts[active] ?? EMPTY_POST;
   const bodyWords = useMemo(() => wordCount(draft?.body || ""), [draft?.body]);
   const hookWords = useMemo(() => wordCount(draft?.hook || ""), [draft?.hook]);
   const titleChars = (draft?.title || "").length;

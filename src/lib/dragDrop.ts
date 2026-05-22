@@ -24,7 +24,7 @@ export function swapItems<T>(arr: T[], indexA: number, indexB: number): T[] {
 /**
  * Handle drag start event
  */
-export function handleDragStart(e: React.DragEvent<HTMLDivElement>, index: number): void {
+export function handleDragStart(e: React.DragEvent<HTMLElement>, index: number): void {
   e.dataTransfer.effectAllowed = "move";
   e.dataTransfer.setData("application/json", JSON.stringify({ index }));
 
@@ -46,7 +46,7 @@ export function handleDragStart(e: React.DragEvent<HTMLDivElement>, index: numbe
 /**
  * Handle drag over event
  */
-export function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
+export function handleDragOver(e: React.DragEvent<HTMLElement>): void {
   e.preventDefault();
   e.dataTransfer.dropEffect = "move";
 }
@@ -54,7 +54,7 @@ export function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
 /**
  * Handle drop event
  */
-export function handleDrop(e: React.DragEvent<HTMLDivElement>, targetIndex: number): number | null {
+export function handleDrop(e: React.DragEvent<HTMLElement>, targetIndex: number): number | null {
   e.preventDefault();
   try {
     const data = e.dataTransfer.getData("application/json");
@@ -71,6 +71,6 @@ export function handleDrop(e: React.DragEvent<HTMLDivElement>, targetIndex: numb
 /**
  * Check if an element is being dragged over
  */
-export function isDragOver(e: React.DragEvent<HTMLDivElement>): boolean {
+export function isDragOver(e: React.DragEvent<HTMLElement>): boolean {
   return e.dataTransfer.types.includes("application/json");
 }

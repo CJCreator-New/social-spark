@@ -4,21 +4,31 @@ import { render, waitFor } from "@testing-library/react";
 import { vi, beforeEach, afterEach, describe, it, expect } from "vitest";
 import { useRegeneratePostMutation } from "@/hooks/useAppQueries";
 
-function TestRunner({ payload }: { payload: any }) {
+type RegeneratePayload = {
+  calendarId: string;
+  post: {
+    day: number;
+    dow: string;
+  };
+};
+
+function TestRunner({ payload }: { payload: RegeneratePayload }) {
   const m = useRegeneratePostMutation(payload.calendarId);
   React.useEffect(() => {
-    m.mutateAsync(payload).catch(() => {});
-  }, []);
+    m.mutateAsync(payload).catch(() => {
+      /* test only: assertion happens against fetch */
+    });
+  }, [m, payload]);
   return null;
 }
 
 describe("useRegeneratePostMutation", () => {
   const OLD = global.fetch;
   beforeEach(() => {
-    (global as any).fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ post: { day: 1, dow: "Mon", title: "ok" } }) }));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ post: { day: 1, dow: "Mon", title: "ok" } }) })));
   });
   afterEach(() => {
-    (global as any).fetch = OLD;
+    vi.stubGlobal("fetch", OLD);
   });
 
   it("calls the regenerate endpoint", async () => {
@@ -29,8 +39,9 @@ describe("useRegeneratePostMutation", () => {
         <TestRunner payload={payload} />
       </QueryClientProvider>
     );
-    await waitFor(() => expect((global as any).fetch).toHaveBeenCalled());
-    const called = (global as any).fetch.mock.calls[0][0] as string;
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const called = fetchMock.mock.calls[0][0] as string;
     expect(called).toContain("/functions/v1/regenerate-post");
   });
 });

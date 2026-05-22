@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { E2E_AUTH_FLAG, E2E_USER_ID, E2E_CALENDAR } from "@/lib/e2eFixtures";
-import { E2E_AUTH_FLAG } from "@/lib/e2eFixtures";
 import e2eStore from "@/lib/e2eStore";
 import { toast } from "sonner";
 import storageService from "@/lib/storageService";
@@ -29,6 +28,7 @@ import { useCreateCalendarMutation, useRegeneratePostMutation } from "@/hooks/us
 import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dragDrop";
 import { SAMPLE_FORM, SAMPLE_POSTS, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
 import mediaManager from "@/lib/mediaManager";
+import type { Database, Json } from "@/integrations/supabase/types";
 
 function hasEmoji(text: string): boolean {
   return /\p{Emoji}/u.test(text);
@@ -37,6 +37,16 @@ function hasEmoji(text: string): boolean {
 function formatBadgeForPlatform(format: string, platform: string): string {
   if (resolvePlatform(platform) !== "twitter") return format;
   return /list|bullet|thread/i.test(format) ? "THREAD FORMAT" : "SINGLE TWEET";
+}
+
+function unwrapPost(value: unknown): Post | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = "post" in value ? (value as { post?: unknown }).post : value;
+  if (!candidate || typeof candidate !== "object") return null;
+  const post = candidate as Partial<Post>;
+  return typeof post.day === "number" && typeof post.dow === "string"
+    ? { ...EMPTY_POST, ...post }
+    : null;
 }
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
@@ -660,6 +670,21 @@ interface Post {
   cta_options?: string[];
 }
 
+type SavedCalendarInsert = Database["public"]["Tables"]["saved_calendars"]["Insert"];
+
+const EMPTY_POST: Post = {
+  day: 1,
+  dow: "Mon",
+  topic: "",
+  format: "Balanced mix",
+  title: "",
+  hook: "",
+  body: "",
+  cta: "",
+  hashtags: "",
+  rationale: "",
+};
+
 type WizardForm = {
   industry: string;
   platform: string;
@@ -813,7 +838,7 @@ async function upsertMediaReferences(params: {
 }
 
 async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraftSnapshot> | null> {
-  const { data, error } = await (supabase as any).from(WIZARD_SERVER_DRAFT_TABLE)
+  const { data, error } = await supabase.from(WIZARD_SERVER_DRAFT_TABLE)
     .select("snapshot")
     .eq("user_id", userId)
     .maybeSingle();
@@ -823,17 +848,17 @@ async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraf
 }
 
 async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
-  await (supabase as any).from(WIZARD_SERVER_DRAFT_TABLE).upsert(
+  await supabase.from(WIZARD_SERVER_DRAFT_TABLE).upsert(
     {
       user_id: userId,
-      snapshot: makeDraftEnvelope(snapshot),
+      snapshot: makeDraftEnvelope(snapshot) as unknown as Json,
     },
     { onConflict: "user_id" }
   );
 }
 
 async function clearServerDraft(userId: string) {
-  await (supabase as any).from(WIZARD_SERVER_DRAFT_TABLE).delete().eq("user_id", userId);
+  await supabase.from(WIZARD_SERVER_DRAFT_TABLE).delete().eq("user_id", userId);
 }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -846,7 +871,7 @@ async function fetchWithGenerationRetry(input: RequestInfo | URL, init: RequestI
   try {
     const url = typeof input === "string" ? input : String(input);
     const method = (init && init.method) || "GET";
-    const bodyKey = init && (init as any).body ? String((init as any).body) : "";
+    const bodyKey = init.body ? String(init.body) : "";
     const dedupeKey = `${method.toUpperCase()}|${url}|${bodyKey}`;
 
     if (_pendingGenRequests.has(dedupeKey)) {
@@ -1239,10 +1264,14 @@ const Index = () => {
               while ((m = urlRe.exec(hay))) {
                 void import("@/lib/mediaManager")
                   .then(mod => mod.default.addMediaRef(wizardDraftKey, m[1]))
-                  .catch(() => {});
+                  .catch(() => {
+                    /* media reference tracking is best effort */
+                  });
               }
             }
-          } catch {}
+          } catch {
+            /* autosave media extraction is best effort */
+          }
           setAutosaveStatus("saved");
           if (autosaveClearTimer.current) window.clearTimeout(autosaveClearTimer.current);
           autosaveClearTimer.current = window.setTimeout(() => {
@@ -1435,17 +1464,20 @@ const Index = () => {
           industry: form.industry,
           industry_label: selectedIndustry?.label || form.industry,
           platform: form.platform,
-          language: form.language,
           core_idea: form.coreIdea,
-          form_payload: { ...form },
-          posts: result,
+          form_payload: { ...form } as unknown as Json,
+          posts: result as unknown as Json,
           week_start_date: form.weekStart || null,
           post_times: seedTimes,
-        } as any);
+        });
 
         cleanup();
         // Persist last generated post count in-memory for E2E runs
-        try { e2eStore.setLastGeneratedPosts(result.length); } catch (_) {}
+        try {
+          e2eStore.setLastGeneratedPosts(result.length);
+        } catch {
+          /* E2E helper is best effort */
+        }
         setSavedId(saved.id);
         toast.success(`${isRetry ? 'Regenerated' : 'Generated'} ${isDay ? 'post' : 'week'} successfully`);
         navigate(`/calendar/${saved.id}`);
@@ -1507,9 +1539,10 @@ const Index = () => {
                 cta: `No CTA`,
                 format: "Balanced mix",
                 hashtags: "",
+                rationale: "",
                 hook_options: [],
                 cta_options: [],
-              } as Post,
+              },
             ];
           }
           const days = (E2E_CALENDAR.posts && E2E_CALENDAR.posts.length) || 7;
@@ -1524,9 +1557,10 @@ const Index = () => {
             cta: `No CTA`,
             format: "Balanced mix",
             hashtags: "",
+            rationale: "",
             hook_options: [],
             cta_options: [],
-          } as Post));
+          }));
         })();
 
         setGenStep(GEN_LABELS.length);
@@ -1654,15 +1688,19 @@ const Index = () => {
         siblings: posts,
         tweak,
       };
-      let data: any = {};
+      let data: unknown = {};
       try {
-        data = await regenerateMutation.mutateAsync(payload as any);
+        data = await regenerateMutation.mutateAsync(payload);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : String(e));
         return;
       }
 
-      const postObj = (data && (data.post ?? data)) as Post;
+      const postObj = unwrapPost(data);
+      if (!postObj) {
+        toast.error("Regenerate failed: no post returned");
+        return;
+      }
 
       const beforeText = `${target.title}\n\n${target.hook}\n\n${target.body}\n\n${target.cta}`;
       const afterText = `${postObj.title}\n\n${postObj.hook}\n\n${postObj.body}\n\n${postObj.cta}`;
@@ -1728,7 +1766,7 @@ const Index = () => {
           siblings: next,
         };
         try {
-          const newPost = await regenerateMutation.mutateAsync(payload as any);
+          const newPost = await regenerateMutation.mutateAsync(payload);
           if (newPost) {
             next[i] = newPost as Post;
             setPosts([...next]);
@@ -1787,7 +1825,7 @@ const Index = () => {
           siblings: next,
         };
         try {
-          const newPost = await regenerateMutation.mutateAsync(payload as any);
+          const newPost = await regenerateMutation.mutateAsync(payload);
           if (newPost) next[i] = newPost as Post;
         } catch (e) {
           // ignore per-item failures
@@ -1802,13 +1840,12 @@ const Index = () => {
         industry: form.industry,
         industry_label: selectedIndustry?.label || form.industry,
         platform: targetPlatform,
-        language: form.language,
         core_idea: form.coreIdea,
-        form_payload: newForm,
-        posts: next,
+        form_payload: newForm as unknown as Json,
+        posts: next as unknown as Json,
         week_start_date: form.weekStart || null,
         post_times: postTimes,
-      } as any);
+      });
       if (!ins?.id) throw new Error("Reformat save failed");
       for (const url of extractMediaUrlsFromPosts(next)) {
         mediaManager.addMediaRef(String(ins.id), url);
@@ -1984,13 +2021,13 @@ ${postText(p)}
         industry_label: selectedIndustry?.label || form.industry,
         platform: form.platform,
         core_idea: form.coreIdea,
-        form_payload: form,
-        posts,
+        form_payload: form as unknown as Json,
+        posts: posts as unknown as Json,
         week_start_date: (isDay ? form.targetDate : form.weekStart) || null,
         post_times: postTimes,
       };
 
-      const data = await createCalendarMutation.mutateAsync(payload as any);
+      const data = await createCalendarMutation.mutateAsync(payload);
       if (!data?.id) throw new Error("Calendar save failed");
       for (const url of extractMediaUrlsFromPosts(posts)) {
         mediaManager.addMediaRef(String(data.id), url);
@@ -2582,7 +2619,6 @@ ${postText(p)}
               <div style={{ marginTop: 18 }}>
                 {/* Lazy-load the skeleton to keep bundle small */}
                 <Suspense fallback={null}>
-                  {/* @ts-ignore */}
                   <GenerateSkeleton />
                 </Suspense>
               </div>
@@ -2661,12 +2697,12 @@ ${postText(p)}
                         onClick={() => setActiveDay(i)}
                         draggable
                         onDragStart={(e) => {
-                          handleDragStart(e as any, i);
+                          handleDragStart(e, i);
                           setDraggedIndex(i);
                         }}
-                        onDragOver={handleDragOver as any}
+                        onDragOver={handleDragOver}
                         onDrop={(e) => {
-                          const sourcIdx = handleDrop(e as any, i);
+                          const sourcIdx = handleDrop(e, i);
                           if (sourcIdx !== null) {
                             handleDayDrop(sourcIdx, i);
                           }

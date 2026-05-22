@@ -70,6 +70,7 @@ function DefaultErrorFallback({
   reset: () => void;
 }) {
   const message = getUserFriendlyMessage(error);
+  const showDetails = import.meta.env.DEV;
 
   return (
     <div
@@ -94,7 +95,7 @@ function DefaultErrorFallback({
           textAlign: "center",
         }}
       >
-        <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚠️</div>
+        <div style={{ fontSize: "48px", marginBottom: "16px" }}>!</div>
 
         <h1
           style={{
@@ -119,24 +120,26 @@ function DefaultErrorFallback({
           {message}
         </p>
 
-        <div
-          style={{
-            fontSize: "12px",
-            backgroundColor: "rgba(240, 154, 154, 0.08)",
-            border: "1px solid rgba(240, 154, 154, 0.3)",
-            borderRadius: "8px",
-            padding: "12px",
-            marginBottom: "24px",
-            color: "#c8a9a9",
-            textAlign: "left",
-            fontFamily: "monospace",
-            overflow: "auto",
-            maxHeight: "150px",
-          }}
-        >
-          <strong>Error Details:</strong>
-          <div style={{ marginTop: "8px" }}>{error.message}</div>
-        </div>
+        {showDetails && (
+          <details
+            style={{
+              fontSize: "12px",
+              backgroundColor: "rgba(240, 154, 154, 0.08)",
+              border: "1px solid rgba(240, 154, 154, 0.3)",
+              borderRadius: "8px",
+              padding: "12px",
+              marginBottom: "24px",
+              color: "#c8a9a9",
+              textAlign: "left",
+              fontFamily: "monospace",
+              overflow: "auto",
+              maxHeight: "150px",
+            }}
+          >
+            <summary>Error details</summary>
+            <div style={{ marginTop: "8px" }}>{error.message}</div>
+          </details>
+        )}
 
         <div style={{ display: "flex", gap: "8px" }}>
           <button

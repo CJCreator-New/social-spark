@@ -4,15 +4,19 @@ import storageService from "@/lib/storageService";
 describe("storageService", () => {
   const key = "test:draft";
   beforeEach(() => {
-    try { localStorage.clear(); } catch (e) {}
+    try {
+      localStorage.clear();
+    } catch {
+      /* jsdom may not expose localStorage in some environments */
+    }
   });
 
   it("saves and loads draft envelope", () => {
     const data = { foo: "bar" };
     storageService.saveDraft(key, { version: 1, createdAt: Date.now(), data }, 10000);
-    const got = storageService.loadDraft(key);
+    const got = storageService.loadDraft<{ version: number; createdAt: number; data: typeof data }>(key);
     expect(got).not.toBeNull();
-    expect((got as any).data.foo).toBe("bar");
+    expect(got?.data.foo).toBe("bar");
   });
 
   it("removes expired drafts on cleanup", () => {

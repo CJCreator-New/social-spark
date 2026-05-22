@@ -33,7 +33,6 @@ export function saveDraft<T>(key: string, data: T, ttlMs?: number) {
     window.localStorage.setItem(storageKey(key), JSON.stringify(envelope));
   } catch (err) {
     // best-effort: ignore quota errors
-    // eslint-disable-next-line no-console
     console.warn("saveDraft failed", err);
   }
 }

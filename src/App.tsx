@@ -15,7 +15,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Landing from "./pages/Landing";
 
-function E2ECrashRoute() {
+function E2ECrashRoute(): JSX.Element {
   throw new Error("Test error");
 }
 

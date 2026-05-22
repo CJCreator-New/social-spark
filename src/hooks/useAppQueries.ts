@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { E2E_AUTH_FLAG, E2E_CALENDAR, E2E_SCHEDULE_ROWS } from "@/lib/e2eFixtures";
 
 function isE2EMode() {
@@ -8,6 +9,12 @@ function isE2EMode() {
 
 type E2ECalendar = typeof E2E_CALENDAR;
 type E2EScheduleRow = (typeof E2E_SCHEDULE_ROWS)[number];
+type Tables = Database["public"]["Tables"];
+type SavedCalendarRow = Tables["saved_calendars"]["Row"];
+type SavedCalendarInsert = Tables["saved_calendars"]["Insert"];
+type SavedCalendarUpdate = Tables["saved_calendars"]["Update"];
+type ProfileRow = Tables["profiles"]["Row"];
+type SavedCalendarListItem = Pick<SavedCalendarRow, "id" | "title" | "industry_label" | "platform" | "core_idea" | "created_at" | "is_favorite" | "posts">;
 
 let e2eCalendars: E2ECalendar[] = [];
 let e2eScheduleRows: E2EScheduleRow[] = [];
@@ -48,12 +55,12 @@ function deleteE2ECalendar(id: string) {
   e2eScheduleRows = e2eScheduleRows.filter((row) => row.calendar_id !== id);
 }
 
-function insertE2ECalendar(calendar: Record<string, unknown>) {
+function insertE2ECalendar(calendar: SavedCalendarInsert | Partial<E2ECalendar>) {
   seedE2EStores();
   const next = {
     ...clone(E2E_CALENDAR),
     ...calendar,
-    id: (calendar.id as string | undefined) || `e2e-calendar-${Date.now()}`,
+    id: calendar.id || `e2e-calendar-${Date.now()}`,
   } as E2ECalendar;
   e2eCalendars = [next, ...e2eCalendars.filter((existing) => existing.id !== next.id)];
   return next;
@@ -125,7 +132,7 @@ export function useSavedCalendarsInfiniteQuery(userId?: string, pageSize = 20) {
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
     initialPageParam: null as string | null,
-    getNextPageParam: (lastPage: { items: unknown[]; nextCursor: string | null }) => lastPage.nextCursor,
+    getNextPageParam: (lastPage: { items: SavedCalendarListItem[]; nextCursor: string | null }) => lastPage.nextCursor,
     queryFn: async ({ pageParam }) => {
       if (!userId) return { items: [], nextCursor: null as string | null };
       let query = supabase
@@ -142,9 +149,9 @@ export function useSavedCalendarsInfiniteQuery(userId?: string, pageSize = 20) {
 
       const { data, error } = await query;
       if (error) throw error;
-      const items = (data as unknown[]) || [];
+      const items = (data as SavedCalendarListItem[] | null) || [];
       if (items.length === 0 && isE2EMode()) {
-        const calendars = getE2ECalendars();
+        const calendars = getE2ECalendars() as SavedCalendarListItem[];
         return { items: calendars, nextCursor: null as string | null };
       }
       const nextCursor = items.length === pageSize ? (items[items.length - 1] as { created_at?: string } | undefined)?.created_at || null : null;
@@ -219,7 +226,7 @@ export function useProfileUpdateMutation(userId?: string) {
       if (!userId) return;
       await qc.cancelQueries({ queryKey: ["profile", userId] });
       const previous = qc.getQueryData(["profile", userId]);
-      qc.setQueryData(["profile", userId], (old: any) => ({ ...(old || {}), ...updates }));
+      qc.setQueryData(["profile", userId], (old: ProfileRow | null | undefined) => ({ ...(old || {}), ...updates }));
       return { previous };
     },
     onError: (_err, _updates, ctx) => {
@@ -234,7 +241,7 @@ export function useProfileUpdateMutation(userId?: string) {
 export function useCreateCalendarMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload: SavedCalendarInsert) => {
       if (isE2EMode()) {
         const created = insertE2ECalendar(payload);
         return { id: created.id };
@@ -243,7 +250,7 @@ export function useCreateCalendarMutation() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (_data, payload: any) => {
+    onSuccess: (_data, payload) => {
       qc.invalidateQueries({ queryKey: ["recent-calendars", payload?.user_id] });
       qc.invalidateQueries({ queryKey: ["calendar", payload?.id] });
     },
@@ -290,7 +297,7 @@ export function useDeleteCalendarMutation(userId?: string) {
 export function useRestoreCalendarMutation(userId?: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: Record<string, unknown>) => {
+    mutationFn: async (payload: SavedCalendarInsert) => {
       if (isE2EMode()) {
         insertE2ECalendar(payload);
         return payload;
@@ -326,7 +333,7 @@ export function useRenameCalendarMutation(userId?: string) {
 export function useDuplicateCalendarMutation(userId?: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: Record<string, unknown>) => {
+    mutationFn: async (payload: SavedCalendarInsert) => {
       if (isE2EMode()) {
         insertE2ECalendar(payload);
         return payload;
@@ -344,7 +351,7 @@ export function useDuplicateCalendarMutation(userId?: string) {
 export function useUpdateSavedCalendarMutation(calendarId?: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (patch: Record<string, unknown>) => {
+    mutationFn: async (patch: SavedCalendarUpdate) => {
       if (!calendarId) throw new Error("No calendar ID");
       const { error } = await supabase.from("saved_calendars").update(patch).eq("id", calendarId);
       if (error) throw error;
@@ -446,7 +453,7 @@ export function useRegeneratePostMutation(calendarId?: string) {
     mutationFn: async (payload: Record<string, unknown>) => {
       if (isE2EMode()) {
         // Return a deterministic regenerated post in E2E mode
-        const incoming = payload?.post as any;
+        const incoming = payload?.post as { title?: string; body?: string } | undefined;
         const post = incoming
           ? { ...incoming, title: `${incoming.title || 'E2E regenerated'}`, body: incoming.body || 'E2E regenerated body' }
           : { id: `e2e-reg-${Date.now()}`, day: 1, title: 'E2E regenerated', hook: 'E2E hook', body: 'E2E regenerated body', cta: 'No CTA' };

@@ -64,7 +64,7 @@ ${payload.bannedWords.length ? `- NEVER SAY (hard ban — do not use these words
 ${payload.requiredWords.length ? `- TRY TO MENTION (weave in naturally if it fits): ${payload.requiredWords.join(", ")}` : ""}
 
 OUTPUT VARIANTS:
-- Provide 3 distinct hook options and 2 CTA variants. Place them in the structured fields `hook_options` (array) and `cta_options` (array). The primary `hook` and `cta` may be the first items from those arrays.
+- Provide 3 distinct hook options and 2 CTA variants. Place them in the structured fields hook_options (array) and cta_options (array). The primary hook and cta may be the first items from those arrays.
 
 HARD RULES:
 1. Stay specific to the ${payload.industryLabel || payload.industry} space — real terminology, real platforms, real trends.

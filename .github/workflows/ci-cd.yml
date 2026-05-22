@@ -28,6 +28,9 @@ jobs:
     - name: Run linter
       run: npm run lint
 
+    - name: Run typecheck
+      run: npm run typecheck
+
     - name: Run unit tests
       run: npm run test:run
 
@@ -62,7 +65,7 @@ jobs:
       run: npx playwright install --with-deps
 
     - name: Run E2E tests
-      run: npm run test:e2e
+      run: npx playwright test --project=chromium --project=mobile-chrome
       env:
         BASE_URL: http://localhost:5173
 
@@ -94,7 +97,7 @@ jobs:
       run: npx playwright install
 
     - name: Run accessibility tests
-      run: npx playwright test e2e/critical-paths.spec.ts --grep "Accessibility"
+      run: npx playwright test e2e/accessibility.spec.ts --project=chromium
 
   security:
     runs-on: ubuntu-latest

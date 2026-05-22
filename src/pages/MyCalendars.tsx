@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import type { Json } from "@/integrations/supabase/types";
 
 interface SavedCalendar {
   id: string;
@@ -33,9 +34,9 @@ interface SavedCalendar {
   core_idea: string | null;
   created_at: string;
   is_favorite?: boolean;
-  posts?: unknown[];
+  posts?: Json;
   industry?: string | null;
-  form_payload?: unknown;
+  form_payload?: Json;
 }
 
 type SortKey = "newest" | "oldest" | "title" | "favorites";
@@ -205,13 +206,13 @@ export default function MyCalendars() {
       industry_label: lastDeleted.industry_label || null,
       platform: lastDeleted.platform || null,
       core_idea: lastDeleted.core_idea || null,
-      form_payload: lastDeleted.form_payload || null,
-      posts: lastDeleted.posts || null,
+      form_payload: lastDeleted.form_payload || {},
+      posts: lastDeleted.posts || [],
       is_favorite: lastDeleted.is_favorite || false,
     };
 
     try {
-      await restoreCalendarMutation.mutateAsync(payload as any);
+      await restoreCalendarMutation.mutateAsync(payload);
     } catch (error) {
       log.error("Failed to restore deleted calendar", error);
       toast.error("Restore failed");

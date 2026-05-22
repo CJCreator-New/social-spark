@@ -134,7 +134,7 @@ export default function Schedule() {
     const firstPage = pages[0];
     setProfileTz(firstPage.profileTz);
     setViewTz(firstPage.profileTz);
-    setRows(pages.flatMap(page => page.rows));
+    setRows(pages.flatMap(page => page.rows) as ScheduledRow[]);
     setCalendars(firstPage.calendars);
   }, [scheduleData]);
 

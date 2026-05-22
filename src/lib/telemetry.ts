@@ -31,11 +31,9 @@ export async function sendEvent(name: string, props: Record<string, unknown> = {
     });
   } catch (e) {
     // ignore
-    // eslint-disable-next-line no-console
     console.warn("telemetry send failed", e);
   }
   // also log locally for dev
-  // eslint-disable-next-line no-console
   console.debug("telemetry:", ev);
 }
 
