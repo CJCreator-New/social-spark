@@ -1,10 +1,10 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { E2E_AUTH_FLAG, E2E_CALENDAR, E2E_SCHEDULE_ROWS } from "@/lib/e2eFixtures";
+import { getE2EAuthFlag, E2E_CALENDAR, E2E_SCHEDULE_ROWS } from "@/lib/e2eFixtures";
 
 function isE2EMode() {
-  return typeof window !== "undefined" && window.localStorage.getItem(E2E_AUTH_FLAG) === "true";
+  return typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true";
 }
 
 type E2ECalendar = typeof E2E_CALENDAR;

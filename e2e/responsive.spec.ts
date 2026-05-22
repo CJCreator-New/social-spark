@@ -1,10 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
-import { E2E_AUTH_FLAG } from "../src/lib/e2eFixtures";
+import { getE2EAuthFlag } from "../src/lib/e2eFixtures";
 
 async function enableE2EAuth(page: Page) {
   await page.addInitScript((flag) => {
     window.localStorage.setItem(flag, "true");
-  }, E2E_AUTH_FLAG);
+  }, getE2EAuthFlag());
 }
 
 const viewports = [

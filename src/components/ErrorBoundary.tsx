@@ -70,7 +70,7 @@ function DefaultErrorFallback({
   reset: () => void;
 }) {
   const message = getUserFriendlyMessage(error);
-  const showDetails = import.meta.env.DEV;
+  const showDetails = import.meta.env.DEV && typeof window !== 'undefined' && window.localStorage.getItem('ss:show-error-details') === 'true';
 
   return (
     <div

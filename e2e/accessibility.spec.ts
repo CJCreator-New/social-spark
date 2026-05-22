@@ -1,11 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
 import { injectAxe, checkA11y } from "axe-playwright";
-import { E2E_AUTH_FLAG, E2E_CALENDAR } from "../src/lib/e2eFixtures";
+import { getE2EAuthFlag, E2E_CALENDAR } from "../src/lib/e2eFixtures";
 
 async function enableE2EAuth(page: Page) {
   await page.addInitScript((flag) => {
     window.localStorage.setItem(flag, "true");
-  }, E2E_AUTH_FLAG);
+  }, getE2EAuthFlag());
 }
 
 async function checkRoute(page: Page, path: string) {

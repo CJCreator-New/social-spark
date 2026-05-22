@@ -28,6 +28,8 @@ export async function sendEvent(name: string, props: Record<string, unknown> = {
       method: "POST",
       headers: getTelemetryHeaders(),
       body: JSON.stringify(ev),
+    }).catch(() => {
+      // Ignore telemetry transport failures.
     });
   } catch (e) {
     // ignore

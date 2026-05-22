@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { E2E_AUTH_FLAG, E2E_USER_EMAIL, E2E_USER_ID } from "@/lib/e2eFixtures";
+import { getE2EAuthFlag, E2E_USER_EMAIL, E2E_USER_ID } from "@/lib/e2eFixtures";
 
 interface AuthContextValue {
   user: User | null;
@@ -18,7 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const e2eEnabled = window.localStorage.getItem(E2E_AUTH_FLAG) === "true";
+    const e2eEnabled = window.localStorage.getItem(getE2EAuthFlag()) === "true";
     if (e2eEnabled) {
       const mockUser = {
         id: E2E_USER_ID,
@@ -60,8 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    if (window.localStorage.getItem(E2E_AUTH_FLAG) === "true") {
-      window.localStorage.removeItem(E2E_AUTH_FLAG);
+    if (window.localStorage.getItem(getE2EAuthFlag()) === "true") {
+      window.localStorage.removeItem(getE2EAuthFlag());
       setSession(null);
       setUser(null);
       return;

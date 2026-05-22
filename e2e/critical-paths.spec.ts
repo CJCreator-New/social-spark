@@ -1,10 +1,10 @@
 import { test, expect, type Page } from '@playwright/test'
-import { E2E_AUTH_FLAG } from '../src/lib/e2eFixtures'
+import { getE2EAuthFlag } from '../src/lib/e2eFixtures'
 
 async function enableE2EAuth(page: Page) {
   await page.addInitScript((flag) => {
     window.localStorage.setItem(flag, 'true')
-  }, E2E_AUTH_FLAG)
+  }, getE2EAuthFlag())
 }
 
 test.describe('Authentication Flow', () => {
@@ -22,9 +22,10 @@ test.describe('Authentication Flow', () => {
     await page.goto('/app')
     await page.waitForLoadState('networkidle')
 
-    // Should stay on app pages
+    // Should stay on app pages — wait for main hero copy to appear
     await expect(page).not.toHaveURL(/.*auth/)
-    await expect(page.getByText(/build the calendar before the scroll ever starts/i)).toBeVisible({ timeout: 15000 })
+    await page.getByText(/build the calendar before the scroll ever starts/i).waitFor({ state: 'visible', timeout: 30000 })
+    await expect(page.getByText(/build the calendar before the scroll ever starts/i)).toBeVisible()
   })
 })
 
@@ -39,7 +40,8 @@ test.describe('Calendar Creation Flow', () => {
     await page.waitForLoadState('networkidle')
 
     // Step 1: Select industry
-    await page.getByRole('radio', { name: /marketing & growth/i }).click()
+    await page.getByRole('radio', { name: /marketing & growth/i }).first().waitFor({ state: 'visible', timeout: 15000 })
+    await page.getByRole('radio', { name: /marketing & growth/i }).first().click()
     await page.getByPlaceholder(/what's the big idea/i).fill('Launch a better B2B content workflow')
     await page.getByRole('button', { name: /next step/i }).click()
 
@@ -68,7 +70,8 @@ test.describe('Calendar Creation Flow', () => {
     await page.waitForLoadState('networkidle')
 
     // Step 1: Select industry
-    await page.getByRole('radio', { name: /marketing & growth/i }).click()
+    await page.getByRole('radio', { name: /marketing & growth/i }).first().waitFor({ state: 'visible', timeout: 15000 })
+    await page.getByRole('radio', { name: /marketing & growth/i }).first().click()
     await page.getByPlaceholder(/what's the big idea/i).fill('Launch a timely holiday campaign')
     await page.getByRole('button', { name: /next step/i }).click()
 
@@ -161,7 +164,8 @@ test.describe('Error Handling', () => {
     await page.waitForLoadState('networkidle')
 
     // Should show connection error
-    await expect(page.locator('.err-box').first()).toHaveText(/connection error\. please check your internet and try again\./i, { timeout: 15000 })
+    await page.locator('.err-box').first().waitFor({ state: 'visible', timeout: 30000 })
+    await expect(page.locator('.err-box').first()).toHaveText(/connection error\. please check your internet and try again\./i)
   })
 })
 

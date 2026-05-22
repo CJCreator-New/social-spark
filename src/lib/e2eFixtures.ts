@@ -1,4 +1,6 @@
-export const E2E_AUTH_FLAG = "ss:e2e-auth";
+export function getE2EAuthFlag() {
+  return "ss:e2e-auth";
+}
 export const E2E_USER_ID = "00000000-0000-4000-8000-000000000001";
 export const E2E_USER_EMAIL = "e2e@contentforge.test";
 

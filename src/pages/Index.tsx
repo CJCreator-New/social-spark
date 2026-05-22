@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { E2E_AUTH_FLAG, E2E_USER_ID, E2E_CALENDAR } from "@/lib/e2eFixtures";
+import { getE2EAuthFlag, E2E_USER_ID, E2E_CALENDAR } from "@/lib/e2eFixtures";
 import e2eStore from "@/lib/e2eStore";
 import { toast } from "sonner";
 import storageService from "@/lib/storageService";
@@ -745,6 +745,21 @@ const DRAFT_VERSION = 1;
 const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const WIZARD_DRAFT_PREFIX = "draft:wizard:";
 const WIZARD_SERVER_DRAFT_TABLE = "wizard_drafts";
+let wizardDraftServerAvailable = true;
+
+function isMissingWizardDraftTableError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { status?: unknown; message?: unknown; details?: unknown };
+  const status = candidate.status;
+  const message = String(candidate.message || candidate.details || "").toLowerCase();
+  return status === 404 || message.includes(WIZARD_SERVER_DRAFT_TABLE) || message.includes("does not exist") || message.includes("not found");
+}
+
+function markWizardDraftServerUnavailable(error: unknown) {
+  if (isMissingWizardDraftTableError(error)) {
+    wizardDraftServerAvailable = false;
+  }
+}
 
 type DraftEnvelope<T> = {
   version: number;
@@ -838,27 +853,36 @@ async function upsertMediaReferences(params: {
 }
 
 async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraftSnapshot> | null> {
+  if (!wizardDraftServerAvailable) return null;
   const { data, error } = await supabase.from(WIZARD_SERVER_DRAFT_TABLE)
     .select("snapshot")
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (error || !data?.snapshot) return null;
+  if (error) {
+    markWizardDraftServerUnavailable(error);
+    return null;
+  }
+  if (!data?.snapshot) return null;
   return parseDraftEnvelope<WizardDraftSnapshot>(data.snapshot);
 }
 
 async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
-  await supabase.from(WIZARD_SERVER_DRAFT_TABLE).upsert(
+  if (!wizardDraftServerAvailable) return;
+  const { error } = await supabase.from(WIZARD_SERVER_DRAFT_TABLE).upsert(
     {
       user_id: userId,
       snapshot: makeDraftEnvelope(snapshot) as unknown as Json,
     },
     { onConflict: "user_id" }
   );
+  if (error) markWizardDraftServerUnavailable(error);
 }
 
 async function clearServerDraft(userId: string) {
-  await supabase.from(WIZARD_SERVER_DRAFT_TABLE).delete().eq("user_id", userId);
+  if (!wizardDraftServerAvailable) return;
+  const { error } = await supabase.from(WIZARD_SERVER_DRAFT_TABLE).delete().eq("user_id", userId);
+  if (error) markWizardDraftServerUnavailable(error);
 }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -1392,7 +1416,7 @@ const Index = () => {
     if (generatingRef.current) return;
     if (!validate(2)) return;
 
-    const isE2E = typeof window !== "undefined" && window.localStorage.getItem(E2E_AUTH_FLAG) === "true";
+    const isE2E = typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true";
 
     if (!isRetry && form.mode !== "day" && !bypassSubtopicPreview && form.topics.length > 0 && form.topics.length < 7 && !isE2E) {
       setSubtopicPreview(buildSubtopicPreview());
@@ -1523,7 +1547,7 @@ const Index = () => {
       log.info(`Starting generation (${mode}, ${isRetry ? 'retry' : 'first attempt'})`, { mode, platform: form.platform, industry: form.industry });
 
       // E2E fast-path: return a deterministic calendar/post when E2E auth flag is set
-      const e2eEnabled = typeof window !== "undefined" && window.localStorage.getItem(E2E_AUTH_FLAG) === "true";
+      const e2eEnabled = typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true";
       if (e2eEnabled) {
         const fakePosts: Post[] = (() => {
           if (isDay) {
@@ -2073,7 +2097,7 @@ ${postText(p)}
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const isE2E = window.localStorage.getItem(E2E_AUTH_FLAG) === "true";
+    const isE2E = window.localStorage.getItem(getE2EAuthFlag()) === "true";
     const hasNetworkErrorFlag = new URLSearchParams(window.location.search).has("e2e-network-error");
     setE2eNetworkError(isE2E && hasNetworkErrorFlag);
   }, []);

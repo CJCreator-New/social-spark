@@ -21,7 +21,7 @@ import PostInsights from "@/components/PostInsights";
 import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
 import { buildTrackingUrl } from "@/lib/utm";
 import { useAuth } from "@/contexts/AuthContext";
-import { E2E_AUTH_FLAG } from "@/lib/e2eFixtures";
+import { getE2EAuthFlag } from "@/lib/e2eFixtures";
 import e2eStore from "@/lib/e2eStore";
 import FeedbackModal from "@/components/FeedbackModal";
 import type { Database, Json } from "@/integrations/supabase/types";
@@ -993,7 +993,7 @@ export default function CalendarDetail() {
               <div className="cd-hero-title">Polish the week, then ship it.</div>
               <p className="cd-hero-copy">Use the active-day card for edits, keep pinned posts protected, and move to schedule only when the calendar reads clean. The workflow is set up to help you review at a glance, not hunt for controls.</p>
               <div className="cd-hero-chiprow">
-                {typeof window !== "undefined" && window.localStorage.getItem(E2E_AUTH_FLAG) === "true" && (() => {
+                {typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true" && (() => {
                   const genCount = e2eStore.getLastGeneratedPosts ? e2eStore.getLastGeneratedPosts() : 0;
                   const visibleCount = genCount || posts.length;
                   return <span className="cd-hero-chip">{visibleCount > 1 ? `${visibleCount}-day calendar` : `1-day calendar`}</span>

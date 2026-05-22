@@ -48,7 +48,6 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "AI is not configured." }, 500);
     }
 
-    const longFormPlatform = isLongFormPlatform(payload.platform);
     const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
     const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: true });
@@ -109,7 +108,7 @@ ${bannedPhrasesBlock()}`;
                     cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
                   hashtags: {
                     type: "string",
-                    description: longFormPlatform
+                    description: isLongFormPlatform(payload.platform)
                       ? "MUST be an empty string for Newsletter/Blog."
                       : "3–6 platform-native hashtags as a single space-separated string.",
                   },

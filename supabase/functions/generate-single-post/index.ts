@@ -45,7 +45,6 @@ Deno.serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI is not configured." }, 500);
 
-    const longFormPlatform = isLongFormPlatform(payload.platform);
     const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
     const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: false });
@@ -96,7 +95,7 @@ ${bannedPhrasesBlock()}`;
               cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
             hashtags: {
               type: "string",
-              description: longFormPlatform ? "MUST be empty for Newsletter/Blog." : "3–6 hashtags, space-separated.",
+              description: isLongFormPlatform(payload.platform) ? "MUST be empty for Newsletter/Blog." : "3–6 hashtags, space-separated.",
             },
             rationale: { type: "string" },
           },
