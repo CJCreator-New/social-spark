@@ -18,6 +18,7 @@ export const SAMPLE_FORM = {
   industry: "creator",
   industryLabel: "Creator Economy",
   platform: "Newsletter",
+  language: "English",
   coreIdea: "Helping indie newsletter writers grow past 1,000 subscribers without paid ads.",
   audiences: ["Newsletter writers", "Aspiring creators", "Coaches & consultants"],
   voice: "Founder POV",

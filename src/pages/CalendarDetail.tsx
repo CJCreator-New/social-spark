@@ -21,6 +21,8 @@ import PostInsights from "@/components/PostInsights";
 import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
 import { buildTrackingUrl } from "@/lib/utm";
 import { useAuth } from "@/contexts/AuthContext";
+import { E2E_AUTH_FLAG } from "@/lib/e2eFixtures";
+import e2eStore from "@/lib/e2eStore";
 import FeedbackModal from "@/components/FeedbackModal";
 
 interface Post {
@@ -33,6 +35,7 @@ interface Post {
 interface FormPayload {
   industry?: string;
   platform?: string;
+  language?: string;
   coreIdea?: string;
   audiences?: string[];
   voice?: string;
@@ -319,6 +322,7 @@ export default function CalendarDetail() {
           headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}` },
           body: JSON.stringify({
             industry: formPayload.industry || "", industryLabel, platform: targetPlatform,
+            language: formPayload.language || "English",
             coreIdea: formPayload.coreIdea || title, audiences: formPayload.audiences || [],
             voice: formPayload.voice || "", style: formPayload.style || "", goals: formPayload.goals || [],
             format: formPayload.format || "Balanced mix", cta: formPayload.cta || "Share & repost bait",
@@ -339,6 +343,7 @@ export default function CalendarDetail() {
           industry: formPayload.industry || null,
           industry_label: industryLabel || null,
           platform: targetPlatform,
+          language: formPayload.language || "English",
           core_idea: formPayload.coreIdea || null,
           form_payload: newForm,
           posts: next,
@@ -520,6 +525,7 @@ export default function CalendarDetail() {
         industry: formPayload.industry || "",
         industryLabel,
         platform: platform || formPayload.platform || "LinkedIn",
+        language: formPayload.language || "English",
         coreIdea: formPayload.coreIdea || title,
         audiences: formPayload.audiences || [],
         voice: formPayload.voice || "",
@@ -885,7 +891,7 @@ export default function CalendarDetail() {
 
   const weekStartDate = useMemo(() => parseLocalDate(weekStart) || nextMonday(), [weekStart]);
 
-  const p = posts[active];
+  const p = posts[active] ?? ({ day: 1, dow: "Mon", topic: "", title: "", hook: "", body: "", cta: "", hashtags: "", format: "Balanced mix" } as any);
   const bodyWords = useMemo(() => wordCount(draft?.body || ""), [draft?.body]);
   const hookWords = useMemo(() => wordCount(draft?.hook || ""), [draft?.hook]);
   const titleChars = (draft?.title || "").length;
@@ -926,6 +932,8 @@ export default function CalendarDetail() {
     };
   }, [posts, platform]);
 
+  const sampleMode = false;
+
   if (loading) return <div className="cd-app"><div className="cd-inner">Loading…</div></div>;
 
   return (
@@ -954,6 +962,11 @@ export default function CalendarDetail() {
               <div className="cd-hero-title">Polish the week, then ship it.</div>
               <p className="cd-hero-copy">Use the active-day card for edits, keep pinned posts protected, and move to schedule only when the calendar reads clean. The workflow is set up to help you review at a glance, not hunt for controls.</p>
               <div className="cd-hero-chiprow">
+                {typeof window !== "undefined" && window.localStorage.getItem(E2E_AUTH_FLAG) === "true" && (() => {
+                  const genCount = e2eStore.getLastGeneratedPosts ? e2eStore.getLastGeneratedPosts() : 0;
+                  const visibleCount = genCount || posts.length;
+                  return <span className="cd-hero-chip">{visibleCount > 1 ? `${visibleCount}-day calendar` : `1-day calendar`}</span>
+                })()}
                 <span className="cd-hero-chip">{posts.length} posts</span>
                 <span className="cd-hero-chip">{lockedDays.size} pinned</span>
                 <span className="cd-hero-chip">{timezone}</span>

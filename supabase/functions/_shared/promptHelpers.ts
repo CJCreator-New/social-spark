@@ -217,6 +217,7 @@ export interface GenerationPayload {
   industry?: string;
   industryLabel?: string;
   platform?: string;
+  language?: string;
   coreIdea?: string;
   audiences?: string[];
   voice?: string;
@@ -268,8 +269,21 @@ export function fixSpelling(text: string): string {
   }
   return result;
 }
-function buildContentRules(platform: string): string {
-  return `\nCONTENT RULES:\n- Do not use markdown syntax in post text: no **bold**, *italic*, headings, or inline code.\n- Use plain-text bullets only (• or →). Do not combine bullets with markdown formatting.\n- Rotate CTA verbs across the week; do not repeat the same CTA verb on every post.\n- Stay tightly within the user's stated topic angle; do not introduce tangential sub-topics unless requested.\n- Keep the post platform-native: LinkedIn = insight-led, Instagram = visual/story-driven, X = concise/opinionated, Facebook = warm/community-first.\n- If the topic is India-specific, incorporate current Indian trends (Digital India, EV adoption, startup ecosystem), regional contexts (South/North/East/West differences), and cultural references (jugaad innovation, dharma/responsibility themes) where relevant.\n- Reference upcoming festivals (Diwali, Holi, Durga Puja) and national events (Republic Day) in seasonal content.\n- Use American English spelling: optimizing, organizing, recognizing, analyzing, utilizing, emphasizing.\n- Avoid British spellings such as organising, optimising, recognising, analysing, utilising, emphasising.${buildEngagementRules(platform)}`;
+function buildContentRules(platform: string, language?: string): string {
+  const normalizedLanguage = String(language || "English").trim().toLowerCase();
+  const spellingRule = normalizedLanguage === "tamil" || normalizedLanguage === "தமிழ்"
+    ? "- Keep the output fully in Tamil script and avoid mixing in English unless a product name or platform term needs it."
+    : "- Use American English spelling: optimizing, organizing, recognizing, analyzing, utilizing, emphasizing.\n- Avoid British spellings such as organising, optimising, recognising, analysing, utilising, emphasising.";
+
+  return `\nCONTENT RULES:\n- Do not use markdown syntax in post text: no **bold**, *italic*, headings, or inline code.\n- Use plain-text bullets only (• or →). Do not combine bullets with markdown formatting.\n- Rotate CTA verbs across the week; do not repeat the same CTA verb on every post.\n- Stay tightly within the user's stated topic angle; do not introduce tangential sub-topics unless requested.\n- Keep the post platform-native: LinkedIn = insight-led, Instagram = visual/story-driven, X = concise/opinionated, Facebook = warm/community-first.\n- If the topic is India-specific, incorporate current Indian trends (Digital India, EV adoption, startup ecosystem), regional contexts (South/North/East/West differences), and cultural references (jugaad innovation, dharma/responsibility themes) where relevant.\n- Reference upcoming festivals (Diwali, Holi, Durga Puja) and national events (Republic Day) in seasonal content.\n${spellingRule}${buildEngagementRules(platform)}`;
+}
+
+function buildLanguageRules(language?: string): string {
+  const normalized = String(language || "English").trim().toLowerCase();
+  if (normalized === "tamil" || normalized === "தமிழ்") {
+    return `\nLANGUAGE RULES:\n- Write the output in natural Tamil script.\n- Do not transliterate Tamil into English letters.\n- Keep English out of the body unless a brand name, product name, or platform term truly needs it.\n- Use clear, everyday Tamil that sounds native and readable, not machine-translated.\n- Keep hashtags platform-native; if Tamil hashtags are used, make them short and natural.`;
+  }
+  return `\nLANGUAGE RULES:\n- Write the output in English unless the user explicitly chooses another language.`;
 }
 
 /**
@@ -285,6 +299,7 @@ export function cleanPayload(body: unknown): GenerationPayload {
     industry: String(payload.industry || "").trim() || "",
     industryLabel: String(payload.industryLabel || "").trim() || "",
     platform: String(payload.platform || "LinkedIn").trim(),
+    language: String(payload.language || "English").trim(),
     coreIdea: String(payload.coreIdea || "").trim() || "",
     audiences: cleanList(payload.audiences, 10),
     voice: String(payload.voice || "").trim() || "",
@@ -314,6 +329,7 @@ export function getPayloadDefaults(): GenerationPayload {
     industry: "",
     industryLabel: "",
     platform: "LinkedIn",
+    language: "English",
     coreIdea: "",
     audiences: [],
     voice: "",
@@ -363,8 +379,9 @@ export function buildPromptContext(
 - Voice / tone: ${voice}
 - Writing style: ${style}
 - Goals: ${goals}
+- Output language: ${payload.language || "English"}
 ${topicLine}- Post format mix: ${payload.format}
-- CTA approach: ${payload.cta}${buildContentRules(payload.platform)}`;
+- CTA approach: ${payload.cta}${buildContentRules(payload.platform, payload.language)}${buildLanguageRules(payload.language)}`;
 
   // Append a short platform preset to help the model match native conventions
   return context + getPlatformPreset(payload.platform);
