@@ -20,9 +20,16 @@ function getTelemetryHeaders(): Record<string, string> {
   return headers;
 }
 
+function shouldSendTelemetry(): boolean {
+  if (import.meta.env.MODE === "test") return true;
+  if (typeof window !== "undefined" && window.location.hostname === "localhost") return false;
+  return true;
+}
+
 export async function sendEvent(name: string, props: Record<string, unknown> = {}) {
   const ev: TelemetryEvent = { name, props, timestamp: Date.now() };
   try {
+    if (!shouldSendTelemetry()) return;
     // Best-effort: fire-and-forget
     void fetch(getTelemetryEndpoint(), {
       method: "POST",
