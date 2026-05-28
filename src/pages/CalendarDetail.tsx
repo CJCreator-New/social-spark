@@ -23,6 +23,7 @@ import { buildTrackingUrl } from "@/lib/utm";
 import { useAuth } from "@/contexts/AuthContext";
 import { getE2EAuthFlag } from "@/lib/e2eFixtures";
 import e2eStore from "@/lib/e2eStore";
+import { generateLocalPosts } from "@/lib/localPostGenerator";
 import FeedbackModal from "@/components/FeedbackModal";
 import type { Database, Json } from "@/integrations/supabase/types";
 
@@ -400,7 +401,33 @@ export default function CalendarDetail() {
     }
 
     const loadedPosts = (calendarData.posts as unknown as Post[]) || [];
-    setPosts(loadedPosts);
+    const isE2E = typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true";
+    const hydratedPosts = loadedPosts.length > 0
+      ? loadedPosts
+      : isE2E
+        ? generateLocalPosts({
+            industry: (calendarData as { industry?: string | null }).industry || "",
+            industryLabel: calendarData.industry_label || "",
+            platform: calendarData.platform || "LinkedIn",
+            language: (calendarData.form_payload as { language?: string } | null)?.language || "English",
+            coreIdea: calendarData.core_idea || calendarData.title || "",
+            audiences: (calendarData.form_payload as { audiences?: string[] } | null)?.audiences || [],
+            voice: (calendarData.form_payload as { voice?: string } | null)?.voice || "",
+            style: (calendarData.form_payload as { style?: string } | null)?.style || "",
+            goals: (calendarData.form_payload as { goals?: string[] } | null)?.goals || [],
+            topics: (calendarData.form_payload as { topics?: string[] } | null)?.topics || [],
+            format: (calendarData.form_payload as { format?: string } | null)?.format || "Balanced mix",
+            cta: (calendarData.form_payload as { cta?: string } | null)?.cta || "Share & repost bait",
+            length: (calendarData.form_payload as { length?: string } | null)?.length || "medium",
+            structure: (calendarData.form_payload as { structure?: string } | null)?.structure || "mixed",
+            extra: (calendarData.form_payload as { extra?: string } | null)?.extra || "",
+            bannedWords: (calendarData.form_payload as { bannedWords?: string[] } | null)?.bannedWords || [],
+            requiredWords: (calendarData.form_payload as { requiredWords?: string[] } | null)?.requiredWords || [],
+            targetTopic: (calendarData.form_payload as { topics?: string[] } | null)?.topics?.[0] || calendarData.core_idea || calendarData.title || "",
+            targetDow: "Mon",
+          })
+        : [];
+    setPosts(hydratedPosts);
     setTitle(calendarData.title);
     setPlatform(calendarData.platform || "");
     setIndustryLabel(calendarData.industry_label || "");
@@ -420,7 +447,7 @@ export default function CalendarDetail() {
       setPostTimes(storedTimes);
     } else {
       const seed: Record<string, string> = {};
-      for (const p of loadedPosts) seed[String(p.day)] = suggestedTimeForDay(Number(p.day) || 1);
+      for (const p of hydratedPosts) seed[String(p.day)] = suggestedTimeForDay(Number(p.day) || 1);
       setPostTimes(seed);
     }
   }, [calendarData, calendarError, navigate]);

@@ -29,6 +29,21 @@ export const STRUCTURE_GUIDE: Record<string, string> = {
   perPost: "Pick the best structure per post based on its topic and format — vary deliberately.",
 };
 
+export const STYLE_GUIDE: Record<string, string> = {
+  "Short punchy lines": "STYLE: Keep every sentence short. Use crisp line breaks, strong verbs, and a fast cadence. One thought per line.",
+  "Long-form narrative": "STYLE: Write like a thoughtful essay. Build tension, explain the arc, and land on a reflective takeaway.",
+  "Lists & frameworks": "STYLE: Organize the body around steps, principles, or frameworks. Use numbered sections or bullet points that feel immediately usable.",
+  "Thread-style breakdown": "STYLE: Make the post feel like a clean thread. Open with the thesis, then break the idea into compact, sequenced beats.",
+  "Stats-led": "STYLE: Lead with a concrete number, percentage, or metric. Use evidence first, then interpret what it means.",
+  "Case study format": "STYLE: Frame the post as a mini case study — situation, friction, action, result, lesson.",
+  "Question-led": "STYLE: Open with a sharp question that creates curiosity. Use the rest of the post to answer it clearly.",
+  "First-person story": "STYLE: Write in first person with a personal moment, lesson, or observation. Keep it grounded and human.",
+  "Industry insight": "STYLE: Sound like an expert sharing a field note. Be specific, signal lived experience, and connect the insight to a broader trend.",
+  "Myth-busting": "STYLE: Start by challenging a common assumption, then explain the reality with concise evidence or logic.",
+  "How-to guide": "STYLE: Teach something directly. Use ordered steps, practical advice, and a clear outcome.",
+  "Behind-the-scenes": "STYLE: Reveal the process, the messy middle, and the decision points. Make it feel candid and specific.",
+};
+
 export const BANNED_PHRASES = [
   "in today's fast-paced world",
   "in the ever-evolving landscape",
@@ -83,6 +98,12 @@ export function getPlatformPreset(platform: string): string {
   }
 }
 
+export function getStylePreset(style?: string): string {
+  const selectedStyle = String(style || "").trim();
+  if (!selectedStyle) return "\nSTYLE PRESCRIPT: Use the most natural style for the topic and audience.";
+  return `\nSTYLE PRESCRIPT: ${STYLE_GUIDE[selectedStyle] || `Use ${selectedStyle} faithfully and keep the structure consistent with that style.`}`;
+}
+
 export function normTag(s: string): string {
   return `#${String(s || "").trim().replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase()}`;
 }
@@ -100,6 +121,17 @@ export function cleanTagList(arr: unknown, max: number): string[] {
 
 export function isLongFormPlatform(platform: string): boolean {
   return platform === "Newsletter" || platform === "Blog";
+}
+
+// Backwards-compatibility alias: some places mistakenly referenced `longFormPlatform`.
+// Provide both an exported const and a global alias so undefined-reference errors are avoided.
+export const longFormPlatform = isLongFormPlatform;
+try {
+  // attach to globalThis for runtimes that reference the identifier unscoped
+  // (this is best-effort and safe — it simply assigns a function reference).
+  (globalThis as unknown as Record<string, unknown>).longFormPlatform = isLongFormPlatform;
+} catch {
+  /* ignore — non-critical */
 }
 
 export function buildHashtagInstr(
@@ -381,7 +413,7 @@ export function buildPromptContext(
 - Goals: ${goals}
 - Output language: ${payload.language || "English"}
 ${topicLine}- Post format mix: ${payload.format}
-- CTA approach: ${payload.cta}${buildContentRules(payload.platform, payload.language)}${buildLanguageRules(payload.language)}`;
+- CTA approach: ${payload.cta}${buildContentRules(payload.platform, payload.language)}${buildLanguageRules(payload.language)}${getStylePreset(payload.style)}`;
 
   // Append a short platform preset to help the model match native conventions
   return context + getPlatformPreset(payload.platform);
@@ -460,25 +492,66 @@ export function parseAIResponse(
   toolName: string
 ): { success: boolean; parsed?: Record<string, unknown>; error?: string } {
   try {
-    const toolCall = (data?.choices?.[0] as Record<string, unknown>)?.message?.tool_calls?.[0];
-    
-    if (!toolCall) {
-      console.error("No tool call in response", JSON.stringify(data));
+    const choice = (data?.choices && Array.isArray(data.choices) && (data.choices as unknown[])[0]) as Record<string, unknown> | undefined;
+    const message = choice?.message as Record<string, unknown> | undefined;
+
+    // Try several shapes where the model might place a function/tool call or structured JSON
+    const toolCall =
+      // new style: message.tool_calls
+      (message?.tool_calls && Array.isArray(message.tool_calls) && (message.tool_calls as unknown[])[0]) ||
+      // alternative: message.tool_call or choice-level function_call
+      (message && ((message as any).tool_call || (message as any).function_call)) ||
+      (choice && ((choice as any).function_call || (choice as any).tool_call));
+
+    // function arguments may be under different keys
+    let funcArgs: unknown | undefined = toolCall && ((toolCall as any).function?.arguments || (toolCall as any).arguments || (toolCall as any).function_call?.arguments || (toolCall as any).function_args);
+
+    // Fallback: some responses embed JSON in the message.content string
+    if (!funcArgs && typeof message?.content === "string") {
+      const content = String(message.content).trim();
+      // If the content is raw JSON, parse it directly
+      if (content.startsWith("{") || content.startsWith("[")) {
+        try {
+          const parsedContent = JSON.parse(content);
+          return { success: true, parsed: parsedContent as Record<string, unknown> };
+        } catch (e) {
+          // ignore and try to extract JSON substring
+        }
+      }
+      // Try to find a JSON object/array substring
+      const m = content.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+      if (m) {
+        try {
+          const parsedContent = JSON.parse(m[0]);
+          return { success: true, parsed: parsedContent as Record<string, unknown> };
+        } catch (e) {
+          // fallthrough to error below
+        }
+      }
+    }
+
+    if (!funcArgs) {
+      console.error("No tool call or JSON content in AI response", JSON.stringify(data));
       return { success: false, error: "AI returned no structured output." };
     }
 
-    const funcArgs = (toolCall as Record<string, unknown>)?.function?.arguments;
-    if (!funcArgs) {
-      console.error("No function arguments in tool call", JSON.stringify(toolCall));
-      return { success: false, error: "AI returned incomplete output." };
-    }
-
     let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(String(funcArgs));
-    } catch (e) {
-      console.error("Failed to parse tool args:", e);
-      return { success: false, error: "Failed to parse AI output." };
+    if (typeof funcArgs === "string") {
+      try {
+        parsed = JSON.parse(funcArgs as string);
+      } catch (e) {
+        console.error("Failed to parse function args string:", funcArgs);
+        return { success: false, error: "Failed to parse AI output." };
+      }
+    } else if (typeof funcArgs === "object") {
+      parsed = funcArgs as Record<string, unknown>;
+    } else {
+      try {
+        parsed = JSON.parse(String(funcArgs));
+      } catch (e) {
+        console.error("Failed to coerce function args to JSON:", funcArgs);
+        return { success: false, error: "Failed to parse AI output." };
+      }
     }
 
     return { success: true, parsed };

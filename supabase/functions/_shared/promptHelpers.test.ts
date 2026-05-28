@@ -50,4 +50,23 @@ describe("promptHelpers engagement guidance", () => {
     expect(context).toContain("natural Tamil script");
     expect(context).toContain("Do not transliterate Tamil into English letters");
   });
+
+  it("adds explicit style guidance for named styles", () => {
+    const payload = cleanPayload({
+      industry: "Marketing",
+      coreIdea: "Smarter content systems",
+      platform: "LinkedIn",
+      audiences: ["Founders"],
+      voice: "data-driven",
+      style: "Stats-led",
+      goals: ["Thought leadership"],
+      format: "Balanced mix",
+      cta: "Comment below",
+    });
+
+    const context = buildPromptContext(payload, { isSinglePost: true });
+
+    expect(context).toContain("STYLE PRESCRIPT");
+    expect(context).toContain("Lead with a concrete number, percentage, or metric");
+  });
 });

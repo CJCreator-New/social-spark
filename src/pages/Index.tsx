@@ -15,6 +15,7 @@ import { downloadIcs, nextMonday, toDateInputValue, parseLocalDate, dateForDow, 
 import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform, niceLabelFor, buildRawMarkdown, stripMarkdown } from "@/lib/platformCopy";
 import { suggestedTimeForDay } from "@/lib/postingTimes";
 import { getVoiceStylePreview } from "@/lib/voiceStylePreview";
+import { generateLocalPosts } from "@/lib/localPostGenerator";
 import { DraftRecoveryDialog } from "@/components/DraftRecoveryDialog";
 import { BatchEditModal, type BatchEditPayload } from "@/components/BatchEditModal";
 import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
@@ -39,14 +40,39 @@ function formatBadgeForPlatform(format: string, platform: string): string {
   return /list|bullet|thread/i.test(format) ? "THREAD FORMAT" : "SINGLE TWEET";
 }
 
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values.map(v => String(v).trim()).filter(Boolean)));
+}
+
 function unwrapPost(value: unknown): Post | null {
   if (!value || typeof value !== "object") return null;
   const candidate = "post" in value ? (value as { post?: unknown }).post : value;
   if (!candidate || typeof candidate !== "object") return null;
-  const post = candidate as Partial<Post>;
+
+  // Some older responses nest the actual post more than once, or return { posts: [...] }.
+  const nestedCandidate = "post" in candidate
+    ? (candidate as { post?: unknown }).post
+    : "posts" in candidate && Array.isArray((candidate as { posts?: unknown[] }).posts)
+      ? (candidate as { posts?: unknown[] }).posts?.[0]
+      : candidate;
+
+  if (!nestedCandidate || typeof nestedCandidate !== "object") return null;
+  const post = nestedCandidate as Partial<Post>;
   return typeof post.day === "number" && typeof post.dow === "string"
     ? { ...EMPTY_POST, ...post }
     : null;
+}
+
+function unwrapPosts(value: unknown): Post[] {
+  if (!value || typeof value !== "object") return [];
+  const candidate = value as Record<string, unknown>;
+
+  if (Array.isArray(candidate.posts)) {
+    return candidate.posts.map(unwrapPost).filter((p): p is Post => !!p);
+  }
+
+  const post = unwrapPost(value);
+  return post ? [post] : [];
 }
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
@@ -1377,7 +1403,7 @@ const Index = () => {
   };
 
   const selectedIndustry = INDUSTRIES.find(i => i.id === form.industry);
-  const topicPool = form.industry ? [...(INDUSTRY_TOPICS[form.industry] || []), ...extraTopics] : [...extraTopics];
+  const topicPool = form.industry ? uniqueStrings([...(INDUSTRY_TOPICS[form.industry] || []), ...extraTopics]) : uniqueStrings([...extraTopics]);
   const audiencePool = form.industry ? (AUDIENCE_PRESETS[form.industry] || AUDIENCE_PRESETS.other) : AUDIENCE_PRESETS.other;
 
   function addCustomTopic() {
@@ -1449,6 +1475,44 @@ const Index = () => {
       abortRef.current = null;
       generatingRef.current = false;
       setIsGenerating(false);
+    };
+
+    const localFallback = (message: string) => {
+      const DOW_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const targetDateObj = form.mode === "day" ? (parseLocalDate(form.targetDate) || new Date()) : null;
+      const localTargetDow = targetDateObj ? DOW_NAMES[targetDateObj.getDay()] : "Mon";
+      const fallbackPosts = generateLocalPosts({
+        industry: form.industry,
+        industryLabel: selectedIndustry?.label || form.industry,
+        platform: form.platform,
+        language: form.language,
+        coreIdea: form.coreIdea,
+        audiences: form.audiences,
+        voice: form.voice,
+        style: form.style,
+        goals: form.goals,
+        topics: form.mode === "day" ? [form.topics[0] || form.coreIdea] : form.topics,
+        format: form.format,
+        cta: form.cta,
+        length: form.length,
+        structure: form.structure,
+        extra: form.extra,
+        bannedWords: form.bannedWords,
+        requiredWords: form.requiredWords,
+        targetTopic: form.topics[0] || form.coreIdea,
+        targetDow: localTargetDow,
+      });
+      const result: Post[] = form.mode === "day" ? fallbackPosts.slice(0, 1) : fallbackPosts;
+      setGenStep(GEN_LABELS.length);
+      setPosts(result);
+      setActiveDay(0);
+      const seedTimes: Record<string, string> = {};
+      for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1);
+      setPostTimes(seedTimes);
+      setTimeout(() => setStep(4), 350);
+      log.warn(`Using local fallback generator`, new Error(message), { mode: form.mode, postCount: result.length });
+      if (typeof telemetry?.sendEvent === "function") telemetry.sendEvent("generate_fallback", { user: user?.id, mode: form.mode, reason: message });
+      toast.warning("Live AI generation is unavailable right now, so a local fallback version was generated.");
     };
 
     try {
@@ -1614,24 +1678,18 @@ const Index = () => {
       cleanup();
 
       if (!res.ok || data?.error) {
-        setStep(2);
         const errorMsg = data?.error || `Generation failed (${res.status}).`;
         log.warn(`Generation failed`, new Error(errorMsg), { mode, status: res.status, endpoint });
-        setError(errorMsg);
-        setLastGenerationError(new Error(errorMsg));
+        localFallback(errorMsg);
         return;
       }
 
       // Normalize: single-post endpoint returns { post }, week endpoint returns { posts }
-      const result: Post[] = isDay
-        ? (data?.post ? [data.post as Post] : [])
-        : (Array.isArray(data?.posts) ? data.posts : []);
+      const result: Post[] = unwrapPosts(data);
       if (result.length === 0) {
         const emptyError = "Empty response. Please try again.";
         log.warn(`Empty generation response`, new Error(emptyError), { mode });
-        setStep(2);
-        setError(emptyError);
-        setLastGenerationError(new Error(emptyError));
+        localFallback(emptyError);
         return;
       }
 
@@ -1650,8 +1708,11 @@ const Index = () => {
       cleanup();
       const aborted = err instanceof DOMException && err.name === "AbortError";
       const reason = (ac.signal as AbortSignal & { reason?: unknown }).reason;
-      setStep(2);
-      
+      if (!aborted) {
+        localFallback(err instanceof Error ? err.message : String(err));
+        return;
+      }
+
       const userMessage = getUserFriendlyMessage(err);
       setError(userMessage);
       setLastGenerationError(err);
@@ -2346,6 +2407,9 @@ ${postText(p)}
                     </div>
                     <div className="vsp-hook">{preview.hook}</div>
                     <div className="vsp-tail">{preview.tail}</div>
+                    {preview.stylePreset && (
+                      <div className="vsp-tail" style={{ marginTop: 8, fontSize: 12, color: '#9a9aae', fontStyle: 'italic' }}>{preview.stylePreset}</div>
+                    )}
                   </div>
                 );
               })()}
@@ -2913,6 +2977,7 @@ ${postText(p)}
 
                 <div className="bbar">
                   <button className="restart" onClick={() => { clearDraft(); setPosts([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setSampleMode(false); setStep(1); setError(""); }}>← Start over</button>
+                  <button className="restart" onClick={() => { setError(""); setStep(2); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ marginLeft: 8 }}>✎ Edit inputs</button>
                   <div className="bactions">
                     <button className="dlbtn" onClick={saveCalendar} disabled={saving || !!savedId || sampleMode} title={sampleMode ? "Sample mode — start your own to save" : ""}>
                       {sampleMode ? "Save (sample only)" : savedId ? "Saved ✓" : saving ? "Saving…" : "Save calendar"}
