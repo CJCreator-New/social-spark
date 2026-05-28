@@ -75,6 +75,7 @@ HARD RULES (follow strictly):
 5. The chosen format mix "${payload.format}" must drive AT LEAST 4 of the 7 posts. The remaining 3 may vary for rhythm.
 6. AT LEAST 3 of the 7 posts must include a concrete number, percentage, year, dollar figure, or named statistic embedded in the body or hook (not made-up — use realistic, defensible figures from the ${payload.industryLabel || payload.industry} space).
 7. The "dow" field MUST be exactly one of: "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" — and the 7 posts must be ordered Mon → Sun, with "day" 1..7 matching that order.
+8. Every provided topic must be represented at least once across the 7 posts. If more topics are supplied than fit in a week, combine related topics into the same post instead of dropping any of them.
 
 ${bannedPhrasesBlock()}`;
 

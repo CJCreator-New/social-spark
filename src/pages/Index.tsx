@@ -1094,7 +1094,13 @@ const Index = () => {
   const buildSubtopicPreview = () => {
     const selectedTopics = form.topics.filter(Boolean);
     if (selectedTopics.length === 0) return [];
-    if (selectedTopics.length >= 7) return selectedTopics.slice(0, 7);
+    if (selectedTopics.length >= 7) {
+      const grouped = Array.from({ length: 7 }, () => [] as string[]);
+      selectedTopics.forEach((topic, index) => {
+        grouped[index % 7].push(topic);
+      });
+      return grouped.map(bucket => bucket.join(" + "));
+    }
 
     const preview = [...selectedTopics];
     const seed = selectedTopics[0] || form.coreIdea || form.industry || "the topic";

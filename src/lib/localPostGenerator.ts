@@ -53,6 +53,24 @@ function uniq(values: string[]): string[] {
   return Array.from(new Set(values.map(v => String(v || "").trim()).filter(Boolean)));
 }
 
+function distributeTopicsAcrossWeek(topics: string[]): string[] {
+  const uniqueTopics = uniq(topics);
+  if (uniqueTopics.length === 0) {
+    return ["your topic"];
+  }
+
+  if (uniqueTopics.length <= 7) {
+    return Array.from({ length: 7 }, (_, index) => uniqueTopics[index] || uniqueTopics[index % uniqueTopics.length] || uniqueTopics[0]);
+  }
+
+  const buckets = Array.from({ length: 7 }, () => [] as string[]);
+  uniqueTopics.forEach((topic, index) => {
+    buckets[index % 7].push(topic);
+  });
+
+  return buckets.map(bucket => bucket.join(" + "));
+}
+
 function toTag(value: string): string {
   const clean = String(value || "").replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase();
   return clean ? `#${clean}` : "";
@@ -143,8 +161,8 @@ function normalizeTopic(value: string, fallback: string): string {
 }
 
 export function generateLocalPosts(input: LocalGenerationInput): GeneratedPost[] {
-  const topics = input.topics.length ? uniq(input.topics) : [input.targetTopic || input.coreIdea || input.industryLabel || input.industry || "your topic"];
-  const effectiveTopics = Array.from({ length: 7 }, (_, index) => topics[index] || topics[index % topics.length] || input.targetTopic || input.coreIdea || "your topic");
+  const baseTopics = input.topics.length ? input.topics : [input.targetTopic || input.coreIdea || input.industryLabel || input.industry || "your topic"];
+  const effectiveTopics = distributeTopicsAcrossWeek(baseTopics);
 
   return effectiveTopics.map((rawTopic, index) => {
     const day = index + 1;

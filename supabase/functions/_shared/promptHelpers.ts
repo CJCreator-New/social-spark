@@ -338,7 +338,7 @@ export function cleanPayload(body: unknown): GenerationPayload {
     style: String(payload.style || "").trim() || "",
     goals: cleanList(payload.goals, 10),
     topic: String(payload.topic || "").trim() || "",
-    topics: cleanList(payload.topics, 7),
+    topics: cleanList(payload.topics, 50),
     dow: String(payload.dow || "Mon").trim(),
     date: String(payload.date || "").trim() || "",
     format: String(payload.format || "Balanced mix").trim(),
@@ -400,7 +400,7 @@ export function buildPromptContext(
   if (opts.isSinglePost) {
     topicLine = `- Topic for this post: ${payload.topic}\n`;
   } else if (opts.includeTopics && payload.topics.length) {
-    topicLine = `- Topics to cover (1 per day; use a wrap-up or adjacent topic for day 7 if fewer than 7 topics): ${payload.topics.join(", ")}\n`;
+    topicLine = `- Topics to cover (use every selected topic at least once across the week; cluster related topics together if needed rather than dropping any): ${payload.topics.join(", ")}\n`;
   }
 
   const dateNote = payload.date ? ` (${payload.date})` : "";
@@ -492,19 +492,36 @@ export function parseAIResponse(
   toolName: string
 ): { success: boolean; parsed?: Record<string, unknown>; error?: string } {
   try {
-    const choice = (data?.choices && Array.isArray(data.choices) && (data.choices as unknown[])[0]) as Record<string, unknown> | undefined;
-    const message = choice?.message as Record<string, unknown> | undefined;
+    const choice = (data?.choices && Array.isArray(data.choices) && data.choices[0] && typeof data.choices[0] === "object")
+      ? (data.choices[0] as Record<string, unknown>)
+      : undefined;
+    const message = choice?.message && typeof choice.message === "object"
+      ? (choice.message as Record<string, unknown>)
+      : undefined;
 
     // Try several shapes where the model might place a function/tool call or structured JSON
     const toolCall =
-      // new style: message.tool_calls
-      (message?.tool_calls && Array.isArray(message.tool_calls) && (message.tool_calls as unknown[])[0]) ||
-      // alternative: message.tool_call or choice-level function_call
-      (message && ((message as any).tool_call || (message as any).function_call)) ||
-      (choice && ((choice as any).function_call || (choice as any).tool_call));
+      (message?.tool_calls && Array.isArray(message.tool_calls) && message.tool_calls[0] && typeof message.tool_calls[0] === "object" && message.tool_calls[0]) ||
+      message?.tool_call ||
+      message?.function_call ||
+      choice?.function_call ||
+      choice?.tool_call;
+
+    const toolCallRecord = toolCall && typeof toolCall === "object" ? (toolCall as Record<string, unknown>) : undefined;
+    const toolFunction = toolCallRecord?.function && typeof toolCallRecord.function === "object"
+      ? (toolCallRecord.function as Record<string, unknown>)
+      : undefined;
+    const nestedFunctionCall = toolCallRecord?.function_call && typeof toolCallRecord.function_call === "object"
+      ? (toolCallRecord.function_call as Record<string, unknown>)
+      : undefined;
 
     // function arguments may be under different keys
-    let funcArgs: unknown | undefined = toolCall && ((toolCall as any).function?.arguments || (toolCall as any).arguments || (toolCall as any).function_call?.arguments || (toolCall as any).function_args);
+    const funcArgs: unknown | undefined = toolCallRecord && (
+      toolFunction?.arguments ||
+      toolCallRecord.arguments ||
+      nestedFunctionCall?.arguments ||
+      toolCallRecord.function_args
+    );
 
     // Fallback: some responses embed JSON in the message.content string
     if (!funcArgs && typeof message?.content === "string") {
