@@ -87,10 +87,26 @@ const STYLE_TAILS: Record<string, { kind: "para" | "bullets"; lines: string[] }>
   },
 };
 
+const STYLE_PRESETS: Record<string, string> = {
+  "Short punchy lines": "Keep every sentence short; use strong verbs and quick rhythms — ideal for scroll-stopping social posts.",
+  "Long-form narrative": "Write an arc: setup, friction, resolution, and a reflective takeaway — suitable for blog excerpts or long captions.",
+  "Lists & frameworks": "Organize around steps or frameworks; use numbered points or bullets that are immediately actionable.",
+  "Thread-style breakdown": "Structure as sequenced beats: thesis, evidence, implication, and a concise close for threaded formats.",
+  "Stats-led": "Lead with a concrete statistic or metric, then interpret it briefly; cite plausibility, avoid invented claims.",
+  "Case study format": "Frame as Situation → Action → Result → Lesson with concrete outcomes and a clear lesson.",
+  "Question-led": "Open with a provocative question, then answer it with concise evidence and a suggested action.",
+  "First-person story": "Tell a brief personal anecdote that reveals a lesson; keep it human, specific, and relatable.",
+  "Industry insight": "Offer a field note or trend observation with supporting detail and implications for the reader.",
+  "Myth-busting": "Call out a common myth, then rebut with concise evidence and the correct perspective.",
+  "How-to guide": "Give step-by-step instructions with clear outcomes and the minimal context needed to act.",
+  "Behind-the-scenes": "Reveal process details, decisions, and failure points — make it candid and instructive.",
+};
+
 export interface VoiceStylePreview {
   hook: string;
   tail: string;
   isBullets: boolean;
+  stylePreset?: string;
 }
 
 export function getVoiceStylePreview(industry: string, voice: string, style: string): VoiceStylePreview | null {
@@ -99,9 +115,11 @@ export function getVoiceStylePreview(industry: string, voice: string, style: str
   const openerSet = INDUSTRY_OPENERS[industryKey] || INDUSTRY_OPENERS.default;
   const hook = openerSet[voice] || openerSet["Conversational & warm"];
   const styleEntry = STYLE_TAILS[style] || STYLE_TAILS["Short punchy lines"];
+  const stylePreset = STYLE_PRESETS[style] || "";
   return {
     hook,
     tail: styleEntry.lines.join("\n"),
     isBullets: styleEntry.kind === "bullets",
+    stylePreset,
   };
 }

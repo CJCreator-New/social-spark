@@ -4,8 +4,10 @@ import {
   LENGTH_GUIDE_SINGLE as LENGTH_GUIDE,
   STRUCTURE_GUIDE,
   bannedPhrasesBlock,
+  buildEngagementRules,
   isLongFormPlatform,
   buildHashtagInstr,
+  getStylePreset,
   jsonResponse,
   checkRateLimit,
   cleanPayload,
@@ -69,7 +71,6 @@ Deno.serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI is not configured." }, 500);
 
-    const longFormPlatform = isLongFormPlatform(payload.platform);
     const targetTopic = (newTopic && newTopic.trim()) || post.topic || "general topic";
     const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
@@ -99,6 +100,13 @@ CONTEXT:
 ${payload.extra ? `- Extra instructions: ${payload.extra}` : ""}
 ${payload.bannedWords.length ? `- NEVER SAY (hard ban — do not use these words or close variants): ${payload.bannedWords.join(", ")}` : ""}
 ${payload.requiredWords.length ? `- TRY TO MENTION (prefer naturally weaving in at least one of these if it fits the topic): ${payload.requiredWords.join(", ")}` : ""}
+
+
+${buildEngagementRules(payload.platform)}
+${getStylePreset(payload.style)}
+
+OUTPUT VARIANTS:
+- Provide 3 distinct hook options and 2 CTA variants. Place them in the structured fields hook_options and cta_options. The primary hook and cta may be the first items from those arrays.
 
 THIS POST:
 - Day: ${post.day} (${post.dow})
@@ -133,12 +141,14 @@ ${bannedPhrasesBlock()}`;
             topic: { type: "string" },
             format: { type: "string" },
             title: { type: "string" },
-            hook: { type: "string" },
+              hook: { type: "string" },
+              hook_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
             body: { type: "string" },
-            cta: { type: "string" },
+              cta: { type: "string" },
+              cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
             hashtags: {
               type: "string",
-              description: longFormPlatform
+              description: isLongFormPlatform(payload.platform)
                 ? "MUST be empty string for Newsletter/Blog."
                 : "3–6 platform-native hashtags space-separated.",
             },
@@ -168,6 +178,44 @@ ${bannedPhrasesBlock()}`;
 
     // Force day to match the original slot
     regenerated.day = post.day;
+
+    // If feedback was provided, try to store it for later review/analytics
+    try {
+      const feedbackText = (body.feedback as string | undefined) || body.feedbackText || null;
+      const feedbackCategory = (body.feedbackCategory as string | undefined) || null;
+      const feedbackRating = typeof body.feedbackRating === "number" ? body.feedbackRating : null;
+      const calendarId = (body.calendarId as string | undefined) || null;
+      if (feedbackText) {
+        const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+        const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        if (SUPABASE_URL && SUPABASE_KEY) {
+          const row = {
+            calendar_id: calendarId,
+            day: post.day,
+            dow: post.dow,
+            platform: payload.platform || null,
+            feedback: feedbackText,
+            category: feedbackCategory,
+            rating: feedbackRating,
+            tweak: tweak || null,
+            ts: new Date().toISOString(),
+          } as Record<string, unknown>;
+          // best-effort insert via REST
+          fetch(`${SUPABASE_URL}/rest/v1/regenerate_feedback`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+              Prefer: "return=representation",
+            },
+            body: JSON.stringify(row),
+          }).catch(e => console.warn("Failed to record regenerate feedback", e));
+        }
+      }
+    } catch (e) {
+      console.warn("Error while storing feedback", e);
+    }
 
     return jsonResponse({ post: regenerated });
   } catch (e) {

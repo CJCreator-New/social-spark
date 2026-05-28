@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import mediaManager from "@/lib/mediaManager";
-import { useProfileQuery, useProfileUpdateMutation } from "@/hooks/useAppQueries";
+import { useDeleteTemplateMutation, useProfileQuery, useProfileUpdateMutation, useTemplatesQuery } from "@/hooks/useAppQueries";
 import { toast } from "sonner";
 import { normalizeTag, displayTag, parsePolicyList } from "@/lib/hashtagPolicy";
 import { listTimezones, browserTimezone, tzLabel } from "@/lib/timezones";
@@ -14,12 +14,17 @@ const GOAL_OPTIONS = ["Awareness", "Engagement", "Drive traffic", "Lead generati
 
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&family=Sora:wght@300;400;500;600&display=swap');
-.pf-app { min-height:100vh; background:#07080d; color:#edeae3; font-family:'Sora',sans-serif; padding:40px 24px 100px; }
+.pf-app { min-height:100vh; background:radial-gradient(circle at 18% 18%, rgba(216,255,121,0.08), transparent 24%), linear-gradient(180deg, #05060a 0%, #0a0d14 100%); color:#edeae3; font-family:'Sora',sans-serif; padding:40px 24px 100px; }
 .pf-inner { max-width:560px; margin:0 auto; }
 .pf-back { font-size:12px; color:#7a7a8e; text-decoration:none; }
 .pf-back:hover { color:#c8f09a; }
 .pf-title { font-family:'Playfair Display',serif; font-size:28px; font-weight:400; margin:14px 0 6px; }
 .pf-sub { font-size:13px; color:#7a7a8e; margin-bottom:28px; }
+.pf-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+.pf-summary-card { padding:14px 16px; border-radius:14px; background:#0d0f18; border:1px solid rgba(255,255,255,0.055); }
+.pf-summary-label { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
+.pf-summary-value { font-family:'Playfair Display',serif; font-size:20px; color:#edeae3; margin-top:4px; }
+.pf-summary-sub { font-size:11px; color:#7a7a8e; margin-top:4px; line-height:1.4; }
 .pf-card { background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:16px; padding:28px; margin-bottom:14px; }
 .pf-section-h { font-family:'Playfair Display',serif; font-size:18px; font-weight:400; margin:0 0 6px; }
 .pf-section-sub { font-size:12px; color:#7a7a8e; margin-bottom:18px; font-weight:300; }
@@ -64,27 +69,17 @@ function TemplatesList() {
     created_at: string;
   };
 
-  const [templates, setTemplates] = useState<TemplateRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user) return;
-    let mounted = true;
-    (async () => {
-      const { data } = await supabase.from('templates').select('id, name, description, config, created_at').eq('user_id', user.id).order('created_at', { ascending: false });
-      if (!mounted) return;
-      setTemplates((data ?? []) as TemplateRecord[]);
-      setLoading(false);
-    })();
-    return () => { mounted = false; };
-  }, [user]);
+  const { data: templates = [], isLoading: loading } = useTemplatesQuery(user?.id);
+  const deleteTemplateMutation = useDeleteTemplateMutation(user?.id);
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this template?')) return;
-    const { error } = await supabase.from('templates').delete().eq('id', id);
-    if (error) return toast.error(error.message || 'Delete failed');
-    setTemplates(t => t.filter(x => x.id !== id));
-    toast.success('Template deleted');
+    try {
+      await deleteTemplateMutation.mutateAsync(id);
+      toast.success('Template deleted');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Delete failed');
+    }
   }
 
   function handleLoad(tpl: TemplateRecord) {
@@ -200,7 +195,11 @@ export default function Profile() {
       return toast.error(updErr.message);
     }
     setAvatarUrl(newUrl);
-    try { mediaManager.addMediaRef(user.id, newUrl); } catch {}
+    try {
+      mediaManager.addMediaRef(user.id, newUrl);
+    } catch {
+      /* media reference tracking is best effort */
+    }
     await supabase.from("media_references").upsert({
       user_id: user.id,
       bucket: "avatars",
@@ -283,6 +282,7 @@ export default function Profile() {
   }
 
   const initial = (displayName || user?.email || "?").charAt(0).toUpperCase();
+  const activeDefaults = [defaultVoice, defaultStyle, defaultTimezone].filter(Boolean).length + (defaultAudiences.length > 0 ? 1 : 0) + (defaultGoals.length > 0 ? 1 : 0);
 
   return (
     <>
@@ -292,6 +292,24 @@ export default function Profile() {
           <Link to="/app" className="pf-back">← Back to ContentForge</Link>
           <h1 className="pf-title">Your profile</h1>
           <div className="pf-sub">Update how you appear inside ContentForge and set brand defaults to pre-fill the wizard.</div>
+
+          <div className="pf-summary">
+            <div className="pf-summary-card">
+              <div className="pf-summary-label">Defaults set</div>
+              <div className="pf-summary-value">{activeDefaults}</div>
+              <div className="pf-summary-sub">Profile fields that will pre-fill the next calendar.</div>
+            </div>
+            <div className="pf-summary-card">
+              <div className="pf-summary-label">Audiences</div>
+              <div className="pf-summary-value">{defaultAudiences.length}</div>
+              <div className="pf-summary-sub">Reusable audience presets.</div>
+            </div>
+            <div className="pf-summary-card">
+              <div className="pf-summary-label">Hashtag rules</div>
+              <div className="pf-summary-value">{bannedHashtags.length + requiredHashtags.length}</div>
+              <div className="pf-summary-sub">Guardrails applied across generations.</div>
+            </div>
+          </div>
 
           <div className="pf-card">
             {loading ? (

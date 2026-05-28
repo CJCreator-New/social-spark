@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
 import { SkeletonList } from "@/components/SkeletonList";
 import { VirtualizedList } from "@/components/VirtualizedList";
+import {
+  useDeleteCalendarMutation,
+  useDuplicateCalendarMutation,
+  useRenameCalendarMutation,
+  useRestoreCalendarMutation,
+  useSavedCalendarsInfiniteQuery,
+  useToggleCalendarFavoriteMutation,
+} from "@/hooks/useAppQueries";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import type { Json } from "@/integrations/supabase/types";
 
 interface SavedCalendar {
   id: string;
@@ -26,22 +34,27 @@ interface SavedCalendar {
   core_idea: string | null;
   created_at: string;
   is_favorite?: boolean;
-  posts?: unknown[];
+  posts?: Json;
   industry?: string | null;
-  form_payload?: unknown;
+  form_payload?: Json;
 }
 
 type SortKey = "newest" | "oldest" | "title" | "favorites";
 const PAGE_SIZE = 20;
 
 const css = `
-.mc-app { min-height:100vh; background:#07080d; color:#edeae3; font-family:'Sora',sans-serif; padding:52px 24px 100px; }
+.mc-app { min-height:100vh; background:radial-gradient(circle at 18% 18%, rgba(216,255,121,0.08), transparent 24%), linear-gradient(180deg, #05060a 0%, #0a0d14 100%); color:#edeae3; font-family:'Sora',sans-serif; padding:52px 24px 100px; }
 .mc-inner { max-width:760px; margin:0 auto; }
-.mc-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:32px; gap:16px; flex-wrap:wrap; }
+.mc-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; gap:16px; flex-wrap:wrap; }
 .mc-title { font-family:'Playfair Display',serif; font-size:32px; font-weight:400; margin:0; }
 .mc-title em { font-style:italic; color:#c8f09a; }
 .mc-back { font-size:12px; color:#7a7a8e; text-decoration:none; transition:color .15s; }
 .mc-back:hover { color:#c8f09a; }
+.mc-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:0 0 20px; }
+.mc-summary-card { padding:14px 16px; border-radius:14px; background:#0d0f18; border:1px solid rgba(255,255,255,0.055); }
+.mc-summary-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
+.mc-summary-value { font-family:'Playfair Display',serif; font-size:24px; color:#edeae3; margin-top:4px; }
+.mc-summary-sub { font-size:11px; color:#7a7a8e; margin-top:4px; line-height:1.4; }
 .mc-empty { text-align:center; padding:60px 20px; color:#7a7a8e; font-size:14px; font-weight:300; border:1px dashed rgba(255,255,255,0.08); border-radius:16px; }
 .mc-empty-illus { width:84px; height:84px; margin:0 auto 22px; border-radius:50%; background:radial-gradient(circle at 30% 30%, rgba(200,240,154,0.18), rgba(200,240,154,0.04) 65%, transparent 80%); border:1px solid rgba(200,240,154,0.18); display:flex; align-items:center; justify-content:center; font-size:34px; color:#c8f09a; }
 .mc-empty-title { font-family:'Playfair Display',serif; font-size:22px; color:#edeae3; margin:0 0 8px; font-weight:400; }
@@ -89,42 +102,13 @@ export default function MyCalendars() {
   const [search, setSearch] = useState("");
   const [favOnly, setFavOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>("newest");
+  const toggleFavoriteMutation = useToggleCalendarFavoriteMutation(user?.id);
+  const deleteCalendarMutation = useDeleteCalendarMutation(user?.id);
+  const restoreCalendarMutation = useRestoreCalendarMutation(user?.id);
+  const renameCalendarMutation = useRenameCalendarMutation(user?.id);
+  const duplicateCalendarMutation = useDuplicateCalendarMutation(user?.id);
 
-  const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["saved-calendars", user?.id],
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-    initialPageParam: null as string | null,
-    getNextPageParam: (lastPage: { items: SavedCalendar[]; nextCursor: string | null }) => lastPage.nextCursor,
-    queryFn: async ({ pageParam }) => {
-      if (!user) return { items: [] as SavedCalendar[], nextCursor: null as string | null };
-
-      log.debug("Loading calendars for user", { userId: user.id, cursor: pageParam });
-      let query = supabase
-        .from("saved_calendars")
-        .select("id, title, industry_label, platform, core_idea, created_at, is_favorite, posts")
-        .order("is_favorite", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(PAGE_SIZE);
-
-      if (pageParam) {
-        query = query.lt("created_at", pageParam);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        log.error("Failed to load calendars", error, { userId: user.id });
-        throw error;
-      }
-
-      log.info(`Loaded ${data?.length || 0} calendars`, { count: data?.length });
-      const items = (data as SavedCalendar[]) || [];
-      const nextCursor = items.length === PAGE_SIZE ? items[items.length - 1]?.created_at : null;
-      return { items, nextCursor };
-    },
-  });
+  const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useSavedCalendarsInfiniteQuery(user?.id, PAGE_SIZE);
 
   useEffect(() => {
     if (error instanceof Error) toast.error(error.message);
@@ -157,18 +141,20 @@ export default function MyCalendars() {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
   }, [items, favOnly, search, sortBy]);
+  const favoriteCount = useMemo(() => items.filter((item) => item.is_favorite).length, [items]);
+  const totalPosts = useMemo(() => items.reduce((count, item) => count + (Array.isArray(item.posts) ? item.posts.length : 0), 0), [items]);
+  const visibleCount = filteredItems.length;
 
   async function toggleFavorite(it: SavedCalendar) {
     const next = !it.is_favorite;
-    const { error } = await supabase.from("saved_calendars").update({ is_favorite: next }).eq("id", it.id);
-    if (error) {
+    try {
+      await toggleFavoriteMutation.mutateAsync({ id: it.id, isFavorite: next });
+      log.info("Calendar favorite updated", { calendarId: it.id, isFavorite: next });
+      await refetch();
+    } catch (error) {
       log.error("Failed to toggle favorite", error, { calendarId: it.id });
-      toast.error(error.message);
-      return;
+      toast.error(error instanceof Error ? error.message : "Toggle favorite failed");
     }
-
-    log.info("Calendar favorite updated", { calendarId: it.id, isFavorite: next });
-    await refetch();
   }
 
   async function confirmDelete() {
@@ -176,15 +162,16 @@ export default function MyCalendars() {
     setDeleting(true);
     // Try to fetch full record so we can offer an undo (re-insert) if deletion succeeds
     const { data: full, error: fetchErr } = await supabase.from("saved_calendars").select("*").eq("id", pendingDelete.id).maybeSingle();
-    const { error } = await supabase.from("saved_calendars").delete().eq("id", pendingDelete.id);
-    setDeleting(false);
-
-    if (error) {
+    try {
+      await deleteCalendarMutation.mutateAsync(pendingDelete.id);
+    } catch (error) {
+      setDeleting(false);
       log.error("Failed to delete calendar", error, { calendarId: pendingDelete.id });
-      toast.error(error.message);
+      toast.error(error instanceof Error ? error.message : "Delete failed");
       setPendingDelete(null);
       return;
     }
+    setDeleting(false);
 
     log.info("Calendar deleted", { calendarId: pendingDelete.id });
     await refetch();
@@ -219,13 +206,14 @@ export default function MyCalendars() {
       industry_label: lastDeleted.industry_label || null,
       platform: lastDeleted.platform || null,
       core_idea: lastDeleted.core_idea || null,
-      form_payload: lastDeleted.form_payload || null,
-      posts: lastDeleted.posts || null,
+      form_payload: lastDeleted.form_payload || {},
+      posts: lastDeleted.posts || [],
       is_favorite: lastDeleted.is_favorite || false,
     };
 
-    const { error } = await supabase.from("saved_calendars").insert([payload as any]);
-    if (error) {
+    try {
+      await restoreCalendarMutation.mutateAsync(payload);
+    } catch (error) {
       log.error("Failed to restore deleted calendar", error);
       toast.error("Restore failed");
       return;
@@ -253,14 +241,15 @@ export default function MyCalendars() {
     }
 
     setRenameSaving(true);
-    const { error } = await supabase.from("saved_calendars").update({ title: value }).eq("id", renamingId);
-    setRenameSaving(false);
-
-    if (error) {
+    try {
+      await renameCalendarMutation.mutateAsync({ id: renamingId, title: value });
+    } catch (error) {
+      setRenameSaving(false);
       log.error("Failed to rename calendar", error, { calendarId: renamingId });
-      toast.error(error.message);
+      toast.error(error instanceof Error ? error.message : "Rename failed");
       return;
     }
+    setRenameSaving(false);
 
     log.info("Calendar renamed", { calendarId: renamingId, newTitle: value });
     setRenamingId(null);
@@ -280,8 +269,8 @@ export default function MyCalendars() {
     }
 
     const newTitle = `${full.title} (copy)`.slice(0, 80);
-    const { error: insErr } = await supabase.from("saved_calendars").insert([
-      {
+    try {
+      await duplicateCalendarMutation.mutateAsync({
         user_id: user.id,
         title: newTitle,
         industry: full.industry,
@@ -291,14 +280,13 @@ export default function MyCalendars() {
         form_payload: full.form_payload as never,
         posts: full.posts as never,
         is_favorite: false,
-      },
-    ]);
-    setDuplicatingId(null);
-
-    if (insErr) {
-      toast.error(insErr.message || "Duplicate failed");
+      });
+    } catch (error) {
+      setDuplicatingId(null);
+      toast.error(error instanceof Error ? error.message : "Duplicate failed");
       return;
     }
+    setDuplicatingId(null);
 
     log.info("Calendar duplicated", { sourceCalendarId: it.id });
     await refetch();
@@ -405,6 +393,24 @@ export default function MyCalendars() {
             </div>
           </div>
 
+          <div className="mc-summary" aria-label="Calendar summary">
+            <div className="mc-summary-card">
+              <div className="mc-summary-label">Visible calendars</div>
+              <div className="mc-summary-value">{visibleCount || items.length}</div>
+              <div className="mc-summary-sub">{favOnly ? "Starred items only" : "All saved calendars"}</div>
+            </div>
+            <div className="mc-summary-card">
+              <div className="mc-summary-label">Starred</div>
+              <div className="mc-summary-value">{favoriteCount}</div>
+              <div className="mc-summary-sub">Quick access to the calendars you reuse most.</div>
+            </div>
+            <div className="mc-summary-card">
+              <div className="mc-summary-label">Posts stored</div>
+              <div className="mc-summary-value">{totalPosts}</div>
+              <div className="mc-summary-sub">Across all saved calendars in this account.</div>
+            </div>
+          </div>
+
           {!isLoading && items.length > 0 && (
             <div className="mc-filter-row">
               <input
@@ -454,7 +460,11 @@ export default function MyCalendars() {
               </Link>
             </div>
           ) : filteredItems.length === 0 ? (
-            <div className="mc-empty">No calendars match your filters.</div>
+            <div className="mc-empty">
+              <div className="mc-empty-illus" aria-hidden="true">⌕</div>
+              <div className="mc-empty-title">No <em>matches</em></div>
+              <p className="mc-empty-sub">Try a different search term or switch off the starred-only filter to see more calendars.</p>
+            </div>
           ) : (
             <>
             <div className="mc-list">

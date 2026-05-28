@@ -17,6 +17,8 @@ export interface PostInsights {
   hashtagLabel: string;
   health: HealthState;
   platformLabel: string;
+  hookScore: number;
+  recommendations: string[];
 }
 
 // Sweet-spot ranges per platform (min, max). Outside = sparse / dense.
@@ -77,6 +79,24 @@ export function insightFor(post: PostLike, platformInput?: string | null): PostI
   if (limitState === "over" || hashtagState === "dense") health = "bad";
   else if (limitState === "warn" || hashtagState === "sparse") health = "warn";
 
+  const hook = String(post.hook || post.title || "").trim();
+  const hookScore = Math.min(
+    1,
+    [
+      hook.length >= 35 && hook.length <= 180,
+      /[0-9%$]/.test(hook),
+      /[?]/.test(hook) || /\b(how|why|what|when|stop|start|before|after)\b/i.test(hook),
+      !/^(here'?s|in this post|today|let'?s)/i.test(hook),
+    ].filter(Boolean).length / 4
+  );
+
+  const recommendations: string[] = [];
+  if (limitState === "over") recommendations.push(`Trim for ${platformLabel}; this version exceeds the platform limit.`);
+  else if (limitState === "warn") recommendations.push("Consider tightening the copy before publishing.");
+  if (hashtagState === "sparse") recommendations.push(`Add a few relevant hashtags for ${platformLabel}.`);
+  if (hashtagState === "dense") recommendations.push("Reduce hashtags so the post feels less crowded.");
+  if (hookScore < 0.5) recommendations.push("Strengthen the hook with a sharper claim, question, or concrete number.");
+
   return {
     charCount: f.charCount,
     charLimit: f.limit,
@@ -87,5 +107,7 @@ export function insightFor(post: PostLike, platformInput?: string | null): PostI
     hashtagLabel,
     health,
     platformLabel,
+    hookScore,
+    recommendations,
   };
 }

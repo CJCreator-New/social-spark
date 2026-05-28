@@ -1,19 +1,21 @@
 let sentryLoaded = false;
-let Sentry: any = null;
+
+type SentryClient = {
+  init: (options: { dsn: string }) => void;
+  captureException: (err: unknown, options?: { extra?: Record<string, unknown> }) => void;
+};
+
+let Sentry: SentryClient | null = null;
 
 export function initSentry(dsn?: string) {
   if (!dsn) return;
-  try {
-    // Lazy-load @sentry/browser if available
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const maybe = require("@sentry/browser");
+  const maybe = (globalThis as { Sentry?: SentryClient }).Sentry;
+  if (maybe) {
     Sentry = maybe;
-    Sentry.init({ dsn });
+    maybe.init({ dsn });
     sentryLoaded = true;
-  } catch (e) {
-    // not installed or failed — noop
-    // eslint-disable-next-line no-console
-    console.warn("Sentry not initialized", e);
+  } else {
+    console.warn("Sentry not initialized");
   }
 }
 
@@ -21,8 +23,6 @@ export function captureException(err: unknown, ctx?: Record<string, unknown>) {
   if (sentryLoaded && Sentry) {
     Sentry.captureException(err, { extra: ctx });
   } else {
-    // fallback logging
-    // eslint-disable-next-line no-console
     console.error("Captured exception", err, ctx || "");
   }
 }

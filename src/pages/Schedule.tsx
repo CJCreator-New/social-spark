@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -11,6 +10,7 @@ import { writeToClipboard, niceLabelFor } from "@/lib/platformCopy";
 import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
 import { downloadScheduleCsv } from "@/lib/exportSchedule";
 import { buildTrackingUrl } from "@/lib/utm";
+import { useCancelScheduledPostMutation, useScheduleInfiniteQuery, useUpdateScheduledPostStatusMutation, useUpdateScheduledPostTimeMutation } from "@/hooks/useAppQueries";
 
 type WorkflowStatus = "drafted" | "approved" | "published" | "failed";
 type SortKey = "date-asc" | "date-desc" | "platform" | "status";
@@ -47,14 +47,24 @@ interface SchedulePage {
 }
 
 const css = `
-.sc-app { min-height:100vh; background:#07080d; color:#edeae3; font-family:'Sora',sans-serif; padding:52px 24px 100px; }
+.sc-app { min-height:100vh; background:radial-gradient(circle at 18% 18%, rgba(216,255,121,0.08), transparent 24%), linear-gradient(180deg, #05060a 0%, #0a0d14 100%); color:#edeae3; font-family:'Sora',sans-serif; padding:52px 24px 100px; }
 .sc-inner { max-width:880px; margin:0 auto; }
-.sc-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; gap:16px; flex-wrap:wrap; }
+.sc-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; gap:16px; flex-wrap:wrap; }
 .sc-title { font-family:'Playfair Display',serif; font-size:32px; font-weight:400; margin:0; }
 .sc-title em { font-style:italic; color:#c8f09a; }
 .sc-back { font-size:12px; color:#7a7a8e; text-decoration:none; }
 .sc-back:hover { color:#c8f09a; }
+.sc-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:0 0 18px; }
+.sc-summary-card { padding:14px 16px; border-radius:14px; background:#0d0f18; border:1px solid rgba(255,255,255,0.055); }
+.sc-summary-label { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
+.sc-summary-value { font-family:'Playfair Display',serif; font-size:24px; color:#edeae3; margin-top:4px; }
+.sc-summary-sub { font-size:11px; color:#7a7a8e; margin-top:4px; line-height:1.4; }
 .sc-empty { text-align:center; padding:60px 20px; color:#7a7a8e; font-size:14px; font-weight:300; border:1px dashed rgba(255,255,255,0.08); border-radius:16px; }
+.sc-empty-illus { width:84px; height:84px; margin:0 auto 22px; border-radius:50%; background:radial-gradient(circle at 30% 30%, rgba(200,240,154,0.18), rgba(200,240,154,0.04) 65%, transparent 80%); border:1px solid rgba(200,240,154,0.18); display:flex; align-items:center; justify-content:center; font-size:34px; color:#c8f09a; }
+.sc-empty-title { font-family:'Playfair Display',serif; font-size:22px; color:#edeae3; margin:0 0 8px; font-weight:400; }
+.sc-empty-sub { font-size:13px; color:#7a7a8e; max-width:420px; margin:0 auto 22px; line-height:1.65; font-weight:300; }
+.sc-empty-cta { display:inline-block; background:#c8f09a; color:#07080d; padding:11px 22px; border-radius:8px; font-size:13px; font-weight:500; text-decoration:none; font-family:'Sora',sans-serif; transition:transform .15s; }
+.sc-empty-cta:hover { transform:translateY(-1px); }
 .sc-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:18px; padding:10px 14px; background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:12px; }
 .sc-tool-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
 .sc-sel { background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px 10px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; cursor:pointer; }
@@ -112,64 +122,11 @@ export default function Schedule() {
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const tzList = listTimezones();
   const log = createScopedLogger('Schedule');
+  const updateStatusMutation = useUpdateScheduledPostStatusMutation();
+  const cancelScheduledPostMutation = useCancelScheduledPostMutation();
+  const updateScheduledTimeMutation = useUpdateScheduledPostTimeMutation();
 
-  const { data: scheduleData, isLoading: loading, error: scheduleError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["schedule", user?.id],
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-    initialPageParam: null as ScheduleCursor,
-    getNextPageParam: (lastPage: SchedulePage) => lastPage.nextCursor,
-    queryFn: async ({ pageParam }): Promise<SchedulePage> => {
-      if (!user) {
-        return {
-          rows: [] as ScheduledRow[],
-          calendars: new Map<string, CalendarMeta>(),
-          profileTz: browserTimezone(),
-          nextCursor: null,
-        };
-      }
-
-      log.debug(`Loading scheduled posts for user`, { userId: user.id, cursor: pageParam });
-      const [{ data: pr }, { data: schedData }, { data: calData }] = await Promise.all([
-        supabase.from("profiles").select("default_timezone").eq("user_id", user.id).maybeSingle(),
-        supabase.from("scheduled_posts")
-          .select("id, calendar_id, post_day, platform, scheduled_at, status, workflow_status, copy_text, post_snapshot, published_at, failure_reason")
-          .neq("status", "cancelled")
-          .order("scheduled_at", { ascending: true })
-          .order("id", { ascending: true })
-          .limit(PAGE_SIZE)
-          .or(pageParam
-            ? `scheduled_at.gt.${pageParam.scheduled_at},and(scheduled_at.eq.${pageParam.scheduled_at},id.gt.${pageParam.id})`
-            : undefined),
-        supabase.from("saved_calendars").select("id, title, timezone, tracking_url"),
-      ]);
-
-      const profTz = (pr as { default_timezone?: string | null } | null)?.default_timezone || browserTimezone();
-      const map = new Map<string, CalendarMeta>();
-      for (const c of (calData as CalendarMeta[]) || []) map.set(c.id, c);
-
-      if (!schedData) {
-        return {
-          rows: [],
-          calendars: map,
-          profileTz: profTz,
-          nextCursor: null,
-        };
-      }
-
-      const items = (schedData as ScheduledRow[]) || [];
-      const lastItem = items[items.length - 1];
-      const nextCursor = items.length === PAGE_SIZE && lastItem ? { scheduled_at: lastItem.scheduled_at, id: lastItem.id } : null;
-
-      log.info(`Loaded ${items.length || 0} scheduled posts`, { count: items.length });
-      return {
-        rows: items,
-        calendars: map,
-        profileTz: profTz,
-        nextCursor,
-      };
-    },
-  });
+  const { data: scheduleData, isLoading: loading, error: scheduleError, fetchNextPage, hasNextPage, isFetchingNextPage } = useScheduleInfiniteQuery(user?.id, PAGE_SIZE);
 
   useEffect(() => {
     if (!scheduleData) return;
@@ -177,7 +134,7 @@ export default function Schedule() {
     const firstPage = pages[0];
     setProfileTz(firstPage.profileTz);
     setViewTz(firstPage.profileTz);
-    setRows(pages.flatMap(page => page.rows));
+    setRows(pages.flatMap(page => page.rows) as ScheduledRow[]);
     setCalendars(firstPage.calendars);
   }, [scheduleData]);
 
@@ -218,16 +175,23 @@ export default function Schedule() {
     }
     return g;
   }, [sorted, sortBy, viewTz]);
+  const summary = useMemo(() => ({
+    total: rows.length,
+    drafted: rows.filter((row) => row.workflow_status === "drafted").length,
+    approved: rows.filter((row) => row.workflow_status === "approved").length,
+    published: rows.filter((row) => row.workflow_status === "published").length,
+  }), [rows]);
 
   async function setStatus(row: ScheduledRow, status: WorkflowStatus) {
     const log = createScopedLogger('Schedule-SetStatus');
     const patch: Record<string, unknown> = { workflow_status: status };
     if (status === "published") patch.published_at = new Date().toISOString();
     if (status !== "failed") patch.failure_reason = null;
-    const { error } = await supabase.from("scheduled_posts").update(patch).eq("id", row.id);
-    if (error) {
+    try {
+      await updateStatusMutation.mutateAsync({ id: row.id, patch });
+    } catch (error) {
       log.error(`Failed to set status`, error, { postId: row.id, newStatus: status });
-      return toast.error(error.message);
+      return toast.error(error instanceof Error ? error.message : "Failed to set status");
     }
     setRows(p => p.map(r => r.id === row.id ? { ...r, ...patch, workflow_status: status } as ScheduledRow : r));
     log.info(`Post status updated`, { postId: row.id, newStatus: status });
@@ -237,10 +201,11 @@ export default function Schedule() {
   async function cancelRow(row: ScheduledRow) {
     const log = createScopedLogger('Schedule-Cancel');
     if (!window.confirm("Cancel this scheduled post?")) return;
-    const { error } = await supabase.from("scheduled_posts").update({ status: "cancelled" }).eq("id", row.id);
-    if (error) {
+    try {
+      await cancelScheduledPostMutation.mutateAsync(row.id);
+    } catch (error) {
       log.error(`Failed to cancel post`, error, { postId: row.id });
-      return toast.error(error.message);
+      return toast.error(error instanceof Error ? error.message : "Failed to cancel post");
     }
     setRows(p => p.filter(r => r.id !== row.id));
     log.info(`Post cancelled`, { postId: row.id });
@@ -267,10 +232,11 @@ export default function Schedule() {
     const cal = calendars.get(row.calendar_id);
     const tz = cal?.timezone || profileTz || browserTimezone();
     const newIso = zonedToUtcIso(editDate, editTime, tz);
-    const { error } = await supabase.from("scheduled_posts").update({ scheduled_at: newIso }).eq("id", row.id);
-    if (error) {
+    try {
+      await updateScheduledTimeMutation.mutateAsync({ id: row.id, scheduledAt: newIso });
+    } catch (error) {
       log.error(`Failed to save edit`, error, { postId: row.id, newTime: newIso });
-      return toast.error(error.message);
+      return toast.error(error instanceof Error ? error.message : "Failed to save edit");
     }
     setRows(p => p.map(r => r.id === row.id ? { ...r, scheduled_at: newIso } : r));
     setEditId(null);
@@ -305,6 +271,29 @@ export default function Schedule() {
             </div>
           </div>
 
+          <div className="sc-summary" aria-label="Schedule summary">
+            <div className="sc-summary-card">
+              <div className="sc-summary-label">Scheduled</div>
+              <div className="sc-summary-value">{summary.total}</div>
+              <div className="sc-summary-sub">Rows currently in your queue.</div>
+            </div>
+            <div className="sc-summary-card">
+              <div className="sc-summary-label">Drafted</div>
+              <div className="sc-summary-value">{summary.drafted}</div>
+              <div className="sc-summary-sub">Needs approval or a second look.</div>
+            </div>
+            <div className="sc-summary-card">
+              <div className="sc-summary-label">Approved</div>
+              <div className="sc-summary-value">{summary.approved}</div>
+              <div className="sc-summary-sub">Ready to publish or reschedule.</div>
+            </div>
+            <div className="sc-summary-card">
+              <div className="sc-summary-label">Published</div>
+              <div className="sc-summary-value">{summary.published}</div>
+              <div className="sc-summary-sub">Completed and archived in the schedule.</div>
+            </div>
+          </div>
+
           {!loading && rows.length > 0 && (
             <div className="sc-toolbar">
               <span className="sc-tool-label">Sort</span>
@@ -326,7 +315,10 @@ export default function Schedule() {
             <SkeletonList rows={5} />
           ) : rows.length === 0 ? (
             <div className="sc-empty">
-              No scheduled posts yet. Open a calendar and click <strong style={{ color: "#c8f09a" }}>Schedule week</strong>.
+              <div className="sc-empty-illus" aria-hidden="true">⌛</div>
+              <div className="sc-empty-title">Nothing in the <em>queue</em> yet</div>
+              <p className="sc-empty-sub">Open a calendar and click <strong style={{ color: "#c8f09a" }}>Schedule week</strong> to populate this view with draft and publish actions.</p>
+              <Link to="/app" className="sc-empty-cta">Create a calendar</Link>
             </div>
           ) : grouped ? (
             [...grouped.entries()].map(([date, list]) => (

@@ -1,46 +1,6 @@
-import React from "react";
-import { createScopedLogger } from "@/lib/logger";
-
-const log = createScopedLogger("ErrorBoundary");
-
-type Props = { children: React.ReactNode };
-type State = { hasError: boolean; error?: Error | null };
-
-export class ErrorBoundary extends React.Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-    log.error("Unhandled error caught by ErrorBoundary", error, info);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: 40, textAlign: "center" }}>
-          <h2>Something went wrong</h2>
-          <p>We're sorry — an unexpected error occurred. You can try reloading the app.</p>
-          <div style={{ marginTop: 16 }}>
-            <button onClick={() => window.location.reload()} style={{ padding: "8px 12px", borderRadius: 6 }}>Reload</button>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
-export default ErrorBoundary;
-import { Component, ReactNode, ErrorInfo } from 'react';
-import { logger } from '@/lib/logger';
-import { getUserFriendlyMessage } from '@/lib/errors';
+import { Component, ReactNode, ErrorInfo } from "react";
+import { logger } from "@/lib/logger";
+import { getUserFriendlyMessage } from "@/lib/errors";
 
 interface Props {
   children: ReactNode;
@@ -54,10 +14,6 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
-/**
- * Error Boundary component that catches React errors and displays fallback UI
- * Logs errors to centralized logging service
- */
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -77,15 +33,11 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log to centralized logger
-    logger.error('React Error Boundary caught error', error, {
+    logger.error("React Error Boundary caught error", error, {
       componentStack: errorInfo.componentStack,
     });
 
-    // Call custom error handler if provided
     this.props.onError?.(error, errorInfo);
-
-    // Update state to show error
     this.setState({ errorInfo });
   }
 
@@ -110,9 +62,6 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-/**
- * Default error fallback UI
- */
 function DefaultErrorFallback({
   error,
   reset,
@@ -121,45 +70,39 @@ function DefaultErrorFallback({
   reset: () => void;
 }) {
   const message = getUserFriendlyMessage(error);
+  const showDetails = import.meta.env.DEV && typeof window !== 'undefined' && window.localStorage.getItem('ss:show-error-details') === 'true';
 
   return (
     <div
       style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#07080d',
-        color: '#edeae3',
-        fontFamily: 'Sora, sans-serif',
-        padding: '24px',
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#07080d",
+        color: "#edeae3",
+        fontFamily: "Sora, sans-serif",
+        padding: "24px",
       }}
     >
       <div
         style={{
-          maxWidth: '500px',
-          background: '#0d0f18',
-          border: '1px solid rgba(255, 255, 255, 0.055)',
-          borderRadius: '16px',
-          padding: '40px',
-          textAlign: 'center',
+          maxWidth: "500px",
+          background: "#0d0f18",
+          border: "1px solid rgba(255, 255, 255, 0.055)",
+          borderRadius: "16px",
+          padding: "40px",
+          textAlign: "center",
         }}
       >
-        <div
-          style={{
-            fontSize: '48px',
-            marginBottom: '16px',
-          }}
-        >
-          ⚠️
-        </div>
+        <div style={{ fontSize: "48px", marginBottom: "16px" }}>!</div>
 
         <h1
           style={{
-            fontFamily: 'Playfair Display, serif',
-            fontSize: '24px',
+            fontFamily: "Playfair Display, serif",
+            fontSize: "24px",
             fontWeight: 400,
-            marginBottom: '16px',
+            marginBottom: "16px",
             margin: 0,
           }}
         >
@@ -168,117 +111,89 @@ function DefaultErrorFallback({
 
         <p
           style={{
-            fontSize: '14px',
-            color: '#7a7a8e',
-            marginBottom: '24px',
+            fontSize: "14px",
+            color: "#7a7a8e",
+            marginBottom: "24px",
             lineHeight: 1.6,
           }}
         >
           {message}
         </p>
 
-        <div
-          style={{
-            fontSize: '12px',
-            backgroundColor: 'rgba(240, 154, 154, 0.08)',
-            border: '1px solid rgba(240, 154, 154, 0.3)',
-            borderRadius: '8px',
-            padding: '12px',
-            marginBottom: '24px',
-            color: '#c8a9a9',
-            textAlign: 'left',
-            fontFamily: 'monospace',
-            overflow: 'auto',
-            maxHeight: '150px',
-          }}
-        >
-          <strong>Error Details:</strong>
-          <div style={{ marginTop: '8px' }}>{error.message}</div>
-        </div>
+        {showDetails && (
+          <details
+            style={{
+              fontSize: "12px",
+              backgroundColor: "rgba(240, 154, 154, 0.08)",
+              border: "1px solid rgba(240, 154, 154, 0.3)",
+              borderRadius: "8px",
+              padding: "12px",
+              marginBottom: "24px",
+              color: "#c8a9a9",
+              textAlign: "left",
+              fontFamily: "monospace",
+              overflow: "auto",
+              maxHeight: "150px",
+            }}
+          >
+            <summary>Error details</summary>
+            <div style={{ marginTop: "8px" }}>{error.message}</div>
+          </details>
+        )}
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: "flex", gap: "8px" }}>
           <button
             onClick={reset}
             style={{
               flex: 1,
-              background: '#c8f09a',
-              color: '#07080d',
-              border: '1px solid #c8f09a',
-              borderRadius: '8px',
-              padding: '12px 16px',
-              fontSize: '14px',
+              background: "#c8f09a",
+              color: "#07080d",
+              border: "1px solid #c8f09a",
+              borderRadius: "8px",
+              padding: "12px 16px",
+              fontSize: "14px",
               fontWeight: 500,
-              cursor: 'pointer',
-              fontFamily: 'Sora, sans-serif',
-              transition: 'all 0.15s',
+              cursor: "pointer",
+              fontFamily: "Sora, sans-serif",
+              transition: "all 0.15s",
             }}
             onMouseEnter={(e) => {
-              (e.target as HTMLButtonElement).style.background = '#b9e289';
+              (e.target as HTMLButtonElement).style.background = "#b9e289";
             }}
             onMouseLeave={(e) => {
-              (e.target as HTMLButtonElement).style.background = '#c8f09a';
+              (e.target as HTMLButtonElement).style.background = "#c8f09a";
             }}
           >
             Try Again
           </button>
-
           <button
-            onClick={() => (window.location.href = '/')}
+            onClick={() => window.location.reload()}
             style={{
               flex: 1,
-              background: 'transparent',
-              color: '#7a7a8e',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
-              padding: '12px 16px',
-              fontSize: '14px',
+              background: "transparent",
+              color: "#edeae3",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              borderRadius: "8px",
+              padding: "12px 16px",
+              fontSize: "14px",
               fontWeight: 500,
-              cursor: 'pointer',
-              fontFamily: 'Sora, sans-serif',
-              transition: 'all 0.15s',
+              cursor: "pointer",
+              fontFamily: "Sora, sans-serif",
+              transition: "all 0.15s",
             }}
             onMouseEnter={(e) => {
-              (e.target as HTMLButtonElement).style.borderColor =
-                'rgba(200, 240, 154, 0.3)';
-              (e.target as HTMLButtonElement).style.color = '#c8f09a';
+              (e.target as HTMLButtonElement).style.borderColor = "rgba(200, 240, 154, 0.3)";
             }}
             onMouseLeave={(e) => {
-              (e.target as HTMLButtonElement).style.borderColor =
-                'rgba(255, 255, 255, 0.1)';
-              (e.target as HTMLButtonElement).style.color = '#7a7a8e';
+              (e.target as HTMLButtonElement).style.borderColor = "rgba(255, 255, 255, 0.1)";
             }}
           >
-            Go Home
+            Reload App
           </button>
         </div>
-
-        <p
-          style={{
-            fontSize: '11px',
-            color: '#5a5a72',
-            marginTop: '16px',
-            margin: '16px 0 0 0',
-          }}
-        >
-          Error details have been logged. Our team is working to fix this issue.
-        </p>
       </div>
     </div>
   );
 }
 
-/**
- * Higher-order component to wrap a component with error boundary
- */
-export function withErrorBoundary<P extends object>(
-  Component: React.ComponentType<P>,
-  errorHandler?: (error: Error, errorInfo: ErrorInfo) => void
-) {
-  return function BoundaryComponent(props: P) {
-    return (
-      <ErrorBoundary onError={errorHandler}>
-        <Component {...props} />
-      </ErrorBoundary>
-    );
-  };
-}
+export default ErrorBoundary;

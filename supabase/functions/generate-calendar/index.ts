@@ -48,7 +48,6 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "AI is not configured." }, 500);
     }
 
-    const longFormPlatform = isLongFormPlatform(payload.platform);
     const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
     const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: true });
@@ -65,6 +64,9 @@ ${payload.extra ? `- Extra instructions: ${payload.extra}` : ""}
 ${payload.bannedWords.length ? `- NEVER SAY (hard ban — do not use these words or close variants in any post): ${payload.bannedWords.join(", ")}` : ""}
 ${payload.requiredWords.length ? `- MUST MENTION (each of these terms must appear naturally in AT LEAST ONE post across the week): ${payload.requiredWords.join(", ")}` : ""}
 
+OUTPUT VARIANTS:
+- For each post, provide 3 hook options and 2 CTA variants. Place them in the hook_options and cta_options fields within each post object. The primary hook and cta may be the first items from those arrays.
+
 HARD RULES (follow strictly):
 1. Generate content that is genuinely specific to the ${payload.industryLabel || payload.industry} space — use real terminology, real platforms, real trends, real names where relevant. Do NOT write generic content.
 2. Strictly follow the POST LENGTH and POST STRUCTURE rules above for the body of every post.
@@ -73,6 +75,7 @@ HARD RULES (follow strictly):
 5. The chosen format mix "${payload.format}" must drive AT LEAST 4 of the 7 posts. The remaining 3 may vary for rhythm.
 6. AT LEAST 3 of the 7 posts must include a concrete number, percentage, year, dollar figure, or named statistic embedded in the body or hook (not made-up — use realistic, defensible figures from the ${payload.industryLabel || payload.industry} space).
 7. The "dow" field MUST be exactly one of: "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" — and the 7 posts must be ordered Mon → Sun, with "day" 1..7 matching that order.
+8. Every provided topic must be represented at least once across the 7 posts. If more topics are supplied than fit in a week, combine related topics into the same post instead of dropping any of them.
 
 ${bannedPhrasesBlock()}`;
 
@@ -99,12 +102,14 @@ ${bannedPhrasesBlock()}`;
                   topic: { type: "string" },
                   format: { type: "string" },
                   title: { type: "string" },
-                  hook: { type: "string" },
+                    hook: { type: "string" },
+                    hook_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
                   body: { type: "string" },
-                  cta: { type: "string" },
+                    cta: { type: "string" },
+                    cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
                   hashtags: {
                     type: "string",
-                    description: longFormPlatform
+                    description: isLongFormPlatform(payload.platform)
                       ? "MUST be an empty string for Newsletter/Blog."
                       : "3–6 platform-native hashtags as a single space-separated string.",
                   },

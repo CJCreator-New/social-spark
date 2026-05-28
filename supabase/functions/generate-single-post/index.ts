@@ -45,7 +45,6 @@ Deno.serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI is not configured." }, 500);
 
-    const longFormPlatform = isLongFormPlatform(payload.platform);
     const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
     const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: false });
@@ -62,6 +61,9 @@ ${contextLines}
 ${payload.extra ? `- Extra instructions: ${payload.extra}` : ""}
 ${payload.bannedWords.length ? `- NEVER SAY (hard ban — do not use these words or close variants): ${payload.bannedWords.join(", ")}` : ""}
 ${payload.requiredWords.length ? `- TRY TO MENTION (weave in naturally if it fits): ${payload.requiredWords.join(", ")}` : ""}
+
+OUTPUT VARIANTS:
+- Provide 3 distinct hook options and 2 CTA variants. Place them in the structured fields hook_options (array) and cta_options (array). The primary hook and cta may be the first items from those arrays.
 
 HARD RULES:
 1. Stay specific to the ${payload.industryLabel || payload.industry} space — real terminology, real platforms, real trends.
@@ -86,12 +88,14 @@ ${bannedPhrasesBlock()}`;
             topic: { type: "string" },
             format: { type: "string" },
             title: { type: "string" },
-            hook: { type: "string" },
+              hook: { type: "string" },
+              hook_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
             body: { type: "string" },
-            cta: { type: "string" },
+              cta: { type: "string" },
+              cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
             hashtags: {
               type: "string",
-              description: longFormPlatform ? "MUST be empty for Newsletter/Blog." : "3–6 hashtags, space-separated.",
+              description: isLongFormPlatform(payload.platform) ? "MUST be empty for Newsletter/Blog." : "3–6 hashtags, space-separated.",
             },
             rationale: { type: "string" },
           },

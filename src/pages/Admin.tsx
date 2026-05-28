@@ -78,33 +78,43 @@ export function AdminDashboard() {
   }
 
   return (
-    <div className="w-full space-y-6 p-6">
+    <div className="relative w-full overflow-hidden bg-slate-950 text-slate-100">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(132,204,22,0.12),transparent_32%),radial-gradient(circle_at_top_right,rgba(56,189,248,0.08),transparent_28%)]" />
+      <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-lime-400/10 blur-3xl" />
+      <div className="absolute right-0 top-32 h-96 w-96 rounded-full bg-cyan-400/10 blur-3xl" />
+      <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-8 px-6 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-sm text-gray-500">Real-time monitoring and analytics</p>
+      <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-2xl shadow-black/20">
+          <p className="text-[10px] uppercase tracking-[0.28em] text-lime-300">System dashboard</p>
+          <h1 className="mt-3 font-serif text-3xl font-normal text-white md:text-4xl">Monitor the studio without losing the story.</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">Track how the product is behaving, spot error spikes, and read the platform mix at a glance.</p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Badge variant="outline">Auto-refresh 30s</Badge>
+            <Badge variant="outline">Errors {stats.errors.total24h} / 24h</Badge>
+            <Badge variant="outline">Success {stats.overview.apiSuccessRate}%</Badge>
+          </div>
         </div>
-        <Button
-          size="sm"
-          onClick={() => window.location.reload()}
-        >
-          Refresh
-        </Button>
-      </div>
 
-      {/* Last Updated */}
-      <div className="text-sm text-gray-500">
-        Last updated: {lastUpdated.toLocaleTimeString()} • Auto-refreshes every 30s
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-2xl shadow-black/20">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.28em] text-slate-400">Last updated</p>
+              <p className="mt-2 font-serif text-2xl font-normal text-white">{lastUpdated.toLocaleTimeString()}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">Auto-refreshes every 30 seconds.</p>
+            </div>
+            <Button size="sm" onClick={() => window.location.reload()}>
+              Refresh
+            </Button>
+          </div>
+          {error && (
+            <Alert variant="destructive" className="mt-5 border-red-500/20 bg-red-500/10 text-red-50">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </div>
       </div>
-
-      {/* Error Alert */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
 
       {/* Overview Stats Grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -337,6 +347,7 @@ export function AdminDashboard() {
           </p>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

@@ -15,6 +15,10 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Landing from "./pages/Landing";
 
+function E2ECrashRoute(): JSX.Element {
+  throw new Error("Test error");
+}
+
 // Lazy load pages for code splitting
 import { lazy } from "react";
 const Index = lazy(() => import("./pages/Index"));
@@ -46,13 +50,14 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ErrorBoundary>
             <AuthProvider>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/" element={<Landing />} />
+                <Route path="/__e2e/crash" element={<E2ECrashRoute />} />
                 <Route path="/app" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Index /></Suspense></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Profile /></Suspense></ProtectedRoute>} />
                 <Route path="/my-calendars" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><MyCalendars /></Suspense></ProtectedRoute>} />
