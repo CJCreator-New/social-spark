@@ -1224,6 +1224,18 @@ const Index = () => {
         if (cancelled) return;
 
         if (newestDraft) {
+          const shouldSkipRecovery = newestDraft.data.step === 4 && newestDraft.data.posts.length === 0;
+          if (shouldSkipRecovery) {
+            if (user) {
+              void clearServerDraft(user.id).catch((error) => {
+                console.warn("Failed to clear empty server draft", error);
+              });
+            }
+            if (localDraft) {
+              storageService.removeDraft(wizardDraftKey);
+            }
+            return;
+          }
           setRecoveryDraft(newestDraft.data);
           setShowRecoveryDialog(true);
           if (user && localDraft && localDraft.savedAt >= (serverDraft?.savedAt || 0)) {
@@ -1377,7 +1389,7 @@ const Index = () => {
     setForm({ ...recoveryDraft.form });
     setStep(recoveryDraft.posts.length > 0 ? 4 : recoveryDraft.step);
     setExtraTopics([...recoveryDraft.extraTopics]);
-    setPosts([...recoveryDraft.posts]);
+    setPostsWithHistory([...recoveryDraft.posts]);
     setActiveDay(recoveryDraft.activeDay);
     setPostTimes({ ...recoveryDraft.postTimes });
     setSavedId(null);
@@ -1510,7 +1522,7 @@ const Index = () => {
       });
       const result: Post[] = form.mode === "day" ? fallbackPosts.slice(0, 1) : fallbackPosts;
       setGenStep(GEN_LABELS.length);
-      setPosts(result);
+      setPostsWithHistory(result);
       setActiveDay(0);
       const seedTimes: Record<string, string> = {};
       for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1);
@@ -1546,7 +1558,7 @@ const Index = () => {
             });
 
         setGenStep(GEN_LABELS.length);
-        setPosts(result);
+        setPostsWithHistory(result);
         setActiveDay(0);
         const seedTimes: Record<string, string> = {};
         for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1);
@@ -1658,7 +1670,7 @@ const Index = () => {
         })();
 
         setGenStep(GEN_LABELS.length);
-        setPosts(fakePosts);
+        setPostsWithHistory(fakePosts);
         setActiveDay(0);
         const seedTimes: Record<string, string> = {};
         for (const r of fakePosts) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1);
@@ -1700,7 +1712,7 @@ const Index = () => {
       }
 
       setGenStep(GEN_LABELS.length);
-      setPosts(result); setActiveDay(0);
+      setPostsWithHistory(result); setActiveDay(0);
       // Seed day-optimized default times per post (keyed by post.day)
       const seedTimes: Record<string, string> = {};
       for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1);
@@ -1860,7 +1872,7 @@ const Index = () => {
           const newPost = await regenerateMutation.mutateAsync(payload);
           if (newPost) {
             next[i] = newPost as Post;
-            setPosts([...next]);
+            setPostsWithHistory([...next]);
             okCount++;
           }
         } catch (e) {
@@ -1955,7 +1967,7 @@ const Index = () => {
 
   function loadSample() {
     setForm(f => ({ ...f, ...SAMPLE_FORM }));
-    setPosts(SAMPLE_POSTS);
+    setPostsWithHistory(SAMPLE_POSTS);
     setPostTimes(SAMPLE_POST_TIMES);
     setActiveDay(0);
     setSampleMode(true);
@@ -1967,7 +1979,7 @@ const Index = () => {
 
   function exitSample() {
     setSampleMode(false);
-    setPosts([]);
+    setPostsWithHistory([]);
     setActiveDay(0);
     setStep(1);
   }
@@ -2982,7 +2994,7 @@ ${postText(p)}
                 )}
 
                 <div className="bbar">
-                  <button className="restart" onClick={() => { clearDraft(); setPosts([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setSampleMode(false); setStep(1); setError(""); }}>← Start over</button>
+                  <button className="restart" onClick={() => { clearDraft(); setPostsWithHistory([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setSampleMode(false); setStep(1); setError(""); }}>← Start over</button>
                   <button className="restart" onClick={() => { setError(""); setStep(2); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ marginLeft: 8 }}>✎ Edit inputs</button>
                   <div className="bactions">
                     <button className="dlbtn" onClick={saveCalendar} disabled={saving || !!savedId || sampleMode} title={sampleMode ? "Sample mode — start your own to save" : ""}>
@@ -3158,7 +3170,7 @@ ${postText(p)}
             after={diffViewData.after}
             onAccept={() => {
               // Accept the change: apply the new post
-              setPosts(prev => prev.map((p, i) => (i === diffViewData.dayIndex ? diffViewData.newPost : p)));
+              setPostsWithHistory(prev => prev.map((p, i) => (i === diffViewData.dayIndex ? diffViewData.newPost : p)));
               setPostsWithHistory(prev => prev.map((p, i) => (i === diffViewData.dayIndex ? diffViewData.newPost : p)));
               setSavedId(null);
               setDiffViewData(null);
