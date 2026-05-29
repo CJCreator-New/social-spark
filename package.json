@@ -19,6 +19,7 @@
     "test:e2e:debug": "playwright test --debug"
   },
   "dependencies": {
+    "@fontsource/fraunces": "^5.2.9",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/manrope": "^5.2.8",
     "@hookform/resolvers": "^3.10.0",

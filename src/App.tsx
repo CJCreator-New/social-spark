@@ -58,11 +58,70 @@ const App = () => {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/" element={<Landing />} />
                 <Route path="/__e2e/crash" element={<E2ECrashRoute />} />
-                <Route path="/app" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Index /></Suspense></ProtectedRoute>} />
-                <Route path="/profile" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Profile /></Suspense></ProtectedRoute>} />
-                <Route path="/my-calendars" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><MyCalendars /></Suspense></ProtectedRoute>} />
-                <Route path="/calendar/:id" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><CalendarDetail /></Suspense></ProtectedRoute>} />
-                <Route path="/schedule" element={<ProtectedRoute><Suspense fallback={<SkeletonList />}><Schedule /></Suspense></ProtectedRoute>} />
+                <Route
+                  path="/app"
+                  element={
+                    <ProtectedRoute>
+                      <Suspense fallback={<main aria-label="ContentForge loading"><h1 style={{ margin: 24 }}>ContentForge</h1><SkeletonList /></main>}>
+                        <Index />
+                      </Suspense>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute>
+                      <Suspense fallback={<main aria-label="Profile loading"><h1 style={{ margin: 24 }}>Profile</h1><SkeletonList /></main>}>
+                        <Profile />
+                      </Suspense>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/my-calendars"
+                  element={
+                    <ProtectedRoute>
+                      <Suspense
+                        fallback={
+                          <main aria-label="My calendars loading">
+                            <h1 style={{ margin: 24 }}>My calendars</h1>
+                            <SkeletonList />
+                          </main>
+                        }
+                      >
+                        <MyCalendars />
+                      </Suspense>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/calendar/:id"
+                  element={
+                    <ProtectedRoute>
+                      <Suspense fallback={<main aria-label="Calendar loading"><h1 style={{ margin: 24 }}>Calendar details</h1><SkeletonList /></main>}>
+                        <CalendarDetail />
+                      </Suspense>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/schedule"
+                  element={
+                    <ProtectedRoute>
+                      <Suspense
+                        fallback={
+                          <main aria-label="Schedule loading">
+                            <h1 style={{ margin: 24 }}>My schedule</h1>
+                            <SkeletonList />
+                          </main>
+                        }
+                      >
+                        <Schedule />
+                      </Suspense>
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="/admin" element={<ProtectedRoute><AdminRoute><Suspense fallback={<SkeletonList />}><Admin /></Suspense></AdminRoute></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

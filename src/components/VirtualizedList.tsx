@@ -5,6 +5,7 @@ interface VirtualizedListProps<T> {
   renderItem: (item: T, index: number) => ReactNode;
   height: number | string;
   estimatedItemHeight: number;
+  ariaLabel?: string;
   overscan?: number;
   getItemHeight?: (item: T, index: number) => number;
   emptyState?: ReactNode;
@@ -33,6 +34,7 @@ export function VirtualizedList<T>({
   renderItem,
   height,
   estimatedItemHeight,
+  ariaLabel,
   overscan = 4,
   getItemHeight,
   emptyState,
@@ -109,6 +111,9 @@ export function VirtualizedList<T>({
   return (
     <div
       ref={containerRef}
+      tabIndex={0}
+      role="region"
+      aria-label={ariaLabel}
       style={{
         height: displayHeight,
         overflowY: "auto",

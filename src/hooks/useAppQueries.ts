@@ -213,26 +213,7 @@ export function useScheduleInfiniteQuery(userId?: string, pageSize = 25) {
         return { rows: [], calendars: new Map(), profileTz: "", nextCursor: null };
       }
 
-      const [{ data: pr }, { data: schedData }, { data: calData }] = await Promise.all([
-        supabase.from("profiles").select("default_timezone").eq("user_id", userId).maybeSingle(),
-        supabase.from("scheduled_posts")
-          .select("id, calendar_id, post_day, platform, scheduled_at, status, workflow_status, copy_text, post_snapshot, published_at, failure_reason")
-          .neq("status", "cancelled")
-          .order("scheduled_at", { ascending: true })
-          .order("id", { ascending: true })
-          .limit(pageSize)
-          .or(pageParam
-            ? `scheduled_at.gt.${pageParam.scheduled_at},and(scheduled_at.eq.${pageParam.scheduled_at},id.gt.${pageParam.id})`
-            : undefined),
-        supabase.from("saved_calendars").select("id, title, timezone, tracking_url"),
-      ]);
-
-      const profTz = (pr as { default_timezone?: string | null } | null)?.default_timezone || "";
-      const map = new Map<string, { id: string; title: string; timezone: string | null; tracking_url: string | null }>();
-      for (const c of (calData as Array<{ id: string; title: string; timezone: string | null; tracking_url: string | null }>) || []) map.set(c.id, c);
-
-      const items = (schedData as unknown[] | null) || [];
-      if (items.length === 0 && isE2EMode()) {
+      if (isE2EMode()) {
         const rows = getE2EScheduleRows();
         return {
           rows,
@@ -241,6 +222,33 @@ export function useScheduleInfiniteQuery(userId?: string, pageSize = 25) {
           nextCursor: null,
         };
       }
+
+      let scheduleQuery = supabase.from("scheduled_posts")
+        .select("id, calendar_id, post_day, platform, scheduled_at, status, workflow_status, copy_text, post_snapshot, published_at, failure_reason")
+        .neq("status", "cancelled")
+        .order("scheduled_at", { ascending: true })
+        .order("id", { ascending: true })
+        .limit(pageSize);
+
+      if (pageParam) {
+        scheduleQuery = scheduleQuery.or(`scheduled_at.gt.${pageParam.scheduled_at},and(scheduled_at.eq.${pageParam.scheduled_at},id.gt.${pageParam.id})`);
+      }
+
+      const [{ data: pr, error: profileError }, { data: schedData, error: scheduleError }, { data: calData, error: calendarsError }] = await Promise.all([
+        supabase.from("profiles").select("default_timezone").eq("user_id", userId).maybeSingle(),
+        scheduleQuery,
+        supabase.from("saved_calendars").select("id, title, timezone, tracking_url"),
+      ]);
+
+      if (profileError) throw profileError;
+      if (scheduleError) throw scheduleError;
+      if (calendarsError) throw calendarsError;
+
+      const profTz = (pr as { default_timezone?: string | null } | null)?.default_timezone || "";
+      const map = new Map<string, { id: string; title: string; timezone: string | null; tracking_url: string | null }>();
+      for (const c of (calData as Array<{ id: string; title: string; timezone: string | null; tracking_url: string | null }>) || []) map.set(c.id, c);
+
+      const items = (schedData as unknown[] | null) || [];
       const lastItem = items[items.length - 1] as { scheduled_at?: string; id?: string } | undefined;
       const nextCursor = items.length === pageSize && lastItem?.scheduled_at && lastItem?.id ? { scheduled_at: lastItem.scheduled_at, id: lastItem.id } : null;
 
@@ -447,6 +455,7 @@ export function useUpdateScheduledPostStatusMutation(calendarId?: string) {
       return { id, patch };
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["schedule"] });
       if (calendarId) qc.invalidateQueries({ queryKey: ["scheduled-posts-status", calendarId] });
     },
   });
@@ -465,6 +474,7 @@ export function useCancelScheduledPostMutation(calendarId?: string) {
       return id;
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["schedule"] });
       if (calendarId) qc.invalidateQueries({ queryKey: ["scheduled-posts-status", calendarId] });
     },
   });
@@ -483,6 +493,7 @@ export function useUpdateScheduledPostTimeMutation(calendarId?: string) {
       return { id, scheduledAt };
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["schedule"] });
       if (calendarId) qc.invalidateQueries({ queryKey: ["scheduled-posts-status", calendarId] });
     },
   });

@@ -2,8 +2,13 @@
 @import '@fontsource/inter/500.css';
 @import '@fontsource/inter/600.css';
 @import '@fontsource/inter/700.css';
+@import '@fontsource/manrope/400.css';
+@import '@fontsource/manrope/500.css';
+@import '@fontsource/manrope/600.css';
 @import '@fontsource/manrope/700.css';
-@import '@fontsource/manrope/800.css';
+@import '@fontsource/fraunces/400.css';
+@import '@fontsource/fraunces/500.css';
+@import '@fontsource/fraunces/600.css';
 
 @tailwind base;
 @tailwind components;
@@ -11,6 +16,10 @@
 
 @layer base {
   :root {
+    --font-body: 'Manrope', 'Inter', system-ui, sans-serif;
+    --font-display: 'Fraunces', 'Manrope', serif;
+    --font-ui: 'Inter', 'Manrope', system-ui, sans-serif;
+
     --background: 222 47% 6%;
     --foreground: 210 40% 98%;
 
@@ -71,21 +80,107 @@
 }
 
 @layer base {
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+  }
+
   * {
     @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: var(--font-body);
+    background:
+      radial-gradient(circle at 15% 15%, hsl(var(--primary) / 0.08), transparent 26%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(222 47% 4%) 100%);
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Manrope', system-ui, sans-serif;
+    font-family: var(--font-display);
+    letter-spacing: -0.04em;
+  }
+
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  [role='button'] {
+    transition: box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease, color 160ms ease, transform 160ms ease;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [role='button']:focus-visible {
+    outline: 2px solid hsl(var(--primary) / 0.75);
+    outline-offset: 2px;
   }
 }
 
 @layer components {
+  .page-shell {
+    @apply relative min-h-svh overflow-x-hidden;
+    background:
+      radial-gradient(circle at 18% 18%, hsl(var(--primary) / 0.08), transparent 24%),
+      radial-gradient(circle at 82% 8%, hsl(var(--accent) / 0.06), transparent 22%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(222 47% 4%) 100%);
+  }
+
+  .page-shell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.12;
+    background-image: linear-gradient(hsl(var(--foreground) / 0.04) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground) / 0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .page-surface {
+    @apply relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] shadow-2xl shadow-black/20 backdrop-blur-xl;
+  }
+
+  .page-panel {
+    @apply relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.025];
+  }
+
+  .section-kicker {
+    @apply text-[10px] font-semibold uppercase tracking-[0.24em] text-lime-300;
+  }
+
+  .section-hint {
+    @apply text-sm leading-6 text-slate-400;
+  }
+
+  .control-input {
+    @apply w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-slate-100 outline-none;
+    font-family: var(--font-body);
+  }
+
+  .control-input::placeholder {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .control-input:focus {
+    border-color: hsl(var(--primary) / 0.35);
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.08);
+  }
+
+  .control-button {
+    @apply inline-flex items-center justify-center rounded-xl border border-transparent px-4 py-3 text-sm font-semibold text-slate-950;
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(72 100% 87%) 100%);
+    box-shadow: 0 16px 40px hsl(var(--primary) / 0.12);
+  }
+
+  .control-button:hover {
+    transform: translateY(-1px);
+  }
+
   .glass-card {
     @apply bg-card/60 backdrop-blur-xl border border-border/50 rounded-xl;
     box-shadow: var(--shadow-card);
@@ -102,6 +197,14 @@
     @apply absolute inset-0 opacity-0 transition-opacity duration-300;
     background: linear-gradient(135deg, hsl(199 89% 58%) 0%, hsl(262 83% 68%) 100%);
   }
+
+/* During dev/test runs Vite may inject an error overlay element that
+   can intercept pointer events and break Playwright clicks. Make it
+   non-interactive so tests can continue while the overlay is visible. */
+vite-error-overlay {
+  pointer-events: none !important;
+  opacity: 0.01 !important;
+}
 
   .glass-button:hover::before {
     @apply opacity-100;

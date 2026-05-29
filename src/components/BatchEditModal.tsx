@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import Modal from "@/components/ui/Modal";
 
 export interface BatchEditPayload {
   brandMention: string;
@@ -53,14 +54,13 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({ isOpen, onClose,
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Batch edit all {totalPosts} posts</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
+    <Modal onClose={onClose} className="modal-content">
+      <div className="modal-header">
+        <h2>Batch edit all {totalPosts} posts</h2>
+        <button className="modal-close" onClick={onClose}>✕</button>
+      </div>
 
-        <div className="modal-body">
+      <div className="modal-body">
           <div className="form-group">
             <label htmlFor="brand-mention">
               Brand mention
@@ -135,7 +135,7 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({ isOpen, onClose,
           </div>
         </div>
 
-        <div className="modal-footer">
+      <div className="modal-footer">
           <button className="btn btn-s" style={{ background: "transparent", borderColor: "var(--border2)", color: "var(--text2)" }} onClick={onClose}>
             Cancel
           </button>
@@ -147,8 +147,7 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({ isOpen, onClose,
           >
             Apply to all {totalPosts}
           </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 };

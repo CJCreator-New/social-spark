@@ -1,4 +1,5 @@
 import React from "react";
+import Modal from "@/components/ui/Modal";
 import { diff_match_patch } from "diff-match-patch";
 
 interface DiffViewProps {
@@ -66,41 +67,39 @@ export const DiffView: React.FC<DiffViewProps> = ({ before, after, onAccept, onR
   const charDelta = afterChars - beforeChars;
 
   return (
-    <div className="diff-overlay">
-      <div className="diff-modal">
-        <div className="diff-header">
-          <h2>{title}</h2>
-          <div className="diff-stats">
-            <span className={charDelta < 0 ? "stat positive" : charDelta > 0 ? "stat negative" : "stat"}>
-              {charDelta < 0 ? `−${Math.abs(charDelta)}` : `+${charDelta}`} chars
-            </span>
-            {removed > 0 && <span className="stat removed">−{removed} words</span>}
-            {added > 0 && <span className="stat added">+{added} words</span>}
-          </div>
-        </div>
-
-        <div className="diff-content">
-          <div className="diff-comparison">
-            <div className="diff-col">
-              <div className="diff-col-label">Before</div>
-              {beforeEl}
-            </div>
-            <div className="diff-col">
-              <div className="diff-col-label">After</div>
-              {afterEl}
-            </div>
-          </div>
-        </div>
-
-        <div className="diff-actions">
-          <button className="btn btn-s" style={{ background: "transparent", borderColor: "var(--border2)", color: "var(--text2)" }} onClick={onReject}>
-            Keep original
-          </button>
-          <button className="btn btn-p" onClick={onAccept}>
-            Accept changes
-          </button>
+    <Modal onClose={onReject} className="diff-modal">
+      <div className="diff-header">
+        <h2>{title}</h2>
+        <div className="diff-stats">
+          <span className={charDelta < 0 ? "stat positive" : charDelta > 0 ? "stat negative" : "stat"}>
+            {charDelta < 0 ? `−${Math.abs(charDelta)}` : `+${charDelta}`} chars
+          </span>
+          {removed > 0 && <span className="stat removed">−{removed} words</span>}
+          {added > 0 && <span className="stat added">+{added} words</span>}
         </div>
       </div>
-    </div>
+
+      <div className="diff-content">
+        <div className="diff-comparison">
+          <div className="diff-col">
+            <div className="diff-col-label">Before</div>
+            {beforeEl}
+          </div>
+          <div className="diff-col">
+            <div className="diff-col-label">After</div>
+            {afterEl}
+          </div>
+        </div>
+      </div>
+
+      <div className="diff-actions">
+        <button className="btn btn-s" style={{ background: "transparent", borderColor: "var(--border2)", color: "var(--text2)" }} onClick={onReject}>
+          Keep original
+        </button>
+        <button className="btn btn-p" onClick={onAccept}>
+          Accept changes
+        </button>
+      </div>
+    </Modal>
   );
 };

@@ -6,6 +6,16 @@ import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
 import { SkeletonList } from "@/components/SkeletonList";
 import { VirtualizedList } from "@/components/VirtualizedList";
+import { WorkspacePage } from "@/components/layout/WorkspacePage";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CalendarClock, CheckCircle2, Clipboard, ExternalLink, MoreHorizontal, RotateCcw, XCircle } from "lucide-react";
 import { writeToClipboard, niceLabelFor } from "@/lib/platformCopy";
 import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
 import { downloadScheduleCsv } from "@/lib/exportSchedule";
@@ -91,6 +101,12 @@ const css = `
 .sc-act-p { background:rgba(200,240,154,.12); border-color:rgba(200,240,154,.32); color:#c8f09a; }
 .sc-act-danger { color:#f09a9a; }
 .sc-act-danger:hover { border-color:rgba(240,154,154,.35); color:#f09a9a; }
+.sc-menu-trigger { width:34px; height:34px; padding:0; display:inline-flex; align-items:center; justify-content:center; }
+.sc-menu-content { min-width:190px; background:#0d0f18; border:1px solid rgba(255,255,255,0.12); color:#edeae3; box-shadow:0 18px 44px rgba(0,0,0,.45); }
+.sc-menu-item { display:flex; gap:9px; align-items:center; font-family:'Sora',sans-serif; font-size:12px; color:#edeae3; cursor:pointer; }
+.sc-menu-item:focus { background:rgba(200,240,154,.12); color:#c8f09a; }
+.sc-menu-item.danger { color:#f09a9a; }
+.sc-menu-sep { background:rgba(255,255,255,0.08); }
 .sc-edit { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px; padding:8px; background:#07080d; border:1px solid rgba(255,255,255,0.08); border-radius:8px; width:100%; }
 .sc-edit input { background:transparent; border:1px solid rgba(255,255,255,0.1); border-radius:5px; padding:5px 8px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; color-scheme:dark; }
 .sc-edit input:focus { border-color:rgba(200,240,154,0.4); }
@@ -119,6 +135,7 @@ export default function Schedule() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
+  const [pendingCancel, setPendingCancel] = useState<ScheduledRow | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const tzList = listTimezones();
   const log = createScopedLogger('Schedule');
@@ -198,9 +215,12 @@ export default function Schedule() {
     toast.success(`Marked ${STATUS_LABEL[status].toLowerCase()}`);
   }
 
-  async function cancelRow(row: ScheduledRow) {
+  function requestCancelRow(row: ScheduledRow) {
+    setPendingCancel(row);
+  }
+
+  async function confirmCancelRow(row: ScheduledRow) {
     const log = createScopedLogger('Schedule-Cancel');
-    if (!window.confirm("Cancel this scheduled post?")) return;
     try {
       await cancelScheduledPostMutation.mutateAsync(row.id);
     } catch (error) {
@@ -208,6 +228,7 @@ export default function Schedule() {
       return toast.error(error instanceof Error ? error.message : "Failed to cancel post");
     }
     setRows(p => p.filter(r => r.id !== row.id));
+    setPendingCancel(null);
     log.info(`Post cancelled`, { postId: row.id });
     toast.success("Cancelled");
   }
@@ -261,92 +282,99 @@ export default function Schedule() {
   return (
     <>
       <style>{css}</style>
-      <div className="sc-app">
-        <div className="sc-inner">
-          <div className="sc-head">
-            <h1 className="sc-title">My <em>schedule</em></h1>
-            <div style={{ display: "flex", gap: 12 }}>
-              <Link to="/my-calendars" className="sc-back">My calendars</Link>
-              <Link to="/app" className="sc-back">← New calendar</Link>
-            </div>
+      <WorkspacePage size="wide">
+        <div className="sc-head">
+          <h1 className="sc-title">My <em>schedule</em></h1>
+          <div style={{ display: "flex", gap: 12 }}>
+            <Link to="/my-calendars" className="sc-back">My calendars</Link>
+            <Link to="/app" className="sc-back">← New calendar</Link>
           </div>
-
-          <div className="sc-summary" aria-label="Schedule summary">
-            <div className="sc-summary-card">
-              <div className="sc-summary-label">Scheduled</div>
-              <div className="sc-summary-value">{summary.total}</div>
-              <div className="sc-summary-sub">Rows currently in your queue.</div>
-            </div>
-            <div className="sc-summary-card">
-              <div className="sc-summary-label">Drafted</div>
-              <div className="sc-summary-value">{summary.drafted}</div>
-              <div className="sc-summary-sub">Needs approval or a second look.</div>
-            </div>
-            <div className="sc-summary-card">
-              <div className="sc-summary-label">Approved</div>
-              <div className="sc-summary-value">{summary.approved}</div>
-              <div className="sc-summary-sub">Ready to publish or reschedule.</div>
-            </div>
-            <div className="sc-summary-card">
-              <div className="sc-summary-label">Published</div>
-              <div className="sc-summary-value">{summary.published}</div>
-              <div className="sc-summary-sub">Completed and archived in the schedule.</div>
-            </div>
-          </div>
-
-          {!loading && rows.length > 0 && (
-            <div className="sc-toolbar">
-              <span className="sc-tool-label">Sort</span>
-              <select className="sc-sel" value={sortBy} onChange={e => setSortBy(e.target.value as SortKey)}>
-                <option value="date-asc">Date · soonest first</option>
-                <option value="date-desc">Date · latest first</option>
-                <option value="platform">Platform</option>
-                <option value="status">Status</option>
-              </select>
-              <span className="sc-tool-label" style={{ marginLeft: 8 }}>Timezone</span>
-              <select className="sc-sel" value={viewTz} onChange={e => setViewTz(e.target.value)} style={{ maxWidth: 240 }}>
-                {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
-              </select>
-              <button className="sc-csv-btn" onClick={exportCsv} disabled={sorted.length === 0}>↓ Export CSV</button>
-            </div>
-          )}
-
-          {loading ? (
-            <SkeletonList rows={5} />
-          ) : rows.length === 0 ? (
-            <div className="sc-empty">
-              <div className="sc-empty-illus" aria-hidden="true">⌛</div>
-              <div className="sc-empty-title">Nothing in the <em>queue</em> yet</div>
-              <p className="sc-empty-sub">Open a calendar and click <strong style={{ color: "#c8f09a" }}>Schedule week</strong> to populate this view with draft and publish actions.</p>
-              <Link to="/app" className="sc-empty-cta">Create a calendar</Link>
-            </div>
-          ) : grouped ? (
-            [...grouped.entries()].map(([date, list]) => (
-              <div key={date} className="sc-group">
-                <h2 className="sc-group-h">{date}</h2>
-                {list.map(row => renderRow(row))}
-              </div>
-            ))
-          ) : (
-            <div className="sc-group">
-              <VirtualizedList
-                items={sorted}
-                renderItem={renderRow}
-                height={600}
-                estimatedItemHeight={100}
-              />
-            </div>
-          )}
-
-          {hasNextPage && (
-            <div ref={loadMoreRef} style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
-              <button className="sc-act" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-                {isFetchingNextPage ? "Loading more…" : "Load more"}
-              </button>
-            </div>
-          )}
         </div>
-      </div>
+
+        <div className="sc-summary" aria-label="Schedule summary">
+          <div className="sc-summary-card">
+            <div className="sc-summary-label">Scheduled</div>
+            <div className="sc-summary-value">{summary.total}</div>
+            <div className="sc-summary-sub">Rows currently in your queue.</div>
+          </div>
+          <div className="sc-summary-card">
+            <div className="sc-summary-label">Drafted</div>
+            <div className="sc-summary-value">{summary.drafted}</div>
+            <div className="sc-summary-sub">Needs approval or a second look.</div>
+          </div>
+          <div className="sc-summary-card">
+            <div className="sc-summary-label">Approved</div>
+            <div className="sc-summary-value">{summary.approved}</div>
+            <div className="sc-summary-sub">Ready to publish or reschedule.</div>
+          </div>
+          <div className="sc-summary-card">
+            <div className="sc-summary-label">Published</div>
+            <div className="sc-summary-value">{summary.published}</div>
+            <div className="sc-summary-sub">Completed and archived in the schedule.</div>
+          </div>
+        </div>
+
+        {!loading && rows.length > 0 && (
+          <div className="sc-toolbar">
+            <span className="sc-tool-label">Sort</span>
+            <select className="sc-sel" aria-label="Sort schedule" value={sortBy} onChange={e => setSortBy(e.target.value as SortKey)}>
+              <option value="date-asc">Date · soonest first</option>
+              <option value="date-desc">Date · latest first</option>
+              <option value="platform">Platform</option>
+              <option value="status">Status</option>
+            </select>
+            <span className="sc-tool-label" style={{ marginLeft: 8 }}>Timezone</span>
+            <select className="sc-sel" aria-label="Schedule timezone" value={viewTz} onChange={e => setViewTz(e.target.value)} style={{ maxWidth: 240 }}>
+              {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
+            </select>
+            <button className="sc-csv-btn" onClick={exportCsv} disabled={sorted.length === 0}>↓ Export CSV</button>
+          </div>
+        )}
+
+        {loading ? (
+          <SkeletonList rows={5} />
+        ) : rows.length === 0 ? (
+          <div className="sc-empty">
+            <div className="sc-empty-illus" aria-hidden="true">⌛</div>
+            <div className="sc-empty-title">Nothing in the <em>queue</em> yet</div>
+            <p className="sc-empty-sub">Open a calendar and click <strong style={{ color: "#c8f09a" }}>Schedule week</strong> to populate this view with draft and publish actions.</p>
+            <Link to="/app" className="sc-empty-cta">Create a calendar</Link>
+          </div>
+        ) : grouped ? (
+          [...grouped.entries()].map(([date, list]) => (
+            <div key={date} className="sc-group">
+              <h2 className="sc-group-h">{date}</h2>
+              {list.map(row => renderRow(row))}
+            </div>
+          ))
+        ) : (
+          <div className="sc-group">
+            <VirtualizedList
+              items={sorted}
+              renderItem={renderRow}
+              height={600}
+              estimatedItemHeight={100}
+              ariaLabel="Scheduled posts list"
+            />
+          </div>
+        )}
+
+        {hasNextPage && (
+          <div ref={loadMoreRef} style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+            <button className="sc-act" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+              {isFetchingNextPage ? "Loading more…" : "Load more"}
+            </button>
+          </div>
+        )}
+      </WorkspacePage>
+      {pendingCancel && (
+        <ConfirmDialog
+          title="Cancel this scheduled post?"
+          message={`${pendingCancel.post_snapshot?.title || pendingCancel.post_snapshot?.topic || `Day ${pendingCancel.post_day}`} will be removed from the queue.`}
+          onCancel={() => setPendingCancel(null)}
+          onConfirm={async () => { setPendingCancel(null); await confirmCancelRow(pendingCancel); }}
+        />
+      )}
     </>
   );
 
@@ -387,24 +415,56 @@ export default function Schedule() {
             </div>
           )}
         </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button className="sc-act sc-act-p" onClick={() => copyRow(row)}>📋 Copy</button>
-          {!isEditing && <button className="sc-act" onClick={() => startEdit(row)}>✎ Edit time</button>}
-          {row.workflow_status === "drafted" && (
-            <button className="sc-act" onClick={() => setStatus(row, "approved")}>✓ Approve</button>
-          )}
-          {row.workflow_status === "approved" && (
-            <button className="sc-act" onClick={() => setStatus(row, "published")}>✓ Mark published</button>
-          )}
-          {row.workflow_status === "published" && (
-            <button className="sc-act" onClick={() => setStatus(row, "approved")}>↺ Re-open</button>
-          )}
-          {row.workflow_status !== "failed" && row.workflow_status !== "published" && (
-            <button className="sc-act sc-act-danger" onClick={() => setStatus(row, "failed")}>✕ Failed</button>
-          )}
-          <button className="sc-act" onClick={() => navigate(`/calendar/${row.calendar_id}`)}>Open</button>
-          <button className="sc-act sc-act-danger" onClick={() => cancelRow(row)}>Cancel</button>
-        </div>
+        {row.workflow_status === "drafted" && (
+          <button className="sc-act" onClick={() => void setStatus(row, "approved")}>
+            Approve
+          </button>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="sc-act sc-menu-trigger" aria-label={`Actions for day ${row.post_day}`}>
+              <MoreHorizontal size={16} aria-hidden="true" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="sc-menu-content">
+            <DropdownMenuItem className="sc-menu-item" onSelect={() => void copyRow(row)}>
+              <Clipboard size={14} aria-hidden="true" /> Copy post text
+            </DropdownMenuItem>
+            {!isEditing && (
+              <DropdownMenuItem className="sc-menu-item" onSelect={() => startEdit(row)}>
+                <CalendarClock size={14} aria-hidden="true" /> Reschedule
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator className="sc-menu-sep" />
+            {row.workflow_status === "drafted" && (
+              <DropdownMenuItem className="sc-menu-item" onSelect={() => void setStatus(row, "approved")}>
+                <CheckCircle2 size={14} aria-hidden="true" /> Approve
+              </DropdownMenuItem>
+            )}
+            {row.workflow_status === "approved" && (
+              <DropdownMenuItem className="sc-menu-item" onSelect={() => void setStatus(row, "published")}>
+                <CheckCircle2 size={14} aria-hidden="true" /> Mark published
+              </DropdownMenuItem>
+            )}
+            {row.workflow_status === "published" && (
+              <DropdownMenuItem className="sc-menu-item" onSelect={() => void setStatus(row, "approved")}>
+                <RotateCcw size={14} aria-hidden="true" /> Re-open
+              </DropdownMenuItem>
+            )}
+            {row.workflow_status !== "failed" && row.workflow_status !== "published" && (
+              <DropdownMenuItem className="sc-menu-item danger" onSelect={() => void setStatus(row, "failed")}>
+                <XCircle size={14} aria-hidden="true" /> Mark failed
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator className="sc-menu-sep" />
+            <DropdownMenuItem className="sc-menu-item" onSelect={() => navigate(`/calendar/${row.calendar_id}`)}>
+              <ExternalLink size={14} aria-hidden="true" /> Open calendar
+            </DropdownMenuItem>
+            <DropdownMenuItem className="sc-menu-item danger" onSelect={() => requestCancelRow(row)}>
+              <XCircle size={14} aria-hidden="true" /> Cancel scheduled post
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     );
   }

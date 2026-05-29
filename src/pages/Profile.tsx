@@ -7,6 +7,7 @@ import { useDeleteTemplateMutation, useProfileQuery, useProfileUpdateMutation, u
 import { toast } from "sonner";
 import { normalizeTag, displayTag, parsePolicyList } from "@/lib/hashtagPolicy";
 import { listTimezones, browserTimezone, tzLabel } from "@/lib/timezones";
+import { WorkspacePage } from "@/components/layout/WorkspacePage";
 
 const VOICE_OPTIONS = ["Technical & analytical", "Conversational & warm", "PM / product thinking", "Opinionated & bold", "Data-driven", "Storytelling-first", "Educational & clear", "Contrarian / challenger", "Founder POV", "Academic & research-backed", "Humorous & witty", "Inspirational & motivating"];
 const STYLE_OPTIONS = ["Short punchy lines", "Long-form narrative", "Lists & frameworks", "Thread-style breakdown", "Stats-led", "Case study format", "Question-led", "First-person story", "Industry insight", "Myth-busting", "How-to guide", "Behind-the-scenes"];
@@ -287,70 +288,69 @@ export default function Profile() {
   return (
     <>
       <style>{css}</style>
-      <div className="pf-app">
-        <div className="pf-inner">
-          <Link to="/app" className="pf-back">← Back to ContentForge</Link>
-          <h1 className="pf-title">Your profile</h1>
-          <div className="pf-sub">Update how you appear inside ContentForge and set brand defaults to pre-fill the wizard.</div>
+      <WorkspacePage size="narrow">
+        <Link to="/app" className="pf-back">← Back to ContentForge</Link>
+        <h1 className="pf-title">Your profile</h1>
+        <div className="pf-sub">Update how you appear inside ContentForge and set brand defaults to pre-fill the wizard.</div>
 
-          <div className="pf-summary">
-            <div className="pf-summary-card">
-              <div className="pf-summary-label">Defaults set</div>
-              <div className="pf-summary-value">{activeDefaults}</div>
-              <div className="pf-summary-sub">Profile fields that will pre-fill the next calendar.</div>
-            </div>
-            <div className="pf-summary-card">
-              <div className="pf-summary-label">Audiences</div>
-              <div className="pf-summary-value">{defaultAudiences.length}</div>
-              <div className="pf-summary-sub">Reusable audience presets.</div>
-            </div>
-            <div className="pf-summary-card">
-              <div className="pf-summary-label">Hashtag rules</div>
-              <div className="pf-summary-value">{bannedHashtags.length + requiredHashtags.length}</div>
-              <div className="pf-summary-sub">Guardrails applied across generations.</div>
-            </div>
+        <div className="pf-summary">
+          <div className="pf-summary-card">
+            <div className="pf-summary-label">Defaults set</div>
+            <div className="pf-summary-value">{activeDefaults}</div>
+            <div className="pf-summary-sub">Profile fields that will pre-fill the next calendar.</div>
           </div>
+          <div className="pf-summary-card">
+            <div className="pf-summary-label">Audiences</div>
+            <div className="pf-summary-value">{defaultAudiences.length}</div>
+            <div className="pf-summary-sub">Reusable audience presets.</div>
+          </div>
+          <div className="pf-summary-card">
+            <div className="pf-summary-label">Hashtag rules</div>
+            <div className="pf-summary-value">{bannedHashtags.length + requiredHashtags.length}</div>
+            <div className="pf-summary-sub">Guardrails applied across generations.</div>
+          </div>
+        </div>
 
+        <div className="pf-card">
+          {loading ? (
+            <div style={{ color: "#7a7a8e", fontSize: 13 }}>Loading…</div>
+          ) : (
+            <>
+              <div className="pf-row">
+                {avatarUrl
+                  ? <img className="pf-avatar" src={avatarUrl} alt="Your avatar" />
+                  : <div className="pf-avatar" aria-hidden="true">{initial}</div>}
+                <div>
+                  <label className="pf-uplabel">
+                    {uploading ? "Uploading…" : "Upload new avatar"}
+                    <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} style={{ display: "none" }} disabled={uploading} aria-label="Upload new avatar" />
+                  </label>
+                  <div className="pf-meta">PNG, JPEG, or WebP, up to 2MB.</div>
+                </div>
+              </div>
+
+              <label className="pf-label" htmlFor="pf-name">Display name</label>
+              <input id="pf-name" className="pf-input" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your name" />
+
+              <label className="pf-label" htmlFor="pf-email">Email</label>
+              <input id="pf-email" className="pf-input" value={user?.email || ""} disabled />
+
+              <label className="pf-label" htmlFor="pf-tz">Default timezone</label>
+              <select id="pf-tz" className="pf-select" value={defaultTimezone} onChange={e => setDefaultTimezone(e.target.value)}>
+                <option value="">— Browser default ({browserTimezone()}) —</option>
+                {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
+              </select>
+              <div className="pf-meta" style={{ marginTop: -8, marginBottom: 8 }}>
+                Used as the fallback when scheduling. Each calendar can override this.
+              </div>
+            </>
+          )}
+        </div>
+
+        {!loading && (
           <div className="pf-card">
-            {loading ? (
-              <div style={{ color: "#7a7a8e", fontSize: 13 }}>Loading…</div>
-            ) : (
-              <>
-                <div className="pf-row">
-                  {avatarUrl
-                    ? <img className="pf-avatar" src={avatarUrl} alt="Your avatar" />
-                    : <div className="pf-avatar" aria-hidden="true">{initial}</div>}
-                  <div>
-                    <label className="pf-uplabel">
-                      {uploading ? "Uploading…" : "Upload new avatar"}
-                      <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} style={{ display: "none" }} disabled={uploading} aria-label="Upload new avatar" />
-                    </label>
-                    <div className="pf-meta">PNG or JPG, up to 2MB.</div>
-                  </div>
-                </div>
-
-                <label className="pf-label" htmlFor="pf-name">Display name</label>
-                <input id="pf-name" className="pf-input" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your name" />
-
-                <label className="pf-label" htmlFor="pf-email">Email</label>
-                <input id="pf-email" className="pf-input" value={user?.email || ""} disabled />
-
-                <label className="pf-label" htmlFor="pf-tz">Default timezone</label>
-                <select id="pf-tz" className="pf-select" value={defaultTimezone} onChange={e => setDefaultTimezone(e.target.value)}>
-                  <option value="">— Browser default ({browserTimezone()}) —</option>
-                  {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
-                </select>
-                <div className="pf-meta" style={{ marginTop: -8, marginBottom: 8 }}>
-                  Used as the fallback when scheduling. Each calendar can override this.
-                </div>
-              </>
-            )}
-          </div>
-
-          {!loading && (
-            <div className="pf-card">
-              <h2 className="pf-section-h">Brand defaults</h2>
-              <div className="pf-section-sub">Pre-fill the wizard with your usual voice, style, audiences, and goals. You can still change them per calendar.</div>
+            <h2 className="pf-section-h">Brand defaults</h2>
+            <div className="pf-section-sub">Pre-fill the wizard with your usual voice, style, audiences, and goals. You can still change them per calendar.</div>
 
               <label className="pf-label" htmlFor="pf-voice">Default voice / tone</label>
               <select id="pf-voice" className="pf-select" value={defaultVoice} onChange={e => setDefaultVoice(e.target.value)}>
@@ -454,21 +454,20 @@ export default function Profile() {
                 <button className="pf-add-btn" onClick={() => addTag("req")}>Require</button>
               </div>
 
-              <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="pf-btn" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
-                </div>
+            <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="pf-btn" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+              </div>
 
-                <div style={{ marginTop: 12 }}>
-                  <h3 className="pf-section-h">Saved templates</h3>
-                  <div className="pf-section-sub">Your saved templates (saved from the wizard). Load a template to pre-fill the wizard.</div>
-                  <TemplatesList />
-                </div>
+              <div style={{ marginTop: 12 }}>
+                <h3 className="pf-section-h">Saved templates</h3>
+                <div className="pf-section-sub">Your saved templates (saved from the wizard). Load a template to pre-fill the wizard.</div>
+                <TemplatesList />
               </div>
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
+      </WorkspacePage>
     </>
   );
 }

@@ -1,0 +1,188 @@
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - navigation [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]: CF
+          - generic [ref=e8]:
+            - generic [ref=e9]: AI content studio
+            - generic [ref=e10]:
+              - text: Content
+              - emphasis [ref=e11]: Forge
+        - generic [ref=e12]:
+          - link "Sign in" [ref=e13] [cursor=pointer]:
+            - /url: /auth
+          - link "Get started" [ref=e14] [cursor=pointer]:
+            - /url: /auth
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - generic [ref=e17]: Editorial-grade content workflows
+          - heading "One brief. A whole week of finished posts." [level=1] [ref=e18]:
+            - text: One brief.
+            - text: A whole week of
+            - emphasis [ref=e19]: finished
+            - text: posts.
+          - paragraph [ref=e20]: ContentForge turns a single idea into a polished, platform-native content calendar for LinkedIn, X, Instagram, Facebook, newsletters, and blogs. Generate, refine, schedule, and export without losing the thread of your brand voice.
+          - generic [ref=e21]:
+            - link "Start free →" [ref=e22] [cursor=pointer]:
+              - /url: /auth
+            - link "See the workflow" [ref=e23] [cursor=pointer]:
+              - /url: "#how-it-works"
+          - generic [ref=e24]:
+            - generic [ref=e25]:
+              - strong [ref=e26]: No credit card
+              - text: required
+            - generic [ref=e27]:
+              - strong [ref=e28]: 7 posts
+              - text: in under a minute
+            - generic [ref=e29]:
+              - strong [ref=e30]: Autosave
+              - text: built in
+          - generic [ref=e31]:
+            - generic [ref=e32]:
+              - generic [ref=e33]: 7x
+              - generic [ref=e34]: Faster than starting each post from scratch
+            - generic [ref=e35]:
+              - generic [ref=e36]: 1 brief
+              - generic [ref=e37]: Turns into a full content calendar with platform tuning
+            - generic [ref=e38]:
+              - generic [ref=e39]: 0 chaos
+              - generic [ref=e40]: Brand defaults, hashtag rules, and draft recovery included
+        - complementary "Product preview" [ref=e41]:
+          - generic [ref=e42]:
+            - generic [ref=e43]:
+              - generic [ref=e44]: Live preview
+              - generic [ref=e45]: A week of content for a SaaS launch campaign
+            - generic [ref=e46]: Ready to schedule
+          - generic [ref=e47]:
+            - generic [ref=e48]:
+              - generic [ref=e49]:
+                - 'heading "Launch Week: shipping a new product narrative" [level=2] [ref=e50]'
+                - generic [ref=e51]: LinkedIn · Founder voice · Conversion-focused · 7 posts
+              - generic [ref=e52]:
+                - generic [ref=e53]:
+                  - strong [ref=e54]: "82"
+                  - text: score
+                - generic [ref=e55]:
+                  - strong [ref=e56]: "3"
+                  - text: formats
+            - generic [ref=e57]:
+              - generic [ref=e58]:
+                - generic [ref=e59]: "01"
+                - generic [ref=e60]:
+                  - generic [ref=e61]: Positioning story
+                  - generic [ref=e62]: A founder-led post that frames the product’s point of view and names the problem with clarity.
+                - generic [ref=e63]: Hook
+              - generic [ref=e64]:
+                - generic [ref=e65]: "02"
+                - generic [ref=e66]:
+                  - generic [ref=e67]: Customer pain point
+                  - generic [ref=e68]: A sharper, more practical post that shows the cost of doing nothing and why the status quo breaks.
+                - generic [ref=e69]: Insight
+              - generic [ref=e70]:
+                - generic [ref=e71]: "03"
+                - generic [ref=e72]:
+                  - generic [ref=e73]: Product proof
+                  - generic [ref=e74]: A concrete value post with a clean CTA, platform-native structure, and branded hashtag policy.
+                - generic [ref=e75]: CTA
+            - generic [ref=e76]:
+              - generic [ref=e77]:
+                - generic [ref=e78]: "7"
+                - generic [ref=e79]: post calendar
+              - generic [ref=e80]:
+                - generic [ref=e81]: "4"
+                - generic [ref=e82]: export formats
+              - generic [ref=e83]:
+                - generic [ref=e84]: "1"
+                - generic [ref=e85]: saved brief template
+              - generic [ref=e86]:
+                - generic [ref=e87]: 24h
+                - generic [ref=e88]: draft recovery window
+      - generic [ref=e89]:
+        - generic [ref=e90]:
+          - heading "Built for people who need content to feel finished." [level=2] [ref=e91]:
+            - text: Built for people who need content to feel
+            - emphasis [ref=e92]: finished
+            - text: .
+          - paragraph [ref=e93]: Every part of the workflow is designed around speed, brand consistency, and the reality that one post becomes a system when you do this every week.
+        - generic [ref=e94]:
+          - article [ref=e95]:
+            - generic [ref=e96]: ◬
+            - heading "Brand-aware generation" [level=3] [ref=e97]
+            - paragraph [ref=e98]: Voice, audience, goals, banned phrases, and hashtag rules persist across every calendar so the output stays recognizably yours.
+          - article [ref=e99]:
+            - generic [ref=e100]: ◭
+            - heading "Platform-native writing" [level=3] [ref=e101]
+            - paragraph [ref=e102]: Length, structure, hooks, and CTA style adapt to the chosen platform instead of forcing every channel into the same mold.
+          - article [ref=e103]:
+            - generic [ref=e104]: ◫
+            - heading "Schedule & export" [level=3] [ref=e105]
+            - paragraph [ref=e106]: Time-zone aware scheduling, CSV/Markdown/PDF/ICS export, and row-level status controls for publishing workflows.
+          - article [ref=e107]:
+            - generic [ref=e108]: ◯
+            - heading "Reusable brief templates" [level=3] [ref=e109]
+            - paragraph [ref=e110]: Save winning prompts as templates so recurring campaigns start from a polished brief instead of a blank screen.
+          - article [ref=e111]:
+            - generic [ref=e112]: ◍
+            - heading "Single-post mode" [level=3] [ref=e113]
+            - paragraph [ref=e114]: Need a post for tomorrow? Generate one fully tuned post with the same brand context and export options.
+          - article [ref=e115]:
+            - generic [ref=e116]: ◎
+            - heading "Draft auto-recovery" [level=3] [ref=e117]
+            - paragraph [ref=e118]: The wizard autosaves locally and restores recovery drafts so a refresh or crash never resets the work.
+        - generic [ref=e119]:
+          - strong [ref=e121]: LinkedIn
+          - strong [ref=e123]: Twitter / X
+          - strong [ref=e125]: Instagram
+          - strong [ref=e127]: Facebook
+          - strong [ref=e129]: Newsletter
+          - strong [ref=e131]: Blog
+      - generic [ref=e132]:
+        - generic [ref=e133]:
+          - heading "From idea to scheduled in three moves." [level=2] [ref=e134]:
+            - text: From idea to
+            - emphasis [ref=e135]: scheduled
+            - text: in three moves.
+          - paragraph [ref=e136]: A guided flow that gets smarter after the first brief, then becomes the fastest way to create a full weekly content plan.
+        - generic [ref=e137]:
+          - generic [ref=e138]:
+            - text: "01"
+            - heading "Brief your week" [level=3] [ref=e139]
+            - paragraph [ref=e140]: Pick an industry, platform, and core idea. Add audience, goals, and tone, or let your saved defaults fill the form for you.
+          - generic [ref=e141]:
+            - text: "02"
+            - heading "Generate & refine" [level=3] [ref=e142]
+            - paragraph [ref=e143]: Get a polished weekly calendar instantly. Regenerate any post, edit inline, or copy the final version in one click.
+          - generic [ref=e144]:
+            - text: "03"
+            - heading "Schedule & publish" [level=3] [ref=e145]
+            - paragraph [ref=e146]: Save the calendar, mark posts as published, or export to your publishing stack with timezone support intact.
+      - generic [ref=e148]:
+        - generic [ref=e149]:
+          - text: Why teams switch
+          - paragraph [ref=e150]: “It feels less like a template generator and more like a content desk that already understands our brand.”
+          - generic [ref=e151]:
+            - strong [ref=e152]: Marketing lead
+            - text: · content operations
+        - generic [ref=e153]:
+          - generic [ref=e156]:
+            - heading "Fewer handoffs" [level=3] [ref=e157]
+            - paragraph [ref=e158]: One brief becomes one calendar, which becomes one schedule, with less copying between tools.
+          - generic [ref=e161]:
+            - heading "Better consistency" [level=3] [ref=e162]
+            - paragraph [ref=e163]: Brand defaults, hashtag policy, and draft recovery keep the output stable even when the workflow is fast.
+          - generic [ref=e166]:
+            - heading "Designed for iteration" [level=3] [ref=e167]
+            - paragraph [ref=e168]: Regenerate, tweak, and save without losing context, so each calendar gets sharper than the last.
+      - generic [ref=e170]:
+        - heading "Stop staring at the blank page." [level=2] [ref=e171]:
+          - text: Stop staring at the
+          - emphasis [ref=e172]: blank page
+          - text: .
+        - paragraph [ref=e173]: Generate your first week of content in under a minute. The interface is built to feel calm, deliberate, and worthy of the work inside it.
+        - link "Create your first calendar →" [ref=e174] [cursor=pointer]:
+          - /url: /auth
+      - generic [ref=e175]: © 2026 ContentForge · Built for serious content teams

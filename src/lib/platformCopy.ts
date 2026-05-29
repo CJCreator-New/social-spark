@@ -178,7 +178,9 @@ function buildTwitter(post: PostLike): { text: string; truncated: boolean } {
   return { text, truncated };
 }
 
-export function formatForPlatform(post: PostLike, platformInput?: string | null): FormattedCopy {
+import { FontStyle, applyStyle } from "./unicodeFonts";
+
+export function formatForPlatform(post: PostLike, platformInput?: string | null, options?: { style?: FontStyle }): FormattedCopy {
   const platform = resolvePlatform(platformInput);
   const limit = PLATFORM_LIMITS[platform];
   const platformLabel = PLATFORM_LABELS[platform];
@@ -209,6 +211,15 @@ export function formatForPlatform(post: PostLike, platformInput?: string | null)
   if (!truncated && text.length > limit) {
     truncated = true;
     text = text.slice(0, limit - 1).replace(/\s+\S*$/, "") + "…";
+  }
+
+  // Apply unicode styling if requested
+  if (options?.style && options.style !== FontStyle.None) {
+    try {
+      text = applyStyle(text, options.style);
+    } catch {
+      // noop on failure — fall back to plain text
+    }
   }
 
   return {

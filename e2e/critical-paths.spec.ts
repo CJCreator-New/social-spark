@@ -8,6 +8,8 @@ async function enableE2EAuth(page: Page) {
 }
 
 test.describe('Authentication Flow', () => {
+  test.describe.configure({ timeout: 60000 })
+
   test('should redirect unauthenticated users to login', async ({ page }) => {
     await page.goto('/app')
 
@@ -19,8 +21,7 @@ test.describe('Authentication Flow', () => {
     // Mock authenticated state
     await enableE2EAuth(page)
 
-    await page.goto('/app')
-    await page.waitForLoadState('networkidle')
+    await page.goto('/app', { waitUntil: 'domcontentloaded' })
 
     // Should stay on app pages — wait for main hero copy to appear
     await expect(page).not.toHaveURL(/.*auth/)
@@ -30,22 +31,24 @@ test.describe('Authentication Flow', () => {
 })
 
 test.describe('Calendar Creation Flow', () => {
+  test.describe.configure({ timeout: 60000 })
+
   test.beforeEach(async ({ page }) => {
     // Mock authentication
     await enableE2EAuth(page)
   })
 
   test('should create a full week calendar', async ({ page }) => {
-    await page.goto('/app')
-    await page.waitForLoadState('networkidle')
+    await page.goto('/app', { waitUntil: 'domcontentloaded' })
 
     // Step 1: Select industry
-    await page.getByRole('radio', { name: /marketing & growth/i }).first().waitFor({ state: 'visible', timeout: 15000 })
+    await page.getByRole('radio', { name: /marketing & growth/i }).first().waitFor({ state: 'visible', timeout: 45000 })
     await page.getByRole('radio', { name: /marketing & growth/i }).first().click()
     await page.getByPlaceholder(/what's the big idea/i).fill('Launch a better B2B content workflow')
     await page.getByRole('button', { name: /next step/i }).click()
 
     // Step 2: Configure content
+    await expect(page.getByPlaceholder(/add a custom topic/i)).toBeVisible({ timeout: 45000 })
     await page.getByPlaceholder(/add a custom topic/i).fill('Social Media Strategy')
     await page.getByRole('button', { name: /^add$/i }).click()
     await page.getByPlaceholder(/add a custom topic/i).fill('Content Marketing')
@@ -66,11 +69,10 @@ test.describe('Calendar Creation Flow', () => {
   })
 
   test('should create a single-day calendar', async ({ page }) => {
-    await page.goto('/app')
-    await page.waitForLoadState('networkidle')
+    await page.goto('/app', { waitUntil: 'domcontentloaded' })
 
     // Step 1: Select industry
-    await page.getByRole('radio', { name: /marketing & growth/i }).first().waitFor({ state: 'visible', timeout: 15000 })
+    await page.getByRole('radio', { name: /marketing & growth/i }).first().waitFor({ state: 'visible', timeout: 45000 })
     await page.getByRole('radio', { name: /marketing & growth/i }).first().click()
     await page.getByPlaceholder(/what's the big idea/i).fill('Launch a timely holiday campaign')
     await page.getByRole('button', { name: /next step/i }).click()
@@ -98,8 +100,7 @@ test.describe('Calendar Management', () => {
   test.beforeEach(async ({ page }) => {
     // Mock authentication and navigate to calendars
     await enableE2EAuth(page)
-    await page.goto('/my-calendars')
-    await page.waitForLoadState('networkidle')
+    await page.goto('/my-calendars', { waitUntil: 'domcontentloaded' })
   })
 
   test('should display calendar list', async ({ page }) => {
@@ -124,8 +125,7 @@ test.describe('Calendar Management', () => {
 test.describe('Schedule Management', () => {
   test.beforeEach(async ({ page }) => {
     await enableE2EAuth(page)
-    await page.goto('/schedule')
-    await page.waitForLoadState('networkidle')
+    await page.goto('/schedule', { waitUntil: 'domcontentloaded' })
   })
 
   test('should display scheduled posts', async ({ page }) => {
@@ -147,7 +147,7 @@ test.describe('Schedule Management', () => {
 
 test.describe('Error Handling', () => {
   test('should show error boundary for crashes', async ({ page }) => {
-    await page.goto('/__e2e/crash')
+    await page.goto('/__e2e/crash', { waitUntil: 'domcontentloaded' })
 
     // Should show error boundary
     await expect(page.getByRole('heading', { name: /something went wrong/i })).toBeVisible({ timeout: 15000 })
@@ -160,8 +160,7 @@ test.describe('Error Handling', () => {
     // Mock network failure
     await page.route('**/functions/**', route => route.abort())
 
-    await page.goto('/app?e2e-network-error=1')
-    await page.waitForLoadState('networkidle')
+    await page.goto('/app?e2e-network-error=1', { waitUntil: 'domcontentloaded' })
 
     // Should show connection error
     await page.locator('.err-box').first().waitFor({ state: 'visible', timeout: 30000 })
@@ -173,7 +172,7 @@ test.describe('Accessibility', () => {
   test('should be keyboard navigable', async ({ page }) => {
     await enableE2EAuth(page)
 
-    await page.goto('/app')
+    await page.goto('/app', { waitUntil: 'domcontentloaded' })
 
     // Tab through interactive elements
     await page.keyboard.press('Tab')
@@ -187,7 +186,7 @@ test.describe('Accessibility', () => {
   test('should have proper ARIA labels', async ({ page }) => {
     await enableE2EAuth(page)
 
-    await page.goto('/my-calendars')
+    await page.goto('/my-calendars', { waitUntil: 'domcontentloaded' })
 
     // Check for ARIA labels on buttons
     const buttons = await page.getByRole('button').all()

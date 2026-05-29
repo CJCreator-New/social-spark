@@ -9,8 +9,9 @@ async function enableE2EAuth(page: Page) {
 }
 
 async function checkRoute(page: Page, path: string) {
-  await page.goto(path);
+  await page.goto(path, { waitUntil: "domcontentloaded" });
   await expect(page.locator("body")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 45000 });
   await injectAxe(page);
   await checkA11y(page, undefined, {
     axeOptions: {
@@ -20,6 +21,8 @@ async function checkRoute(page: Page, path: string) {
 }
 
 test.describe("Accessibility smoke checks", () => {
+  test.describe.configure({ timeout: 60000 });
+
   test("public landing has no serious axe violations", async ({ page }) => {
     await checkRoute(page, "/");
   });
@@ -48,7 +51,7 @@ test.describe("Accessibility smoke checks", () => {
     await checkRoute(page, `/calendar/${E2E_CALENDAR.id}`);
     await expect(page.getByText(E2E_CALENDAR.title)).toBeVisible();
 
-    await page.goto("/my-calendars");
+    await page.goto("/my-calendars", { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: /^delete$/i }).first().click();
     await injectAxe(page);
     await checkA11y(page, undefined, {

@@ -25,6 +25,8 @@ import { getE2EAuthFlag } from "@/lib/e2eFixtures";
 import e2eStore from "@/lib/e2eStore";
 import { generateLocalPosts } from "@/lib/localPostGenerator";
 import FeedbackModal from "@/components/FeedbackModal";
+import { WorkspacePage } from "@/components/layout/WorkspacePage";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Database, Json } from "@/integrations/supabase/types";
 
 interface Post {
@@ -257,6 +259,7 @@ export default function CalendarDetail() {
   const tweakRef = useRef<HTMLDivElement>(null);
   const [lockedDays, setLockedDays] = useState<Set<number>>(new Set());
   const [reformatTarget, setReformatTarget] = useState<string>("");
+  const [pendingReformatTarget, setPendingReformatTarget] = useState<string | null>(null);
   const [reformatting, setReformatting] = useState(false);
   const createCalendar = useCreateCalendarMutation();
   const regenerateMutation = useRegeneratePostMutation(id);
@@ -335,8 +338,6 @@ export default function CalendarDetail() {
     if (!targetPlatform || targetPlatform === platform || reformatting || regenerating) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Sign in required"); return; }
-    const ok = window.confirm(`Reformat all 7 posts for ${niceLabelFor(targetPlatform)}? Saves as a NEW calendar — this one stays untouched.`);
-    if (!ok) return;
     setReformatting(true);
     try {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -992,98 +993,98 @@ export default function CalendarDetail() {
 
   const sampleMode = false;
 
-  if (loading) return <div className="cd-app"><div className="cd-inner">Loading…</div></div>;
+  if (loading) return <WorkspacePage size="wide"><div className="cd-inner">Loading…</div></WorkspacePage>;
 
   return (
     <>
       <style>{css}</style>
-      <div className="cd-app">
-        <div className="cd-inner">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <Link to="/my-calendars" className="cd-back">← Back to my calendars</Link>
-            <button
-              type="button"
-              className={`cd-fav-btn ${isFavorite ? "on" : ""}`}
-              onClick={toggleFavorite}
-              aria-pressed={isFavorite}
-              title={isFavorite ? "Unstar" : "Star"}
-            >
-              {isFavorite ? "★ Starred" : "☆ Star"}
-            </button>
-          </div>
-          <h1 className="cd-title">{title}</h1>
-          <div className="cd-meta">{meta}</div>
+      <WorkspacePage size="wide">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <Link to="/my-calendars" className="cd-back">← Back to my calendars</Link>
+          <button
+            type="button"
+            className={`cd-fav-btn ${isFavorite ? "on" : ""}`}
+            onClick={toggleFavorite}
+            aria-pressed={isFavorite}
+            title={isFavorite ? "Unstar" : "Star"}
+          >
+            {isFavorite ? "★ Starred" : "☆ Star"}
+          </button>
+        </div>
+        <h1 className="cd-title">{title}</h1>
+        <div className="cd-meta">{meta}</div>
 
-          <div className="cd-hero">
-            <div className="cd-hero-main">
-              <div className="cd-hero-kicker">Review workspace</div>
-              <div className="cd-hero-title">Polish the week, then ship it.</div>
-              <p className="cd-hero-copy">Use the active-day card for edits, keep pinned posts protected, and move to schedule only when the calendar reads clean. The workflow is set up to help you review at a glance, not hunt for controls.</p>
-              <div className="cd-hero-chiprow">
-                {typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true" && (() => {
-                  const genCount = e2eStore.getLastGeneratedPosts ? e2eStore.getLastGeneratedPosts() : 0;
-                  const visibleCount = genCount || posts.length;
-                  return <span className="cd-hero-chip">{visibleCount > 1 ? `${visibleCount}-day calendar` : `1-day calendar`}</span>
-                })()}
-                <span className="cd-hero-chip">{posts.length} posts</span>
-                <span className="cd-hero-chip">{lockedDays.size} pinned</span>
-                <span className="cd-hero-chip">{timezone}</span>
-                <span className="cd-hero-chip">{editing ? "Editing mode" : "Review mode"}</span>
-              </div>
-              <div style={{ marginTop: 12 }}>
-                <PostInsights post={p} platform={platform} topic={p.topic} />
-              </div>
+        <div className="cd-hero">
+          <div className="cd-hero-main">
+            <div className="cd-hero-kicker">Review workspace</div>
+            <div className="cd-hero-title">Polish the week, then ship it.</div>
+            <p className="cd-hero-copy">Use the active-day card for edits, keep pinned posts protected, and move to schedule only when the calendar reads clean. The workflow is set up to help you review at a glance, not hunt for controls.</p>
+            <div className="cd-hero-chiprow">
+              {typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true" && (() => {
+                const genCount = e2eStore.getLastGeneratedPosts ? e2eStore.getLastGeneratedPosts() : 0;
+                const visibleCount = genCount || posts.length;
+                return <span className="cd-hero-chip">{visibleCount > 1 ? `${visibleCount}-day calendar` : `1-day calendar`}</span>
+              })()}
+              <span className="cd-hero-chip">{posts.length} posts</span>
+              <span className="cd-hero-chip">{lockedDays.size} pinned</span>
+              <span className="cd-hero-chip">{timezone}</span>
+              <span className="cd-hero-chip">{editing ? "Editing mode" : "Review mode"}</span>
             </div>
-            <div className="cd-hero-side">
-              <div className="cd-hero-card">
-                <span>Active day</span>
-                <strong>Day {p?.day ?? 0} · {p?.dow ?? "—"}</strong>
-                <small>{p ? shortDateLabel(dateForDow(weekStartDate, p.dow)) : "No active post"}</small>
-              </div>
-              <div className="cd-hero-card">
-                <span>Workflow</span>
-                <strong>{sampleMode ? "Sample calendar" : "Live calendar"}</strong>
-                <small>{posts.length > 1 ? "Use the strip to jump between days" : "Single post review"}</small>
-              </div>
+            <div style={{ marginTop: 12 }}>
+              <PostInsights post={p} platform={platform} topic={p.topic} />
             </div>
           </div>
-
-          {analytics && (
-            <div className="cd-stats" aria-label="Calendar analytics">
-              <div className="cd-stat">
-                <span className="cd-stat-label">Posts</span>
-                <span className="cd-stat-val">{analytics.total}</span>
-                <span className="cd-stat-sub">this week</span>
-              </div>
-              <div className="cd-stat">
-                <span className="cd-stat-label">Avg length</span>
-                <span className="cd-stat-val">{analytics.avgChars.toLocaleString()}</span>
-                <span className="cd-stat-sub">chars / post</span>
-              </div>
-              <div className="cd-stat">
-                <span className="cd-stat-label">Avg hashtags</span>
-                <span className="cd-stat-val">{analytics.avgHashtags}</span>
-                <span className="cd-stat-sub">per post</span>
-              </div>
-              <div className="cd-stat">
-                <span className="cd-stat-label">Within limit</span>
-                <span className="cd-stat-val">
-                  <em>{analytics.withinPct}%</em>
-                </span>
-                <span className="cd-stat-sub">on {analytics.platformLabel}</span>
-              </div>
-              <div className="cd-stat">
-                <span className="cd-stat-label">Top format</span>
-                <span className="cd-stat-val" style={{ fontSize: 14, lineHeight: 1.4 }}>{analytics.topFormat}</span>
-                <span className="cd-stat-sub">most-used</span>
-              </div>
+          <div className="cd-hero-side">
+            <div className="cd-hero-card">
+              <span>Active day</span>
+              <strong>Day {p?.day ?? 0} · {p?.dow ?? "—"}</strong>
+              <small>{p ? shortDateLabel(dateForDow(weekStartDate, p.dow)) : "No active post"}</small>
             </div>
-          )}
+            <div className="cd-hero-card">
+              <span>Workflow</span>
+              <strong>{sampleMode ? "Sample calendar" : "Live calendar"}</strong>
+              <small>{posts.length > 1 ? "Use the strip to jump between days" : "Single post review"}</small>
+            </div>
+          </div>
+        </div>
 
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
+        {analytics && (
+          <div className="cd-stats" aria-label="Calendar analytics">
+            <div className="cd-stat">
+              <span className="cd-stat-label">Posts</span>
+              <span className="cd-stat-val">{analytics.total}</span>
+              <span className="cd-stat-sub">this week</span>
+            </div>
+            <div className="cd-stat">
+              <span className="cd-stat-label">Avg length</span>
+              <span className="cd-stat-val">{analytics.avgChars.toLocaleString()}</span>
+              <span className="cd-stat-sub">chars / post</span>
+            </div>
+            <div className="cd-stat">
+              <span className="cd-stat-label">Avg hashtags</span>
+              <span className="cd-stat-val">{analytics.avgHashtags}</span>
+              <span className="cd-stat-sub">per post</span>
+            </div>
+            <div className="cd-stat">
+              <span className="cd-stat-label">Within limit</span>
+              <span className="cd-stat-val">
+                <em>{analytics.withinPct}%</em>
+              </span>
+              <span className="cd-stat-sub">on {analytics.platformLabel}</span>
+            </div>
+            <div className="cd-stat">
+              <span className="cd-stat-label">Top format</span>
+              <span className="cd-stat-val" style={{ fontSize: 14, lineHeight: 1.4 }}>{analytics.topFormat}</span>
+              <span className="cd-stat-sub">most-used</span>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
             <span style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#7a7a8e" }}>Week starting</span>
             <input
               type="date"
+              aria-label="Week start date"
               value={weekStart}
               onChange={e => updateWeekStart(e.target.value)}
               style={{ background: "#07080d", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "6px 10px", fontSize: 12, color: "#edeae3", fontFamily: "Sora, sans-serif", outline: "none", colorScheme: "dark" }}
@@ -1091,10 +1092,11 @@ export default function CalendarDetail() {
             <span style={{ fontSize: 11, color: "#7a7a8e" }}>Day 1 = {shortDateLabel(weekStartDate)}</span>
           </div>
 
-          <div className="cd-tz-bar">
+        <div className="cd-tz-bar">
             <span className="cd-reformat-label">Timezone</span>
             <select
               className="cd-tz-sel"
+              aria-label="Calendar timezone"
               value={timezone}
               onChange={e => updateTimezone(e.target.value)}
               style={{ maxWidth: 240 }}
@@ -1113,10 +1115,11 @@ export default function CalendarDetail() {
             />
           </div>
 
-          <div className="cd-reformat-bar">
+        <div className="cd-reformat-bar">
             <span className="cd-reformat-label">Reformat for</span>
             <select
               className="cd-reformat-sel"
+              aria-label="Reformat platform"
               value={reformatTarget}
               onChange={(e) => setReformatTarget(e.target.value)}
               disabled={reformatting || regenerating}
@@ -1130,39 +1133,39 @@ export default function CalendarDetail() {
               type="button"
               className="cd-reformat-btn"
               disabled={!reformatTarget || reformatting || regenerating}
-              onClick={() => reformatAllForPlatform(reformatTarget)}
+              onClick={() => setPendingReformatTarget(reformatTarget)}
               title="Re-runs all 7; saved as a new calendar"
             >
               {reformatting ? "Reformatting all 7…" : "Reformat all 7 →"}
             </button>
           </div>
 
-          {posts.length > 1 && (
-            <div className="cd-strip" role="tablist" aria-label="Days of the week">
-              {posts.map((post, i) => {
-                const st = statusByDay[post.day];
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    role="tab"
-                    aria-selected={i === active}
-                    disabled={editing}
-                    className={`cd-tab ${i === active ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
-                    onClick={() => { if (!editing) setActive(i); }}
-                    title={st ? `Status: ${st}` : "Not scheduled"}
-                  >
-                    {st && <span className={`cd-tab-status ${st}`} aria-hidden="true" style={{ background: st === "published" ? "#c8f09a" : st === "approved" ? "#9ab5f0" : st === "failed" ? "#f09a9a" : "#9a9aae" }} />}
-                    <div className="cd-tab-dow">{post.dow}</div>
-                    <div className="cd-tab-n">{i + 1}</div>
-                    <div className="cd-tab-date">{shortDateLabel(dateForDow(weekStartDate, post.dow)).split(" · ")[1]}</div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+        {posts.length > 1 && (
+          <div className="cd-strip" role="tablist" aria-label="Days of the week">
+            {posts.map((post, i) => {
+              const st = statusByDay[post.day];
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === active}
+                  disabled={editing}
+                  className={`cd-tab ${i === active ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
+                  onClick={() => { if (!editing) setActive(i); }}
+                  title={st ? `Status: ${st}` : "Not scheduled"}
+                >
+                  {st && <span className={`cd-tab-status ${st}`} aria-hidden="true" style={{ background: st === "published" ? "#c8f09a" : st === "approved" ? "#9ab5f0" : st === "failed" ? "#f09a9a" : "#9a9aae" }} />}
+                  <div className="cd-tab-dow">{post.dow}</div>
+                  <div className="cd-tab-n">{i + 1}</div>
+                  <div className="cd-tab-date">{shortDateLabel(dateForDow(weekStartDate, post.dow)).split(" · ")[1]}</div>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-          <div className="cd-export-row" aria-label="Export options">
+        <div className="cd-export-row" aria-label="Export options">
             <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("md")}>
               {exportingFormat === "md" ? "↓ .md…" : "↓ .md"}
             </button>
@@ -1174,7 +1177,7 @@ export default function CalendarDetail() {
             </button>
           </div>
 
-          <div className="cd-bulk-bar">
+        <div className="cd-bulk-bar">
             {posts.length > 1 ? (
               <>
                 <span className="cd-bulk-label">
@@ -1217,8 +1220,8 @@ export default function CalendarDetail() {
             )}
           </div>
 
-          {p && !editing && (
-            <div className="cd-card">
+        {p && !editing && (
+          <div className="cd-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
                 <span className="cd-date-pill">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
                 <button
@@ -1236,6 +1239,7 @@ export default function CalendarDetail() {
                 <input
                   type="time"
                   className="cd-time-input"
+                  aria-label={`Post time for day ${p.day}`}
                   value={postTimes[String(p.day)] || suggestedTimeForDay(p.day)}
                   onChange={e => updatePostTime(p.day, e.target.value)}
                 />
@@ -1433,10 +1437,10 @@ export default function CalendarDetail() {
                 </div>
               </div>
             </div>
-          )}
+        )}
 
-          {p && editing && draft && (
-            <div className="cd-card">
+        {p && editing && draft && (
+          <div className="cd-card">
               <div className="cd-blabel"><span>Day · Day-of-week</span></div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                 <input
@@ -1499,12 +1503,11 @@ export default function CalendarDetail() {
                 <button className="cd-btn" onClick={cancelEdit} disabled={saving}>Cancel</button>
               </div>
             </div>
-          )}
-        </div>
-      </div>
+        )}
+      </WorkspacePage>
       {scheduleOpen && (
         <div className="cd-modal-bg" onClick={() => !scheduling && setScheduleOpen(false)}>
-          <div className="cd-modal" onClick={e => e.stopPropagation()}>
+          <div className="cd-modal" onClick={e => e.stopPropagation()} tabIndex={0} role="dialog" aria-modal="true" aria-label="Schedule this week dialog">
             <h3>Schedule this week</h3>
             <p>
               Queues all 7 posts to your schedule using the times below. Existing scheduled
@@ -1518,6 +1521,7 @@ export default function CalendarDetail() {
                   <input
                     type="time"
                     className="cd-modal-time"
+                    aria-label={`Schedule time for day ${post.day}`}
                     value={postTimes[String(post.day)] || suggestedTimeForDay(post.day)}
                     onChange={e => updatePostTime(post.day, e.target.value)}
                   />
@@ -1550,6 +1554,14 @@ export default function CalendarDetail() {
               setFeedbackSubmitting(false);
             }
           }}
+        />
+      )}
+      {pendingReformatTarget && (
+        <ConfirmDialog
+          title="Reformat all 7 posts?"
+          message={`This will create a new calendar reformatted for ${niceLabelFor(pendingReformatTarget)} and leave the current one untouched.`}
+          onCancel={() => setPendingReformatTarget(null)}
+          onConfirm={async () => { setPendingReformatTarget(null); await reformatAllForPlatform(pendingReformatTarget); }}
         />
       )}
     </>

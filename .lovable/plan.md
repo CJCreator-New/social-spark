@@ -19,6 +19,19 @@ These items are now implemented and validated in the app:
 
 ---
 
+Recent updates (2026-05-28):
+
+- Centralized typography and global tokens in [src/index.css](src/index.css) and installed `@fontsource/fraunces` — Done.
+- Added shared authenticated shell `src/components/layout/WorkspacePage.tsx` and migrated `MyCalendars`, `Schedule`, `Profile`, and `CalendarDetail` to use it — Done.
+- Replaced native `window.confirm` dialogs with in-product confirmation dialogs on `Schedule` and `CalendarDetail` — Done.
+- Wrapped the generator (`src/pages/Index.tsx`) in `WorkspacePage` and simplified the stepper to a compact card grid (outer-frame refactor) — Done.
+- Ran static checks on edited files; no errors reported after changes — Done.
+
+Next immediate work: simplify generator internals (stepper behavior, CTA hierarchy) and reduce modal density (consolidate BatchEditModal/DiffView) — In progress.
+
+
+---
+
 ## Theme 1 — User Productivity (highest ROI)
 
 ### 1.1 Brief Templates ("Save & Load")

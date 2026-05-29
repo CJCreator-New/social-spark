@@ -21,6 +21,8 @@ import { BatchEditModal, type BatchEditPayload } from "@/components/BatchEditMod
 import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
 import PostInsights from "@/components/PostInsights";
 import { DiffView } from "@/components/DiffView";
+import Modal from "@/components/ui/Modal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { ToneConsistencyChecker } from "@/components/ToneConsistencyChecker";
 import { InspirationBank } from "@/components/InspirationBank";
 import GenerateSkeleton from "@/components/GenerateSkeleton";
@@ -29,6 +31,7 @@ import { useCreateCalendarMutation, useRegeneratePostMutation } from "@/hooks/us
 import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dragDrop";
 import { SAMPLE_FORM, SAMPLE_POSTS, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
 import mediaManager from "@/lib/mediaManager";
+import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import type { Database, Json } from "@/integrations/supabase/types";
 
 function hasEmoji(text: string): boolean {
@@ -164,7 +167,7 @@ const css = `
   --text: #edeae3; --text2: #7a7a8e; --text3: #3a3a50;
   --err: #f09a9a; --err-bg: rgba(240,154,154,0.07);
   --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
-  min-height: 100vh; background: var(--bg); color: var(--text);
+  color: var(--text);
   position: relative; overflow-x: hidden;
   font-family: 'Sora', sans-serif; -webkit-font-smoothing: antialiased;
 }
@@ -176,7 +179,7 @@ const css = `
   background:radial-gradient(circle,rgba(200,240,154,0.035) 0%,transparent 65%);
   pointer-events:none;top:-300px;left:50%;transform:translateX(-50%);z-index:0; }
 
-.cf-app .inner { position:relative;z-index:1;max-width:1120px;margin:0 auto;padding:52px 24px 100px; }
+.cf-app .inner { position:relative;z-index:1;width:100%; }
 
 .cf-app .brand { margin-bottom:52px; }
 .cf-app .brand-eyebrow { font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);font-weight:500;margin-bottom:12px;display:flex;align-items:center;gap:8px; }
@@ -204,14 +207,14 @@ const css = `
 .cf-app .hero-link { color:var(--accent);text-decoration:none;font-size:12px;letter-spacing:.04em; }
 .cf-app .hero-link:hover { text-decoration:underline; }
 
-.cf-app .stepper { display:flex;align-items:center;margin-bottom:44px; }
-.cf-app .snode { display:flex;align-items:center;gap:7px; }
-.cf-app .sdot { width:26px;height:26px;border-radius:50%;border:1px solid var(--border2);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3);font-weight:600;transition:all .25s;flex-shrink:0; }
+.cf-app .stepper { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:36px; }
+.cf-app .snode { display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:16px;background:var(--surface);min-width:0; }
+.cf-app .sdot { width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3);font-weight:600;transition:all .25s;flex-shrink:0; }
 .cf-app .sdot.done { background:var(--adim);border-color:rgba(200,240,154,.5);color:var(--accent); }
 .cf-app .sdot.active { background:var(--accent);border-color:var(--accent);color:#07080d; }
-.cf-app .slabel { font-size:11px;color:var(--text3);letter-spacing:.04em;font-weight:400;transition:color .25s;white-space:nowrap; }
+.cf-app .slabel { font-size:12px;color:var(--text3);letter-spacing:.03em;font-weight:400;transition:color .25s;white-space:normal;line-height:1.2; }
 .cf-app .slabel.active { color:var(--text2); } .cf-app .slabel.done { color:rgba(200,240,154,.6); }
-.cf-app .sline { flex:1;height:1px;background:var(--border);margin:0 8px;min-width:8px; }
+.cf-app .sline { display:none; }
 .cf-app .sline.done { background:rgba(200,240,154,.25); }
 
 .cf-app .screen { display:none; }
@@ -532,13 +535,13 @@ const css = `
   .cf-app .ind-grid{grid-template-columns:repeat(3,1fr);}
   .cf-app .plat-grid{grid-template-columns:repeat(2,1fr);}
   .cf-app .g2{grid-template-columns:1fr;}
-  .cf-app .inner{padding:36px 16px 80px;}
   .cf-app .brand-title{font-size:30px;}
   .cf-app .hero-shell{grid-template-columns:1fr;}
   .cf-app .hero-title{font-size:28px;max-width:none;}
   .cf-app .hero-grid{grid-template-columns:1fr;}
   .cf-app .step4-layout{grid-template-columns:1fr;}
   .cf-app .step4-side{position:static;}
+  .cf-app .stepper{grid-template-columns:repeat(2,minmax(0,1fr));}
   /* Hide inactive step labels on mobile but keep the active one for context. */
   .cf-app .stepper .slabel:not(.active){display:none;}
   .cf-app .stepper .slabel.active{font-size:11px;}
@@ -597,7 +600,7 @@ function SelectField({ label, options, value, onChange, placeholder, hint }: Sel
     <div>
       <div className="flabel">{label}{hint && <span className="fhint">{hint}</span>}</div>
       <div className="swrap">
-        <select className="sel" value={value} onChange={e => onChange(e.target.value)}>
+        <select className="sel" aria-label={label || "Select option"} value={value} onChange={e => onChange(e.target.value)}>
           <option value="">{placeholder || "Select…"}</option>
           {options.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
@@ -1009,6 +1012,7 @@ const Index = () => {
   const [subtopicPreview, setSubtopicPreview] = useState<string[]>([]);
   const [batchEditOpen, setBatchEditOpen] = useState(false);
   const [diffViewData, setDiffViewData] = useState<{ before: string; after: string; dayIndex: number; newPost: Post } | null>(null);
+  const [confirm, setConfirm] = useState<{ title?: string; message: string; onConfirm: () => void | Promise<void> } | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showPerformance, setShowPerformance] = useState(false);
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1755,70 +1759,62 @@ const Index = () => {
     const target = posts[idx];
     if (!target) return;
     setRegenIdx(idx);
-    setTweakOpenIdx(null);
-    try {
-      if (tweak === "clean-formatting") {
-        const cleaned: Post = {
-          ...target,
-          title: stripMarkdown(target.title),
-          hook: stripMarkdown(target.hook),
-          body: stripMarkdown(target.body),
-          cta: stripMarkdown(target.cta),
-        };
-        setPostsWithHistory(prev => prev.map((p, i) => (i === idx ? cleaned : p)));
-        setSavedId(null);
-        toast.success(`Day ${target.day} formatting cleaned ✓`);
-        return;
-      }
-      const payload = {
-        industry: form.industry,
-        industryLabel: selectedIndustry?.label || form.industry,
-        platform: form.platform,
-        language: form.language,
-        coreIdea: form.coreIdea,
-        audiences: form.audiences,
-        voice: form.voice,
-        style: form.style,
-        goals: form.goals,
-        format: form.format,
-        cta: form.cta,
-        length: form.length,
-        structure: form.structure,
-        extra: form.extra,
-        bannedWords: form.bannedWords,
-        requiredWords: form.requiredWords,
-        post: target,
-        siblings: posts,
-        tweak,
-      };
-      let data: unknown = {};
+    const doRegenerate = async (targetsParam: { p: Post; i: number }[]) => {
+      setReformatting(true);
       try {
-        data = await regenerateMutation.mutateAsync(payload);
+        const next = [...posts];
+        let okCount = 0;
+        for (const { p: target, i } of targetsParam) {
+          setRegenIdx(i);
+          const payload = {
+            industry: form.industry,
+            industryLabel: selectedIndustry?.label || form.industry,
+            platform: form.platform,
+            language: form.language,
+            coreIdea: form.coreIdea,
+            audiences: form.audiences,
+            voice: form.voice,
+            style: form.style,
+            goals: form.goals,
+            format: form.format,
+            cta: form.cta,
+            length: form.length,
+            structure: form.structure,
+            extra: form.extra,
+            bannedWords: form.bannedWords,
+            requiredWords: form.requiredWords,
+            post: target,
+            siblings: next,
+          };
+          try {
+            const newPost = await regenerateMutation.mutateAsync(payload);
+            if (newPost) {
+              next[i] = newPost as Post;
+              setPostsWithHistory([...next]);
+              okCount++;
+            }
+          } catch (e) {
+            // ignore per-item failures
+          }
+        }
+        setSavedId(null);
+        toast.success(`Regenerated ${okCount} of ${targetsParam.length} unlocked post${targetsParam.length === 1 ? "" : "s"}`);
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : String(e));
-        return;
+        toast.error(e instanceof Error ? e.message : "Regenerate failed");
+      } finally {
+        setRegenIdx(null);
+        setReformatting(false);
       }
+    };
 
-      const postObj = unwrapPost(data);
-      if (!postObj) {
-        toast.error("Regenerate failed: no post returned");
-        return;
-      }
+    const targets = [{ p: target, i: idx }];
 
-      const beforeText = `${target.title}\n\n${target.hook}\n\n${target.body}\n\n${target.cta}`;
-      const afterText = `${postObj.title}\n\n${postObj.hook}\n\n${postObj.body}\n\n${postObj.cta}`;
-
-      setDiffViewData({
-        before: beforeText,
-        after: afterText,
-        dayIndex: idx,
-        newPost: postObj,
-      });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Regenerate failed");
-    } finally {
-      setRegenIdx(null);
+    if (targets.length === posts.length) {
+      setConfirm({ title: "Regenerate all posts?", message: `Regenerate all ${posts.length} posts? Tip: pin posts you love first.`, onConfirm: async () => { setConfirm(null); await doRegenerate(targets); } });
+      return;
     }
+
+    await doRegenerate(targets);
   }
 
   function toggleLock(day: number) {
@@ -1838,55 +1834,61 @@ const Index = () => {
       toast.error("All posts are locked. Unpin at least one to regenerate.");
       return;
     }
-    if (targets.length === posts.length) {
-      const ok = window.confirm(`Regenerate all ${posts.length} posts? Tip: pin posts you love first.`);
-      if (!ok) return;
-    }
-    setReformatting(true);
-    try {
-      const next = [...posts];
-      let okCount = 0;
-      for (const { p: target, i } of targets) {
-        setRegenIdx(i);
-        const payload = {
-          industry: form.industry,
-          industryLabel: selectedIndustry?.label || form.industry,
-          platform: form.platform,
-          language: form.language,
-          coreIdea: form.coreIdea,
-          audiences: form.audiences,
-          voice: form.voice,
-          style: form.style,
-          goals: form.goals,
-          format: form.format,
-          cta: form.cta,
-          length: form.length,
-          structure: form.structure,
-          extra: form.extra,
-          bannedWords: form.bannedWords,
-          requiredWords: form.requiredWords,
-          post: target,
-          siblings: next,
-        };
-        try {
-          const newPost = await regenerateMutation.mutateAsync(payload);
-          if (newPost) {
-            next[i] = newPost as Post;
-            setPostsWithHistory([...next]);
-            okCount++;
+
+    const doRegenerate = async (targetsParam: { p: Post; i: number }[]) => {
+      setReformatting(true);
+      try {
+        const next = [...posts];
+        let okCount = 0;
+        for (const { p: target, i } of targetsParam) {
+          setRegenIdx(i);
+          const payload = {
+            industry: form.industry,
+            industryLabel: selectedIndustry?.label || form.industry,
+            platform: form.platform,
+            language: form.language,
+            coreIdea: form.coreIdea,
+            audiences: form.audiences,
+            voice: form.voice,
+            style: form.style,
+            goals: form.goals,
+            format: form.format,
+            cta: form.cta,
+            length: form.length,
+            structure: form.structure,
+            extra: form.extra,
+            bannedWords: form.bannedWords,
+            requiredWords: form.requiredWords,
+            post: target,
+            siblings: next,
+          };
+          try {
+            const newPost = await regenerateMutation.mutateAsync(payload);
+            if (newPost) {
+              next[i] = newPost as Post;
+              setPostsWithHistory([...next]);
+              okCount++;
+            }
+          } catch (e) {
+            // ignore per-item failures
           }
-        } catch (e) {
-          // ignore per-item failures
         }
+        setSavedId(null);
+        toast.success(`Regenerated ${okCount} of ${targetsParam.length} unlocked post${targetsParam.length === 1 ? "" : "s"}`);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Regenerate failed");
+      } finally {
+        setRegenIdx(null);
+        setReformatting(false);
       }
-      setSavedId(null);
-      toast.success(`Regenerated ${okCount} of ${targets.length} unlocked post${targets.length === 1 ? "" : "s"}`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Regenerate failed");
-    } finally {
-      setRegenIdx(null);
-      setReformatting(false);
+    };
+
+    if (targets.length === posts.length) {
+      setConfirm({ title: "Regenerate all posts?", message: `Regenerate all ${posts.length} posts? Tip: pin posts you love first.`, onConfirm: async () => { setConfirm(null); await doRegenerate(targets); } });
+      return;
     }
+
+    await doRegenerate(targets);
   }
 
   async function reformatAllForPlatform(targetPlatform: string) {
@@ -1895,12 +1897,10 @@ const Index = () => {
       toast.error("Sign in to reformat — the result is saved as a new calendar.");
       return;
     }
-    const ok = window.confirm(
-      `Reformat this 7-day calendar for ${niceLabelFor(targetPlatform)}? It will be saved as a NEW calendar — your current one stays untouched.`
-    );
-    if (!ok) return;
-    setReformatting(true);
-    try {
+    setConfirm({ title: "Reformat calendar?", message: `Reformat this 7-day calendar for ${niceLabelFor(targetPlatform)}? It will be saved as a NEW calendar — your current one stays untouched.`, onConfirm: async () => {
+      setConfirm(null);
+      setReformatting(true);
+      try {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const { data: { session } } = await supabase.auth.getSession();
@@ -1956,13 +1956,14 @@ const Index = () => {
       await upsertMediaReferences({ userId: user.id, referenceKey: String(ins.id), bucket: "calendars", posts: next });
       toast.success(`Reformatted for ${niceLabelFor(targetPlatform)} ✓ — opening new calendar`);
       navigate(`/calendar/${ins.id}`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Reformat failed");
-    } finally {
-      setRegenIdx(null);
-      setReformatting(false);
-      setReformatTarget("");
-    }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Reformat failed");
+      } finally {
+        setRegenIdx(null);
+        setReformatting(false);
+        setReformatTarget("");
+      }
+    } });
   }
 
   function loadSample() {
@@ -2188,7 +2189,7 @@ ${postText(p)}
   }, [e2eNetworkError]);
 
   return (
-    <>
+    <WorkspacePage size="xwide" className="cf-app">
       <style>{css}</style>
       <DraftRecoveryDialog
         open={showRecoveryDialog && !!recoveryDraft}
@@ -2201,6 +2202,14 @@ ${postText(p)}
         onRestore={restoreDraft}
         onDiscard={discardDraft}
       />
+      {confirm && (
+        <ConfirmDialog
+          title={confirm.title}
+          message={confirm.message}
+          onConfirm={() => confirm.onConfirm()}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
       <div className="cf-app">
         <div className="bg-grid" />
         <div className="bg-glow" />
@@ -2295,12 +2304,11 @@ ${postText(p)}
           {/* STEPPER */}
           <div className="stepper">
             {STEP_LABELS.map((s, i) => (
-              <div key={s} className="snode" style={{ flexShrink: 0 }}>
+              <div key={s} className={`snode ${i + 1 === step ? "on" : ""}`} role="button" tabIndex={0} onClick={() => setStep(i + 1)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setStep(i + 1); }}>
                 <div className={`sdot ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>
                   {i + 1 < step ? <Check /> : i + 1}
                 </div>
                 <div className={`slabel ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>{s}</div>
-                {i < STEP_LABELS.length - 1 && <div className={`sline ${i + 1 < step ? "done" : ""}`} style={{ flex: 1, minWidth: 8 }} />}
               </div>
             ))}
           </div>
@@ -2678,26 +2686,24 @@ ${postText(p)}
           </div>
 
           {showSubtopicConfirm && (
-            <div className="screen active" style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(7, 10, 18, 0.78)", display: "grid", placeItems: "center", padding: 20 }}>
-              <div className="card" style={{ width: "min(760px, 100%)", maxHeight: "86vh", overflow: "auto", margin: 0 }}>
-                <div className="sh">Your topic will be expanded into 7 posts</div>
-                <div className="time-hint" style={{ marginTop: 8 }}>
-                  You selected fewer than 7 topics, so the remaining days will be filled with related angles.
-                </div>
-                <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-                  {subtopicPreview.map((topic, index) => (
-                    <div key={index} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.08)", background: "rgba(255,255,255,.03)", color: "var(--text)" }}>
-                      <strong style={{ color: "var(--accent)", marginRight: 8 }}>Day {index + 1}</strong>
-                      {topic}
-                    </div>
-                  ))}
-                </div>
-                <div className="brow" style={{ marginTop: 20 }}>
-                  <button className="btn btn-g" onClick={() => setShowSubtopicConfirm(false)}>Edit topics</button>
-                  <button className="btn btn-p" onClick={() => { setShowSubtopicConfirm(false); void generate(false, true); }}>Looks good, generate →</button>
-                </div>
+            <Modal onClose={() => setShowSubtopicConfirm(false)} className="modal-content">
+              <div className="sh">Your topic will be expanded into 7 posts</div>
+              <div className="time-hint" style={{ marginTop: 8 }}>
+                You selected fewer than 7 topics, so the remaining days will be filled with related angles.
               </div>
-            </div>
+              <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+                {subtopicPreview.map((topic, index) => (
+                  <div key={index} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.08)", background: "rgba(255,255,255,.03)", color: "var(--text)" }}>
+                    <strong style={{ color: "var(--accent)", marginRight: 8 }}>Day {index + 1}</strong>
+                    {topic}
+                  </div>
+                ))}
+              </div>
+              <div className="brow" style={{ marginTop: 20 }}>
+                <button className="btn btn-g" onClick={() => setShowSubtopicConfirm(false)}>Edit topics</button>
+                <button className="btn btn-p" onClick={() => { setShowSubtopicConfirm(false); void generate(false, true); }}>Looks good, generate →</button>
+              </div>
+            </Modal>
           )}
 
           {/* ── STEP 3 ── */}
@@ -3196,8 +3202,21 @@ ${postText(p)}
             </div>
           </div>
         )}
+
+        {(step === 1 || step === 2) && (
+          <button
+            className="btn btn-p"
+            style={{ position: "fixed", right: 24, bottom: 28, zIndex: 950, padding: "12px 18px", borderRadius: 12 }}
+            onClick={() => generate(false)}
+            disabled={isGenerating}
+            aria-hidden="true"
+            tabIndex={-1}
+          >
+            {isGenerating ? `⏳ ${genMsg || "Generating..."}` : (form.mode === "day" ? "Generate this post →" : "Generate my week →")}
+          </button>
+        )}
       </div>
-    </>
+    </WorkspacePage>
   );
 };
 

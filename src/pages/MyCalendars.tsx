@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
 import { SkeletonList } from "@/components/SkeletonList";
 import { VirtualizedList } from "@/components/VirtualizedList";
+import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import {
   useDeleteCalendarMutation,
   useDuplicateCalendarMutation,
@@ -14,16 +15,7 @@ import {
   useSavedCalendarsInfiniteQuery,
   useToggleCalendarFavoriteMutation,
 } from "@/hooks/useAppQueries";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Json } from "@/integrations/supabase/types";
 
 interface SavedCalendar {
@@ -328,7 +320,7 @@ export default function MyCalendars() {
             />
           ) : (
             <Link to={`/calendar/${it.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-              <h3 className="mc-item-title">{it.title}</h3>
+              <h2 className="mc-item-title">{it.title}</h2>
             </Link>
           )}
           <div className="mc-meta" style={{ marginTop: 4 }}>
@@ -371,146 +363,134 @@ export default function MyCalendars() {
         </div>
       )}
       <style>{css}</style>
-      <div className="mc-app">
-        <div className="mc-inner">
-          <div className="mc-head">
-            <div>
-              <h1 className="mc-title">My <em>calendars</em></h1>
-              <div className="mc-meta" style={{ marginTop: 6 }}>
-                {user?.email}
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <Link to="/schedule" className="mc-back">
-                📅 Schedule
-              </Link>
-              <Link to="/app" className="mc-back">
-                ← New calendar
-              </Link>
-              <button className="mc-act" onClick={async () => { await signOut(); navigate("/auth"); }}>
-                Sign out
-              </button>
+      <WorkspacePage size="medium">
+        <div className="mc-head">
+          <div>
+            <h1 className="mc-title">My <em>calendars</em></h1>
+            <div className="mc-meta" style={{ marginTop: 6 }}>
+              {user?.email}
             </div>
           </div>
-
-          <div className="mc-summary" aria-label="Calendar summary">
-            <div className="mc-summary-card">
-              <div className="mc-summary-label">Visible calendars</div>
-              <div className="mc-summary-value">{visibleCount || items.length}</div>
-              <div className="mc-summary-sub">{favOnly ? "Starred items only" : "All saved calendars"}</div>
-            </div>
-            <div className="mc-summary-card">
-              <div className="mc-summary-label">Starred</div>
-              <div className="mc-summary-value">{favoriteCount}</div>
-              <div className="mc-summary-sub">Quick access to the calendars you reuse most.</div>
-            </div>
-            <div className="mc-summary-card">
-              <div className="mc-summary-label">Posts stored</div>
-              <div className="mc-summary-value">{totalPosts}</div>
-              <div className="mc-summary-sub">Across all saved calendars in this account.</div>
-            </div>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <Link to="/schedule" className="mc-back">
+              📅 Schedule
+            </Link>
+            <Link to="/app" className="mc-back">
+              ← New calendar
+            </Link>
+            <button className="mc-act" onClick={async () => { await signOut(); navigate("/auth"); }}>
+              Sign out
+            </button>
           </div>
-
-          {!isLoading && items.length > 0 && (
-            <div className="mc-filter-row">
-              <input
-                type="search"
-                className="mc-search"
-                placeholder="Search by title, industry, or platform…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <button
-                type="button"
-                className={`mc-chip ${favOnly ? "on" : ""}`}
-                onClick={() => setFavOnly((f) => !f)}
-                aria-pressed={favOnly}
-              >
-                {favOnly ? "★ Starred only" : "☆ Starred only"}
-              </button>
-              <select
-                className="mc-sort"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortKey)}
-                aria-label="Sort calendars"
-              >
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="title">Title A–Z</option>
-                <option value="favorites">Favorites first</option>
-              </select>
-            </div>
-          )}
-
-          {isLoading ? (
-            <SkeletonList rows={4} />
-          ) : items.length === 0 ? (
-            <div className="mc-empty" style={{ padding: "72px 24px" }}>
-              <div className="mc-empty-illus" aria-hidden="true">
-                ✦
-              </div>
-              <h2 className="mc-empty-title">
-                No <em>calendars</em> yet
-              </h2>
-              <p className="mc-empty-sub">
-                Generate a full week of platform-native posts tailored to your niche, voice, and audience — saved here for quick access.
-              </p>
-              <Link to="/app" className="mc-empty-cta">
-                Generate your first calendar →
-              </Link>
-            </div>
-          ) : filteredItems.length === 0 ? (
-            <div className="mc-empty">
-              <div className="mc-empty-illus" aria-hidden="true">⌕</div>
-              <div className="mc-empty-title">No <em>matches</em></div>
-              <p className="mc-empty-sub">Try a different search term or switch off the starred-only filter to see more calendars.</p>
-            </div>
-          ) : (
-            <>
-            <div className="mc-list">
-              <VirtualizedList
-                items={filteredItems}
-                renderItem={renderCalendarItem}
-                height={600}
-                estimatedItemHeight={90}
-              />
-            </div>
-            {hasNextPage && (
-              <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
-                <button
-                  className="mc-act"
-                  onClick={() => fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                >
-                  {isFetchingNextPage ? "Loading more…" : "Load more"}
-                </button>
-              </div>
-            )}
-            </>
-          )}
         </div>
-      </div>
 
-      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open && !deleting) setPendingDelete(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this calendar?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingDelete ? `“${pendingDelete.title}” will be permanently removed. This cannot be undone.` : ""}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="mc-dialog-danger"
-              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
-              disabled={deleting}
+        <div className="mc-summary" aria-label="Calendar summary">
+          <div className="mc-summary-card">
+            <div className="mc-summary-label">Visible calendars</div>
+            <div className="mc-summary-value">{visibleCount || items.length}</div>
+            <div className="mc-summary-sub">{favOnly ? "Starred items only" : "All saved calendars"}</div>
+          </div>
+          <div className="mc-summary-card">
+            <div className="mc-summary-label">Starred</div>
+            <div className="mc-summary-value">{favoriteCount}</div>
+            <div className="mc-summary-sub">Quick access to the calendars you reuse most.</div>
+          </div>
+          <div className="mc-summary-card">
+            <div className="mc-summary-label">Posts stored</div>
+            <div className="mc-summary-value">{totalPosts}</div>
+            <div className="mc-summary-sub">Across all saved calendars in this account.</div>
+          </div>
+        </div>
+
+        {!isLoading && items.length > 0 && (
+          <div className="mc-filter-row">
+            <input
+              type="search"
+              className="mc-search"
+              placeholder="Search by title, industry, or platform…"
+              aria-label="Search calendars"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <button
+              type="button"
+              className={`mc-chip ${favOnly ? "on" : ""}`}
+              onClick={() => setFavOnly((f) => !f)}
+              aria-pressed={favOnly}
             >
-              {deleting ? "Deleting…" : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              {favOnly ? "★ Starred only" : "☆ Starred only"}
+            </button>
+            <select
+              className="mc-sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              aria-label="Sort calendars"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="title">Title A–Z</option>
+              <option value="favorites">Favorites first</option>
+            </select>
+          </div>
+        )}
+
+        {isLoading ? (
+          <SkeletonList rows={4} />
+        ) : items.length === 0 ? (
+          <div className="mc-empty" style={{ padding: "72px 24px" }}>
+            <div className="mc-empty-illus" aria-hidden="true">
+              ✦
+            </div>
+            <h2 className="mc-empty-title">
+              No <em>calendars</em> yet
+            </h2>
+            <p className="mc-empty-sub">
+              Generate a full week of platform-native posts tailored to your niche, voice, and audience — saved here for quick access.
+            </p>
+            <Link to="/app" className="mc-empty-cta">
+              Generate your first calendar →
+            </Link>
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="mc-empty">
+            <div className="mc-empty-illus" aria-hidden="true">⌕</div>
+            <div className="mc-empty-title">No <em>matches</em></div>
+            <p className="mc-empty-sub">Try a different search term or switch off the starred-only filter to see more calendars.</p>
+          </div>
+        ) : (
+          <>
+          <div className="mc-list">
+            <VirtualizedList
+              items={filteredItems}
+              renderItem={renderCalendarItem}
+              height={600}
+              estimatedItemHeight={90}
+              ariaLabel="Saved calendars list"
+            />
+          </div>
+          {hasNextPage && (
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+              <button
+                className="mc-act"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? "Loading more…" : "Load more"}
+              </button>
+            </div>
+          )}
+          </>
+        )}
+      </WorkspacePage>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Delete this calendar?"
+          message={`“${pendingDelete.title}” will be permanently removed. This cannot be undone.`}
+          onCancel={() => { if (!deleting) setPendingDelete(null); }}
+          onConfirm={async () => { await confirmDelete(); }}
+        />
+      )}
     </>
   );
 }
