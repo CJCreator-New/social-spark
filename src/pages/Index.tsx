@@ -33,6 +33,7 @@ import { SAMPLE_FORM, SAMPLE_POSTS, SAMPLE_POST_TIMES } from "@/lib/sampleCalend
 import mediaManager from "@/lib/mediaManager";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import type { Database, Json } from "@/integrations/supabase/types";
+import { FontStyle, applyStyle } from "@/lib/unicodeFonts";
 
 function hasEmoji(text: string): boolean {
   return /\p{Emoji}/u.test(text);
@@ -138,6 +139,15 @@ const VOICE_OPTIONS = ["Technical & analytical", "Conversational & warm", "PM / 
 const STYLE_OPTIONS = ["Short punchy lines", "Long-form narrative", "Lists & frameworks", "Thread-style breakdown", "Stats-led", "Case study format", "Question-led", "First-person story", "Industry insight", "Myth-busting", "How-to guide", "Behind-the-scenes"];
 const FORMAT_OPTIONS = ["Balanced mix", "Storytelling-led", "Data & insights", "How-it-works", "Opinion / POV", "List posts", "Interviews & Q&A", "Case studies"];
 const CTA_OPTIONS = ["Share & repost bait", "Spark comments & debate", "Drive to profile / newsletter", "Collect leads", "Build community", "No hard CTA"];
+const COPY_STYLE_OPTIONS = ["None", "Bold serif", "Italic", "Bold italic", "Monospace", "Sans-serif bold"];
+const COPY_STYLE_MAP: Record<string, FontStyle> = {
+  None: FontStyle.None,
+  "Bold serif": FontStyle.BoldSerif,
+  Italic: FontStyle.Italic,
+  "Bold italic": FontStyle.BoldItalic,
+  Monospace: FontStyle.Monospace,
+  "Sans-serif bold": FontStyle.SansSerifBold,
+};
 const GOAL_OPTIONS = ["Awareness", "Engagement", "Drive traffic", "Lead generation", "Thought leadership", "Community building", "Sales & conversion"];
 
 const LENGTH_OPTIONS = [
@@ -726,6 +736,7 @@ type WizardForm = {
   topics: string[];
   format: string;
   cta: string;
+  copyStyle: string;
   length: string;
   structure: string;
   extra: string;
@@ -758,6 +769,7 @@ const INITIAL_FORM: WizardForm = {
   topics: [],
   format: "Balanced mix",
   cta: "Share & repost bait",
+  copyStyle: "None",
   length: "medium",
   structure: "mixed",
   extra: "",
@@ -1071,8 +1083,8 @@ const Index = () => {
 
   const weekSummary = useMemo(() => {
     const totalPosts = posts.length;
-    const totalChars = posts.reduce((sum, post) => sum + formatForPlatform(post, form.platform).charCount, 0);
-    const totalWithinLimit = posts.filter(post => formatForPlatform(post, form.platform).charCount <= formatForPlatform(post, form.platform).limit).length;
+    const totalChars = posts.reduce((sum, post) => sum + formatForPlatform(post, form.platform, { style: getClipboardStyle() }).charCount, 0);
+    const totalWithinLimit = posts.filter(post => formatForPlatform(post, form.platform, { style: getClipboardStyle() }).charCount <= formatForPlatform(post, form.platform, { style: getClipboardStyle() }).limit).length;
     const formatCounts = posts.reduce<Record<string, number>>((counts, post) => {
       const label = baseFormatLabel(post.format);
       counts[label] = (counts[label] || 0) + 1;
@@ -1093,7 +1105,7 @@ const Index = () => {
       hashtagCounts,
       postingTimes,
     };
-  }, [posts, form.platform, postTimes]);
+  }, [posts, form.platform, postTimes, form.copyStyle]);
 
   const buildSubtopicPreview = () => {
     const selectedTopics = form.topics.filter(Boolean);
@@ -2046,7 +2058,13 @@ const Index = () => {
   }
 
   function postText(p: Post) {
-    return `${p.title}\n\n${p.hook}\n\n${p.body}\n\n${p.cta}\n\n${p.hashtags}`;
+    const text = `${p.title}\n\n${p.hook}\n\n${p.body}\n\n${p.cta}\n\n${p.hashtags}`;
+    const style = getClipboardStyle();
+    return style === FontStyle.None ? text : applyStyle(text, style);
+  }
+
+  function getClipboardStyle(): FontStyle {
+    return COPY_STYLE_MAP[form.copyStyle] || FontStyle.None;
   }
 
   function getPostContentForDiff(p: Post): string {
@@ -2063,7 +2081,7 @@ const Index = () => {
   async function copyPost(i: number) {
     const p = posts[i];
     if (!p) return;
-    const formatted = formatForPlatform(p, form.platform);
+    const formatted = formatForPlatform(p, form.platform, { style: getClipboardStyle() });
     const ok = await writeToClipboard(formatted.text);
     if (!ok) { toast.error("Could not copy to clipboard"); return; }
     setCopiedIdx(i);
@@ -2076,7 +2094,7 @@ const Index = () => {
   }
   async function copyAll() {
     const all = posts.map(p => {
-      const f = formatForPlatform(p, form.platform);
+      const f = formatForPlatform(p, form.platform, { style: getClipboardStyle() });
       return `=== Day ${p.day} — ${p.dow} | ${p.topic} ===\n${f.text}`;
     }).join("\n\n\n");
     const ok = await writeToClipboard(all);
@@ -2414,6 +2432,7 @@ ${postText(p)}
               <div className="g2">
                 <SelectField label="Voice / tone" options={VOICE_OPTIONS} value={form.voice} onChange={v => upd("voice", v)} placeholder="Select a voice…" />
                 <SelectField label="Writing style" options={STYLE_OPTIONS} value={form.style} onChange={v => upd("style", v)} placeholder="Select a style…" />
+                <SelectField label="Copy style" options={COPY_STYLE_OPTIONS} value={form.copyStyle} onChange={v => upd("copyStyle", v)} placeholder="Keep plain text" hint="Applied when copying or scheduling" />
               </div>
 
               {(() => {
@@ -2531,6 +2550,7 @@ ${postText(p)}
                 <div className="csect">
                   <InspirationBank
                     industry={form.industry}
+                    platform={form.platform}
                     onTopicClick={(topic) => {
                       const updated = form.mode === "day" ? [topic] : [...form.topics, topic];
                       if (updated.length <= (form.mode === "day" ? 1 : 7)) {
@@ -2887,7 +2907,7 @@ ${postText(p)}
                         </div>
                         {(() => {
                           const niceLabel = niceLabelFor(form.platform);
-                          const f = formatForPlatform(posts[activeDay], form.platform);
+                          const f = formatForPlatform(posts[activeDay], form.platform, { style: getClipboardStyle() });
                           const ratio = f.charCount / f.limit;
                           const budgetCls = f.charCount > f.limit ? "over" : ratio >= 0.9 ? "warn" : "";
                           return (
@@ -3021,7 +3041,7 @@ ${postText(p)}
                             industryLabel: selectedIndustry?.label,
                             platform: form.platform,
                             coreIdea: form.coreIdea,
-                          }, posts);
+                          }, posts, { style: getClipboardStyle() });
                           toast.success("Downloaded .md ✓");
                         } catch (e) {
                           toast.error(e instanceof Error ? e.message : "Download .md failed");

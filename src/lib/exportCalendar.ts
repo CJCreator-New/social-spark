@@ -1,3 +1,5 @@
+import { FontStyle, applyStyle } from "./unicodeFonts";
+
 export interface ExportPost {
   day: number;
   dow: string;
@@ -18,6 +20,10 @@ export interface ExportMeta {
   coreIdea?: string;
 }
 
+export interface ExportOptions {
+  style?: FontStyle;
+}
+
 function fileSlug(s: string) {
   return (s || "calendar").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "calendar";
 }
@@ -33,47 +39,53 @@ function triggerDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export function downloadMd(meta: ExportMeta, posts: ExportPost[]) {
+function styleText(text: string, style?: FontStyle): string {
+  if (!style || style === FontStyle.None) return text;
+  return applyStyle(text, style);
+}
+
+export function downloadMd(meta: ExportMeta, posts: ExportPost[], options?: ExportOptions) {
+  const style = options?.style;
   const lines: string[] = [];
-  lines.push(`# ${meta.title}`);
+  lines.push(`# ${styleText(meta.title, style)}`);
   lines.push("");
   const sub: string[] = [];
-  if (meta.industryLabel) sub.push(meta.industryLabel);
-  if (meta.platform) sub.push(meta.platform);
+  if (meta.industryLabel) sub.push(styleText(meta.industryLabel, style));
+  if (meta.platform) sub.push(styleText(meta.platform, style));
   sub.push(new Date().toLocaleDateString());
   lines.push(`_${sub.join(" · ")}_`);
   if (meta.coreIdea) {
     lines.push("");
-    lines.push(`> ${meta.coreIdea}`);
+    lines.push(`> ${styleText(meta.coreIdea, style)}`);
   }
   lines.push("");
   for (const p of posts) {
     lines.push("---");
     lines.push("");
-    lines.push(`## Day ${p.day} — ${p.dow}: ${p.title}`);
+    lines.push(`## Day ${p.day} — ${p.dow}: ${styleText(p.title, style)}`);
     lines.push("");
-    lines.push(`**Topic:** ${p.topic}  •  **Format:** ${p.format}`);
+    lines.push(`**Topic:** ${styleText(p.topic, style)}  •  **Format:** ${styleText(p.format, style)}`);
     lines.push("");
     lines.push("### Hook");
     lines.push("");
-    lines.push(`> ${p.hook.replace(/\n/g, "\n> ")}`);
+    lines.push(`> ${styleText(p.hook, style).replace(/\n/g, "\n> ")}`);
     lines.push("");
     lines.push("### Post body");
     lines.push("");
-    lines.push(p.body);
+    lines.push(styleText(p.body, style));
     lines.push("");
     lines.push("### CTA");
     lines.push("");
-    lines.push(p.cta);
+    lines.push(styleText(p.cta, style));
     lines.push("");
     lines.push("### Hashtags");
     lines.push("");
-    lines.push(p.hashtags);
+    lines.push(styleText(p.hashtags, style));
     lines.push("");
     if (p.rationale) {
       lines.push("### Why this works");
       lines.push("");
-      lines.push(`_${p.rationale}_`);
+      lines.push(`_${styleText(p.rationale, style)}_`);
       lines.push("");
     }
   }

@@ -3,15 +3,16 @@ import { getTrendingTopicsForIndustry, getTrendingTopicsLastUpdated } from "@/li
 
 interface InspirationBankProps {
   industry: string;
+  platform?: string;
   onTopicClick: (topic: string) => void;
 }
 
-export const InspirationBank: React.FC<InspirationBankProps> = ({ industry, onTopicClick }) => {
-  const topics = useMemo(() => getTrendingTopicsForIndustry(industry), [industry]);
+export const InspirationBank: React.FC<InspirationBankProps> = ({ industry, platform, onTopicClick }) => {
+  const topics = useMemo(() => getTrendingTopicsForIndustry(industry, platform), [industry, platform]);
   const lastUpdated = getTrendingTopicsLastUpdated();
 
   // Show top 6 trending topics
-  const displayTopics = topics
+  const displayTopics = [...topics]
     .sort((a, b) => (b.trending ? 1 : 0) - (a.trending ? 1 : 0))
     .slice(0, 6);
 
@@ -19,7 +20,7 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({ industry, onTo
     <div className="inspiration-bank">
       <div className="insp-header">
         <div>
-          <div className="insp-title">💡 Trending this week</div>
+          <div className="insp-title">💡 Trending this week{platform ? ` on ${platform}` : ""}</div>
           <div className="insp-subtitle">Hot topics real professionals are discussing</div>
         </div>
         <div className="insp-updated">{lastUpdated}</div>

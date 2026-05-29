@@ -10,6 +10,78 @@ export interface TrendingTopic {
   posts: number; // Approximate posts using this topic this week
 }
 
+const PLATFORM_ALIASES: Record<string, string> = {
+  linkedin: "LinkedIn",
+  "twitter/x": "Twitter/X",
+  twitter: "Twitter/X",
+  x: "Twitter/X",
+  instagram: "Instagram",
+  facebook: "Facebook",
+  newsletter: "Newsletter",
+  blog: "Blog",
+  tiktok: "TikTok",
+  threads: "Threads",
+  bluesky: "Bluesky",
+};
+
+const PLATFORM_FIT_KEYWORDS: Record<string, string[]> = {
+  LinkedIn: ["strategy", "leadership", "business", "metrics", "funding", "policy", "compliance", "devops", "data", "analytics", "career", "education"],
+  "Twitter/X": ["ai", "trend", "news", "update", "launch", "crypto", "security", "metrics", "regulation", "product", "startup", "opinion"],
+  Instagram: ["creator", "visual", "story", "wellness", "fashion", "content", "community", "behind-the-scenes", "lifestyle", "brand"],
+  Facebook: ["community", "wellbeing", "family", "education", "retention", "story", "tips", "local", "support", "work culture"],
+  Newsletter: ["guide", "framework", "analysis", "deep dive", "research", "case", "strategy", "insight", "metrics", "lesson"],
+  Blog: ["seo", "guide", "how-to", "framework", "analysis", "research", "tutorial", "case", "opinion", "strategy"],
+  TikTok: ["creator", "visual", "story", "how-to", "tutorial", "content", "brand", "lifestyle", "product", "community"],
+  Threads: ["opinion", "insight", "discussion", "trend", "tech", "startup", "community", "hot take", "strategy"],
+  Bluesky: ["tech", "startup", "analysis", "open source", "policy", "dev", "community", "research", "trend"],
+};
+
+const PLATFORM_DEFAULT_WEIGHTS: Record<string, number> = {
+  LinkedIn: 1.1,
+  "Twitter/X": 1.05,
+  Instagram: 1.0,
+  Facebook: 0.95,
+  Newsletter: 1.15,
+  Blog: 1.1,
+  TikTok: 1.0,
+  Threads: 1.0,
+  Bluesky: 0.95,
+};
+
+function normalizeKey(value: string): string {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizePlatform(platform?: string): string | undefined {
+  if (!platform) return undefined;
+  const key = normalizeKey(platform);
+  return PLATFORM_ALIASES[key] || platform.trim();
+}
+
+function computePlatformFit(topic: TrendingTopic, platform?: string): number {
+  const normalizedPlatform = normalizePlatform(platform);
+  if (!normalizedPlatform) return 0;
+
+  const keywords = PLATFORM_FIT_KEYWORDS[normalizedPlatform] || [];
+  const haystack = normalizeKey(`${topic.topic} ${topic.category}`);
+  const directMatch = keywords.reduce((score, keyword) => (haystack.includes(keyword) ? score + 1 : score), 0);
+  const trendingBoost = topic.trending ? 1.25 : 0;
+  const popularityBoost = Math.min(topic.posts / 1000, 1.5);
+  const platformWeight = PLATFORM_DEFAULT_WEIGHTS[normalizedPlatform] || 1;
+
+  return (directMatch * 1.5 + trendingBoost + popularityBoost) * platformWeight;
+}
+
+function rankTopics(topics: TrendingTopic[], platform?: string): TrendingTopic[] {
+  return [...topics].sort((a, b) => {
+    const platformDelta = computePlatformFit(b, platform) - computePlatformFit(a, platform);
+    if (platformDelta !== 0) return platformDelta;
+    if (a.trending !== b.trending) return a.trending ? -1 : 1;
+    if (b.posts !== a.posts) return b.posts - a.posts;
+    return a.topic.localeCompare(b.topic);
+  });
+}
+
 const TRENDING_BY_INDUSTRY: Record<string, TrendingTopic[]> = {
   tech: [
     { topic: "AI agents", category: "AI & ML", trending: true, posts: 1200 },
@@ -121,12 +193,13 @@ const TRENDING_BY_INDUSTRY: Record<string, TrendingTopic[]> = {
   ],
 };
 
-export function getTrendingTopicsForIndustry(industry: string): TrendingTopic[] {
-  return TRENDING_BY_INDUSTRY[industry] || TRENDING_BY_INDUSTRY.other;
+export function getTrendingTopicsForIndustry(industry: string, platform?: string): TrendingTopic[] {
+  const topics = TRENDING_BY_INDUSTRY[industry] || TRENDING_BY_INDUSTRY.other;
+  return rankTopics(topics, platform);
 }
 
-export function getTrendingTopicsCount(industry: string): { trending: number; total: number } {
-  const topics = getTrendingTopicsForIndustry(industry);
+export function getTrendingTopicsCount(industry: string, platform?: string): { trending: number; total: number } {
+  const topics = getTrendingTopicsForIndustry(industry, platform);
   const trending = topics.filter((t) => t.trending).length;
   return { trending, total: topics.length };
 }

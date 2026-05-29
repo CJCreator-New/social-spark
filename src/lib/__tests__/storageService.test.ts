@@ -26,4 +26,20 @@ describe("storageService", () => {
     const got = storageService.loadDraft(key);
     expect(got).toBeNull();
   });
+
+  it("lists and removes draft keys", () => {
+    storageService.saveDraft("one", { value: 1 }, 10000);
+    storageService.saveDraft("two", { value: 2 }, 10000);
+
+    expect(storageService.listDraftKeys().sort()).toEqual(["one", "two"]);
+
+    storageService.removeDraft("one");
+    expect(storageService.listDraftKeys()).toEqual(["two"]);
+  });
+
+  it("cleans corrupted drafts during load", () => {
+    localStorage.setItem("ss:draft:bad", "not-json");
+    expect(storageService.loadDraft("bad")).toBeNull();
+    expect(localStorage.getItem("ss:draft:bad")).toBeNull();
+  });
 });

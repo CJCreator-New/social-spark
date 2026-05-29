@@ -16,9 +16,25 @@ describe('unicodeFonts', () => {
     expect(applyStyle(s, FontStyle.None)).toBe(s)
   })
 
+  it('leaves punctuation and non-ascii characters unchanged', () => {
+    const input = 'Hello, мир! 123 — test.'
+    const out = applyStyle(input, FontStyle.Italic)
+
+    expect(out.includes(',')).toBe(true)
+    expect(out.includes('мир')).toBe(true)
+    expect(out.includes('—')).toBe(true)
+  })
+
+  it('supports additional style families', () => {
+    expect(applyStyle('Ab12', FontStyle.BoldItalic)).not.toBe('Ab12')
+    expect(applyStyle('Ab12', FontStyle.Monospace)).not.toBe('Ab12')
+    expect(applyStyle('Ab12', FontStyle.SansSerifBold)).not.toBe('Ab12')
+    expect(applyStyle('Ab12', FontStyle.DoubleStruck)).not.toBe('Ab12')
+  })
+
   it('generates preview samples', () => {
     const samples = generatePreviewSamples()
-    expect(Object.keys(samples).length).toBeGreaterThan(0)
+    expect(Object.keys(samples)).toEqual(expect.arrayContaining(Object.values(FontStyle)))
     expect(typeof samples[FontStyle.BoldSerif]).toBe('string')
   })
 })
