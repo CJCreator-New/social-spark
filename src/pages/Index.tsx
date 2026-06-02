@@ -709,6 +709,8 @@ interface Post {
   image_prompt?: string;
   hook_options?: string[];
   cta_options?: string[];
+  variant_scores?: Record<string, number>[];
+  chosen_index?: number;
 }
 
 type SavedCalendarInsert = Database["public"]["Tables"]["saved_calendars"]["Insert"];
@@ -1076,6 +1078,13 @@ async function fetchWithGenerationRetry(input: RequestInfo | URL, init: RequestI
       }
     }
   }
+}
+
+function calculateScore(scores: Record<string, number>): number {
+  const keys = Object.keys(scores);
+  if (keys.length === 0) return 0;
+  const sum = keys.reduce((acc, k) => acc + scores[k], 0);
+  return Number((sum / keys.length).toFixed(1));
 }
 
 const Index = () => {
@@ -3047,6 +3056,18 @@ ${postText(p)}
                         <span className="ptag pt-date">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
                         <span className="ptag pt-topic">{p.topic}</span>
                         <span className="ptag pt-fmt">{formatBadgeForPlatform(p.format, form.platform)}</span>
+                        {p.variant_scores && p.chosen_index !== undefined && p.variant_scores[p.chosen_index] && (() => {
+                          const s = p.variant_scores[p.chosen_index];
+                          const avg = calculateScore(s);
+                          const breakdown = Object.entries(s)
+                            .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}/5`)
+                            .join("\n");
+                          return (
+                            <span className="ptag pt-fmt" style={{ background: "rgba(255, 215, 0, 0.15)", color: "#FFD700", border: "1px solid rgba(255, 215, 0, 0.3)" }} title={`AI Quality Score (LLM-as-judge)\n\n${breakdown}\n\nSelected from ${p.variant_scores.length} variants.`}>
+                              ✨ {avg}/5.0
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", position: "relative" }} ref={tweakOpenIdx === activeDay ? tweakRef : undefined}>
                         <button

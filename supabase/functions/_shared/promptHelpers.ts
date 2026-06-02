@@ -549,21 +549,42 @@ export function buildSystemMessage(
   payload: GenerationPayload,
   opts: { includeTopics?: boolean; isSinglePost?: boolean } = {}
 ): string {
-  const persona = `You are a senior ${payload.platform} content strategist for ${payload.industryLabel || payload.industry || 'the industry'} who writes for ${payload.audiences.length ? payload.audiences.join(', ') : 'the target audience'}. Follow the strategic framework and content rules strictly.`;
+  const now = new Date();
+  const dateStr = now.toISOString().split("T")[0];
+  const season = now.getMonth() >= 2 && now.getMonth() <= 4 ? "Spring" : 
+                 now.getMonth() >= 5 && now.getMonth() <= 7 ? "Summer" :
+                 now.getMonth() >= 8 && now.getMonth() <= 10 ? "Autumn" : "Winter";
+
+  const persona = `You are a senior ${payload.platform} content strategist for ${payload.industryLabel || payload.industry || 'the industry'} who writes for ${payload.audiences.length ? payload.audiences.join(', ') : 'the target audience'}. Follow the strategic framework and content rules strictly.
+CONTEXT:
+- Today's Date: ${dateStr}
+- Current Season: ${season}`;
+
   const framework = buildStrategicPromptFramework(payload);
   const contentRules = buildContentRules(payload.platform, payload.language);
   const languageRules = buildLanguageRules(payload.language);
   const stylePreset = getStylePreset(payload.style);
   const banned = bannedPhrasesBlock();
+  
+  const antiMimicry = payload.brand_examples && payload.brand_examples.length > 0
+    ? "\nANTI-MIMICRY RULE: Match the cadence, vocabulary, and sentence structure of the brand examples provided, but do NOT copy phrases or specific hooks verbatim. Freshness is key."
+    : "";
+
   const exemplars = getExemplars(payload.platform, payload.style);
   const userExamples = (payload.brand_examples || []).slice(0, 3);
   const exemplarBlock = exemplars.length || userExamples.length
-    ? `\nEXEMPLARS:\n${exemplars.map(e => `- ${e}`).join("\n")}${userExamples.length ? `\n- USER EXAMPLES:\n${userExamples.map(e => `  - ${e}`).join("\n")}` : ""}`
+    ? `\nEXEMPLARS (Model-provided + User Brand):
+${exemplars.map(e => `- ${e}`).join("\n")}
+${userExamples.length ? `- USER BRAND EXAMPLES:\n${userExamples.map(e => `  - ${e}`).join("\n")}` : ""}
+
+CONTRASTIVE GUIDANCE:
+- STRONG HOOK: Specific, creates curiosity gap, starts with high-impact word, or uses a concrete number.
+- WEAK HOOK: "In today's fast-paced world...", "Have you ever wondered...", or generic statements. Avoid these at all costs.`
     : "";
 
   const frameworkNote = payload.framework && payload.framework !== "Auto" ? `\nFRAMEWORK: Use ${payload.framework} for the post structure.` : "\nFRAMEWORK: Auto — choose the best framework if unsure.";
 
-  return [persona, framework, contentRules, languageRules, stylePreset, frameworkNote, exemplarBlock, banned, getPlatformPreset(payload.platform)].join("\n\n");
+  return [persona, framework, contentRules, languageRules, stylePreset, frameworkNote, antiMimicry, exemplarBlock, banned, getPlatformPreset(payload.platform)].join("\n\n");
 }
 
 export const EXEMPLARS: Record<string, Record<string, string[]>> = {
@@ -654,6 +675,69 @@ export async function enrichTopics(
   }
 
   return payload.topics.length >= 7 ? payload.topics.slice(0, 7) : payload.topics;
+}
+
+/**
+ * Perform a tiny judge call to score generated variants and pick the winner.
+ */
+export async function scoreVariants(
+  variants: string[],
+  brief: { coreIdea?: string; topic?: string; platform: string; industry?: string; goals?: string[] },
+  apiKey: string
+): Promise<{ scores: Record<string, number>[], winner_index: number }> {
+  if (!variants.length) return { scores: [], winner_index: 0 };
+  
+  const model = "google/gemini-2.5-flash-lite";
+  const system = `You are a critical content editor. Score the following ${variants.length} post variants on 5 criteria (0-5 scale): 
+1. hook_strength (creates curiosity/impact)
+2. specificity (avoiding fluff)
+3. on_brief (matches topic/audience)
+4. platform_fit (native feel for ${brief.platform})
+5. cta_clarity (clear action)
+
+Return a JSON object with a "results" array containing the scores for each variant in order, and a "winner_index" for the best overall variant.`;
+
+  const user = `BRIEF: Topic "${brief.topic || brief.coreIdea}", Industry "${brief.industry}", Goals: ${brief.goals?.join(", ") || "Engagement"}
+VARIANTS:
+${variants.map((v, i) => `[Variant ${i}]: ${v.slice(0, 1000)}`).join("\n\n")}`;
+
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
+        temperature: 0.1, // High precision
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const content = data?.choices?.[0]?.message?.content || "";
+      const m = content.match(/\{[\s\S]*\}/);
+      if (m) {
+        const parsed = JSON.parse(m[0]);
+        if (parsed.results && Array.isArray(parsed.results)) {
+          return {
+            scores: parsed.results,
+            winner_index: typeof parsed.winner_index === "number" ? parsed.winner_index : 0
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Judge scoring failed:", e);
+  }
+
+  // Fallback: simple uniform scores
+  return {
+    scores: variants.map(() => ({ hook_strength: 3, specificity: 3, on_brief: 3, platform_fit: 3, cta_clarity: 3 })),
+    winner_index: 0
+  };
 }
 
 /**
@@ -842,6 +926,29 @@ export function normalizePost(
   const hookOptions = rawHookOptions ? rawHookOptions.map(h => fixSpelling(h)) : (p.hook ? [fixSpelling(String(p.hook || ""))] : []);
   const ctaOptions = rawCtaOptions ? rawCtaOptions.map(c => fixSpelling(c)) : (p.cta ? [fixSpelling(String(p.cta || ""))] : []);
 
+  const body = fixSpelling(String(p.body || ""));
+  const actualWordCount = body.split(/\s+/).filter(Boolean).length;
+  const reportedWordCount = Number(p.word_count) || actualWordCount;
+
+  // Rough length check based on payload.length
+  if (payload?.length) {
+    const rangeMap: Record<string, [number, number]> = {
+      short: [80, 120],
+      medium: [160, 230],
+      long: [280, 380],
+    };
+    const range = rangeMap[payload.length];
+    if (range) {
+      // 25% drift allowance
+      const min = range[0] * 0.75;
+      const max = range[1] * 1.25;
+      if (actualWordCount < min || actualWordCount > max) {
+        console.warn(`Word count drift detected: ${actualWordCount} vs target range ${range[0]}-${range[1]}. Allowing but flagging.`);
+        // For now, we flag it in self_check rather than hard rejection to avoid UX loops
+      }
+    }
+  }
+
   return {
     day: 1,
     dow: overrideDow || p.dow || "Mon",
@@ -851,7 +958,9 @@ export function normalizePost(
     // primary hook (first option) and full variants
     hook: hookOptions.length ? hookOptions[0] : "",
     hook_options: hookOptions,
-    body: fixSpelling(String(p.body || "")),
+    body,
+    word_count: reportedWordCount,
+    actual_word_count: actualWordCount,
     // primary CTA and full variants
     cta: ctaOptions.length ? ctaOptions[0] : "",
     cta_options: ctaOptions,
@@ -860,9 +969,10 @@ export function normalizePost(
       : p.hashtags || "",
     rationale: fixSpelling(String(p.rationale || "")),
     image_prompt: fixSpelling(String(p.image_prompt || "")),
-    // Maintain Phase A/C fields if present
+    // Maintain Phase A/C/D fields if present
     plan: p.plan,
     body_variants: p.body_variants,
+    variant_scores: p.variant_scores,
     chosen_index: p.chosen_index,
     self_check: p.self_check,
     forbidden: p.forbidden,

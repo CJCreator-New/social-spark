@@ -12,6 +12,9 @@ import {
   checkRateLimit,
   cleanPayload,
   normalizePost,
+  scoreVariants,
+  callAIGateway,
+  parseAIResponse,
   buildSystemMessage,
   buildUserMessage,
 } from "../_shared/promptHelpers.ts";
@@ -154,6 +157,7 @@ CRITIQUE & REWRITE GUIDANCE:
             },
             body_variants: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 2 },
             chosen_index: { type: "number" },
+            word_count: { type: "number", description: "Actual word count of the generated body." },
             self_check: {
               type: "object",
               properties: {
@@ -197,10 +201,29 @@ CRITIQUE & REWRITE GUIDANCE:
     }
 
     let parsed = parseResult.parsed as Record<string, unknown>;
+
+    // Task 4: LLM-as-judge scoring
+    const candidates = [String(parsed.body || "")];
+    if (Array.isArray(parsed.body_variants)) {
+      candidates.push(...parsed.body_variants.map(v => String(v || "")));
+    }
+    
+    if (candidates.length > 1) {
+      const judgeRes = await scoreVariants(candidates, payload, LOVABLE_API_KEY || "");
+      parsed.variant_scores = judgeRes.scores;
+      parsed.chosen_index = judgeRes.winner_index;
+      if (judgeRes.winner_index > 0 && judgeRes.winner_index < candidates.length) {
+        parsed.body = candidates[judgeRes.winner_index];
+      }
+    }
+
     let regenerated = normalizePost(parsed, post.dow, payload);
     if (!regenerated) {
       return jsonResponse({ error: "Failed to normalize post response." }, 500);
     }
+    
+    // Attach scores
+    regenerated.variant_scores = parsed.variant_scores;
 
     // Force day to match the original slot
     regenerated.day = post.day;

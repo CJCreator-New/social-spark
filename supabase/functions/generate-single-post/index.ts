@@ -17,6 +17,7 @@ import {
   callAIGateway,
   parseAIResponse,
   normalizePost,
+  scoreVariants,
   recordServerTelemetryEvent,
 } from "../_shared/promptHelpers.ts";
 
@@ -94,6 +95,7 @@ Deno.serve(async (req) => {
             },
             body_variants: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 2 },
             chosen_index: { type: "number" },
+            word_count: { type: "number", description: "Actual word count of the generated body." },
             self_check: {
               type: "object",
               properties: {
@@ -136,10 +138,30 @@ Deno.serve(async (req) => {
     }
 
     let parsed = parseResult.parsed as Record<string, unknown>;
+
+    // Task 4: LLM-as-judge scoring if variants exist
+    const candidates = [String(parsed.body || "")];
+    if (Array.isArray(parsed.body_variants)) {
+      candidates.push(...parsed.body_variants.map(v => String(v || "")));
+    }
+    
+    if (candidates.length > 1) {
+      const judgeRes = await scoreVariants(candidates, payload, LOVABLE_API_KEY || "");
+      parsed.variant_scores = judgeRes.scores;
+      parsed.chosen_index = judgeRes.winner_index;
+      // Auto-pick the winner
+      if (judgeRes.winner_index > 0 && judgeRes.winner_index < candidates.length) {
+        parsed.body = candidates[judgeRes.winner_index];
+      }
+    }
+
     let post = normalizePost(parsed, payload.dow, payload);
     if (!post) {
       return jsonResponse({ error: "Failed to normalize post response." }, 500);
     }
+
+    // Attach scores to the final output
+    post.variant_scores = parsed.variant_scores;
 
     // If user requested a polished output, do a concise self-critique + rewrite pass on the pro model
     if (payload.quality === "polished") {

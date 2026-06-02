@@ -34,6 +34,8 @@ interface Post {
   title: string; hook: string; body: string; cta: string; hashtags: string; rationale: string; image_prompt?: string;
   hook_options?: string[];
   cta_options?: string[];
+  variant_scores?: Record<string, number>[];
+  chosen_index?: number;
 }
 
 type SavedCalendarInsert = Database["public"]["Tables"]["saved_calendars"]["Insert"];
@@ -242,6 +244,13 @@ function hasEmoji(text: string): boolean {
   return /\p{Emoji}/u.test(text);
 }
 type TweakKind = "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting" | "enhance";
+
+function calculateScore(scores: Record<string, number>): number {
+  const keys = Object.keys(scores);
+  if (keys.length === 0) return 0;
+  const sum = keys.reduce((acc, k) => acc + scores[k], 0);
+  return Number((sum / keys.length).toFixed(1));
+}
 
 export default function CalendarDetail() {
   const { id } = useParams();
@@ -1391,6 +1400,19 @@ export default function CalendarDetail() {
                             <span className={`cd-chip ${healthCls}`} title="Overall health (length + hashtags)">
                               {healthLabel}
                             </span>
+                            {p.variant_scores && p.chosen_index !== undefined && p.variant_scores[p.chosen_index] && (() => {
+                              const s = p.variant_scores[p.chosen_index];
+                              const avg = calculateScore(s);
+                              const scoreCls = avg >= 4.5 ? "good" : avg >= 3.5 ? "warn" : "bad";
+                              const breakdown = Object.entries(s)
+                                .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}/5`)
+                                .join("\n");
+                              return (
+                                <span className={`cd-chip ${scoreCls}`} title={`AI Quality Score (LLM-as-judge)\n\n${breakdown}\n\nSelected from ${p.variant_scores.length} variants.`}>
+                                  ✨ {avg}/5.0
+                                </span>
+                              );
+                            })()}
                           </>
                         );
                       })()}

@@ -15,6 +15,8 @@ interface Post {
   rationale: string;
   hook_options?: string[];
   cta_options?: string[];
+  variant_scores?: Record<string, number>[];
+  chosen_index?: number;
 }
 
 export default function PostInsights({ post, platform, topic }: { post: Post; platform?: string; topic?: string }) {

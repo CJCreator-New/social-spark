@@ -17,6 +17,8 @@ import {
   buildUserMessage,
   parseAIResponse,
   applyHashtagPolicy,
+  scoreVariants,
+  normalizePost,
   recordServerTelemetryEvent,
 } from "../_shared/promptHelpers.ts";
 
@@ -117,6 +119,7 @@ Deno.serve(async (req) => {
                   },
                   body_variants: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 2 },
                   chosen_index: { type: "number" },
+                  word_count: { type: "number", description: "Actual word count of the generated body." },
                   self_check: {
                     type: "object",
                     properties: {
@@ -163,16 +166,30 @@ Deno.serve(async (req) => {
     }
 
     let parsed = parseResult.parsed as Record<string, unknown>;
-    let posts = Array.isArray(parsed.posts)
-      ? parsed.posts.map(post => {
-          if (!post || typeof post !== "object") return post;
-          const p = post as Record<string, unknown>;
-          return {
-            ...p,
-            hashtags: applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags),
-          };
-        })
-      : [];
+    let initialPosts = Array.isArray(parsed.posts) ? parsed.posts : [];
+    
+    // Task 4: LLM-as-judge scoring for each post in the calendar
+    const scoredPosts = await Promise.all(initialPosts.map(async (p: any) => {
+      const candidates = [String(p.body || "")];
+      if (Array.isArray(p.body_variants)) {
+        candidates.push(...p.body_variants.map((v: any) => String(v || "")));
+      }
+      
+      if (candidates.length > 1) {
+        const judgeRes = await scoreVariants(candidates, payload, LOVABLE_API_KEY || "");
+        p.variant_scores = judgeRes.scores;
+        p.chosen_index = judgeRes.winner_index;
+        // Auto-pick the winner
+        if (judgeRes.winner_index > 0 && judgeRes.winner_index < candidates.length) {
+          p.body = candidates[judgeRes.winner_index];
+        }
+      }
+
+      const normalized = normalizePost(p, p.dow, payload);
+      return normalized || p;
+    }));
+
+    let posts = scoredPosts;
     if (posts.length === 0) {
       return jsonResponse({ error: "AI returned an empty calendar." }, 500);
     }
@@ -193,10 +210,9 @@ Deno.serve(async (req) => {
           if (polishParse.success) {
             const polishedParsed = polishParse.parsed as Record<string, unknown>;
             const polishedPosts = Array.isArray(polishedParsed.posts) ? polishedParsed.posts : null;
-            if (polishedPosts) posts = polishedPosts.map(p => ({
-              ...p,
-              hashtags: applyHashtagPolicy((p as Record<string, unknown>).hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags),
-            }));
+            if (polishedPosts) {
+              posts = polishedPosts.map(p => normalizePost(p, (p as any).dow, payload) || p);
+            }
           }
         }
       } catch (e) {
