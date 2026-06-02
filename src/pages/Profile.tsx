@@ -205,7 +205,7 @@ export default function Profile() {
     } catch {
       /* media reference tracking is best effort */
     }
-    await supabase.from("media_references").upsert({
+    await (supabase.from as any)("media_references").upsert({
       user_id: user.id,
       bucket: "avatars",
       storage_path: path,
@@ -221,7 +221,7 @@ export default function Profile() {
       const oldPath = getAvatarPathFromPublicUrl(previousUrl);
       if (oldPath && oldPath !== path) void supabase.storage.from("avatars").remove([oldPath]);
       if (oldPath && oldPath !== path) {
-        void supabase.from("media_references")
+        void (supabase.from as any)("media_references")
           .update({ reference_count: 0, orphaned_at: new Date().toISOString(), last_referenced_at: new Date().toISOString() })
           .eq("bucket", "avatars")
           .eq("storage_path", oldPath);
