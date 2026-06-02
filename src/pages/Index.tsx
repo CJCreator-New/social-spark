@@ -984,7 +984,7 @@ async function upsertMediaReferences(params: {
 
 async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraftSnapshot> | null> {
   if (!wizardDraftServerAvailable) return null;
-  const { data, error } = await supabase.from(WIZARD_SERVER_DRAFT_TABLE)
+  const { data, error } = await (supabase.from as any)(WIZARD_SERVER_DRAFT_TABLE)
     .select("snapshot")
     .eq("user_id", userId)
     .maybeSingle();
@@ -994,7 +994,7 @@ async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraf
     return null;
   }
   if (!data?.snapshot) return null;
-  return parseDraftEnvelope<WizardDraftSnapshot>(data.snapshot);
+  return parseDraftEnvelope<WizardDraftSnapshot>((data as any).snapshot);
 }
 
 async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
