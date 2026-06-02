@@ -6,6 +6,7 @@ import {
   bannedPhrasesBlock,
   isLongFormPlatform,
   buildHashtagInstr,
+  buildCinematicImagePromptRules,
   jsonResponse,
   checkRateLimit,
   cleanPayload,
@@ -13,6 +14,7 @@ import {
   callAIGateway,
   parseAIResponse,
   applyHashtagPolicy,
+  recordServerTelemetryEvent,
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req) => {
@@ -23,10 +25,13 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const payload = cleanPayload(body);
+    if (!payload.topics || payload.topics.length === 0) {
+      console.info("generate-calendar: no topics provided; AI should infer topics from core idea or industry.", { industry: payload.industry, industryLabel: payload.industryLabel });
+    }
 
-    // Validate required fields
-    if (!payload.coreIdea?.trim() || payload.topics.length === 0) {
-      return jsonResponse({ error: "Missing core idea or topics." }, 400);
+    // Validate required fields (topics are optional; if omitted, AI may infer sensible topics)
+    if (!payload.coreIdea?.trim()) {
+      return jsonResponse({ error: "Missing core idea." }, 400);
     }
 
     // Rate limiting: 10 requests per minute per user
@@ -52,7 +57,8 @@ Deno.serve(async (req) => {
     const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
     const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: true });
 
-    const contextLines = buildPromptContext(payload, { includeTopics: true });
+    const includeTopics = Array.isArray(payload.topics) && payload.topics.length > 0;
+    const contextLines = buildPromptContext(payload, { includeTopics });
 
     const prompt = `You are a world-class ${payload.platform} content strategist specialising in ${payload.industryLabel || payload.industry} content.
 
@@ -63,6 +69,8 @@ ${contextLines}
 ${payload.extra ? `- Extra instructions: ${payload.extra}` : ""}
 ${payload.bannedWords.length ? `- NEVER SAY (hard ban — do not use these words or close variants in any post): ${payload.bannedWords.join(", ")}` : ""}
 ${payload.requiredWords.length ? `- MUST MENTION (each of these terms must appear naturally in AT LEAST ONE post across the week): ${payload.requiredWords.join(", ")}` : ""}
+
+${buildCinematicImagePromptRules(payload)}
 
 OUTPUT VARIANTS:
 - For each post, provide 3 hook options and 2 CTA variants. Place them in the hook_options and cta_options fields within each post object. The primary hook and cta may be the first items from those arrays.
@@ -75,7 +83,7 @@ HARD RULES (follow strictly):
 5. The chosen format mix "${payload.format}" must drive AT LEAST 4 of the 7 posts. The remaining 3 may vary for rhythm.
 6. AT LEAST 3 of the 7 posts must include a concrete number, percentage, year, dollar figure, or named statistic embedded in the body or hook (not made-up — use realistic, defensible figures from the ${payload.industryLabel || payload.industry} space).
 7. The "dow" field MUST be exactly one of: "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" — and the 7 posts must be ordered Mon → Sun, with "day" 1..7 matching that order.
-8. Every provided topic must be represented at least once across the 7 posts. If more topics are supplied than fit in a week, combine related topics into the same post instead of dropping any of them.
+${includeTopics ? '8. Every provided topic must be represented at least once across the 7 posts. If more topics are supplied than fit in a week, combine related topics into the same post instead of dropping any of them.' : ''}
 
 ${bannedPhrasesBlock()}`;
 
@@ -107,6 +115,7 @@ ${bannedPhrasesBlock()}`;
                   body: { type: "string" },
                     cta: { type: "string" },
                     cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
+                    image_prompt: { type: "string" },
                   hashtags: {
                     type: "string",
                     description: isLongFormPlatform(payload.platform)
@@ -115,7 +124,7 @@ ${bannedPhrasesBlock()}`;
                   },
                   rationale: { type: "string" },
                 },
-                required: ["day", "dow", "topic", "format", "title", "hook", "body", "cta", "hashtags", "rationale"],
+                  required: ["day", "dow", "topic", "format", "title", "hook", "body", "cta", "hashtags", "rationale", "image_prompt"],
                 additionalProperties: false,
               },
             },
@@ -151,7 +160,20 @@ ${bannedPhrasesBlock()}`;
       return jsonResponse({ error: "AI returned an empty calendar." }, 500);
     }
 
-    return jsonResponse({ posts });
+    const responseBody: Record<string, unknown> = { posts };
+    if ((payload as Record<string, unknown>).inferredTopics) {
+      responseBody.meta = { inferredTopics: true };
+      console.info("generate-calendar: marking response with meta.inferredTopics = true");
+      await recordServerTelemetryEvent("generate_topics_inferred", {
+        endpoint: "generate-calendar",
+        mode: "full-week",
+        platform: payload.platform,
+        industry: payload.industryLabel || payload.industry,
+        coreIdea: payload.coreIdea,
+      });
+    }
+
+    return jsonResponse(responseBody);
   } catch (e) {
     console.error("generate-calendar error", e, e?.stack);
     return jsonResponse(

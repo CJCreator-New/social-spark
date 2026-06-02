@@ -33,6 +33,7 @@ export interface GeneratedPost {
   cta: string;
   hashtags: string;
   rationale: string;
+  image_prompt: string;
   hook_options: string[];
   cta_options: string[];
 }
@@ -155,6 +156,29 @@ function rationaleFor(topic: string, angle: string, platform: string): string {
   return `${platform} readers respond to specific, useful framing. This version keeps ${topic} tied to ${angle}, gives the post a clear point of view, and ends with an easy next action.`;
 }
 
+function imagePromptFor(input: LocalGenerationInput, topic: string, angle: string): string {
+  const audience = input.audiences[0] || "the audience";
+  const idea = input.coreIdea || input.industryLabel || input.industry || topic;
+  const platform = input.platform || "social";
+  const aspectRatio = /x|twitter/i.test(platform) ? "16:9" : /story|reel|tiktok/i.test(platform) ? "9:16" : "4:5";
+  const mood = /data|analytical|technical/i.test(String(input.voice || "") + " " + String(input.style || ""))
+    ? "sharp, high-contrast, precise"
+    : /warm|friendly|human/i.test(String(input.voice || "") + " " + String(input.style || ""))
+      ? "warm, cinematic, emotionally grounded"
+      : "dramatic, polished, and editorial";
+
+  return [
+    `Cinematic key art inspired by ${topic} and the idea of ${idea}.`,
+    `Create a single, high-end film still that speaks to ${audience} without showing text overlays, UI panels, or infographic elements.`,
+    `Art direction: ${mood}, premium editorial photography, realistic depth, layered foreground and background detail, subtle motion, and a sense of scale.`,
+    `Lighting: dramatic but controlled, with strong directional light, soft rim light, realistic shadows, and a polished contrast curve.`,
+    `Composition: ${angle} as the visual anchor, off-center framing, leading lines, clear focal hierarchy, and shallow depth of field.`,
+    `Color palette: rich cinematic tones with deep shadows, accent highlights, and a restrained palette that feels luxurious rather than noisy.`,
+    `Atmosphere: dust, haze, glow, texture, and quiet tension that make the scene feel alive and immersive.`,
+    `Quality guardrails: no watermark, no collage, no generic stock-photo look, no clutter, no flat lighting, no text in the image. Aspect ratio ${aspectRatio}.`,
+  ].join(" ");
+}
+
 function normalizeTopic(value: string, fallback: string): string {
   const trimmed = String(value || "").trim();
   return trimmed || fallback;
@@ -185,6 +209,7 @@ export function generateLocalPosts(input: LocalGenerationInput): GeneratedPost[]
       cta: ctaOptionsFor(topic)[0],
       hashtags,
       rationale: rationaleFor(topic, angle, input.platform),
+      image_prompt: imagePromptFor(input, topic, angle),
       hook_options: uniq([
         hook,
         `Most people get ${topic} wrong by skipping ${angle}.`,

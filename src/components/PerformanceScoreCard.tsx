@@ -5,9 +5,10 @@ import { calculatePerformanceScore, getScoreColor, getReadabilityLabel } from "@
 interface PerformanceScoreCardProps {
   post: Post;
   topic?: string;
+  onEnhance?: () => void;
 }
 
-export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({ post, topic = "" }) => {
+export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({ post, topic = "", onEnhance }) => {
   const score = useMemo(() => calculatePerformanceScore(post, topic), [post, topic]);
 
   return (
@@ -121,6 +122,13 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({ post
       <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 10, fontStyle: "italic" }}>
         💡 Tip: Higher scores mean better engagement potential. Aim for 7+.
       </div>
+      {typeof onEnhance === "function" && (
+        <div style={{ marginTop: 10 }}>
+          <button className="cpbtn" onClick={onEnhance} style={{ fontSize: 13 }}>
+            ✨ Enhance for performance
+          </button>
+        </div>
+      )}
     </div>
   );
 };

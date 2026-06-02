@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { computeDedupeHash } from '../../../src/lib/normalize';
+import type { TrendSourceItem } from '../adapters/news.ts';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -16,10 +17,10 @@ function computeScore(signal_count: number, last_seen: string | null, sourceWeig
   return Math.log(signal_count + 1) * sourceWeight * decay;
 }
 
-export async function upsertTopics(items: Array<any>) {
+export async function upsertTopics(items: TrendSourceItem[]) {
   if (!supabase) return { ok: false, reason: 'no supabase' };
 
-  const upserts = [];
+  const upserts: string[] = [];
   for (const it of items) {
     const dedupe_hash = computeDedupeHash((it.title || '').toLowerCase(), (it.normalized_terms || []).map(String));
     const now = new Date().toISOString();

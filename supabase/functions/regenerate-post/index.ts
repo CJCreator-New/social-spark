@@ -33,7 +33,20 @@ const TWEAK_INSTRUCTIONS: Record<string, string> = {
   "add-stat": "TWEAK: Keep the same angle, but weave in 1–2 specific, plausible statistics or concrete numbers (e.g. percentages, dollar figures, time spans). Cite them as 'roughly' or 'around' if you can't be sure.",
   "remove-emoji": "TWEAK: Keep the same angle and structure, but remove ALL emojis from the title, hook, body, and CTA. Replace with plain punctuation.",
   "more-personal": "TWEAK: Keep the same angle, but rewrite in first-person with a small, specific personal anecdote or observation in the hook. Make it feel like a human wrote it, not a brand.",
+  "enhance": "TWEAK: Improve this post for engagement based on performance metrics — strengthen the hook (make it shorter, punchier, and curiosity-driving), sharpen the CTA to invite replies, increase hashtag relevance (add 1–2 targeted tags), and simplify any long sentences to improve readability. Preserve the core angle and avoid introducing new topics.",
 };
+
+const ENHANCE_FOCUS_INSTRUCTIONS: Record<string, string> = {
+  hookStrength: "FOCUS: The hook is the weakest area. Rebuild the opening line to create curiosity faster, preferably with a specific claim, question, or sharp contrast.",
+  ctaEffectiveness: "FOCUS: The CTA is the weakest area. Make the call to action more specific, easier to answer, and more clearly connected to the topic.",
+  hashtagRelevance: "FOCUS: Hashtag relevance is weakest. Replace generic tags with fewer, more specific platform-native tags tied to the topic and audience.",
+  readability: "FOCUS: Readability is weakest. Shorten long sentences, reduce complexity, and make the post easier to scan without losing substance.",
+};
+
+function buildEnhanceTweakInstruction(focusMetric?: string): string {
+  const focus = focusMetric ? ENHANCE_FOCUS_INSTRUCTIONS[focusMetric] : "";
+  return [TWEAK_INSTRUCTIONS.enhance, focus].filter(Boolean).join("\n");
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -48,7 +61,8 @@ Deno.serve(async (req) => {
     const post = body.post as ExistingPost | undefined;
     const siblings = (body.siblings as ExistingPost[] | undefined) || [];
     const newTopic = body.newTopic as string | undefined;
-    const tweak = body.tweak as "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | undefined;
+    const tweak = body.tweak as "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "enhance" | undefined;
+    const focusMetric = typeof body.focusMetric === "string" ? body.focusMetric : "";
 
     if (!post || typeof post.day !== "number" || !post.dow) {
       return jsonResponse({ error: "Missing post context (day/dow required)." }, 400);
@@ -74,7 +88,9 @@ Deno.serve(async (req) => {
     const targetTopic = (newTopic && newTopic.trim()) || post.topic || "general topic";
     const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
-    const tweakInstr = (tweak && TWEAK_INSTRUCTIONS[tweak]) || "";
+    const tweakInstr = tweak === "enhance"
+      ? buildEnhanceTweakInstruction(focusMetric)
+      : (tweak && TWEAK_INSTRUCTIONS[tweak]) || "";
     const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: false });
 
     const siblingSummary = siblings
@@ -115,6 +131,7 @@ ${tweakInstr ? "" : (post.title ? `- Previous title (do NOT reuse): "${post.titl
 ${tweakInstr ? "" : (post.hook ? `- Previous hook (do NOT reuse opener): "${post.hook.slice(0, 120)}"` : "")}
 ${tweakInstr ? `\nCURRENT VERSION TO TWEAK (preserve angle, transform per tweak instruction):\n- Title: "${post.title || ""}"\n- Hook: "${post.hook || ""}"\n- Body: "${(post.body || "").slice(0, 600)}"\n- CTA: "${post.cta || ""}"\n` : ""}
 ${tweakInstr ? tweakInstr + "\n" : ""}
+${tweak === "enhance" && focusMetric ? `TARGETED PERFORMANCE FOCUS: ${focusMetric}\n` : ""}
 OTHER POSTS IN THIS WEEK (do NOT duplicate angles, openers, statistics, or examples):
 ${siblingSummary || "(none provided)"}
 

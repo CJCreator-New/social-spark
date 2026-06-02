@@ -30,6 +30,7 @@ import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useCreateCalendarMutation, useRegeneratePostMutation } from "@/hooks/useAppQueries";
 import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dragDrop";
 import { SAMPLE_FORM, SAMPLE_POSTS, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
+import { calculatePerformanceScore, getWeakestPerformanceMetric, type PerformanceFocusMetric } from "@/lib/postPerformanceScore";
 import mediaManager from "@/lib/mediaManager";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import type { Database, Json } from "@/integrations/supabase/types";
@@ -198,11 +199,11 @@ const css = `
 .cf-app .brand-title em { font-style:italic;color:var(--accent); }
 .cf-app .brand-sub { font-size:13px;color:var(--text2);margin-top:10px;font-weight:300;line-height:1.65;max-width:480px; }
 
-.cf-app .hero-shell { display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:16px;align-items:stretch;margin:22px 0 28px; }
-.cf-app .hero-panel { background:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01)); border:1px solid var(--border); border-radius:24px; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,.22); }
-.cf-app .hero-panel.alt { background:linear-gradient(180deg,rgba(200,240,154,0.06),rgba(255,255,255,0.01)); }
+.cf-app .hero-shell { display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:18px;align-items:start;margin:18px 0 28px; }
+.cf-app .hero-panel { background:linear-gradient(180deg,color-mix(in srgb, var(--color-surface) 88%, transparent),rgba(255,255,255,0.015)); border:1px solid color-mix(in srgb, var(--color-primary) 12%, var(--border)); border-radius:26px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,.22); backdrop-filter:blur(10px); }
+.cf-app .hero-panel.alt { background:linear-gradient(180deg,color-mix(in srgb, var(--color-primary) 10%, rgba(255,255,255,0.03)),rgba(255,255,255,0.01)); }
 .cf-app .hero-kicker { font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);font-weight:500;margin-bottom:12px; }
-.cf-app .hero-title { font-family:'Playfair Display',serif;font-size:34px;font-weight:400;letter-spacing:-.5px;line-height:1.06;margin:0 0 12px;max-width:14ch; }
+.cf-app .hero-title { font-family:'Playfair Display',serif;font-size:36px;font-weight:400;letter-spacing:-.5px;line-height:1.05;margin:0 0 12px;max-width:14ch; }
 .cf-app .hero-copy { font-size:13px;color:var(--text2);line-height:1.75;max-width:52ch;margin:0 0 18px; }
 .cf-app .hero-badges { display:flex;flex-wrap:wrap;gap:8px; }
 .cf-app .hero-badge { display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;border:1px solid var(--border2);background:rgba(255,255,255,0.015);font-size:11px;color:var(--text2);font-weight:300; }
@@ -214,7 +215,7 @@ const css = `
 .cf-app .hero-note { margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(200,240,154,.06);border:1px solid rgba(200,240,154,.16);font-size:12px;color:rgba(237,234,227,.88);line-height:1.6; }
 .cf-app .hero-note strong { color:var(--accent);font-weight:500; }
 .cf-app .hero-linkrow { margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center; }
-.cf-app .hero-link { color:var(--accent);text-decoration:none;font-size:12px;letter-spacing:.04em; }
+.cf-app .hero-link { color:var(--accent);text-decoration:none;font-size:12px;letter-spacing:.04em;display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,0.015); }
 .cf-app .hero-link:hover { text-decoration:underline; }
 
 .cf-app .stepper { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:36px; }
@@ -705,6 +706,7 @@ interface Post {
   cta: string;
   hashtags: string;
   rationale: string;
+  image_prompt?: string;
   hook_options?: string[];
   cta_options?: string[];
 }
@@ -757,6 +759,18 @@ type WizardDraftSnapshot = {
   postTimes: Record<string, string>;
 };
 
+type BrandMemory = {
+  voice: string;
+  style: string;
+  copyStyle: string;
+  cta: string;
+  audiences: string[];
+  goals: string[];
+  bannedWords: string[];
+  requiredWords: string[];
+  updatedAt: number;
+};
+
 const INITIAL_FORM: WizardForm = {
   industry: "",
   platform: "LinkedIn",
@@ -786,7 +800,82 @@ const DRAFT_VERSION = 1;
 const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const WIZARD_DRAFT_PREFIX = "draft:wizard:";
 const WIZARD_SERVER_DRAFT_TABLE = "wizard_drafts";
+const BRAND_MEMORY_PREFIX = "brand-memory:wizard:";
 let wizardDraftServerAvailable = true;
+
+function brandMemoryKey(userId?: string | null) {
+  return `${BRAND_MEMORY_PREFIX}${userId || "guest"}`;
+}
+
+function readBrandMemory(userId?: string | null): BrandMemory | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(brandMemoryKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<BrandMemory> | null;
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      voice: String(parsed.voice || ""),
+      style: String(parsed.style || ""),
+      copyStyle: String(parsed.copyStyle || "None"),
+      cta: String(parsed.cta || ""),
+      audiences: Array.isArray(parsed.audiences) ? parsed.audiences.map(v => String(v).trim()).filter(Boolean) : [],
+      goals: Array.isArray(parsed.goals) ? parsed.goals.map(v => String(v).trim()).filter(Boolean) : [],
+      bannedWords: Array.isArray(parsed.bannedWords) ? parsed.bannedWords.map(v => String(v).trim()).filter(Boolean) : [],
+      requiredWords: Array.isArray(parsed.requiredWords) ? parsed.requiredWords.map(v => String(v).trim()).filter(Boolean) : [],
+      updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : Date.now(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeBrandMemory(userId: string | null | undefined, memory: BrandMemory) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(brandMemoryKey(userId), JSON.stringify(memory));
+  } catch {
+    /* best effort */
+  }
+}
+
+function clearBrandMemory(userId: string | null | undefined) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(brandMemoryKey(userId));
+  } catch {
+    /* best effort */
+  }
+}
+
+function brandMemoryToPrompt(memory: BrandMemory | null): string {
+  if (!memory) return "";
+  const parts = [
+    memory.voice ? `Voice: ${memory.voice}` : "",
+    memory.style ? `Style: ${memory.style}` : "",
+    memory.copyStyle && memory.copyStyle !== "None" ? `Copy style: ${memory.copyStyle}` : "",
+    memory.cta ? `CTA style: ${memory.cta}` : "",
+    memory.audiences.length ? `Audience preferences: ${memory.audiences.join(", ")}` : "",
+    memory.goals.length ? `Goal preferences: ${memory.goals.join(", ")}` : "",
+    memory.bannedWords.length ? `Avoid these phrases: ${memory.bannedWords.join(", ")}` : "",
+    memory.requiredWords.length ? `Prefer these phrases: ${memory.requiredWords.join(", ")}` : "",
+  ].filter(Boolean);
+  return parts.join(" | ");
+}
+
+function buildBrandMemorySnapshot(form: WizardForm): BrandMemory {
+  return {
+    voice: form.voice,
+    style: form.style,
+    copyStyle: form.copyStyle,
+    cta: form.cta,
+    audiences: [...form.audiences],
+    goals: [...form.goals],
+    bannedWords: [...form.bannedWords],
+    requiredWords: [...form.requiredWords],
+    updatedAt: Date.now(),
+  };
+}
 
 function isMissingWizardDraftTableError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -1027,6 +1116,8 @@ const Index = () => {
   const [confirm, setConfirm] = useState<{ title?: string; message: string; onConfirm: () => void | Promise<void> } | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showPerformance, setShowPerformance] = useState(false);
+  const [brandMemory, setBrandMemory] = useState<BrandMemory | null>(null);
+  const [generationMeta, setGenerationMeta] = useState<{ inferredTopics?: boolean } | null>(null);
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const generatingRef = useRef(false);
@@ -1050,6 +1141,10 @@ const Index = () => {
       setPosts(postsHistory);
     }
   }, [postsHistory, posts]);
+
+  useEffect(() => {
+    setBrandMemory(readBrandMemory(user?.id));
+  }, [user?.id]);
 
   // Keyboard shortcuts for undo/redo and batch edit
   useEffect(() => {
@@ -1081,6 +1176,10 @@ const Index = () => {
     refMap[field].current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
+  const getClipboardStyle = useCallback((): FontStyle => {
+    return COPY_STYLE_MAP[form.copyStyle] || FontStyle.None;
+  }, [form.copyStyle]);
+
   const weekSummary = useMemo(() => {
     const totalPosts = posts.length;
     const totalChars = posts.reduce((sum, post) => sum + formatForPlatform(post, form.platform, { style: getClipboardStyle() }).charCount, 0);
@@ -1105,7 +1204,7 @@ const Index = () => {
       hashtagCounts,
       postingTimes,
     };
-  }, [posts, form.platform, postTimes, form.copyStyle]);
+  }, [posts, form.platform, postTimes, getClipboardStyle]);
 
   const buildSubtopicPreview = () => {
     const selectedTopics = form.topics.filter(Boolean);
@@ -1457,11 +1556,7 @@ const Index = () => {
     if (s === 2) {
       if (form.mode === "day") {
         if (!form.targetDate) { setError("Please pick a date for your post."); return false; }
-        if (form.topics.length === 0) { setError("Please pick (or add) one topic for this post."); scrollToField("topics"); return false; }
-      } else if (form.topics.length === 0) {
-        setError("Please select at least 1 topic.");
-        scrollToField("topics");
-        return false;
+        // Topics are optional: if none selected, the generator will infer sensible angles from the core idea.
       }
     }
     setError(""); return true;
@@ -1539,6 +1634,7 @@ const Index = () => {
       const result: Post[] = form.mode === "day" ? fallbackPosts.slice(0, 1) : fallbackPosts;
       setGenStep(GEN_LABELS.length);
       setPostsWithHistory(result);
+      setGenerationMeta(null);
       setActiveDay(0);
       const seedTimes: Record<string, string> = {};
       for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1);
@@ -1594,6 +1690,7 @@ const Index = () => {
         });
 
         cleanup();
+        setGenerationMeta(null);
         // Persist last generated post count in-memory for E2E runs
         try {
           e2eStore.setLastGeneratedPosts(result.length);
@@ -1636,11 +1733,19 @@ const Index = () => {
         extra: form.extra,
         bannedWords: form.bannedWords,
         requiredWords: form.requiredWords,
+        brandMemory: brandMemoryToPrompt(brandMemory),
       };
 
-      const body = isDay
+      let body: Record<string, unknown> = isDay
         ? { ...baseBody, topic: form.topics[0] || form.coreIdea, dow: targetDow, date: form.targetDate }
         : { ...baseBody, topics: form.topics };
+
+      // If no explicit topics were provided, log telemetry and mark payload so server can note inference
+      const topicsEmpty = isDay ? !form.topics[0] : form.topics.length === 0;
+      if (topicsEmpty) {
+        if (typeof telemetry?.sendEvent === "function") telemetry.sendEvent("generate_infer_topics", { user: user?.id, mode: form.mode, industry: form.industry, platform: form.platform });
+        body = { ...body, inferredTopics: true };
+      }
 
       log.info(`Starting generation (${mode}, ${isRetry ? 'retry' : 'first attempt'})`, { mode, platform: form.platform, industry: form.industry });
 
@@ -1719,6 +1824,7 @@ const Index = () => {
       }
 
       // Normalize: single-post endpoint returns { post }, week endpoint returns { posts }
+      const inferredTopics = Boolean((data as { meta?: { inferredTopics?: boolean } })?.meta?.inferredTopics);
       const result: Post[] = unwrapPosts(data);
       if (result.length === 0) {
         const emptyError = "Empty response. Please try again.";
@@ -1729,6 +1835,7 @@ const Index = () => {
 
       setGenStep(GEN_LABELS.length);
       setPostsWithHistory(result); setActiveDay(0);
+      setGenerationMeta({ inferredTopics });
       // Seed day-optimized default times per post (keyed by post.day)
       const seedTimes: Record<string, string> = {};
       for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1);
@@ -1736,7 +1843,9 @@ const Index = () => {
       setTimeout(() => setStep(4), 350);
       log.info(`Generation completed successfully`, { mode, postCount: result.length });
       if (typeof telemetry?.sendEvent === "function") telemetry.sendEvent("generate_success", { user: user?.id, mode: form.mode, postCount: result.length });
-      toast.success(`${isRetry ? 'Regenerated' : 'Generated'} ${isDay ? 'post' : 'week'} successfully`);
+      toast.success(
+        `${isRetry ? 'Regenerated' : 'Generated'} ${isDay ? 'post' : 'week'} successfully${inferredTopics ? " — topics were inferred from your core idea" : ""}`,
+      );
     } catch (err) {
       if (typeof telemetry?.sendEvent === "function") telemetry.sendEvent("generate_error", { user: user?.id, mode: form.mode, error: String(err) });
       cleanup();
@@ -1766,10 +1875,23 @@ const Index = () => {
     if (abortRef.current) abortRef.current.abort("user");
   }
 
-  async function regenerateDay(idx: number, tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting") {
+  async function regenerateDay(idx: number, tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting" | "enhance", focusMetric?: PerformanceFocusMetric) {
     if (regenIdx !== null) return;
     const target = posts[idx];
     if (!target) return;
+    const targetFocusMetric = tweak === "enhance"
+      ? focusMetric || getWeakestPerformanceMetric(calculatePerformanceScore(target, form.coreIdea))
+      : undefined;
+    if (tweak === "enhance" && typeof telemetry?.sendEvent === "function") {
+      telemetry.sendEvent("enhance_clicked", {
+        user: user?.id,
+        mode: form.mode,
+        day: target.day,
+        platform: form.platform,
+        industry: form.industry,
+        focusMetric: targetFocusMetric,
+      });
+    }
     setRegenIdx(idx);
     const doRegenerate = async (targetsParam: { p: Post; i: number }[]) => {
       setReformatting(true);
@@ -1795,8 +1917,10 @@ const Index = () => {
             extra: form.extra,
             bannedWords: form.bannedWords,
             requiredWords: form.requiredWords,
+            brandMemory: brandMemoryToPrompt(brandMemory),
             post: target,
             siblings: next,
+            ...(tweak === "enhance" ? { focusMetric: targetFocusMetric } : {}),
           };
           try {
             const newPost = await regenerateMutation.mutateAsync(payload);
@@ -1827,6 +1951,42 @@ const Index = () => {
     }
 
     await doRegenerate(targets);
+  }
+
+  async function enhanceCurrentPost() {
+    await regenerateDay(activeDay, "enhance");
+  }
+
+  function saveBrandMemoryFromForm() {
+    const snapshot = buildBrandMemorySnapshot(form);
+    writeBrandMemory(user?.id, snapshot);
+    setBrandMemory(snapshot);
+    toast.success("Brand memory saved");
+  }
+
+  function applyBrandMemoryToForm() {
+    if (!brandMemory) {
+      toast.error("No saved brand memory yet");
+      return;
+    }
+    setForm(prev => ({
+      ...prev,
+      voice: brandMemory.voice || prev.voice,
+      style: brandMemory.style || prev.style,
+      copyStyle: brandMemory.copyStyle || prev.copyStyle,
+      cta: brandMemory.cta || prev.cta,
+      audiences: brandMemory.audiences.length ? brandMemory.audiences : prev.audiences,
+      goals: brandMemory.goals.length ? brandMemory.goals : prev.goals,
+      bannedWords: brandMemory.bannedWords.length ? brandMemory.bannedWords : prev.bannedWords,
+      requiredWords: brandMemory.requiredWords.length ? brandMemory.requiredWords : prev.requiredWords,
+    }));
+    toast.success("Brand memory applied to the wizard");
+  }
+
+  function clearBrandMemorySaved() {
+    clearBrandMemory(user?.id);
+    setBrandMemory(null);
+    toast.success("Brand memory cleared");
   }
 
   function toggleLock(day: number) {
@@ -1871,6 +2031,7 @@ const Index = () => {
             extra: form.extra,
             bannedWords: form.bannedWords,
             requiredWords: form.requiredWords,
+            brandMemory: brandMemoryToPrompt(brandMemory),
             post: target,
             siblings: next,
           };
@@ -1936,6 +2097,7 @@ const Index = () => {
           extra: form.extra,
           bannedWords: form.bannedWords,
           requiredWords: form.requiredWords,
+            brandMemory: brandMemoryToPrompt(brandMemory),
           post: posts[i],
           siblings: next,
         };
@@ -1984,6 +2146,7 @@ const Index = () => {
     setPostTimes(SAMPLE_POST_TIMES);
     setActiveDay(0);
     setSampleMode(true);
+    setGenerationMeta(null);
     setSavedId(null);
     setLockedDays(new Set());
     setStep(4);
@@ -1994,6 +2157,7 @@ const Index = () => {
     setSampleMode(false);
     setPostsWithHistory([]);
     setActiveDay(0);
+    setGenerationMeta(null);
     setStep(1);
   }
 
@@ -2061,10 +2225,6 @@ const Index = () => {
     const text = `${p.title}\n\n${p.hook}\n\n${p.body}\n\n${p.cta}\n\n${p.hashtags}`;
     const style = getClipboardStyle();
     return style === FontStyle.None ? text : applyStyle(text, style);
-  }
-
-  function getClipboardStyle(): FontStyle {
-    return COPY_STYLE_MAP[form.copyStyle] || FontStyle.None;
   }
 
   function getPostContentForDiff(p: Post): string {
@@ -2459,6 +2619,23 @@ ${postText(p)}
                 );
               })()}
 
+              <div className="csect" style={{ marginTop: 18 }}>
+                <div className="flabel">Brand memory <span className="fhint">(saves voice, style, CTA, and phrase preferences)</span></div>
+                <div className="time-hint" style={{ marginBottom: 10 }}>
+                  Save your brand setup once and reuse it on future generations without changing the current fields.
+                </div>
+                <div className="bactions" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
+                  <button type="button" className="cpbtn" onClick={saveBrandMemoryFromForm}>Save brand memory</button>
+                  <button type="button" className="cpbtn" onClick={applyBrandMemoryToForm} disabled={!brandMemory}>Apply saved memory</button>
+                  <button type="button" className="cpbtn" onClick={clearBrandMemorySaved} disabled={!brandMemory}>Clear saved memory</button>
+                </div>
+                {brandMemory && (
+                  <div className="time-hint" style={{ marginTop: 8 }}>
+                    Saved: {brandMemory.voice || "Voice unset"} · {brandMemory.style || "Style unset"}{brandMemory.cta ? ` · ${brandMemory.cta}` : ""}
+                  </div>
+                )}
+              </div>
+
               <div className="divider" />
 
               <div className="csect">
@@ -2528,7 +2705,7 @@ ${postText(p)}
               <div className="csect" ref={topicsRef}>
                 <MultiSelect
                   label={form.mode === "day" ? "Topic for this post" : "Topics to cover"}
-                  hint={form.mode === "day" ? "(pick exactly 1)" : "(pick up to 7; fewer than 7 will be expanded into related angles)"}
+                  hint={form.mode === "day" ? "(optional — will infer topic from core idea if left empty)" : "(optional — pick up to 7; fewer than 7 will be expanded into related angles or inferred from your core idea)"}
                   options={topicPool.length > 0 ? topicPool : ["Add custom topics below ↓"]}
                   disabledOptions={topicPool.length > 0 ? [] : ["Add custom topics below ↓"]}
                   value={form.topics}
@@ -2769,6 +2946,13 @@ ${postText(p)}
               <div className="step4-layout">
                 <div className="step4-main">
                   <>
+                {generationMeta?.inferredTopics && !sampleMode && (
+                  <div className="sample-banner" style={{ marginBottom: 14 }}>
+                    <div className="sample-banner-text">
+                      <strong>Topics were inferred.</strong> The generator filled the gap from your core idea and industry, so you can still refine the angles later.
+                    </div>
+                  </div>
+                )}
                 {sampleMode && (
                   <div className="sample-banner">
                     <div className="sample-banner-text">
@@ -2902,6 +3086,7 @@ ${postText(p)}
                               </button>
                               <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "clean-formatting")}>Clean formatting symbols</button>
                               <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "more-personal")}>More personal</button>
+                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "enhance")}>Enhance for performance</button>
                             </div>
                           )}
                         </div>
@@ -3009,7 +3194,10 @@ ${postText(p)}
                     </button>
                     {showRationale && <div className="rationale">{p.rationale}</div>}
 
-                    <PerformanceScoreCard post={p} topic={form.coreIdea} />
+                    <div className="blabel" style={{ marginTop: 16 }}>Cinematic image prompt</div>
+                    <div className="rationale" style={{ whiteSpace: 'pre-wrap' }}>{p.image_prompt || "No image prompt generated yet."}</div>
+
+                    <PerformanceScoreCard post={p} topic={form.coreIdea} onEnhance={enhanceCurrentPost} />
                     <div style={{ marginTop: 12 }}>
                       <PostInsights post={p} platform={form.platform} topic={form.coreIdea} />
                     </div>
@@ -3140,7 +3328,7 @@ ${postText(p)}
                     </div>
                   ) : posts[activeDay] ? (
                     <>
-                      <PerformanceScoreCard post={posts[activeDay]} topic={form.coreIdea} />
+                      <PerformanceScoreCard post={posts[activeDay]} topic={form.coreIdea} onEnhance={enhanceCurrentPost} />
                       <div style={{ marginTop: 12 }}>
                         <PostInsights post={posts[activeDay]} platform={form.platform} topic={form.coreIdea} />
                       </div>

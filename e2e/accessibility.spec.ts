@@ -35,6 +35,8 @@ test.describe("Accessibility smoke checks", () => {
     await enableE2EAuth(page);
     await checkRoute(page, "/app");
     await expect(page.getByRole("radiogroup", { name: /industry or niche/i })).toBeVisible();
+    await expect(page.getByText(/build the calendar before the scroll ever starts/i)).toBeVisible();
+    await expect(page.getByText(/current setup/i)).toBeVisible();
   });
 
   test("saved calendars and schedule have no serious axe violations", async ({ page }) => {
@@ -50,6 +52,8 @@ test.describe("Accessibility smoke checks", () => {
     await enableE2EAuth(page);
     await checkRoute(page, `/calendar/${E2E_CALENDAR.id}`);
     await expect(page.getByText(E2E_CALENDAR.title)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /workspace controls/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /reformat and export/i })).toBeVisible();
 
     await page.goto("/my-calendars", { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: /^delete$/i }).first().click();

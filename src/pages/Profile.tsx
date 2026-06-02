@@ -132,8 +132,7 @@ export default function Profile() {
   const [requiredHashtags, setRequiredHashtags] = useState<string[]>([]);
   const [bannedTagInput, setBannedTagInput] = useState("");
   const [requiredTagInput, setRequiredTagInput] = useState("");
-  const [defaultTimezone, setDefaultTimezone] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const [defaultTimezone, setDefaultTimezone] = useState<string>(browserTimezone());
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const tzList = listTimezones();
@@ -150,7 +149,7 @@ export default function Profile() {
     }
   }
 
-  const { data: profileData } = useProfileQuery(user?.id);
+  const { data: profileData, isLoading: profileLoading, error: profileError } = useProfileQuery(user?.id);
   const updateProfile = useProfileUpdateMutation(user?.id);
 
   useEffect(() => {
@@ -165,8 +164,13 @@ export default function Profile() {
     setBannedHashtags(parsePolicyList(d?.banned_hashtags));
     setRequiredHashtags(parsePolicyList(d?.required_hashtags));
     setDefaultTimezone(d?.default_timezone || browserTimezone());
-    setLoading(false);
   }, [profileData]);
+
+  useEffect(() => {
+    if (profileError instanceof Error) {
+      toast.error(profileError.message);
+    }
+  }, [profileError]);
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -266,20 +270,25 @@ export default function Profile() {
   async function handleSave() {
     if (!user) return;
     setSaving(true);
-    const updates: Record<string, unknown> = {
-      avatar_url: avatarUrl,
-      default_voice: defaultVoice || null,
-      default_style: defaultStyle || null,
-      default_audiences: defaultAudiences.length ? defaultAudiences : null,
-      default_goals: defaultGoals.length ? defaultGoals : null,
-      banned_hashtags: bannedHashtags.length ? bannedHashtags : null,
-      required_hashtags: requiredHashtags.length ? requiredHashtags : null,
-      default_timezone: defaultTimezone || null,
-    };
-    if (displayName.trim()) updates.display_name = displayName.trim();
-    await updateProfile.mutateAsync(updates);
-    setSaving(false);
-    toast.success("Profile updated");
+    try {
+      const updates: Record<string, unknown> = {
+        avatar_url: avatarUrl,
+        default_voice: defaultVoice || null,
+        default_style: defaultStyle || null,
+        default_audiences: defaultAudiences.length ? defaultAudiences : null,
+        default_goals: defaultGoals.length ? defaultGoals : null,
+        banned_hashtags: bannedHashtags.length ? bannedHashtags : null,
+        required_hashtags: requiredHashtags.length ? requiredHashtags : null,
+        default_timezone: defaultTimezone || null,
+      };
+      if (displayName.trim()) updates.display_name = displayName.trim();
+      await updateProfile.mutateAsync(updates);
+      toast.success("Profile updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const initial = (displayName || user?.email || "?").charAt(0).toUpperCase();
@@ -312,7 +321,7 @@ export default function Profile() {
         </div>
 
         <div className="pf-card">
-          {loading ? (
+          {profileLoading ? (
             <div style={{ color: "#7a7a8e", fontSize: 13 }}>Loading…</div>
           ) : (
             <>
@@ -347,7 +356,7 @@ export default function Profile() {
           )}
         </div>
 
-        {!loading && (
+        {!profileLoading && (
           <div className="pf-card">
             <h2 className="pf-section-h">Brand defaults</h2>
             <div className="pf-section-sub">Pre-fill the wizard with your usual voice, style, audiences, and goals. You can still change them per calendar.</div>

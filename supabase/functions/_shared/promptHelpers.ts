@@ -195,6 +195,49 @@ export function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+export async function recordServerTelemetryEvent(
+  eventName: string,
+  props: Record<string, unknown> = {},
+  userId: string | null = null,
+): Promise<boolean> {
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.warn("Missing supabase env for server telemetry");
+    return false;
+  }
+
+  const row = {
+    event_name: eventName,
+    props,
+    user_id: userId,
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    const res = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/telemetry_events`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify(row),
+    });
+
+    if (!res.ok) {
+      console.warn("Server telemetry insert failed", await res.text());
+      return false;
+    }
+
+    return true;
+  } catch (e) {
+    console.warn("Server telemetry error", e);
+    return false;
+  }
+}
+
 // ─── RATE LIMITING ────────────────────────────────────────────────────────
 
 interface RateLimitConfig {
@@ -248,9 +291,11 @@ export async function checkRateLimit(userId: string, endpoint: string, config: R
 export interface GenerationPayload {
   industry?: string;
   industryLabel?: string;
+  niche?: string;
   platform?: string;
   language?: string;
   coreIdea?: string;
+  brandMemory?: string;
   audiences?: string[];
   voice?: string;
   style?: string;
@@ -330,9 +375,11 @@ export function cleanPayload(body: unknown): GenerationPayload {
   return {
     industry: String(payload.industry || "").trim() || "",
     industryLabel: String(payload.industryLabel || "").trim() || "",
+    niche: String(payload.niche || "").trim() || "",
     platform: String(payload.platform || "LinkedIn").trim(),
     language: String(payload.language || "English").trim(),
     coreIdea: String(payload.coreIdea || "").trim() || "",
+    brandMemory: String(payload.brandMemory || "").trim() || "",
     audiences: cleanList(payload.audiences, 10),
     voice: String(payload.voice || "").trim() || "",
     style: String(payload.style || "").trim() || "",
@@ -360,9 +407,11 @@ export function getPayloadDefaults(): GenerationPayload {
   return {
     industry: "",
     industryLabel: "",
+    niche: "",
     platform: "LinkedIn",
     language: "English",
     coreIdea: "",
+    brandMemory: "",
     audiences: [],
     voice: "",
     style: "",
@@ -384,6 +433,66 @@ export function getPayloadDefaults(): GenerationPayload {
 }
 
 /**
+ * Build the strategic prompt framework that keeps every output centered on one core idea.
+ */
+export function buildStrategicPromptFramework(payload: GenerationPayload): string {
+  const industry = payload.industryLabel || payload.industry || "the selected industry";
+  const niche = payload.niche || industry;
+  const audiences = payload.audiences.length ? payload.audiences.join(", ") : "the target audience";
+  const voice = payload.voice || "the intended brand voice";
+  const style = payload.style || "the intended writing style";
+  const platform = payload.platform || "the chosen platform";
+  const coreIdea = payload.coreIdea || "the provided core idea";
+
+  return `
+PROMPT FRAMEWORK:
+CORE IDEA LOCK:
+- Core idea / central angle: ${coreIdea}
+- Non-negotiable rule: every sentence must support this angle.
+
+VARIABLE SELECTION MATRIX:
+- Industry: use the terminology, examples, and market reality of ${industry}.
+- Platform: adapt hook length, structure, cadence, and formatting to ${platform}.
+- Niche: narrow the frame to ${niche} without widening the topic.
+- Target audience: speak directly to ${audiences}, their goals, and their pain points.
+- Brand voice: preserve ${voice} as the personality of the message.
+- Writing style: render the idea in a ${style} style without changing the thesis.
+${payload.brandMemory ? `- Brand memory: honor these saved preferences without overwriting the core idea: ${payload.brandMemory}` : ""}
+
+FOCUS GUARDRAILS:
+- Do not introduce secondary angles, tangents, or adjacent topics.
+- If a detail does not reinforce the core idea, remove it.
+- If a variable conflicts with the core idea, the core idea wins.
+- Keep the output specialized, but never let specialization become drift.
+
+QUALITY CHECK:
+- Ask whether each line supports the core idea.
+- Ask whether the industry, niche, audience, voice, and style choices changed delivery rather than meaning.
+- Reject any draft that feels broad, generic, or off-angle.`;
+}
+
+export function buildCinematicImagePromptRules(payload: GenerationPayload): string {
+  const industry = payload.industryLabel || payload.industry || "the selected industry";
+  const topic = payload.topic || payload.coreIdea || industry;
+  const audience = payload.audiences.length ? payload.audiences.join(", ") : "the target audience";
+  const voice = payload.voice || "the intended brand voice";
+  const style = payload.style || "the intended writing style";
+
+  return `
+IMAGE PROMPT REQUIREMENT:
+- Add an "image_prompt" field that turns the post into a single cinematic visual concept.
+- Translate the post into a scene, not a literal screenshot or infographic.
+- Preserve the same core idea, but express it through symbolism, mood, and visual storytelling.
+- The prompt must be detailed enough for a high-end image model to produce a polished, editorial-quality result.
+- Anchor the scene in ${industry} and ${topic}, and make it feel relevant to ${audience}.
+- Match the emotional tone of ${voice} and ${style}, but elevate it into a cinematic art direction brief.
+- Explicitly cover artistic style, lighting, composition, color palette, textures, depth, and atmospheric details.
+- Favor language like film still, key art, dramatic framing, realistic depth, rich contrast, and controlled motion.
+- Avoid text overlays, watermarks, UI mockups, collage language, and generic stock-photo language.
+- Keep the final image_prompt concise enough to paste into an image generator, but rich enough to steer quality.`;
+}
+
+/**
  * Build the common prompt context lines (repeated in all functions)
  */
 export function buildPromptContext(
@@ -391,6 +500,7 @@ export function buildPromptContext(
   opts: { includeTopics?: boolean; isSinglePost?: boolean } = {}
 ): string {
   const label = payload.industryLabel || payload.industry;
+  const niche = payload.niche || label;
   const audiences = payload.audiences.length ? payload.audiences.join(", ") : "industry professionals";
   const voice = payload.voice || "conversational and professional";
   const style = payload.style || "balanced";
@@ -398,14 +508,16 @@ export function buildPromptContext(
 
   let topicLine = "";
   if (opts.isSinglePost) {
-    topicLine = `- Topic for this post: ${payload.topic}\n`;
+    const singleTopic = payload.topic || payload.coreIdea || payload.industryLabel || payload.industry || "the topic";
+    topicLine = `- Topic for this post: ${singleTopic}\n`;
   } else if (opts.includeTopics && payload.topics.length) {
     topicLine = `- Topics to cover (use every selected topic at least once across the week; cluster related topics together if needed rather than dropping any): ${payload.topics.join(", ")}\n`;
   }
 
   const dateNote = payload.date ? ` (${payload.date})` : "";
 
-  const context = `- Industry / niche: ${label}
+  const context = `- Industry / niche: ${label || "(not specified)"}
+- Niche focus: ${niche || label || "(not specified)"}
 - Core idea: ${payload.coreIdea}
 - Audience: ${audiences}
 - Voice / tone: ${voice}
@@ -415,8 +527,10 @@ export function buildPromptContext(
 ${topicLine}- Post format mix: ${payload.format}
 - CTA approach: ${payload.cta}${buildContentRules(payload.platform, payload.language)}${buildLanguageRules(payload.language)}${getStylePreset(payload.style)}`;
 
+  const framework = buildStrategicPromptFramework(payload);
+
   // Append a short platform preset to help the model match native conventions
-  return context + getPlatformPreset(payload.platform);
+  return context + framework + getPlatformPreset(payload.platform);
 }
 
 /**
@@ -615,5 +729,6 @@ export function normalizePost(
       ? applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags)
       : p.hashtags || "",
     rationale: fixSpelling(String(p.rationale || "")),
+    image_prompt: fixSpelling(String(p.image_prompt || "")),
   };
 }

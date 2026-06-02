@@ -2,6 +2,20 @@
 import { normalizeText, tokenize } from '../../../src/lib/normalize';
 import { fetchWithRetry, sleep } from '../../../src/lib/http';
 
+export type TrendSourceItem = {
+  source: string;
+  source_id: string | null;
+  title: string;
+  normalized_terms: string[];
+  industry: string | null;
+  platform: string | null;
+  metadata: Record<string, unknown>;
+  raw_payload: Record<string, unknown>;
+  timestamp: string | null;
+  signal_count?: number;
+  last_seen?: string | null;
+};
+
 const NEWS_KEY = process.env.NEWSAPI_KEY;
 
 export async function fetchLatest(params: { sources?: string[]; since?: string; maxItems?: number } = {}) {
@@ -9,7 +23,7 @@ export async function fetchLatest(params: { sources?: string[]; since?: string; 
   const sources = params.sources || ['technology'];
   const maxItems = params.maxItems || 200;
   const q = encodeURIComponent(sources.join(' OR '));
-  const items: any[] = [];
+  const items: TrendSourceItem[] = [];
   let page = 1;
   try {
     while (items.length < maxItems && page < 6) { // NewsAPI limits pages
@@ -33,7 +47,7 @@ export async function fetchLatest(params: { sources?: string[]; since?: string; 
           normalized_terms: tokenize(normalized),
           industry: null,
           platform: 'news',
-          metadata: { source: a.source?.name },
+          metadata: { source: a.source?.name } as Record<string, unknown>,
           raw_payload: a,
           timestamp: a.publishedAt,
         });

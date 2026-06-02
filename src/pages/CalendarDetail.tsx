@@ -31,7 +31,7 @@ import type { Database, Json } from "@/integrations/supabase/types";
 
 interface Post {
   day: number; dow: string; topic: string; format: string;
-  title: string; hook: string; body: string; cta: string; hashtags: string; rationale: string;
+  title: string; hook: string; body: string; cta: string; hashtags: string; rationale: string; image_prompt?: string;
   hook_options?: string[];
   cta_options?: string[];
 }
@@ -102,6 +102,8 @@ const css = `
 .cd-hero-card span { display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#7a7a8e;font-weight:500;margin-bottom:6px; }
 .cd-hero-card strong { display:block;font-family:'Playfair Display',serif;font-size:22px;font-weight:400;color:#edeae3;line-height:1.15;margin-bottom:3px; }
 .cd-hero-card small { display:block;font-size:11px;color:#5a5a72;line-height:1.5; }
+.cd-hero-surface { display:grid; gap:12px; margin-top:16px; }
+.cd-hero-surface .cd-hero-card { box-shadow:0 12px 28px rgba(0,0,0,.18); }
 .cd-strip { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-bottom:18px; }
 .cd-tab { padding:10px 4px; border-radius:8px; border:1px solid rgba(255,255,255,0.055); text-align:center; cursor:pointer; background:#0d0f18; font-family:'Sora',sans-serif; color:inherit; width:100%; transition:border-color .15s; }
 .cd-tab:hover { border-color:rgba(255,255,255,0.12); }
@@ -115,6 +117,11 @@ const css = `
 .cd-export-btn { padding:7px 14px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:transparent; color:#9a9aae; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
 .cd-export-btn:hover { border-color:rgba(200,240,154,0.32); color:#c8f09a; }
 .cd-export-btn:focus-visible { outline:2px solid rgba(200,240,154,0.7); outline-offset:2px; }
+.cd-toolbar-shell { display:grid; grid-template-columns:1fr; gap:12px; margin-bottom:14px; }
+.cd-toolbar-card { background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:16px; padding:14px 16px; }
+.cd-toolbar-card h2 { font-family:'Playfair Display',serif; font-size:18px; font-weight:400; margin:0 0 8px; }
+.cd-toolbar-card p { margin:0; font-size:12px; color:#7a7a8e; line-height:1.65; }
+.cd-toolbar-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; }
 .cd-card { background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:16px; padding:26px; }
 .cd-ptitle { font-family:'Playfair Display',serif; font-size:21px; font-weight:400; line-height:1.35; margin-bottom:18px; }
 .cd-blabel { font-size:9px; letter-spacing:.15em; text-transform:uppercase; color:#3a3a50; margin:16px 0 7px; font-weight:500; display:flex; justify-content:space-between; align-items:center; }
@@ -234,7 +241,7 @@ function wordCount(s: string): number {
 function hasEmoji(text: string): boolean {
   return /\p{Emoji}/u.test(text);
 }
-type TweakKind = "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting";
+type TweakKind = "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting" | "enhance";
 
 export default function CalendarDetail() {
   const { id } = useParams();
@@ -1080,65 +1087,86 @@ export default function CalendarDetail() {
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
-            <span style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#7a7a8e" }}>Week starting</span>
-            <input
-              type="date"
-              aria-label="Week start date"
-              value={weekStart}
-              onChange={e => updateWeekStart(e.target.value)}
-              style={{ background: "#07080d", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "6px 10px", fontSize: 12, color: "#edeae3", fontFamily: "Sora, sans-serif", outline: "none", colorScheme: "dark" }}
-            />
-            <span style={{ fontSize: 11, color: "#7a7a8e" }}>Day 1 = {shortDateLabel(weekStartDate)}</span>
+        <div className="cd-toolbar-shell">
+          <div className="cd-toolbar-card">
+            <h2>Workspace controls</h2>
+            <p>Lock the week start, timezone, and tracking destination before you export or reformat. These settings stay attached to the calendar draft.</p>
+            <div className="cd-toolbar-row">
+              <span className="cd-reformat-label">Week starting</span>
+              <input
+                type="date"
+                aria-label="Week start date"
+                value={weekStart}
+                onChange={e => updateWeekStart(e.target.value)}
+                style={{ background: "#07080d", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "6px 10px", fontSize: 12, color: "#edeae3", fontFamily: "Sora, sans-serif", outline: "none", colorScheme: "dark" }}
+              />
+              <span style={{ fontSize: 11, color: "#7a7a8e" }}>Day 1 = {shortDateLabel(weekStartDate)}</span>
+            </div>
+            <div className="cd-toolbar-row">
+              <span className="cd-reformat-label">Timezone</span>
+              <select
+                className="cd-tz-sel"
+                aria-label="Calendar timezone"
+                value={timezone}
+                onChange={e => updateTimezone(e.target.value)}
+                style={{ maxWidth: 240 }}
+                title={`Workspace default: ${profileTimezone || browserTimezone()}`}
+              >
+                {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
+              </select>
+              <span className="cd-reformat-label" style={{ marginLeft: 4 }}>Tracking URL</span>
+              <input
+                className="cd-tz-input"
+                type="url"
+                placeholder="https://yoursite.com/launch"
+                value={trackingUrl}
+                onChange={e => setTrackingUrl(e.target.value)}
+                onBlur={e => updateTrackingUrl(e.target.value.trim())}
+              />
+            </div>
           </div>
 
-        <div className="cd-tz-bar">
-            <span className="cd-reformat-label">Timezone</span>
-            <select
-              className="cd-tz-sel"
-              aria-label="Calendar timezone"
-              value={timezone}
-              onChange={e => updateTimezone(e.target.value)}
-              style={{ maxWidth: 240 }}
-              title={`Workspace default: ${profileTimezone || browserTimezone()}`}
-            >
-              {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
-            </select>
-            <span className="cd-reformat-label" style={{ marginLeft: 4 }}>Tracking URL</span>
-            <input
-              className="cd-tz-input"
-              type="url"
-              placeholder="https://yoursite.com/launch"
-              value={trackingUrl}
-              onChange={e => setTrackingUrl(e.target.value)}
-              onBlur={e => updateTrackingUrl(e.target.value.trim())}
-            />
+          <div className="cd-toolbar-card">
+            <h2>Reformat and export</h2>
+            <p>Use the quick actions below to generate alternate platform versions or export the calendar into the formats you need for handoff.</p>
+            <div className="cd-toolbar-row">
+              <span className="cd-reformat-label">Reformat for</span>
+              <select
+                className="cd-reformat-sel"
+                aria-label="Reformat platform"
+                value={reformatTarget}
+                onChange={(e) => setReformatTarget(e.target.value)}
+                disabled={reformatting || regenerating}
+              >
+                <option value="" disabled>Choose platform…</option>
+                {(["LinkedIn","Twitter/X","Instagram","Facebook","Newsletter","Blog"] as const)
+                  .filter(p => p !== platform)
+                  .map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <button
+                type="button"
+                className="cd-reformat-btn"
+                disabled={!reformatTarget || reformatting || regenerating}
+                onClick={() => setPendingReformatTarget(reformatTarget)}
+                title="Re-runs all 7; saved as a new calendar"
+              >
+                {reformatting ? "Reformatting all 7…" : "Reformat all 7 →"}
+              </button>
+            </div>
+            <div className="cd-toolbar-row">
+              <span className="cd-reformat-label">Export</span>
+              <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("md")}>
+                {exportingFormat === "md" ? "↓ .md…" : "↓ .md"}
+              </button>
+              <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("pdf")}>
+                {exportingFormat === "pdf" ? "↓ .pdf…" : "↓ .pdf"}
+              </button>
+              <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("ics")} title="Export to Google Calendar / Outlook / Apple Cal">
+                {exportingFormat === "ics" ? "📅 .ics…" : "📅 .ics"}
+              </button>
+            </div>
           </div>
-
-        <div className="cd-reformat-bar">
-            <span className="cd-reformat-label">Reformat for</span>
-            <select
-              className="cd-reformat-sel"
-              aria-label="Reformat platform"
-              value={reformatTarget}
-              onChange={(e) => setReformatTarget(e.target.value)}
-              disabled={reformatting || regenerating}
-            >
-              <option value="" disabled>Choose platform…</option>
-              {(["LinkedIn","Twitter/X","Instagram","Facebook","Newsletter","Blog"] as const)
-                .filter(p => p !== platform)
-                .map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <button
-              type="button"
-              className="cd-reformat-btn"
-              disabled={!reformatTarget || reformatting || regenerating}
-              onClick={() => setPendingReformatTarget(reformatTarget)}
-              title="Re-runs all 7; saved as a new calendar"
-            >
-              {reformatting ? "Reformatting all 7…" : "Reformat all 7 →"}
-            </button>
-          </div>
+        </div>
 
         {posts.length > 1 && (
           <div className="cd-strip" role="tablist" aria-label="Days of the week">
@@ -1332,6 +1360,8 @@ export default function CalendarDetail() {
                   });
                 })()}
               </div>
+              <div className="cd-blabel"><span>Cinematic image prompt</span></div>
+              <div className="cd-body" style={{ whiteSpace: "pre-wrap" }}>{p.image_prompt || "No image prompt generated yet."}</div>
               <div className="cd-actions">
                 {(() => {
                   const f = formatForPlatform(p, platform);
@@ -1416,6 +1446,7 @@ export default function CalendarDetail() {
                       <button className="cd-tweak-opt" onClick={() => regenerateDay("punchier")}>Make punchier</button>
                       <button className="cd-tweak-opt" onClick={() => regenerateDay("add-stat")}>Add a stat</button>
                       <button className="cd-tweak-opt" onClick={() => regenerateDay("remove-emoji")}>Remove emoji</button>
+                      <button className="cd-tweak-opt" onClick={() => regenerateDay("enhance")}>Enhance for performance</button>
                       {(() => {
                         const t = posts[active];
                         const hasE = t ? hasEmoji((t.title || "") + " " + (t.hook || "") + " " + (t.body || "") + " " + (t.cta || "")) : false;
@@ -1497,6 +1528,9 @@ export default function CalendarDetail() {
 
               <div className="cd-blabel"><span>Why this works (rationale)</span></div>
               <textarea className="cd-edit-area" rows={3} value={draft.rationale} onChange={e => setDraft({ ...draft, rationale: e.target.value })} />
+
+              <div className="cd-blabel"><span>Cinematic image prompt</span></div>
+              <textarea className="cd-edit-area" rows={8} value={draft.image_prompt || ""} onChange={e => setDraft({ ...draft, image_prompt: e.target.value })} />
 
               <div className="cd-actions">
                 <button className="cd-btn cd-btn-p" onClick={saveEdit} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>

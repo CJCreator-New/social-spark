@@ -1,7 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { buildEngagementRules, buildPromptContext, cleanPayload } from "./promptHelpers.ts";
+import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload } from "./promptHelpers.ts";
 
 describe("promptHelpers engagement guidance", () => {
+  it("adds a core-idea framework that locks the output to one angle", () => {
+    const payload = cleanPayload({
+      industry: "SaaS",
+      niche: "Customer onboarding",
+      coreIdea: "Better onboarding",
+      platform: "LinkedIn",
+      audiences: ["Founders", "Product teams"],
+      voice: "clear",
+      style: "how-to guide",
+      goals: ["Awareness"],
+      format: "Balanced mix",
+      cta: "Comment below",
+    });
+
+    const context = buildPromptContext(payload, { isSinglePost: true });
+
+    expect(context).toContain("PROMPT FRAMEWORK");
+    expect(context).toContain("CORE IDEA LOCK");
+    expect(context).toContain("Core idea / central angle: Better onboarding");
+    expect(context).toContain("Niche: narrow the frame to Customer onboarding without widening the topic");
+    expect(context).toContain("If a variable conflicts with the core idea, the core idea wins");
+    expect(context).toContain("Reject any draft that feels broad, generic, or off-angle");
+  });
+
   it("adds platform-specific guidance for LinkedIn", () => {
     const rules = buildEngagementRules("LinkedIn");
 
@@ -68,5 +92,24 @@ describe("promptHelpers engagement guidance", () => {
 
     expect(context).toContain("STYLE PRESCRIPT");
     expect(context).toContain("Lead with a concrete number, percentage, or metric");
+  });
+
+  it("adds cinematic image prompt guidance for visual generation", () => {
+    const payload = cleanPayload({
+      industry: "SaaS",
+      coreIdea: "Better onboarding",
+      topic: "First-run experience",
+      platform: "Instagram",
+      audiences: ["Founders"],
+      voice: "cinematic",
+      style: "editorial",
+    });
+
+    const guidance = buildCinematicImagePromptRules(payload);
+
+    expect(guidance).toContain("image_prompt");
+    expect(guidance).toContain("artistic style, lighting, composition, color palette, textures, depth, and atmospheric details");
+    expect(guidance).toContain("film still, key art, dramatic framing");
+    expect(guidance).toContain("Avoid text overlays, watermarks, UI mockups");
   });
 });

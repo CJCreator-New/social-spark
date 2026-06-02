@@ -9,6 +9,8 @@ export interface PerformanceScore {
   feedback: string[]; // Actionable suggestions
 }
 
+export type PerformanceFocusMetric = "hookStrength" | "ctaEffectiveness" | "hashtagRelevance" | "readability";
+
 /**
  * Detect if a hook creates curiosity (starts with stat, question, or strong verb)
  */
@@ -223,6 +225,17 @@ export function calculatePerformanceScore(post: Post, topic: string = ""): Perfo
     overallScore,
     feedback,
   };
+}
+
+export function getWeakestPerformanceMetric(score: PerformanceScore): PerformanceFocusMetric {
+  const candidates: Array<{ metric: PerformanceFocusMetric; gap: number }> = [
+    { metric: "hookStrength", gap: 10 - score.hookStrength },
+    { metric: "ctaEffectiveness", gap: 10 - score.ctaEffectiveness },
+    { metric: "hashtagRelevance", gap: Math.max(0, (100 - score.hashtagRelevance) / 10) },
+    { metric: "readability", gap: score.readability < 8 ? 8 - score.readability : score.readability > 12 ? score.readability - 12 : 0 },
+  ];
+
+  return candidates.sort((a, b) => b.gap - a.gap)[0]?.metric || "hookStrength";
 }
 
 /**

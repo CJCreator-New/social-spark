@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { getE2EAuthFlag } from "../src/lib/e2eFixtures";
+import { E2E_CALENDAR, getE2EAuthFlag } from "../src/lib/e2eFixtures";
 
 async function enableE2EAuth(page: Page) {
   await page.addInitScript((flag) => {
@@ -34,6 +34,16 @@ for (const viewport of viewports) {
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         expect(overflow).toBeLessThanOrEqual(2);
       }
+    });
+
+    test("redesigned calendar detail keeps toolbar cards visible", async ({ page }) => {
+      await enableE2EAuth(page);
+
+      await page.goto(`/calendar/${E2E_CALENDAR.id}`);
+      await expect(page.getByRole("heading", { name: /workspace controls/i })).toBeVisible({ timeout: 30000 });
+      await expect(page.getByRole("heading", { name: /reformat and export/i })).toBeVisible();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(2);
     });
   });
 }

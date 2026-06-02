@@ -2,10 +2,24 @@
 import { normalizeText, tokenize } from '../../../src/lib/normalize';
 import { fetchWithRetry, sleep } from '../../../src/lib/http';
 
+export type TrendSourceItem = {
+  source: string;
+  source_id: string | null;
+  title: string;
+  normalized_terms: string[];
+  industry: string | null;
+  platform: string | null;
+  metadata: Record<string, unknown>;
+  raw_payload: Record<string, unknown>;
+  timestamp: string | null;
+  signal_count?: number;
+  last_seen?: string | null;
+};
+
 export async function fetchLatest(params: { subreddit?: string; since?: string; maxItems?: number } = {}) {
   const subreddit = params.subreddit || 'all';
   const maxItems = params.maxItems || 200;
-  const items: any[] = [];
+  const items: TrendSourceItem[] = [];
   let after: string | null = null;
   let attempts = 0;
   try {
@@ -34,7 +48,7 @@ export async function fetchLatest(params: { subreddit?: string; since?: string; 
           normalized_terms: tokenize(normalized),
           industry: null,
           platform: 'reddit',
-          metadata: { subreddit: post.subreddit, score: post.score },
+          metadata: { subreddit: post.subreddit, score: post.score } as Record<string, unknown>,
           raw_payload: post,
           timestamp: new Date((post.created_utc || Date.now()/1000) * 1000).toISOString(),
         });

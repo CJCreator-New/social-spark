@@ -12,7 +12,7 @@ describe("exportCalendar", () => {
     vi.stubGlobal("URL", {
       createObjectURL: (blob: Blob) => {
         capturedBlob = blob;
-        return createObjectURLMock(blob);
+        return createObjectURLMock();
       },
       revokeObjectURL: revokeObjectURLMock,
     } as unknown as typeof URL);
@@ -52,6 +52,7 @@ describe("exportCalendar", () => {
           cta: "Reply now",
           hashtags: "#AI #Growth",
           rationale: "Works because it is specific",
+          image_prompt: "Cinematic key art of a founder at dusk.",
         },
       ],
       { style: FontStyle.BoldSerif }
@@ -66,5 +67,6 @@ describe("exportCalendar", () => {
     expect(text).toContain(applyStyle("Open strong", FontStyle.BoldSerif));
     expect(text).toContain(applyStyle("Reply now", FontStyle.BoldSerif));
     expect(text).toContain(applyStyle("#AI #Growth", FontStyle.BoldSerif));
+    expect(text).toContain(applyStyle("Cinematic key art of a founder at dusk.", FontStyle.BoldSerif));
   });
 });

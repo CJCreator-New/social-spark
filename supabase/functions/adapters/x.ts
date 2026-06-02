@@ -2,12 +2,26 @@
 import { normalizeText, tokenize } from '../../../src/lib/normalize';
 import { fetchWithRetry, sleep } from '../../../src/lib/http';
 
+export type TrendSourceItem = {
+  source: string;
+  source_id: string | null;
+  title: string;
+  normalized_terms: string[];
+  industry: string | null;
+  platform: string | null;
+  metadata: Record<string, unknown>;
+  raw_payload: Record<string, unknown>;
+  timestamp: string | null;
+  signal_count?: number;
+  last_seen?: string | null;
+};
+
 const BEARER = process.env.X_BEARER_TOKEN || process.env.TWITTER_BEARER_TOKEN;
 
 export async function fetchLatest(params: { query?: string; since?: string; maxItems?: number } = {}) {
   if (!BEARER) return [];
   const maxItems = params.maxItems || 200;
-  const items: any[] = [];
+  const items: TrendSourceItem[] = [];
   let next_token: string | undefined = undefined;
   let attempts = 0;
   const qparam = params.query || 'trending OR #trending';
@@ -35,7 +49,7 @@ export async function fetchLatest(params: { query?: string; since?: string; maxI
           normalized_terms: tokenize(normalized),
           industry: null,
           platform: 'x',
-          metadata: { public_metrics: t.public_metrics },
+          metadata: { public_metrics: t.public_metrics } as Record<string, unknown>,
           raw_payload: t,
           timestamp: t.created_at,
         });

@@ -21,6 +21,7 @@ import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zone
 import { downloadScheduleCsv } from "@/lib/exportSchedule";
 import { buildTrackingUrl } from "@/lib/utm";
 import { useCancelScheduledPostMutation, useScheduleInfiniteQuery, useUpdateScheduledPostStatusMutation, useUpdateScheduledPostTimeMutation } from "@/hooks/useAppQueries";
+import { resolveScheduleTimezone, saveScheduleTimezone } from "@/lib/schedulePreferences";
 
 type WorkflowStatus = "drafted" | "approved" | "published" | "failed";
 type SortKey = "date-asc" | "date-desc" | "platform" | "status";
@@ -150,10 +151,14 @@ export default function Schedule() {
     const pages = scheduleData.pages;
     const firstPage = pages[0];
     setProfileTz(firstPage.profileTz);
-    setViewTz(firstPage.profileTz);
+    setViewTz((current) => current || resolveScheduleTimezone(user?.id, firstPage.profileTz, browserTimezone()));
     setRows(pages.flatMap(page => page.rows) as ScheduledRow[]);
     setCalendars(firstPage.calendars);
-  }, [scheduleData]);
+  }, [scheduleData, user?.id]);
+
+  useEffect(() => {
+    saveScheduleTimezone(user?.id, viewTz);
+  }, [user?.id, viewTz]);
 
   useEffect(() => {
     if (!hasNextPage || isFetchingNextPage) return;

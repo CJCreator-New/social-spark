@@ -11,9 +11,11 @@ import {
   checkRateLimit,
   cleanPayload,
   buildPromptContext,
+  buildCinematicImagePromptRules,
   callAIGateway,
   parseAIResponse,
   normalizePost,
+  recordServerTelemetryEvent,
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req) => {
@@ -22,10 +24,12 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const payload = cleanPayload(body);
+    if (!payload.topic) {
+      console.info("generate-single-post: no topic provided; AI may infer topic from core idea or industry.", { industry: payload.industry, industryLabel: payload.industryLabel });
+    }
 
-    // Validate required fields
+    // Validate required fields (topic is optional — AI can infer a topic from core idea)
     if (!payload.coreIdea?.trim()) return jsonResponse({ error: "Missing core idea." }, 400);
-    if (!payload.topic?.trim()) return jsonResponse({ error: "Missing topic." }, 400);
     if (!VALID_DOW.has(payload.dow)) return jsonResponse({ error: "Invalid day-of-week." }, 400);
 
     // Rate limiting: 20 requests per minute per user (higher for single-post as it's faster)
@@ -50,6 +54,7 @@ Deno.serve(async (req) => {
     const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: false });
 
     const dateNote = payload.date ? ` (${payload.date})` : "";
+    // If no explicit topic was provided, allow the model to infer one from the core idea
     const contextLines = buildPromptContext(payload, { isSinglePost: true });
 
     const prompt = `You are a world-class ${payload.platform} content strategist specialising in ${payload.industryLabel || payload.industry} content.
@@ -61,6 +66,8 @@ ${contextLines}
 ${payload.extra ? `- Extra instructions: ${payload.extra}` : ""}
 ${payload.bannedWords.length ? `- NEVER SAY (hard ban — do not use these words or close variants): ${payload.bannedWords.join(", ")}` : ""}
 ${payload.requiredWords.length ? `- TRY TO MENTION (weave in naturally if it fits): ${payload.requiredWords.join(", ")}` : ""}
+
+${buildCinematicImagePromptRules(payload)}
 
 OUTPUT VARIANTS:
 - Provide 3 distinct hook options and 2 CTA variants. Place them in the structured fields hook_options (array) and cta_options (array). The primary hook and cta may be the first items from those arrays.
@@ -93,13 +100,14 @@ ${bannedPhrasesBlock()}`;
             body: { type: "string" },
               cta: { type: "string" },
               cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
+              image_prompt: { type: "string" },
             hashtags: {
               type: "string",
               description: isLongFormPlatform(payload.platform) ? "MUST be empty for Newsletter/Blog." : "3–6 hashtags, space-separated.",
             },
             rationale: { type: "string" },
           },
-          required: ["day", "dow", "topic", "format", "title", "hook", "body", "cta", "hashtags", "rationale"],
+          required: ["day", "dow", "topic", "format", "title", "hook", "body", "cta", "hashtags", "rationale", "image_prompt"],
           additionalProperties: false,
         },
       },
@@ -121,7 +129,21 @@ ${bannedPhrasesBlock()}`;
       return jsonResponse({ error: "Failed to normalize post response." }, 500);
     }
 
-    return jsonResponse({ post });
+    const responseBody: Record<string, unknown> = { post };
+    if ((payload as Record<string, unknown>).inferredTopics) {
+      responseBody.meta = { inferredTopics: true };
+      console.info("generate-single-post: marking response with meta.inferredTopics = true");
+      await recordServerTelemetryEvent("generate_topics_inferred", {
+        endpoint: "generate-single-post",
+        mode: "single-day",
+        platform: payload.platform,
+        industry: payload.industryLabel || payload.industry,
+        coreIdea: payload.coreIdea,
+        dow: payload.dow,
+      });
+    }
+
+    return jsonResponse(responseBody);
   } catch (e) {
     console.error("generate-single-post error", e, e?.stack);
     return jsonResponse(

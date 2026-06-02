@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ import {
 import { AlertCircle, Activity, TrendingUp, Users, Calendar, Zap } from 'lucide-react';
 import { fetchAdminStats, AdminStats } from '@/lib/admin';
 import { SkeletonList } from '@/components/SkeletonList';
+import telemetry from '@/lib/telemetry';
 
 // ============================================================================
 // ADMIN DASHBOARD COMPONENT
@@ -50,6 +51,12 @@ export function AdminDashboard() {
         setStats(data);
         setLastUpdated(new Date());
         setError(null);
+        telemetry.sendEvent('admin_dashboard_loaded', {
+          activeUsersToday: data.overview.activeUsersToday,
+          calendarsGeneratedToday: data.overview.calendarsGeneratedToday,
+          apiSuccessRate: data.overview.apiSuccessRate,
+          apiErrorRate: data.overview.apiErrorRate,
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load admin stats');
       } finally {
@@ -63,6 +70,11 @@ export function AdminDashboard() {
     const interval = setInterval(loadStats, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleRefresh = async () => {
+    telemetry.sendEvent('admin_dashboard_refresh_clicked');
+    window.location.reload();
+  };
 
   if (loading) {
     return <SkeletonList rows={4} />;
@@ -91,6 +103,7 @@ export function AdminDashboard() {
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">Track how the product is behaving, spot error spikes, and read the platform mix at a glance.</p>
           <div className="mt-5 flex flex-wrap gap-2">
             <Badge variant="outline">Auto-refresh 30s</Badge>
+            <Badge variant="outline">Telemetry on</Badge>
             <Badge variant="outline">Errors {stats.errors.total24h} / 24h</Badge>
             <Badge variant="outline">Success {stats.overview.apiSuccessRate}%</Badge>
           </div>
@@ -103,7 +116,7 @@ export function AdminDashboard() {
               <p className="mt-2 font-serif text-2xl font-normal text-white">{lastUpdated.toLocaleTimeString()}</p>
               <p className="mt-2 text-sm leading-6 text-slate-400">Auto-refreshes every 30 seconds.</p>
             </div>
-            <Button size="sm" onClick={() => window.location.reload()}>
+            <Button size="sm" onClick={handleRefresh}>
               Refresh
             </Button>
           </div>

@@ -8,26 +8,41 @@ import { computeDedupeHash } from '../../../src/lib/normalize';
 import { pushMetrics, summarizeCounts } from '../../../src/lib/metrics';
 import { addBreadcrumb } from '../../../src/lib/monitoring';
 
-async function attemptAdapter<T extends any[]>(fn: (...args: any[]) => Promise<T>, args: any[] = [], maxAttempts = 3) {
+type TrendItem = {
+  source: string;
+  source_id: string | null;
+  title: string;
+  normalized_terms: string[];
+  industry: string | null;
+  platform: string | null;
+  metadata: Record<string, unknown>;
+  raw_payload: Record<string, unknown>;
+  timestamp: string | null;
+  signal_count?: number;
+  last_seen?: string | null;
+};
+
+async function attemptAdapter<Args extends unknown[], T>(fn: (...args: Args) => Promise<T>, args: Args, maxAttempts = 3): Promise<T> {
   let attempt = 0;
-  const results: T | null = null;
+  let lastError: unknown = null;
   while (attempt < maxAttempts) {
     attempt += 1;
     try {
       const res = await fn(...args);
       return res;
     } catch (err) {
+      lastError = err;
       console.error('adapter attempt failed', { attempt, err });
       if (attempt >= maxAttempts) throw err;
       const wait = 200 * Math.pow(2, attempt) + Math.random() * 200;
       await sleep(wait);
     }
   }
-  return results as unknown as T;
+  throw lastError instanceof Error ? lastError : new Error('adapter failed');
 }
 
-function mergeItems(items: Array<any>) {
-  const map = new Map<string, any>();
+function mergeItems(items: TrendItem[]) {
+  const map = new Map<string, TrendItem & { dedupe_hash: string; signal_count: number }>();
   for (const it of items) {
     const hash = computeDedupeHash((it.title || '').toLowerCase(), (it.normalized_terms || []).map(String));
     if (!map.has(hash)) {
@@ -45,13 +60,13 @@ function mergeItems(items: Array<any>) {
 }
 
 export async function handler() {
-  const out: any = { adapters: {}, total_raw: 0, total_merged: 0, upserts: 0 };
+  const out: { adapters: Record<string, number>; total_raw: number; total_merged: number; upserts: number } = { adapters: {}, total_raw: 0, total_merged: 0, upserts: 0 };
 
   // Run adapters with retries in parallel
   const promises = [
-    attemptAdapter(fetchReddit, [{ subreddit: 'all', maxItems: 200 }], 3).catch((e) => { console.error('reddit failed', e); return [] as any[] }),
-    attemptAdapter(fetchX, [{ query: 'trending OR #trending', maxItems: 200 }], 3).catch((e) => { console.error('x failed', e); return [] as any[] }),
-    attemptAdapter(fetchNews, [{ sources: ['technology','business'], maxItems: 200 }], 3).catch((e) => { console.error('news failed', e); return [] as any[] }),
+    attemptAdapter(fetchReddit, [{ subreddit: 'all', maxItems: 200 }], 3).catch((e) => { console.error('reddit failed', e); return [] as TrendItem[] }),
+    attemptAdapter(fetchX, [{ query: 'trending OR #trending', maxItems: 200 }], 3).catch((e) => { console.error('x failed', e); return [] as TrendItem[] }),
+    attemptAdapter(fetchNews, [{ sources: ['technology','business'], maxItems: 200 }], 3).catch((e) => { console.error('news failed', e); return [] as TrendItem[] }),
   ];
 
   const [r, x, n] = await Promise.all(promises);

@@ -11,6 +11,7 @@ export interface ExportPost {
   cta: string;
   hashtags: string;
   rationale: string;
+  image_prompt?: string;
 }
 
 export interface ExportMeta {
@@ -86,6 +87,13 @@ export function downloadMd(meta: ExportMeta, posts: ExportPost[], options?: Expo
       lines.push("### Why this works");
       lines.push("");
       lines.push(`_${styleText(p.rationale, style)}_`);
+      lines.push("");
+    }
+
+    if (p.image_prompt) {
+      lines.push("### Cinematic image prompt");
+      lines.push("");
+      lines.push(styleText(p.image_prompt, style));
       lines.push("");
     }
   }
@@ -168,6 +176,11 @@ export function downloadPdf(meta: ExportMeta, posts: ExportPost[]) {
     if (p.rationale) {
       writeWrapped("WHY THIS WORKS", { size: 8, bold: true, color: [120, 140, 90], gap: 4 });
       writeWrapped(p.rationale, { size: 10, color: [120, 120, 140], gap: 12 });
+    }
+
+    if (p.image_prompt) {
+      writeWrapped("CINEMATIC IMAGE PROMPT", { size: 8, bold: true, color: [120, 140, 90], gap: 4 });
+      writeWrapped(p.image_prompt, { size: 10, color: [120, 120, 140], gap: 12 });
     }
 
     hr();
