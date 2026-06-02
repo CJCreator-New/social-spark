@@ -999,7 +999,7 @@ async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraf
 
 async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
   if (!wizardDraftServerAvailable) return;
-  const { error } = await supabase.from(WIZARD_SERVER_DRAFT_TABLE).upsert(
+  const { error } = await (supabase.from as any)(WIZARD_SERVER_DRAFT_TABLE).upsert(
     {
       user_id: userId,
       snapshot: makeDraftEnvelope(snapshot) as unknown as Json,
@@ -1011,7 +1011,7 @@ async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
 
 async function clearServerDraft(userId: string) {
   if (!wizardDraftServerAvailable) return;
-  const { error } = await supabase.from(WIZARD_SERVER_DRAFT_TABLE).delete().eq("user_id", userId);
+  const { error } = await (supabase.from as any)(WIZARD_SERVER_DRAFT_TABLE).delete().eq("user_id", userId);
   if (error) markWizardDraftServerUnavailable(error);
 }
 
