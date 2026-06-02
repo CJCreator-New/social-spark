@@ -14,99 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      job_queue: {
-        Row: {
-          attempts: number
-          created_at: string
-          id: string
-          job_type: string
-          last_error: string | null
-          locked_at: string | null
-          lock_token: string | null
-          max_attempts: number
-          next_attempt_at: string
-          payload: Json
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          attempts?: number
-          created_at?: string
-          id?: string
-          job_type: string
-          last_error?: string | null
-          locked_at?: string | null
-          lock_token?: string | null
-          max_attempts?: number
-          next_attempt_at?: string
-          payload?: Json
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          attempts?: number
-          created_at?: string
-          id?: string
-          job_type?: string
-          last_error?: string | null
-          locked_at?: string | null
-          lock_token?: string | null
-          max_attempts?: number
-          next_attempt_at?: string
-          payload?: Json
-          status?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      media_references: {
-        Row: {
-          bucket: string
-          created_at: string
-          deleted_at: string | null
-          id: string
-          last_referenced_at: string
-          orphaned_at: string | null
-          public_url: string
-          reference_count: number
-          reference_key: string | null
-          reference_kind: string
-          storage_path: string
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          bucket: string
-          created_at?: string
-          deleted_at?: string | null
-          id?: string
-          last_referenced_at?: string
-          orphaned_at?: string | null
-          public_url: string
-          reference_count?: number
-          reference_key?: string | null
-          reference_kind?: string
-          storage_path: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          bucket?: string
-          created_at?: string
-          deleted_at?: string | null
-          id?: string
-          last_referenced_at?: string
-          orphaned_at?: string | null
-          public_url?: string
-          reference_count?: number
-          reference_key?: string | null
-          reference_kind?: string
-          storage_path?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -304,30 +211,6 @@ export type Database = {
         }
         Relationships: []
       }
-      telemetry_events: {
-        Row: {
-          created_at: string
-          event_name: string
-          id: string
-          props: Json
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          event_name: string
-          id?: string
-          props?: Json
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          event_name?: string
-          id?: string
-          props?: Json
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       user_roles: {
         Row: {
           created_at: string
@@ -349,72 +232,6 @@ export type Database = {
         }
         Relationships: []
       }
-      regenerate_feedback: {
-        Row: {
-          calendar_id: string | null
-          category: string | null
-          created_at: string
-          day: number
-          dow: string
-          feedback: string
-          id: string
-          platform: string | null
-          rating: number | null
-          tweak: string | null
-          user_id: string | null
-        }
-        Insert: {
-          calendar_id?: string | null
-          category?: string | null
-          created_at?: string
-          day: number
-          dow: string
-          feedback: string
-          id?: string
-          platform?: string | null
-          rating?: number | null
-          tweak?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          calendar_id?: string | null
-          category?: string | null
-          created_at?: string
-          day?: number
-          dow?: string
-          feedback?: string
-          id?: string
-          platform?: string | null
-          rating?: number | null
-          tweak?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      wizard_drafts: {
-        Row: {
-          created_at: string
-          id: string
-          snapshot: Json
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          snapshot: Json
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          snapshot?: Json
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
@@ -426,16 +243,6 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
-      }
-      claim_next_job: {
-        Args: Record<PropertyKey, never>
-        Returns: Database["public"]["Tables"]["job_queue"]["Row"][]
-      }
-      cleanup_orphan_media_references: {
-        Args: {
-          max_age?: unknown
-        }
-        Returns: Database["public"]["Tables"]["media_references"]["Row"][]
       }
     }
     Enums: {
