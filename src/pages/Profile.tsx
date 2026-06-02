@@ -133,6 +133,9 @@ export default function Profile() {
   const [bannedTagInput, setBannedTagInput] = useState("");
   const [requiredTagInput, setRequiredTagInput] = useState("");
   const [defaultTimezone, setDefaultTimezone] = useState<string>(browserTimezone());
+  const [brandExamples, setBrandExamples] = useState<string[]>([]);
+  const [brandExampleInput, setBrandExampleInput] = useState("");
+  const [defaultFramework, setDefaultFramework] = useState<string>("Auto");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const tzList = listTimezones();
@@ -160,10 +163,12 @@ export default function Profile() {
     setDefaultStyle(profileData.default_style || "");
     setDefaultAudiences(profileData.default_audiences || []);
     setDefaultGoals(profileData.default_goals || []);
-    const d = profileData as { banned_hashtags?: string[] | null; required_hashtags?: string[] | null; default_timezone?: string | null } | null;
+    const d = profileData as { banned_hashtags?: string[] | null; required_hashtags?: string[] | null; default_timezone?: string | null; brand_examples?: string[] | null; default_framework?: string | null } | null;
     setBannedHashtags(parsePolicyList(d?.banned_hashtags));
     setRequiredHashtags(parsePolicyList(d?.required_hashtags));
     setDefaultTimezone(d?.default_timezone || browserTimezone());
+    setBrandExamples(d?.brand_examples || []);
+    setDefaultFramework(d?.default_framework || "Auto");
   }, [profileData]);
 
   useEffect(() => {
@@ -243,6 +248,14 @@ export default function Profile() {
     setAudienceInput("");
   }
 
+  function addBrandExample() {
+    const v = brandExampleInput.trim();
+    if (!v) return;
+    if (brandExamples.length >= 3) return toast.error('Max 3 examples');
+    setBrandExamples(p => [...p, v]);
+    setBrandExampleInput('');
+  }
+
   function removeAudience(a: string) {
     setDefaultAudiences(p => p.filter(x => x !== a));
   }
@@ -281,6 +294,8 @@ export default function Profile() {
         required_hashtags: requiredHashtags.length ? requiredHashtags : null,
         default_timezone: defaultTimezone || null,
       };
+      if (brandExamples.length) updates.brand_examples = brandExamples;
+      if (defaultFramework) updates.default_framework = defaultFramework;
       if (displayName.trim()) updates.display_name = displayName.trim();
       await updateProfile.mutateAsync(updates);
       toast.success("Profile updated");
@@ -409,6 +424,32 @@ export default function Profile() {
                     {g}
                   </button>
                 ))}
+              </div>
+
+              <label className="pf-label" htmlFor="pf-framework">Default prompt framework</label>
+              <select id="pf-framework" className="pf-select" value={defaultFramework} onChange={e => setDefaultFramework(e.target.value)}>
+                <option value="Auto">Auto (choose best)</option>
+                <option value="AIDA">AIDA</option>
+                <option value="PAS">PAS</option>
+                <option value="BAB">BAB</option>
+                <option value="4U">4U</option>
+                <option value="FAB">FAB</option>
+                <option value="Question-led">Question-led</option>
+                <option value="Story-led">Story-led</option>
+              </select>
+
+              <div className="pf-label">Brand example posts (optional — up to 3)</div>
+              <div className="pf-tagrow" aria-hidden>
+                {brandExamples.length === 0 ? <div className="pf-tagrow-empty">No examples saved</div> : brandExamples.map((b, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ flex: 1, fontSize: 13, color: '#c8f09a' }}>{b}</div>
+                    <button className="pf-add-btn" onClick={() => setBrandExamples(prev => prev.filter((_, idx) => idx !== i))}>Remove</button>
+                  </div>
+                ))}
+              </div>
+              <div className="pf-add-row">
+                <input className="pf-input" placeholder="Paste one of your best posts" value={brandExampleInput} onChange={e => setBrandExampleInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addBrandExample())} />
+                <button className="pf-add-btn" onClick={() => addBrandExample()}>Add</button>
               </div>
 
               <div style={{ height: 8 }} />

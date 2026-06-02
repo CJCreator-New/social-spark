@@ -12,6 +12,8 @@ import {
   checkRateLimit,
   cleanPayload,
   normalizePost,
+  buildSystemMessage,
+  buildUserMessage,
 } from "../_shared/promptHelpers.ts";
 
 interface ExistingPost {
@@ -98,52 +100,28 @@ Deno.serve(async (req) => {
       .map(s => `- Day ${s.day} (${s.dow}) · "${s.topic}" — opener: "${(s.hook || s.title || "").slice(0, 100)}"`)
       .join("\n");
 
-    const prompt = `You are a world-class ${payload.platform} content strategist specialising in ${payload.industryLabel || payload.industry} content.
+    const systemMsg = buildSystemMessage(payload, { isSinglePost: true });
+    
+    // Phase D: Diff-aware regen logic
+    // Construct a specific comparison if a tweak is provided
+    let diffContext = "";
+    if (tweakInstr) {
+      diffContext = `
+CRITIQUE & REWRITE GUIDANCE:
+1. Identify the parts of the CURRENT VERSION below that fail the TWEAK instruction.
+2. Formulate a plan to fix only those parts while preserving the core value of the post.
+3. Rewrite the post, ensuring the specific instruction ("${tweak}") is fully executed.
+`;
+    }
 
-Re-write a SINGLE post (Day ${post.day} — ${post.dow}) in an existing 7-day ${payload.platform} content calendar. The other 6 posts are unchanged — your post must feel fresh and complementary, not duplicative.
-
-CONTEXT:
-- Industry / niche: ${payload.industryLabel || payload.industry}
-- Core idea: ${payload.coreIdea}
-- Audience: ${payload.audiences.length ? payload.audiences.join(", ") : "industry professionals"}
-- Voice / tone: ${payload.voice || "conversational and professional"}
-- Writing style: ${payload.style || "balanced"}
-- Goals: ${payload.goals.join(", ") || "Awareness, Engagement"}
-- Post format mix: ${payload.format}
-- CTA approach: ${payload.cta}
-- POST LENGTH: ${lengthInstr}
-- POST STRUCTURE: ${structureInstr}
-${payload.extra ? `- Extra instructions: ${payload.extra}` : ""}
-${payload.bannedWords.length ? `- NEVER SAY (hard ban — do not use these words or close variants): ${payload.bannedWords.join(", ")}` : ""}
-${payload.requiredWords.length ? `- TRY TO MENTION (prefer naturally weaving in at least one of these if it fits the topic): ${payload.requiredWords.join(", ")}` : ""}
-
-
-${buildEngagementRules(payload.platform)}
-${getStylePreset(payload.style)}
-
-OUTPUT VARIANTS:
-- Provide 3 distinct hook options and 2 CTA variants. Place them in the structured fields hook_options and cta_options. The primary hook and cta may be the first items from those arrays.
-
-THIS POST:
-- Day: ${post.day} (${post.dow})
-- Topic: ${targetTopic}
-${tweakInstr ? "" : (post.title ? `- Previous title (do NOT reuse): "${post.title}"` : "")}
-${tweakInstr ? "" : (post.hook ? `- Previous hook (do NOT reuse opener): "${post.hook.slice(0, 120)}"` : "")}
-${tweakInstr ? `\nCURRENT VERSION TO TWEAK (preserve angle, transform per tweak instruction):\n- Title: "${post.title || ""}"\n- Hook: "${post.hook || ""}"\n- Body: "${(post.body || "").slice(0, 600)}"\n- CTA: "${post.cta || ""}"\n` : ""}
-${tweakInstr ? tweakInstr + "\n" : ""}
-${tweak === "enhance" && focusMetric ? `TARGETED PERFORMANCE FOCUS: ${focusMetric}\n` : ""}
-OTHER POSTS IN THIS WEEK (do NOT duplicate angles, openers, statistics, or examples):
-${siblingSummary || "(none provided)"}
-
-HARD RULES:
-1. ${tweakInstr ? `Apply the TWEAK above to the current version. Keep the same core angle and topic.` : `Write a genuinely fresh take on "${targetTopic}" that does NOT repeat the previous title/hook above.`}
-2. Stay specific to the ${payload.industryLabel || payload.industry} space — real terminology, real platforms, real trends.
-3. Follow the POST LENGTH and POST STRUCTURE rules exactly${tweakInstr === TWEAK_INSTRUCTIONS.shorter ? " (the 'shorter' tweak overrides the length target)" : ""}.
-4. ${hashtagInstr}
-5. The "dow" field MUST be "${post.dow}" and "day" MUST be ${post.day}.
-6. In the "format" field, append the structure used (e.g. "How-to — hybrid").
-
-${bannedPhrasesBlock()}`;
+    const userMsg = buildUserMessage(payload, { isSinglePost: true }) + 
+      `\n\nREWRITE CONTEXT:\n- Day: ${post.day} (${post.dow})\n- Topic: ${targetTopic}` +
+      (post.title ? `\n- Previous Title Ref: "${post.title}"` : "") +
+      `\n\nCURRENT VERSION:\n- Title: "${post.title || ''}"\n- Hook: "${post.hook || ''}"\n- Body: "${(post.body || '').slice(0, 800)}"\n- CTA: "${post.cta || ''}"\n` +
+      `\nUSER INSTRUCTION / TWEAK:\n${tweakInstr || "General variety improvement"}\n` +
+      diffContext +
+      `\nOTHER POSTS IN THIS WEEK (For context/variety reference):\n${siblingSummary || '(none provided)'}\n\n` +
+      `HARD RULES: Return the full post object. Fix exactly what was requested. If a tweak is provided, prioritize it over generic platform rules.`;
 
     const tool = {
       type: "function",
@@ -163,6 +141,29 @@ ${bannedPhrasesBlock()}`;
             body: { type: "string" },
               cta: { type: "string" },
               cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
+            // Phase A additions: plan + variants + self-check
+            plan: {
+              type: "object",
+              properties: {
+                angle: { type: "string" },
+                hook_thesis: { type: "string" },
+                proof_points: { type: "array", items: { type: "string" } },
+                cta_intent: { type: "string" },
+              },
+              additionalProperties: false,
+            },
+            body_variants: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 2 },
+            chosen_index: { type: "number" },
+            self_check: {
+              type: "object",
+              properties: {
+                forbidden_violations: { type: "array", items: { type: "string" } },
+                checks_passed: { type: "boolean" },
+                notes: { type: "string" },
+              },
+              additionalProperties: false,
+            },
+            forbidden: { type: "array", items: { type: "string" } },
             hashtags: {
               type: "string",
               description: isLongFormPlatform(payload.platform)
@@ -177,7 +178,15 @@ ${bannedPhrasesBlock()}`;
       },
     };
 
-    const aiRes = await callAIGateway(prompt, tool, LOVABLE_API_KEY);
+    const model = payload.quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+    const temperature = payload.quality === "polished" ? 0.45 : 0.5;
+
+    const aiRes = await callAIGateway(
+      [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }],
+      tool,
+      LOVABLE_API_KEY,
+      { model, temperature }
+    );
     if (aiRes.status !== 200) {
       return jsonResponse({ error: aiRes.error }, aiRes.status);
     }
@@ -187,14 +196,38 @@ ${bannedPhrasesBlock()}`;
       return jsonResponse({ error: parseResult.error }, 500);
     }
 
-    const parsed = parseResult.parsed as Record<string, unknown>;
-    const regenerated = normalizePost(parsed, post.dow, payload);
+    let parsed = parseResult.parsed as Record<string, unknown>;
+    let regenerated = normalizePost(parsed, post.dow, payload);
     if (!regenerated) {
       return jsonResponse({ error: "Failed to normalize post response." }, 500);
     }
 
     // Force day to match the original slot
     regenerated.day = post.day;
+
+    // If polished quality requested, run a focused polish pass (critique + rewrite)
+    if (payload.quality === "polished") {
+      try {
+        const polishSystem = systemMsg + "\n\nPOLISHING RUBRIC:\n- Improve hook specificity and curiosity.\n- Tighten body language and remove vague claims.\n- Strengthen CTA clarity and actionability.\n- Preserve angle and do not introduce new topics.";
+        const polishUser = `Polish the following post JSON to a publication-ready version using the rubric above. Return using the same 'return_post' function schema.\n\nCURRENT_POST_JSON:\n${JSON.stringify(parsed, null, 2)}`;
+
+        const polishRes = await callAIGateway([
+          { role: "system", content: polishSystem },
+          { role: "user", content: polishUser },
+        ], tool, LOVABLE_API_KEY, { model: "google/gemini-2.5-pro", temperature: 0.4 });
+
+        if (polishRes.status === 200) {
+          const polishParse = parseAIResponse(polishRes.data || {}, "return_post");
+          if (polishParse.success) {
+            parsed = polishParse.parsed as Record<string, unknown>;
+            const polished = normalizePost(parsed, post.dow, payload);
+            if (polished) regenerated = polished;
+          }
+        }
+      } catch (e) {
+        console.warn("Regenerate polish pass failed, returning initial rewrite", e);
+      }
+    }
 
     // If feedback was provided, try to store it for later review/analytics
     try {

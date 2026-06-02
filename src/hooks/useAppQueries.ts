@@ -121,7 +121,7 @@ export function useProfileQuery(userId?: string) {
       if (!userId) return null;
       const { data, error } = await supabase
         .from("profiles")
-        .select("display_name, avatar_url, default_voice, default_style, default_audiences, default_goals, banned_hashtags, required_hashtags, default_timezone")
+        .select("display_name, avatar_url, default_voice, default_style, default_audiences, default_goals, banned_hashtags, required_hashtags, default_timezone, brand_examples, default_framework")
         .eq("user_id", userId)
         .maybeSingle();
       if (error) throw error;

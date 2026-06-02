@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload } from "./promptHelpers.ts";
+import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload, buildSystemMessage, buildUserMessage } from "./promptHelpers.ts";
 
 describe("promptHelpers engagement guidance", () => {
   it("adds a core-idea framework that locks the output to one angle", () => {
@@ -111,5 +111,21 @@ describe("promptHelpers engagement guidance", () => {
     expect(guidance).toContain("artistic style, lighting, composition, color palette, textures, depth, and atmospheric details");
     expect(guidance).toContain("film still, key art, dramatic framing");
     expect(guidance).toContain("Avoid text overlays, watermarks, UI mockups");
+  });
+
+  it("builds system and user messages for calls", () => {
+    const payload = cleanPayload({ industry: "SaaS", coreIdea: "Better onboarding", platform: "LinkedIn", audiences: ["Founders"] });
+    const sys = buildSystemMessage(payload, { isSinglePost: true });
+    const usr = buildUserMessage(payload, { isSinglePost: true });
+
+    expect(sys).toContain("You are a senior LinkedIn content strategist");
+    expect(sys).toContain("PROMPT FRAMEWORK");
+    expect(usr).toContain("BRIEF:");
+    expect(usr).toContain("Return the result via the provided function tool");
+  });
+
+  it("defaults quality to draft in cleaned payloads", () => {
+    const p = cleanPayload({ industry: "SaaS", coreIdea: "x" });
+    expect(p.quality).toBe("draft");
   });
 });

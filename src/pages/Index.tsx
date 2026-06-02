@@ -747,6 +747,7 @@ type WizardForm = {
   weekStart: string;
   mode: "week" | "day";
   targetDate: string;
+  quality?: "draft" | "polished";
 };
 
 type WizardDraftSnapshot = {
@@ -792,6 +793,7 @@ const INITIAL_FORM: WizardForm = {
   weekStart: toDateInputValue(nextMonday()),
   mode: "week",
   targetDate: toDateInputValue(nextMonday()),
+  quality: "draft",
 };
 
 // ─── MAIN ────────────────────────────────────────────────────────────────────
@@ -1274,13 +1276,13 @@ const Index = () => {
   }, [step, posts.length]);
 
   // Load user profile with React Query
-  const { data: profileData } = useQuery({
+    const { data: profileData } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       if (!user) return null;
       const { data } = await supabase
         .from("profiles")
-        .select("default_voice, default_style, default_audiences, default_goals")
+        .select("default_voice, default_style, default_audiences, default_goals, brand_examples, default_framework")
         .eq("user_id", user.id)
         .maybeSingle();
       return data;
@@ -1733,6 +1735,9 @@ const Index = () => {
         extra: form.extra,
         bannedWords: form.bannedWords,
         requiredWords: form.requiredWords,
+        brand_examples: profileData?.brand_examples || [],
+        framework: profileData?.default_framework || "Auto",
+        quality: form.quality || "draft",
         brandMemory: brandMemoryToPrompt(brandMemory),
       };
 
@@ -2593,6 +2598,7 @@ ${postText(p)}
                 <SelectField label="Voice / tone" options={VOICE_OPTIONS} value={form.voice} onChange={v => upd("voice", v)} placeholder="Select a voice…" />
                 <SelectField label="Writing style" options={STYLE_OPTIONS} value={form.style} onChange={v => upd("style", v)} placeholder="Select a style…" />
                 <SelectField label="Copy style" options={COPY_STYLE_OPTIONS} value={form.copyStyle} onChange={v => upd("copyStyle", v)} placeholder="Keep plain text" hint="Applied when copying or scheduling" />
+                <SelectField label="Output quality" options={["draft", "polished"]} value={form.quality} onChange={v => upd("quality", v as "draft" | "polished")} placeholder="draft" hint="Polished performs a critique+rewrite pass (slower, uses pro model)" />
               </div>
 
               {(() => {

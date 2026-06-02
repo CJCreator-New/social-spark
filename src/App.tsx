@@ -14,6 +14,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Landing from "./pages/Landing";
+import Index from "./pages/Index";
 
 function E2ECrashRoute(): JSX.Element {
   throw new Error("Test error");
@@ -21,7 +22,6 @@ function E2ECrashRoute(): JSX.Element {
 
 // Lazy load pages for code splitting
 import { lazy } from "react";
-const Index = lazy(() => import("./pages/Index"));
 const Profile = lazy(() => import("./pages/Profile"));
 const MyCalendars = lazy(() => import("./pages/MyCalendars"));
 const CalendarDetail = lazy(() => import("./pages/CalendarDetail"));
@@ -62,9 +62,7 @@ const App = () => {
                   path="/app"
                   element={
                     <ProtectedRoute>
-                      <Suspense fallback={<main aria-label="ContentForge loading"><h1 style={{ margin: 24 }}>ContentForge</h1><SkeletonList /></main>}>
-                        <Index />
-                      </Suspense>
+                      <Index />
                     </ProtectedRoute>
                   }
                 />

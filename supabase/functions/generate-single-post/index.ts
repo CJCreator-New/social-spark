@@ -12,6 +12,8 @@ import {
   cleanPayload,
   buildPromptContext,
   buildCinematicImagePromptRules,
+  buildSystemMessage,
+  buildUserMessage,
   callAIGateway,
   parseAIResponse,
   normalizePost,
@@ -57,30 +59,8 @@ Deno.serve(async (req) => {
     // If no explicit topic was provided, allow the model to infer one from the core idea
     const contextLines = buildPromptContext(payload, { isSinglePost: true });
 
-    const prompt = `You are a world-class ${payload.platform} content strategist specialising in ${payload.industryLabel || payload.industry} content.
-
-Write a SINGLE high-impact ${payload.platform} post for ${payload.dow}${dateNote}.
-${contextLines}
-- POST LENGTH: ${lengthInstr}
-- POST STRUCTURE: ${structureInstr}
-${payload.extra ? `- Extra instructions: ${payload.extra}` : ""}
-${payload.bannedWords.length ? `- NEVER SAY (hard ban — do not use these words or close variants): ${payload.bannedWords.join(", ")}` : ""}
-${payload.requiredWords.length ? `- TRY TO MENTION (weave in naturally if it fits): ${payload.requiredWords.join(", ")}` : ""}
-
-${buildCinematicImagePromptRules(payload)}
-
-OUTPUT VARIANTS:
-- Provide 3 distinct hook options and 2 CTA variants. Place them in the structured fields hook_options (array) and cta_options (array). The primary hook and cta may be the first items from those arrays.
-
-HARD RULES:
-1. Stay specific to the ${payload.industryLabel || payload.industry} space — real terminology, real platforms, real trends.
-2. Follow the POST LENGTH and POST STRUCTURE rules exactly.
-3. ${hashtagInstr}
-4. The "dow" field MUST be exactly "${payload.dow}" and "day" MUST be 1.
-5. In the "format" field, append the structure used (e.g. "How-to — hybrid").
-6. Include at least one concrete number, percentage, year, or named statistic in the body or hook (realistic, defensible).
-
-${bannedPhrasesBlock()}`;
+    const systemMsg = buildSystemMessage(payload, { isSinglePost: true });
+    const userMsg = buildUserMessage(payload, { isSinglePost: true });
 
     const tool = {
       type: "function",
@@ -101,6 +81,29 @@ ${bannedPhrasesBlock()}`;
               cta: { type: "string" },
               cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
               image_prompt: { type: "string" },
+            // New plan + variants + self-check schema (Phase A additions)
+            plan: {
+              type: "object",
+              properties: {
+                angle: { type: "string" },
+                hook_thesis: { type: "string" },
+                proof_points: { type: "array", items: { type: "string" } },
+                cta_intent: { type: "string" },
+              },
+              additionalProperties: false,
+            },
+            body_variants: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 2 },
+            chosen_index: { type: "number" },
+            self_check: {
+              type: "object",
+              properties: {
+                forbidden_violations: { type: "array", items: { type: "string" } },
+                checks_passed: { type: "boolean" },
+                notes: { type: "string" },
+              },
+              additionalProperties: false,
+            },
+            forbidden: { type: "array", items: { type: "string" } },
             hashtags: {
               type: "string",
               description: isLongFormPlatform(payload.platform) ? "MUST be empty for Newsletter/Blog." : "3–6 hashtags, space-separated.",
@@ -113,7 +116,16 @@ ${bannedPhrasesBlock()}`;
       },
     };
 
-    const aiRes = await callAIGateway(prompt, tool, LOVABLE_API_KEY);
+    // Choose defaults for model and temperature per route (Phase A)
+    const model = payload.quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+    const temperature = payload.quality === "polished" ? 0.6 : 0.8;
+
+    const aiRes = await callAIGateway(
+      [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }],
+      tool,
+      LOVABLE_API_KEY,
+      { model, temperature }
+    );
     if (aiRes.status !== 200) {
       return jsonResponse({ error: aiRes.error }, aiRes.status);
     }
@@ -123,10 +135,35 @@ ${bannedPhrasesBlock()}`;
       return jsonResponse({ error: parseResult.error }, 500);
     }
 
-    const parsed = parseResult.parsed as Record<string, unknown>;
-    const post = normalizePost(parsed, payload.dow, payload);
+    let parsed = parseResult.parsed as Record<string, unknown>;
+    let post = normalizePost(parsed, payload.dow, payload);
     if (!post) {
       return jsonResponse({ error: "Failed to normalize post response." }, 500);
+    }
+
+    // If user requested a polished output, do a concise self-critique + rewrite pass on the pro model
+    if (payload.quality === "polished") {
+      try {
+        const polishSystem = systemMsg + "\n\nPOLISHING RUBRIC:\n- Remove any filler or vague language. \n- Strengthen hooks for curiosity and specificity.\n- Improve readability: shorter sentences, clearer verbs.\n- Ensure CTA is actionable and tied to the goal.\n- Preserve the core angle and facts.\n- Keep platform-native formatting.\n";
+        const polishUser = `Please polish the following single post JSON to a higher-quality, publication-ready version using the rubric above. Return using the same function schema (return_post).\n\nCURRENT_POST_JSON:\n${JSON.stringify(parsed, null, 2)}`;
+
+        const polishRes = await callAIGateway(
+          [{ role: "system", content: polishSystem }, { role: "user", content: polishUser }],
+          tool,
+          LOVABLE_API_KEY,
+          { model: "google/gemini-2.5-pro", temperature: 0.45 }
+        );
+        if (polishRes.status === 200) {
+          const polishParse = parseAIResponse(polishRes.data || {}, "return_post");
+          if (polishParse.success) {
+            parsed = polishParse.parsed as Record<string, unknown>;
+            const polished = normalizePost(parsed, payload.dow, payload);
+            if (polished) post = polished;
+          }
+        }
+      } catch (e) {
+        console.warn("Polish pass failed, returning initial draft", e);
+      }
     }
 
     const responseBody: Record<string, unknown> = { post };

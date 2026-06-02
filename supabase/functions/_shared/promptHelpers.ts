@@ -309,10 +309,13 @@ export interface GenerationPayload {
   length?: string;
   structure?: string;
   extra?: string;
+  brand_examples?: string[];
+  framework?: string; // AIDA | PAS | BAB | 4U | FAB | Question-led | Story-led | Auto
   bannedWords?: string[];
   requiredWords?: string[];
   bannedHashtags?: string[];
   requiredHashtags?: string[];
+  quality?: "draft" | "polished"; // draft: single-call, polished: two-pass critique+rewrite
 }
 
 const BRITISH_TO_AMERICAN: Record<string, string> = {
@@ -393,6 +396,9 @@ export function cleanPayload(body: unknown): GenerationPayload {
     length: String(payload.length || "medium").trim(),
     structure: String(payload.structure || "mixed").trim(),
     extra: String(payload.extra || "").trim() || "",
+    brand_examples: cleanList(payload.brand_examples, 3),
+    framework: String(payload.framework || "Auto").trim(),
+    quality: String(payload.quality || "draft").trim() === "polished" ? "polished" : "draft",
     bannedWords: cleanList(payload.bannedWords, 20),
     requiredWords: cleanList(payload.requiredWords, 10),
     bannedHashtags: cleanTagList(payload.bannedHashtags, 30),
@@ -425,6 +431,9 @@ export function getPayloadDefaults(): GenerationPayload {
     length: "medium",
     structure: "mixed",
     extra: "",
+    brand_examples: [],
+    framework: "Auto",
+    quality: "draft",
     bannedWords: [],
     requiredWords: [],
     bannedHashtags: [],
@@ -534,14 +543,133 @@ ${topicLine}- Post format mix: ${payload.format}
 }
 
 /**
+ * Build a system message that contains framework-level rules, persona, and global guards.
+ */
+export function buildSystemMessage(
+  payload: GenerationPayload,
+  opts: { includeTopics?: boolean; isSinglePost?: boolean } = {}
+): string {
+  const persona = `You are a senior ${payload.platform} content strategist for ${payload.industryLabel || payload.industry || 'the industry'} who writes for ${payload.audiences.length ? payload.audiences.join(', ') : 'the target audience'}. Follow the strategic framework and content rules strictly.`;
+  const framework = buildStrategicPromptFramework(payload);
+  const contentRules = buildContentRules(payload.platform, payload.language);
+  const languageRules = buildLanguageRules(payload.language);
+  const stylePreset = getStylePreset(payload.style);
+  const banned = bannedPhrasesBlock();
+  const exemplars = getExemplars(payload.platform, payload.style);
+  const userExamples = (payload.brand_examples || []).slice(0, 3);
+  const exemplarBlock = exemplars.length || userExamples.length
+    ? `\nEXEMPLARS:\n${exemplars.map(e => `- ${e}`).join("\n")}${userExamples.length ? `\n- USER EXAMPLES:\n${userExamples.map(e => `  - ${e}`).join("\n")}` : ""}`
+    : "";
+
+  const frameworkNote = payload.framework && payload.framework !== "Auto" ? `\nFRAMEWORK: Use ${payload.framework} for the post structure.` : "\nFRAMEWORK: Auto — choose the best framework if unsure.";
+
+  return [persona, framework, contentRules, languageRules, stylePreset, frameworkNote, exemplarBlock, banned, getPlatformPreset(payload.platform)].join("\n\n");
+}
+
+export const EXEMPLARS: Record<string, Record<string, string[]>> = {
+  LinkedIn: {
+    "Short punchy lines": [
+      `Hook: "70% of startups fail in year one — here's how we cut churn by 40%."\nBody: "We focused on onboarding checklists, timed emails, and a 5-step support playbook. Result: activation up 18%.\nCTA: Tell me your biggest onboarding challenge.",`,
+      `Hook: "Stop treating features like product — build for outcomes instead."\nBody: "Map the customer journey, define the A -> B outcome, then ship experiments that move the needle. We ran 3 trials and found one that improved retention by 7%.\nCTA: What's one customer outcome you care about?",`,
+    ],
+  },
+  Instagram: {
+    "First-person story": [
+      `Hook: "I almost quit my startup at month 6."\nBody: "We had no product-market fit. I started talking to customers daily, built a tiny feature, and saw signups jump. Lesson: ship small, learn fast.\nCTA: Save if you need permission to iterate.",`,
+      `Hook: "The photo you won't see: my messy desk at 3am."\nBody: "Real work looks chaotic. Here's how I prioritize focus: 1) Block time, 2) say no, 3) ship imperfect.\nCTA: Share your late-night ritual.",`,
+    ],
+  },
+};
+
+export function getExemplars(platform: string, style?: string): string[] {
+  const plat = String(platform || "");
+  const st = String(style || "");
+  const byPlatform = (EXEMPLARS as Record<string, Record<string, string[]>>)[plat] || {};
+  if (st && byPlatform[st]) return byPlatform[st].slice(0, 2);
+  // fallback: collect first two examples across styles
+  const all = Object.values(byPlatform).flat();
+  return all.slice(0, 2);
+}
+
+/**
+ * Build a concise user message containing the per-request brief (core idea, topic(s), length, structure, extras).
+ */
+export function buildUserMessage(
+  payload: GenerationPayload,
+  opts: { includeTopics?: boolean; isSinglePost?: boolean } = {}
+): string {
+  const topicLine = opts.isSinglePost
+    ? `Topic: ${payload.topic || payload.coreIdea || '(not specified)'}`
+    : (opts.includeTopics && payload.topics && payload.topics.length) ? `Topics: ${payload.topics.join(', ')}` : `Core idea: ${payload.coreIdea || '(not specified)'} `;
+
+  const brief = `BRIEF:\n+- Industry: ${payload.industryLabel || payload.industry || '(not specified)'}\n+- ${topicLine}\n+- Audience: ${payload.audiences.length ? payload.audiences.join(', ') : '(not specified)'}\n+- Voice: ${payload.voice || '(not specified)'}\n+- Style: ${payload.style || '(not specified)'}\n+- Goals: ${payload.goals.length ? payload.goals.join(', ') : '(not specified)'}\n+- Length target: ${payload.length || 'medium'}\n+- Structure target: ${payload.structure || 'mixed'}\n${payload.extra ? `- Extra: ${payload.extra}` : ''}\n`;
+
+  const ask = `Return the result via the provided function tool. Include a lightweight plan first (plan.angle, plan.hook_thesis, plan.proof_points[], plan.cta_intent) before the final body. Also provide 3 hook_options, 2 cta_options, and up to 2 body_variants. Provide a self_check object listing any forbidden rule violations.`;
+
+  return brief + "\n" + ask;
+}
+
+/**
+ * Perform a cheap pre-call to gemini-2.5-flash-lite to turn coreIdea + topics[] 
+ * into 7 differentiated angles for a calendar.
+ */
+export async function enrichTopics(
+  payload: GenerationPayload,
+  apiKey: string
+): Promise<string[]> {
+  const model = "google/gemini-2.5-flash-lite";
+  const system = `You are a senior content strategist. Given a core idea and a list of topics, return exactly 7 unique, highly differentiated post angles for a 7-day calendar. Each angle should be one sentence, focusing on a specific fact, story, or contrarian point. Do not repeat themes. Return as a simple JSON array of strings.`;
+  const user = `Core Idea: ${payload.coreIdea}\nTopics: ${payload.topics.join(", ")}\nIndustry: ${payload.industryLabel || payload.industry}`;
+
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        temperature: 0.8,
+      }),
+    });
+
+    if (!res.ok) return payload.topics.length >= 7 ? payload.topics.slice(0, 7) : payload.topics;
+
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content || "";
+    const m = content.match(/\[[\s\S]*\]/);
+    if (m) {
+      try {
+        const enriched = JSON.parse(m[0]);
+        if (Array.isArray(enriched) && enriched.length >= 7) return enriched.slice(0, 7);
+      } catch (e) { /* fallback */ }
+    }
+  } catch (e) {
+    console.warn("Topic enrichment failed:", e);
+  }
+
+  return payload.topics.length >= 7 ? payload.topics.slice(0, 7) : payload.topics;
+}
+
+/**
  * Call the Lovable AI Gateway with unified error handling
  */
 export async function callAIGateway(
-  prompt: string,
+  messages: Array<{ role: string; content: string }>,
   tool: Record<string, unknown>,
   apiKey: string,
-  timeoutMs: number = 90000
+  opts: { timeoutMs?: number; model?: string; temperature?: number; top_p?: number } = {}
 ): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
+  const timeoutMs = opts.timeoutMs ?? 90000;
+  const model = opts.model || "google/gemini-2.5-flash";
+  const temperature = typeof opts.temperature === "number" ? opts.temperature : 0.8;
+  const top_p = typeof opts.top_p === "number" ? opts.top_p : 1.0;
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -553,10 +681,12 @@ export async function callAIGateway(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "user", content: prompt }],
+        model,
+        messages,
         tools: [tool],
         tool_choice: { type: "function", function: { name: tool.function?.name } },
+        temperature,
+        top_p,
       }),
       signal: controller.signal,
     });
@@ -730,5 +860,11 @@ export function normalizePost(
       : p.hashtags || "",
     rationale: fixSpelling(String(p.rationale || "")),
     image_prompt: fixSpelling(String(p.image_prompt || "")),
+    // Maintain Phase A/C fields if present
+    plan: p.plan,
+    body_variants: p.body_variants,
+    chosen_index: p.chosen_index,
+    self_check: p.self_check,
+    forbidden: p.forbidden,
   };
 }

@@ -11,7 +11,10 @@ import {
   checkRateLimit,
   cleanPayload,
   buildPromptContext,
+  enrichTopics,
   callAIGateway,
+  buildSystemMessage,
+  buildUserMessage,
   parseAIResponse,
   applyHashtagPolicy,
   recordServerTelemetryEvent,
@@ -53,39 +56,24 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "AI is not configured." }, 500);
     }
 
+    // Phase D: Topic enrichment pre-call (calendar only)
+    let enrichedPayload = { ...payload };
+    if (payload.topics.length > 0 || payload.coreIdea) {
+      const enrichedTopics = await enrichTopics(payload, LOVABLE_API_KEY);
+      if (enrichedTopics && enrichedTopics.length >= 7) {
+        enrichedPayload.topics = enrichedTopics;
+      }
+    }
+
     const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
     const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: true });
 
-    const includeTopics = Array.isArray(payload.topics) && payload.topics.length > 0;
-    const contextLines = buildPromptContext(payload, { includeTopics });
+    const includeTopics = Array.isArray(enrichedPayload.topics) && enrichedPayload.topics.length > 0;
+    const contextLines = buildPromptContext(enrichedPayload, { includeTopics });
 
-    const prompt = `You are a world-class ${payload.platform} content strategist specialising in ${payload.industryLabel || payload.industry} content.
-
-Create a complete 7-day ${payload.platform} content calendar for this creator:
-${contextLines}
-- POST LENGTH: ${lengthInstr}
-- POST STRUCTURE: ${structureInstr}
-${payload.extra ? `- Extra instructions: ${payload.extra}` : ""}
-${payload.bannedWords.length ? `- NEVER SAY (hard ban — do not use these words or close variants in any post): ${payload.bannedWords.join(", ")}` : ""}
-${payload.requiredWords.length ? `- MUST MENTION (each of these terms must appear naturally in AT LEAST ONE post across the week): ${payload.requiredWords.join(", ")}` : ""}
-
-${buildCinematicImagePromptRules(payload)}
-
-OUTPUT VARIANTS:
-- For each post, provide 3 hook options and 2 CTA variants. Place them in the hook_options and cta_options fields within each post object. The primary hook and cta may be the first items from those arrays.
-
-HARD RULES (follow strictly):
-1. Generate content that is genuinely specific to the ${payload.industryLabel || payload.industry} space — use real terminology, real platforms, real trends, real names where relevant. Do NOT write generic content.
-2. Strictly follow the POST LENGTH and POST STRUCTURE rules above for the body of every post.
-3. In the "format" field of each post, append the structure used (e.g. "List post — bullets", "Storytelling — paragraphs", "How-to — hybrid") so the user can see the mix at a glance.
-4. ${hashtagInstr}
-5. The chosen format mix "${payload.format}" must drive AT LEAST 4 of the 7 posts. The remaining 3 may vary for rhythm.
-6. AT LEAST 3 of the 7 posts must include a concrete number, percentage, year, dollar figure, or named statistic embedded in the body or hook (not made-up — use realistic, defensible figures from the ${payload.industryLabel || payload.industry} space).
-7. The "dow" field MUST be exactly one of: "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" — and the 7 posts must be ordered Mon → Sun, with "day" 1..7 matching that order.
-${includeTopics ? '8. Every provided topic must be represented at least once across the 7 posts. If more topics are supplied than fit in a week, combine related topics into the same post instead of dropping any of them.' : ''}
-
-${bannedPhrasesBlock()}`;
+    const systemMsg = buildSystemMessage(enrichedPayload, { includeTopics });
+    const userMsg = buildUserMessage(enrichedPayload, { includeTopics });
 
     const tool = {
       type: "function",
@@ -116,6 +104,29 @@ ${bannedPhrasesBlock()}`;
                     cta: { type: "string" },
                     cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
                     image_prompt: { type: "string" },
+                  // Phase A additions: plan + variants + self-check
+                  plan: {
+                    type: "object",
+                    properties: {
+                      angle: { type: "string" },
+                      hook_thesis: { type: "string" },
+                      proof_points: { type: "array", items: { type: "string" } },
+                      cta_intent: { type: "string" },
+                    },
+                    additionalProperties: false,
+                  },
+                  body_variants: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 2 },
+                  chosen_index: { type: "number" },
+                  self_check: {
+                    type: "object",
+                    properties: {
+                      forbidden_violations: { type: "array", items: { type: "string" } },
+                      checks_passed: { type: "boolean" },
+                      notes: { type: "string" },
+                    },
+                    additionalProperties: false,
+                  },
+                  forbidden: { type: "array", items: { type: "string" } },
                   hashtags: {
                     type: "string",
                     description: isLongFormPlatform(payload.platform)
@@ -135,7 +146,13 @@ ${bannedPhrasesBlock()}`;
       },
     };
 
-    const aiRes = await callAIGateway(prompt, tool, LOVABLE_API_KEY);
+    const model = payload.quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+    const temperature = payload.quality === "polished" ? 0.55 : 0.7;
+
+    const aiRes = await callAIGateway([
+      { role: "system", content: systemMsg },
+      { role: "user", content: userMsg },
+    ], tool, LOVABLE_API_KEY, { model, temperature });
     if (aiRes.status !== 200) {
       return jsonResponse({ error: aiRes.error }, aiRes.status);
     }
@@ -145,8 +162,8 @@ ${bannedPhrasesBlock()}`;
       return jsonResponse({ error: parseResult.error }, 500);
     }
 
-    const parsed = parseResult.parsed as Record<string, unknown>;
-    const posts = Array.isArray(parsed.posts)
+    let parsed = parseResult.parsed as Record<string, unknown>;
+    let posts = Array.isArray(parsed.posts)
       ? parsed.posts.map(post => {
           if (!post || typeof post !== "object") return post;
           const p = post as Record<string, unknown>;
@@ -158,6 +175,33 @@ ${bannedPhrasesBlock()}`;
       : [];
     if (posts.length === 0) {
       return jsonResponse({ error: "AI returned an empty calendar." }, 500);
+    }
+
+    // If polished quality requested, run a second pass to polish the whole calendar into a publication-ready week
+    if (payload.quality === "polished") {
+      try {
+        const polishSystem = systemMsg + "\n\nPOLISHING RUBRIC:\n- Ensure each post opens with a strong, specific hook.\n- Tighten and clarify language; remove vague phrases.\n- Improve CTAs for clarity and action.\n- Preserve angles and avoid introducing new topics.\n- Apply consistent platform-native formatting across the week.";
+        const polishUser = `Polish the following calendar JSON to a higher-quality, publication-ready week using the rubric above. Return using the same 'return_calendar' function schema.\n\nCURRENT_CALENDAR_JSON:\n${JSON.stringify({ posts }, null, 2)}`;
+
+        const polishRes = await callAIGateway([
+          { role: "system", content: polishSystem },
+          { role: "user", content: polishUser },
+        ], tool, LOVABLE_API_KEY, { model: "google/gemini-2.5-pro", temperature: 0.45 });
+
+        if (polishRes.status === 200) {
+          const polishParse = parseAIResponse(polishRes.data || {}, "return_calendar");
+          if (polishParse.success) {
+            const polishedParsed = polishParse.parsed as Record<string, unknown>;
+            const polishedPosts = Array.isArray(polishedParsed.posts) ? polishedParsed.posts : null;
+            if (polishedPosts) posts = polishedPosts.map(p => ({
+              ...p,
+              hashtags: applyHashtagPolicy((p as Record<string, unknown>).hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags),
+            }));
+          }
+        }
+      } catch (e) {
+        console.warn("Calendar polish pass failed, returning initial draft", e);
+      }
     }
 
     const responseBody: Record<string, unknown> = { posts };
