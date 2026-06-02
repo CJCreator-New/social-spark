@@ -967,7 +967,7 @@ async function upsertMediaReferences(params: {
   if (!urls.length) return;
 
   await Promise.all(urls.map((publicUrl) =>
-    supabase.from("media_references").upsert({
+    (supabase.from as any)("media_references").upsert({
       user_id: userId,
       bucket,
       storage_path: publicUrl,
@@ -984,7 +984,7 @@ async function upsertMediaReferences(params: {
 
 async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraftSnapshot> | null> {
   if (!wizardDraftServerAvailable) return null;
-  const { data, error } = await supabase.from(WIZARD_SERVER_DRAFT_TABLE)
+  const { data, error } = await (supabase.from as any)(WIZARD_SERVER_DRAFT_TABLE)
     .select("snapshot")
     .eq("user_id", userId)
     .maybeSingle();
@@ -994,12 +994,12 @@ async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraf
     return null;
   }
   if (!data?.snapshot) return null;
-  return parseDraftEnvelope<WizardDraftSnapshot>(data.snapshot);
+  return parseDraftEnvelope<WizardDraftSnapshot>((data as any).snapshot);
 }
 
 async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
   if (!wizardDraftServerAvailable) return;
-  const { error } = await supabase.from(WIZARD_SERVER_DRAFT_TABLE).upsert(
+  const { error } = await (supabase.from as any)(WIZARD_SERVER_DRAFT_TABLE).upsert(
     {
       user_id: userId,
       snapshot: makeDraftEnvelope(snapshot) as unknown as Json,
@@ -1011,7 +1011,7 @@ async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
 
 async function clearServerDraft(userId: string) {
   if (!wizardDraftServerAvailable) return;
-  const { error } = await supabase.from(WIZARD_SERVER_DRAFT_TABLE).delete().eq("user_id", userId);
+  const { error } = await (supabase.from as any)(WIZARD_SERVER_DRAFT_TABLE).delete().eq("user_id", userId);
   if (error) markWizardDraftServerUnavailable(error);
 }
 
