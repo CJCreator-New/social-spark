@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
     }
 
     const responseBody: Record<string, unknown> = { post };
-    if ((payload as Record<string, unknown>).inferredTopics) {
+    if ((payload as unknown as Record<string, unknown>).inferredTopics) {
       responseBody.meta = { inferredTopics: true };
       console.info("generate-single-post: marking response with meta.inferredTopics = true");
       await recordServerTelemetryEvent("generate_topics_inferred", {
@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
 
     return jsonResponse(responseBody);
   } catch (e) {
-    console.error("generate-single-post error", e, e?.stack);
+    console.error("generate-single-post error", e, e instanceof Error ? e.stack : undefined);
     return jsonResponse(
       { error: e instanceof Error ? e.message : "Unknown error" },
       500

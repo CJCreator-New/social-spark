@@ -15,6 +15,46 @@ type SavedCalendarInsert = Tables["saved_calendars"]["Insert"];
 type SavedCalendarUpdate = Tables["saved_calendars"]["Update"];
 type ProfileRow = Tables["profiles"]["Row"];
 type SavedCalendarListItem = Pick<SavedCalendarRow, "id" | "title" | "industry_label" | "platform" | "core_idea" | "created_at" | "is_favorite" | "posts">;
+type GeneratedPostPayload = {
+  day?: number;
+  dow?: string;
+  topic?: string;
+  format?: string;
+  title?: string;
+  hook?: string;
+  body?: string;
+  cta?: string;
+  hashtags?: string;
+  rationale?: string;
+  image_prompt?: string;
+  [key: string]: unknown;
+};
+
+type RepurposePayload = {
+  post: GeneratedPostPayload;
+  targetPlatform: string;
+  platform?: string;
+  context?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+type GeneratePostImagePayload = {
+  calendarId: string;
+  postDay: number;
+  post: GeneratedPostPayload;
+  prompt: string;
+  platform?: string;
+  aspectRatio?: string;
+};
+
+type InlineRewritePayload = {
+  text: string;
+  instruction: string;
+  field: "title" | "hook" | "body" | "cta";
+  platform?: string;
+  post?: GeneratedPostPayload;
+  context?: Record<string, unknown>;
+};
 
 let e2eCalendars: E2ECalendar[] = [];
 let e2eScheduleRows: E2EScheduleRow[] = [];
@@ -524,6 +564,94 @@ export function useRegeneratePostMutation(calendarId?: string) {
     },
     onSuccess: () => {
       if (calendarId) qc.invalidateQueries({ queryKey: ["calendar", calendarId] });
+    },
+  });
+}
+
+export function useRepurposePostMutation() {
+  return useMutation({
+    mutationFn: async (payload: RepurposePayload) => {
+      if (isE2EMode()) {
+        const post = payload.post || {};
+        const target = payload.targetPlatform || "LinkedIn";
+        return {
+          ...post,
+          format: target === "Instagram" ? "Instagram carousel script" : `${target} version`,
+          title: `${post.title || post.topic || "Repurposed post"} (${target})`,
+          body: `[${target}] ${post.body || post.hook || "Repurposed body"}`,
+          cta: post.cta || "Save this for later.",
+        };
+      }
+      const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+      const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/repurpose-post`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_KEY,
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.error) throw new Error(data?.error || `Repurpose failed (${res.status})`);
+      return data.post;
+    },
+  });
+}
+
+export function useGeneratePostImageMutation() {
+  return useMutation({
+    mutationFn: async (payload: GeneratePostImagePayload) => {
+      if (isE2EMode()) {
+        return {
+          publicUrl: "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='1200'%20height='1200'%20viewBox='0%200%201200%201200'%3E%3Crect%20width='1200'%20height='1200'%20fill='%2307080d'/%3E%3Crect%20x='80'%20y='80'%20width='1040'%20height='1040'%20rx='48'%20fill='%23181a26'/%3E%3Ctext%20x='600'%20y='580'%20fill='%23c8f09a'%20font-family='Arial'%20font-size='48'%20text-anchor='middle'%3EGenerated%20visual%3C/text%3E%3Ctext%20x='600'%20y='650'%20fill='%23edeae3'%20font-family='Arial'%20font-size='28'%20text-anchor='middle'%3EE2E%20placeholder%3C/text%3E%3C/svg%3E",
+          storagePath: `e2e/${payload.calendarId}/${payload.postDay}.svg`,
+          aspectRatio: payload.aspectRatio || "1:1",
+          prompt: payload.prompt,
+        };
+      }
+      const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+      const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-post-image`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_KEY,
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.error) throw new Error(data?.error || `Image generation failed (${res.status})`);
+      return data;
+    },
+  });
+}
+
+export function useInlineRewriteMutation() {
+  return useMutation({
+    mutationFn: async (payload: InlineRewritePayload) => {
+      if (isE2EMode()) {
+        return `${payload.text.trim()} (${payload.instruction})`;
+      }
+      const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+      const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/inline-rewrite`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_KEY,
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.error) throw new Error(data?.error || `Rewrite failed (${res.status})`);
+      return String(data.rewrittenText || "");
     },
   });
 }

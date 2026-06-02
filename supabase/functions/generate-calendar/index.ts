@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
     }
 
     const responseBody: Record<string, unknown> = { posts };
-    if ((payload as Record<string, unknown>).inferredTopics) {
+    if ((payload as unknown as Record<string, unknown>).inferredTopics) {
       responseBody.meta = { inferredTopics: true };
       console.info("generate-calendar: marking response with meta.inferredTopics = true");
       await recordServerTelemetryEvent("generate_topics_inferred", {
@@ -235,7 +235,7 @@ Deno.serve(async (req) => {
 
     return jsonResponse(responseBody);
   } catch (e) {
-    console.error("generate-calendar error", e, e?.stack);
+    console.error("generate-calendar error", e, e instanceof Error ? e.stack : undefined);
     return jsonResponse(
       { error: e instanceof Error ? e.message : "Unknown error" },
       500

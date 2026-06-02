@@ -289,33 +289,33 @@ export async function checkRateLimit(userId: string, endpoint: string, config: R
  * Standardized payload structure shared across all generation functions
  */
 export interface GenerationPayload {
-  industry?: string;
-  industryLabel?: string;
-  niche?: string;
-  platform?: string;
-  language?: string;
-  coreIdea?: string;
-  brandMemory?: string;
-  audiences?: string[];
-  voice?: string;
-  style?: string;
-  goals?: string[];
-  topic?: string;           // Single-post only
-  topics?: string[];         // Calendar only
-  dow?: string;              // Single-post only
-  date?: string;             // Single-post only
-  format?: string;
-  cta?: string;
-  length?: string;
-  structure?: string;
-  extra?: string;
-  brand_examples?: string[];
-  framework?: string; // AIDA | PAS | BAB | 4U | FAB | Question-led | Story-led | Auto
-  bannedWords?: string[];
-  requiredWords?: string[];
-  bannedHashtags?: string[];
-  requiredHashtags?: string[];
-  quality?: "draft" | "polished"; // draft: single-call, polished: two-pass critique+rewrite
+  industry: string;
+  industryLabel: string;
+  niche: string;
+  platform: string;
+  language: string;
+  coreIdea: string;
+  brandMemory: string;
+  audiences: string[];
+  voice: string;
+  style: string;
+  goals: string[];
+  topic: string;           // Single-post only
+  topics: string[];         // Calendar only
+  dow: string;              // Single-post only
+  date: string;             // Single-post only
+  format: string;
+  cta: string;
+  length: string;
+  structure: string;
+  extra: string;
+  brand_examples: string[];
+  framework: string; // AIDA | PAS | BAB | 4U | FAB | Question-led | Story-led | Auto
+  bannedWords: string[];
+  requiredWords: string[];
+  bannedHashtags: string[];
+  requiredHashtags: string[];
+  quality: "draft" | "polished"; // draft: single-call, polished: two-pass critique+rewrite
 }
 
 const BRITISH_TO_AMERICAN: Record<string, string> = {
@@ -757,6 +757,7 @@ export async function callAIGateway(
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const functionName = ((tool as { function?: { name?: unknown } }).function?.name || "") as string;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -768,7 +769,7 @@ export async function callAIGateway(
         model,
         messages,
         tools: [tool],
-        tool_choice: { type: "function", function: { name: tool.function?.name } },
+        tool_choice: { type: "function", function: { name: functionName } },
         temperature,
         top_p,
       }),
@@ -913,7 +914,7 @@ export function parseAIResponse(
 export function normalizePost(
   post: unknown,
   overrideDow?: string,
-  payload?: Pick<GenerationPayload, "platform" | "bannedHashtags" | "requiredHashtags">,
+  payload?: Pick<GenerationPayload, "platform" | "bannedHashtags" | "requiredHashtags" | "length">,
 ): Record<string, unknown> | null {
   if (!post || typeof post !== "object") {
     return null;

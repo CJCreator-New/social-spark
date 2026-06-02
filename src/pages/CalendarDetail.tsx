@@ -2,7 +2,7 @@ import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor, bui
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useCalendarQuery, useProfileQuery, useProfileUpdateMutation, useScheduledPostsQuery, useCreateCalendarMutation, useRegeneratePostMutation, useUpdateSavedCalendarMutation } from "@/hooks/useAppQueries";
+import { useCalendarQuery, useProfileQuery, useProfileUpdateMutation, useScheduledPostsQuery, useCreateCalendarMutation, useRegeneratePostMutation, useUpdateSavedCalendarMutation, useRepurposePostMutation, useGeneratePostImageMutation, useInlineRewriteMutation } from "@/hooks/useAppQueries";
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
 import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
@@ -32,6 +32,10 @@ import type { Database, Json } from "@/integrations/supabase/types";
 interface Post {
   day: number; dow: string; topic: string; format: string;
   title: string; hook: string; body: string; cta: string; hashtags: string; rationale: string; image_prompt?: string;
+  image_url?: string;
+  image_storage_path?: string;
+  image_aspect_ratio?: string;
+  image_generated_at?: string;
   hook_options?: string[];
   cta_options?: string[];
   variant_scores?: Record<string, number>[];
@@ -226,12 +230,21 @@ const css = `
 .cd-status-dot.published { background:#c8f09a; }
 .cd-status-dot.failed { background:#f09a9a; }
 .cd-tab-status { position:absolute; top:3px; left:4px; width:5px; height:5px; border-radius:50%; }
+.cd-image-preview { margin:10px 0 12px; border:1px solid rgba(255,255,255,0.08); border-radius:10px; overflow:hidden; background:#07080d; }
+.cd-image-preview img { display:block; width:100%; max-height:420px; object-fit:cover; }
+.cd-editor-tools { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 12px; }
+.cd-editor-note { font-size:11px; color:#7a7a8e; line-height:1.55; }
+.cd-editor-meter { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:8px 0 12px; }
+.cd-editor-meter span { border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); border-radius:8px; padding:8px 10px; font-size:11px; color:#9a9aae; line-height:1.45; }
+.cd-editor-meter strong { display:block; color:#edeae3; font-size:13px; font-weight:500; margin-bottom:2px; }
+.cd-editor-warning { border:1px solid rgba(240,212,154,.28); background:rgba(240,212,154,.06); border-radius:8px; color:#f0d49a; padding:9px 10px; font-size:11px; line-height:1.55; margin-bottom:12px; }
 
 @media (max-width: 760px) {
   .cd-app { padding:28px 16px 80px; }
   .cd-hero { grid-template-columns:1fr; }
   .cd-hero-title { font-size:26px; max-width:none; }
   .cd-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .cd-editor-meter { grid-template-columns:1fr; }
 }
 `;
 
@@ -250,6 +263,53 @@ function calculateScore(scores: Record<string, number>): number {
   if (keys.length === 0) return 0;
   const sum = keys.reduce((acc, k) => acc + scores[k], 0);
   return Number((sum / keys.length).toFixed(1));
+}
+
+function aspectRatioForPlatform(platform?: string): string {
+  const normalized = resolvePlatform(platform || "");
+  if (normalized === "instagram") return "4:5";
+  if (normalized === "twitter") return "16:9";
+  if (normalized === "facebook") return "1.91:1";
+  return "1.91:1";
+}
+
+function readingStats(text: string) {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
+  const averageSentenceWords = sentences.length ? words.length / sentences.length : words.length;
+  const longSentences = sentences.filter(sentence => wordCount(sentence) > 28).length;
+  const score = Math.max(1, Math.min(100, Math.round(100 - averageSentenceWords * 2.1 - longSentences * 4)));
+  const label = score >= 72 ? "Easy" : score >= 52 ? "Moderate" : "Dense";
+  return { score, label, averageSentenceWords: Math.round(averageSentenceWords), longSentences };
+}
+
+function normalizeForRepeatCheck(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(word => word.length > 3);
+}
+
+function repeatedPhraseWarning(text: string, corpus: string[]): string | null {
+  const words = normalizeForRepeatCheck(text);
+  if (words.length < 16 || corpus.length === 0) return null;
+
+  const phrases = new Set<string>();
+  for (let i = 0; i <= words.length - 7; i += 1) {
+    phrases.add(words.slice(i, i + 7).join(" "));
+  }
+
+  for (const prior of corpus) {
+    const priorWords = normalizeForRepeatCheck(prior);
+    if (priorWords.length < 16) continue;
+    for (let i = 0; i <= priorWords.length - 7; i += 1) {
+      const phrase = priorWords.slice(i, i + 7).join(" ");
+      if (phrases.has(phrase)) return `Possible repeat: "${phrase}"`;
+    }
+  }
+  return null;
 }
 
 export default function CalendarDetail() {
@@ -297,6 +357,18 @@ export default function CalendarDetail() {
   const [statusByDay, setStatusByDay] = useState<Record<number, "drafted" | "approved" | "published" | "failed">>({});
   const [tagPopover, setTagPopover] = useState<{ day: number; tag: string } | null>(null);
   const [tagReplacement, setTagReplacement] = useState("");
+  const [repurposeOpen, setRepurposeOpen] = useState(false);
+  const repurposeRef = useRef<HTMLDivElement>(null);
+  const [repurposedPost, setRepurposedPost] = useState<Post | null>(null);
+  const [repurposedTarget, setRepurposedTarget] = useState("");
+  const [repurposing, setRepurposing] = useState(false);
+  const repurposeMutation = useRepurposePostMutation();
+  const generateImageMutation = useGeneratePostImageMutation();
+  const inlineRewriteMutation = useInlineRewriteMutation();
+  const [imageGeneratingDay, setImageGeneratingDay] = useState<number | null>(null);
+  const [inlineSelection, setInlineSelection] = useState<{ field: "hook" | "body" | "cta"; start: number; end: number; text: string } | null>(null);
+  const [inlineRewriting, setInlineRewriting] = useState(false);
+  const [pastPostText, setPastPostText] = useState<string[]>([]);
   const tzList = listTimezones();
 
   const { data: calendarData, isLoading: calendarLoading, error: calendarError } = useCalendarQuery(id);
@@ -311,6 +383,10 @@ export default function CalendarDetail() {
 
   const handleCopyMenuClickOutside = useCallback((e: MouseEvent) => {
     if (copyMenuRef.current && !copyMenuRef.current.contains(e.target as Node)) setCopyMenuOpen(false);
+  }, []);
+
+  const handleRepurposeClickOutside = useCallback((e: MouseEvent) => {
+    if (repurposeRef.current && !repurposeRef.current.contains(e.target as Node)) setRepurposeOpen(false);
   }, []);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -335,6 +411,12 @@ export default function CalendarDetail() {
     document.addEventListener("mousedown", handleCopyMenuClickOutside);
     return () => document.removeEventListener("mousedown", handleCopyMenuClickOutside);
   }, [copyMenuOpen, handleCopyMenuClickOutside]);
+
+  useEffect(() => {
+    if (!repurposeOpen) return;
+    document.addEventListener("mousedown", handleRepurposeClickOutside);
+    return () => document.removeEventListener("mousedown", handleRepurposeClickOutside);
+  }, [repurposeOpen, handleRepurposeClickOutside]);
 
   // Keyboard shortcuts: arrow keys navigate between days
   useEffect(() => {
@@ -498,6 +580,31 @@ export default function CalendarDetail() {
     setTimezone(dx.timezone || profTz);
   }, [calendarData, profileData]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("saved_calendars")
+        .select("id, posts")
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (cancelled || error) return;
+      const snippets: string[] = [];
+      for (const calendar of data || []) {
+        if (calendar.id === id) continue;
+        const postList = Array.isArray(calendar.posts) ? calendar.posts : [];
+        for (const item of postList) {
+          if (!item || typeof item !== "object") continue;
+          const post = item as Partial<Post>;
+          snippets.push([post.title, post.hook, post.body, post.cta].filter(Boolean).join(" "));
+        }
+      }
+      setPastPostText(snippets.filter(Boolean));
+    })();
+    return () => { cancelled = true; };
+  }, [id, user?.id]);
+
   // Set loading state based on queries
   useEffect(() => {
     setLoading(calendarLoading);
@@ -649,6 +756,144 @@ export default function CalendarDetail() {
       toast.error(e instanceof Error ? e.message : "Regenerate failed");
     } finally {
       setRegenerating(false);
+    }
+  }
+
+  async function repurposeTo(targetPlatform: string) {
+    const log = createScopedLogger('CalendarDetail-Repurpose');
+    if (repurposing) return;
+    const sourcePost = posts[active];
+    if (!sourcePost) return;
+
+    setRepurposing(true);
+    setRepurposeOpen(false);
+    try {
+      const payload = {
+        post: sourcePost,
+        targetPlatform,
+        platform: platform || formPayload.platform || "LinkedIn",
+        context: {
+          industry: formPayload.industry || "",
+          voice: formPayload.voice || "",
+          style: formPayload.style || "",
+          goals: formPayload.goals || [],
+        }
+      };
+      const data = await repurposeMutation.mutateAsync(payload);
+      const result = unwrapPost(data);
+      if (result) {
+        setRepurposedPost({
+          ...result,
+          day: sourcePost.day,
+          dow: sourcePost.dow,
+          image_url: undefined,
+          image_storage_path: undefined,
+          image_generated_at: undefined,
+        });
+        setRepurposedTarget(targetPlatform);
+      } else {
+        toast.error("Failed to parse repurposed post");
+      }
+    } catch (e) {
+      log.error("Repurpose failed", e);
+      toast.error(e instanceof Error ? e.message : "Repurpose failed");
+    } finally {
+      setRepurposing(false);
+    }
+  }
+
+  async function saveRepurposedPost() {
+    if (!repurposedPost || !id) return;
+    const previous = posts;
+    const updated = posts.map((post, index) => index === active ? repurposedPost : post);
+    setPosts(updated);
+    try {
+      await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
+      setRepurposedPost(null);
+      setRepurposedTarget("");
+      toast.success("Repurposed version saved");
+    } catch (error) {
+      setPosts(previous);
+      toast.error(error instanceof Error ? error.message : "Failed to save repurposed version");
+    }
+  }
+
+  async function generateVisualForPost(post: Post) {
+    if (!id || imageGeneratingDay) return;
+    const prompt = (post.image_prompt || "").trim();
+    if (!prompt) {
+      toast.error("Add an image prompt before generating a visual");
+      return;
+    }
+
+    const aspectRatio = aspectRatioForPlatform(platform);
+    setImageGeneratingDay(post.day);
+    try {
+      const result = await generateImageMutation.mutateAsync({
+        calendarId: id,
+        postDay: post.day,
+        post,
+        prompt,
+        platform: platform || formPayload.platform || "LinkedIn",
+        aspectRatio,
+      });
+      const updatedPost: Post = {
+        ...post,
+        image_url: String(result.publicUrl || ""),
+        image_storage_path: String(result.storagePath || ""),
+        image_aspect_ratio: String(result.aspectRatio || aspectRatio),
+        image_generated_at: String(result.generatedAt || new Date().toISOString()),
+      };
+      if (!updatedPost.image_url) throw new Error("Image generation returned no URL");
+      const updated = posts.map(p => p.day === post.day ? updatedPost : p);
+      setPosts(updated);
+      await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
+      toast.success("Visual generated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Image generation failed");
+    } finally {
+      setImageGeneratingDay(null);
+    }
+  }
+
+  function rememberInlineSelection(field: "hook" | "body" | "cta", target: HTMLTextAreaElement) {
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    const text = target.value.slice(start, end).trim();
+    setInlineSelection(text ? { field, start, end, text } : null);
+  }
+
+  async function rewriteInlineSelection(instruction: "punchier" | "add-stat" | "question" | "simpler") {
+    if (!draft || !inlineSelection) {
+      toast.error("Select text in the hook, body, or CTA first");
+      return;
+    }
+    if (inlineRewriting) return;
+
+    setInlineRewriting(true);
+    try {
+      const rewritten = await inlineRewriteMutation.mutateAsync({
+        text: inlineSelection.text,
+        instruction,
+        field: inlineSelection.field,
+        platform: platform || formPayload.platform || "LinkedIn",
+        post: draft,
+        context: {
+          industry: formPayload.industry || "",
+          voice: formPayload.voice || "",
+          goals: formPayload.goals || [],
+        },
+      });
+      if (!rewritten.trim()) throw new Error("Rewrite returned empty text");
+      const original = String(draft[inlineSelection.field] || "");
+      const nextValue = `${original.slice(0, inlineSelection.start)}${rewritten}${original.slice(inlineSelection.end)}`;
+      setDraft({ ...draft, [inlineSelection.field]: nextValue });
+      setInlineSelection(null);
+      toast.success("Selection rewritten");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Rewrite failed");
+    } finally {
+      setInlineRewriting(false);
     }
   }
 
@@ -971,6 +1216,8 @@ export default function CalendarDetail() {
   const hookWords = useMemo(() => wordCount(draft?.hook || ""), [draft?.hook]);
   const titleChars = (draft?.title || "").length;
   const ctaChars = (draft?.cta || "").length;
+  const draftReadability = useMemo(() => readingStats(draft?.body || ""), [draft?.body]);
+  const repeatWarning = useMemo(() => repeatedPhraseWarning(draft?.body || "", pastPostText), [draft?.body, pastPostText]);
   const lengthTarget = formPayload.length;
   const targetHint =
     lengthTarget === "short" ? "target 80–120" :
@@ -1371,6 +1618,32 @@ export default function CalendarDetail() {
               </div>
               <div className="cd-blabel"><span>Cinematic image prompt</span></div>
               <div className="cd-body" style={{ whiteSpace: "pre-wrap" }}>{p.image_prompt || "No image prompt generated yet."}</div>
+              {p.image_url && (
+                <div className="cd-image-preview">
+                  <img src={p.image_url} alt={`Generated visual for day ${p.day}`} />
+                </div>
+              )}
+              <div className="cd-actions" style={{ marginTop: 10 }}>
+                <button
+                  className="cd-btn"
+                  disabled={regenerating || imageGeneratingDay === p.day || !p.image_prompt}
+                  onClick={() => generateVisualForPost(p)}
+                  title={!p.image_prompt ? "This post needs an image prompt first" : `Generate a ${aspectRatioForPlatform(platform)} visual`}
+                >
+                  {imageGeneratingDay === p.day ? "Generating visual..." : p.image_url ? "Regenerate visual" : "Generate visual"}
+                </button>
+                {p.image_url && (
+                  <button
+                    className="cd-btn"
+                    onClick={async () => {
+                      const ok = await writeToClipboard(p.image_url || "");
+                      if (ok) toast.success("Image URL copied");
+                    }}
+                  >
+                    Copy image URL
+                  </button>
+                )}
+              </div>
               <div className="cd-actions">
                 {(() => {
                   const f = formatForPlatform(p, platform);
@@ -1452,7 +1725,28 @@ export default function CalendarDetail() {
                 >
                   📝 Regenerate + feedback
                 </button>
-                <div className="cd-tweak-wrap" ref={tweakOpen ? tweakRef : undefined}>
+                <div className="cd-tweak-wrap" ref={repurposeRef}>
+                  <button
+                    className="cd-btn"
+                    disabled={regenerating || repurposing}
+                    onClick={() => setRepurposeOpen(o => !o)}
+                    aria-haspopup="menu"
+                    aria-expanded={repurposeOpen}
+                  >
+                    {repurposing ? "⏳ Repurposing..." : "♻️ Repurpose ▾"}
+                  </button>
+                  {repurposeOpen && (
+                    <div className="cd-tweak-menu" role="menu">
+                      <button className="cd-tweak-opt" onClick={() => repurposeTo("X")}>Repurpose for X (Twitter)</button>
+                      <button className="cd-tweak-opt" onClick={() => repurposeTo("Instagram")}>Repurpose for Instagram</button>
+                      <button className="cd-tweak-opt" onClick={() => repurposeTo("Facebook")}>Repurpose for Facebook</button>
+                      <button className="cd-tweak-opt" onClick={() => repurposeTo("LinkedIn")}>Repurpose for LinkedIn</button>
+                      <button className="cd-tweak-opt" onClick={() => repurposeTo("Newsletter")}>Repurpose for Newsletter</button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="cd-tweak-wrap" ref={tweakRef}>
                   <button
                     className="cd-btn"
                     disabled={regenerating}
@@ -1531,19 +1825,53 @@ export default function CalendarDetail() {
                 <span>Hook</span>
                 <span className="cd-blabel-count">{hookWords} words</span>
               </div>
-              <textarea className="cd-edit-area" rows={3} value={draft.hook} onChange={e => setDraft({ ...draft, hook: e.target.value })} />
+              <textarea
+                className="cd-edit-area"
+                rows={3}
+                value={draft.hook}
+                onChange={e => setDraft({ ...draft, hook: e.target.value })}
+                onSelect={e => rememberInlineSelection("hook", e.currentTarget)}
+              />
 
               <div className="cd-blabel">
                 <span>Post body</span>
                 <span className="cd-blabel-count">{bodyWords} words · {targetHint}</span>
               </div>
-              <textarea className="cd-edit-area" rows={10} value={draft.body} onChange={e => setDraft({ ...draft, body: e.target.value })} />
+              <textarea
+                className="cd-edit-area"
+                rows={10}
+                value={draft.body}
+                onChange={e => setDraft({ ...draft, body: e.target.value })}
+                onSelect={e => rememberInlineSelection("body", e.currentTarget)}
+              />
+              <div className="cd-editor-tools">
+                <button className="cd-btn" disabled={inlineRewriting} onClick={() => rewriteInlineSelection("punchier")}>Punchier</button>
+                <button className="cd-btn" disabled={inlineRewriting} onClick={() => rewriteInlineSelection("add-stat")}>Add stat</button>
+                <button className="cd-btn" disabled={inlineRewriting} onClick={() => rewriteInlineSelection("question")}>Make question</button>
+                <button className="cd-btn" disabled={inlineRewriting} onClick={() => rewriteInlineSelection("simpler")}>Simpler</button>
+                <span className="cd-editor-note">
+                  {inlineSelection ? `${inlineSelection.text.length} selected in ${inlineSelection.field}` : "Select text in hook, body, or CTA"}
+                  {inlineRewriting ? " · rewriting..." : ""}
+                </span>
+              </div>
+              <div className="cd-editor-meter">
+                <span><strong>{draftReadability.label}</strong>{draftReadability.score}/100 readability</span>
+                <span><strong>{draftReadability.averageSentenceWords}</strong>avg words per sentence</span>
+                <span><strong>{draftReadability.longSentences}</strong>long sentence{draftReadability.longSentences === 1 ? "" : "s"}</span>
+              </div>
+              {repeatWarning && <div className="cd-editor-warning">{repeatWarning}. Consider rewriting this passage before saving.</div>}
 
               <div className="cd-blabel">
                 <span>CTA</span>
                 <span className="cd-blabel-count">{ctaChars} chars</span>
               </div>
-              <textarea className="cd-edit-area" rows={2} value={draft.cta} onChange={e => setDraft({ ...draft, cta: e.target.value })} />
+              <textarea
+                className="cd-edit-area"
+                rows={2}
+                value={draft.cta}
+                onChange={e => setDraft({ ...draft, cta: e.target.value })}
+                onSelect={e => rememberInlineSelection("cta", e.currentTarget)}
+              />
 
               <div className="cd-blabel"><span>Hashtags</span></div>
               <textarea className="cd-edit-area" rows={2} value={draft.hashtags} onChange={e => setDraft({ ...draft, hashtags: e.target.value })} />
@@ -1611,6 +1939,43 @@ export default function CalendarDetail() {
             }
           }}
         />
+      )}
+
+      {repurposedPost && (
+        <div className="cd-modal-bg" onClick={() => setRepurposedPost(null)}>
+          <div className="cd-modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+            <div className="cd-hero-kicker">✨ Repurposed Variant</div>
+            <h3 className="cd-title" style={{ marginTop: 0 }}>{repurposedPost.topic}</h3>
+            <p className="cd-meta" style={{ marginBottom: 15 }}>Optimized for {repurposedTarget || repurposedPost.format}</p>
+
+            <div className="cd-blabel"><span>Repurposed Body</span></div>
+            <div className="cd-card" style={{ background: "rgba(255,255,255,0.02)", padding: 15, borderRadius: 12, marginBottom: 20 }}>
+              <div style={{ whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.6, color: "#edeae3" }}>
+                {repurposedPost.body}
+              </div>
+            </div>
+
+            <div className="cd-modal-actions">
+              <button
+                className="cd-btn"
+                onClick={() => {
+                  writeToClipboard(repurposedPost.body);
+                  toast.success("Repurposed text copied!");
+                }}
+              >
+                📋 Copy Text
+              </button>
+              <button
+                className="cd-btn"
+                style={{ background: "#c8f09a", color: "#07080d" }}
+                onClick={saveRepurposedPost}
+              >
+                📥 Save this version
+              </button>
+              <button className="cd-fav-btn" onClick={() => { setRepurposedPost(null); setRepurposedTarget(""); }}>Close</button>
+            </div>
+          </div>
+        </div>
       )}
       {pendingReformatTarget && (
         <ConfirmDialog
