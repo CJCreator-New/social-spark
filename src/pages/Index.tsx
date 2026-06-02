@@ -967,7 +967,7 @@ async function upsertMediaReferences(params: {
   if (!urls.length) return;
 
   await Promise.all(urls.map((publicUrl) =>
-    supabase.from("media_references").upsert({
+    (supabase.from as any)("media_references").upsert({
       user_id: userId,
       bucket,
       storage_path: publicUrl,
