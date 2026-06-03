@@ -40,6 +40,7 @@ interface Post {
   cta_options?: string[];
   variant_scores?: Record<string, number>[];
   chosen_index?: number;
+  [key: string]: any;
 }
 
 type SavedCalendarInsert = Database["public"]["Tables"]["saved_calendars"]["Insert"];

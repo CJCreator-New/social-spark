@@ -4,7 +4,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { getE2EAuthFlag, E2E_CALENDAR, E2E_SCHEDULE_ROWS } from "@/lib/e2eFixtures";
 
 function isE2EMode() {
-  return typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true";
+  return import.meta.env.DEV && typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true";
 }
 
 type E2ECalendar = typeof E2E_CALENDAR;
@@ -305,7 +305,7 @@ export function useScheduleInfiniteQuery(userId?: string, pageSize = 25) {
 export function useProfileUpdateMutation(userId?: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (updates: Record<string, unknown>) => {
+    mutationFn: async (updates: Database["public"]["Tables"]["profiles"]["Update"]) => {
       if (!userId) throw new Error("No user ID");
       const { error } = await supabase.from("profiles").update(updates).eq("user_id", userId);
       if (error) throw error;
@@ -485,7 +485,7 @@ export function useDeleteTemplateMutation(userId?: string) {
 export function useUpdateScheduledPostStatusMutation(calendarId?: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: Record<string, unknown> }) => {
+    mutationFn: async ({ id, patch }: { id: string; patch: Database["public"]["Tables"]["scheduled_posts"]["Update"] }) => {
       if (isE2EMode()) {
         updateE2EScheduleRow(id, patch);
         return { id, patch };
@@ -553,9 +553,14 @@ export function useRegeneratePostMutation(calendarId?: string) {
       }
       const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
       const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY },
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_KEY,
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));

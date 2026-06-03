@@ -18,8 +18,10 @@ export type Database = {
         Row: {
           avatar_url: string | null
           banned_hashtags: string[] | null
+          brand_examples: string[] | null
           created_at: string
           default_audiences: string[] | null
+          default_framework: string | null
           default_goals: string[] | null
           default_style: string | null
           default_timezone: string | null
@@ -33,8 +35,10 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           banned_hashtags?: string[] | null
+          brand_examples?: string[] | null
           created_at?: string
           default_audiences?: string[] | null
+          default_framework?: string | null
           default_goals?: string[] | null
           default_style?: string | null
           default_timezone?: string | null
@@ -48,8 +52,10 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           banned_hashtags?: string[] | null
+          brand_examples?: string[] | null
           created_at?: string
           default_audiences?: string[] | null
+          default_framework?: string | null
           default_goals?: string[] | null
           default_style?: string | null
           default_timezone?: string | null

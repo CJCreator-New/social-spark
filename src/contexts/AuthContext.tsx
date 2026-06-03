@@ -18,7 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const e2eEnabled = window.localStorage.getItem(getE2EAuthFlag()) === "true";
+    const e2eEnabled = import.meta.env.DEV && window.localStorage.getItem(getE2EAuthFlag()) === "true";
     if (e2eEnabled) {
       const mockUser = {
         id: E2E_USER_ID,
@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    if (window.localStorage.getItem(getE2EAuthFlag()) === "true") {
+    if (import.meta.env.DEV && window.localStorage.getItem(getE2EAuthFlag()) === "true") {
       window.localStorage.removeItem(getE2EAuthFlag());
       setSession(null);
       setUser(null);

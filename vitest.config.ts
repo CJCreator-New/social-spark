@@ -12,5 +12,9 @@ export default defineConfig({
     exclude: ["e2e/**", "node_modules/**", "dist/**"],
     environment: "jsdom",
     globals: true,
+    env: {
+      VITE_SUPABASE_URL: "https://dummy.supabase.co",
+      VITE_SUPABASE_PUBLISHABLE_KEY: "dummy-key",
+    },
   },
 })

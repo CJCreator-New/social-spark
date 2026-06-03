@@ -1,109 +1,157 @@
-# Welcome to your Lovable project
+# ContentForge
 
-## Project info
+AI-powered weekly content calendar generator. Turn one brief into a week of polished, platform-native social media posts for LinkedIn, X/Twitter, Instagram, Facebook, newsletters, and blogs.
 
-**URL**: https://lovable.dev/projects/b31b4522-b054-4b2f-ac2d-d7f2a2953cef
+## Features
 
-## How can I edit this code?
+- **Brand-aware generation** — Voice, audience, goals, banned phrases, and hashtag rules persist across every calendar
+- **Platform-native writing** — Content adapts to each platform's length, structure, and CTA conventions
+- **Schedule & export** — Timezone-aware scheduling, CSV / Markdown / PDF / ICS export
+- **Reusable templates** — Save winning prompts as brief templates
+- **Single-post mode** — Generate one fully tuned post with the same brand context
+- **Draft auto-recovery** — The wizard autosaves locally and to the server; a refresh never resets your work
+- **Undo / redo** — Full history for post editing (Ctrl+Z / Ctrl+Y)
+- **Batch edit** — Apply changes across all posts at once (Ctrl+Shift+E)
+- **Drag-and-drop reordering** — Rearrange your weekly calendar visually
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+| Layer | Technology |
+|-------|-----------|
+| **Framework** | Vite + React 18 + TypeScript |
+| **Styling** | Tailwind CSS + shadcn/ui + custom CSS |
+| **State** | TanStack Query (React Query) |
+| **Auth & DB** | Supabase (Auth, Postgres, Edge Functions, Storage) |
+| **Testing** | Vitest (unit) + Playwright (E2E) |
+| **CI/CD** | GitHub Actions |
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/b31b4522-b054-4b2f-ac2d-d7f2a2953cef) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/b31b4522-b054-4b2f-ac2d-d7f2a2953cef) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
-
-## Local setup & verification (for maintainers)
-
-Follow these steps to set up the project locally and verify core checks used by the audit:
-
-1. Copy environment vars into a local `.env` file (do not commit this file):
+## Architecture Overview
 
 ```
-VITE_SUPABASE_URL=your-supabase-url
-VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+src/
+├── pages/           # Route-level page components
+│   ├── Index.tsx    # Main wizard / calendar builder (largest component)
+│   ├── Landing.tsx  # Public landing page
+│   ├── Auth.tsx     # Sign in / sign up
+│   ├── Profile.tsx  # User profile & brand defaults
+│   ├── MyCalendars.tsx  # Calendar list
+│   ├── CalendarDetail.tsx  # Single calendar view
+│   ├── Schedule.tsx  # Publishing schedule
+│   └── Admin.tsx    # Admin dashboard
+├── components/      # Shared UI components
+├── contexts/        # React contexts (Auth)
+├── hooks/           # Custom hooks (data fetching, mutations)
+├── lib/             # Utilities (config, errors, logger, storage, export)
+├── integrations/    # Supabase client & types
+└── main.tsx         # App entry point
+
+supabase/
+├── functions/       # Edge Functions (generate-calendar, regenerate-post, etc.)
+├── migrations/      # SQL migrations (22 files)
+└── config.toml      # Supabase project configuration
+
+e2e/                 # Playwright E2E test specs
 ```
 
-2. Install dependencies and run dev server:
+## Getting Started
 
-```sh
-npm install
-npm run dev
+### Prerequisites
+
+- **Node.js** ≥ 18.x
+- **npm** (comes with Node)
+- A **Supabase** project (for auth, DB, and edge functions)
+
+### Setup
+
+1. **Clone and install:**
+   ```bash
+   git clone <repo-url> && cd social-spark
+   npm install
+   ```
+
+2. **Configure environment:**
+   Create a `.env` file (gitignored) with your Supabase credentials:
+   ```env
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=eyJ...your-anon-key
+   ```
+
+3. **Run the dev server:**
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:5173](http://localhost:5173)
+
+### Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start Vite dev server |
+| `npm run build` | Production build |
+| `npm run lint` | Run ESLint |
+| `npm run typecheck` | Run TypeScript type checking |
+| `npm run test:run` | Run unit tests (Vitest) |
+| `npm run test:coverage` | Run tests with coverage report |
+| `npx playwright test` | Run E2E tests (requires dev server or build) |
+
+## Supabase Edge Functions
+
+Deploy from `supabase/functions/`:
+
+| Function | Purpose |
+|----------|---------|
+| `generate-calendar` | Generate a full week of posts from a brief |
+| `generate-single-post` | Generate one post |
+| `regenerate-post` | Re-generate a single post within a calendar |
+| `repurpose-post` | Reformat a post for a different platform |
+| `inline-rewrite` | Apply a tweak instruction to a post |
+| `generate-post-image` | Generate an image for a post |
+| `queue-worker` | Process background job queue (cron) |
+| `cleanup-media` | Remove orphaned media files (cron) |
+| `telemetry` | Capture usage events |
+| `trends_ingest` / `trends_read` / `trends_admin` | Trending topics pipeline |
+| `adapters` | Platform adapter utilities |
+
+See [docs/DEPLOYMENT_SETUP.md](docs/DEPLOYMENT_SETUP.md) for deployment details.
+
+## Configuration
+
+All application constants are centralized in [`src/lib/config.ts`](src/lib/config.ts):
+- Rate limits, API retry config, generation timeouts
+- Platform character limits (Twitter 280, LinkedIn 3000, etc.)
+- Content length guides, structure templates
+- React Query caching defaults
+- Feature flags
+
+Feature flags can be overridden at runtime via `localStorage`:
+```js
+// In browser console:
+localStorage.setItem("ss:feature_flags", JSON.stringify({ enable_telemetry: false }));
 ```
 
-3. Run the core verification checks used in audits:
+## Testing
 
-```sh
-npm run lint
-npm run test:run
-npm run build
-npm audit --audit-level=moderate
+### Unit Tests (Vitest)
+```bash
+npm run test:run       # Run once
+npm run test:coverage  # With coverage
 ```
 
-4. If you need to remove a tracked local `.env` from the repository:
+### E2E Tests (Playwright)
+The E2E suite uses a mock authentication mode (dev-only) that bypasses Supabase auth for deterministic test execution.
 
-```sh
-git rm --cached .env
-git commit -m "Remove tracked .env from repository"
+```bash
+npx playwright test
 ```
 
-Document any additional environment variables or deployment steps in this file.
+See [`e2e/critical-paths.spec.ts`](e2e/critical-paths.spec.ts) for the test scenarios.
+
+## Documentation
+
+Additional docs are in the [`docs/`](docs/) directory:
+- [Deployment Setup](docs/DEPLOYMENT_SETUP.md) — Edge function and migration checklist
+- [Requirements](docs/requirements/) — Business, functional, backend, frontend, and QA requirements
+
+## License
+
+Private — All rights reserved.
