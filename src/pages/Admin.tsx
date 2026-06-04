@@ -7,30 +7,18 @@
  * Access: /admin (admin users only)
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
 import { AlertCircle, Activity, TrendingUp, Users, Calendar, Zap } from 'lucide-react';
 import { fetchAdminStats, AdminStats } from '@/lib/admin';
 import { SkeletonList } from '@/components/SkeletonList';
 import telemetry from '@/lib/telemetry';
+
+const AdminCharts = lazy(() => import("./admin/AdminCharts"));
+
 
 // ============================================================================
 // ADMIN DASHBOARD COMPONENT
@@ -236,32 +224,9 @@ export function AdminDashboard() {
             <CardDescription>Distribution across social platforms</CardDescription>
           </CardHeader>
           <CardContent>
-            {Object.keys(stats.usage.platformDistribution).length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={Object.entries(stats.usage.platformDistribution).map(([name, value]) => ({
-                      name,
-                      value,
-                    }))}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, value }) => `${name} (${value})`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1'].map((color, index) => (
-                      <Cell key={`cell-${index}`} fill={color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="py-8 text-center text-sm text-gray-500">No platform data available</p>
-            )}
+            <Suspense fallback={<p className="py-8 text-center text-sm text-gray-500">Loading charts...</p>}>
+              <AdminCharts platformDistribution={stats.usage.platformDistribution} />
+            </Suspense>
           </CardContent>
         </Card>
 

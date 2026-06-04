@@ -8,9 +8,10 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { SkeletonList } from "@/components/SkeletonList";
 import { setupGlobalErrorHandlers } from "@/lib/logger";
+import { RouteFallback } from "@/components/layout/RouteFallback";
 import { lazy } from "react";
+
 const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -54,15 +55,15 @@ const App = () => {
           <ErrorBoundary>
             <AuthProvider>
               <Routes>
-                <Route path="/auth" element={<Suspense fallback={<div style={{ padding: 24, color: '#edeae3' }}>Loading...</div>}><Auth /></Suspense>} />
-                <Route path="/reset-password" element={<Suspense fallback={<div style={{ padding: 24, color: '#edeae3' }}>Loading...</div>}><ResetPassword /></Suspense>} />
-                <Route path="/" element={<Suspense fallback={<div style={{ padding: 24, color: '#edeae3' }}>Loading...</div>}><Landing /></Suspense>} />
+                <Route path="/auth" element={<Suspense fallback={<RouteFallback title="Sign In" />}><Auth /></Suspense>} />
+                <Route path="/reset-password" element={<Suspense fallback={<RouteFallback title="Reset Password" />}><ResetPassword /></Suspense>} />
+                <Route path="/" element={<Suspense fallback={<RouteFallback title="ContentForge" />}><Landing /></Suspense>} />
                 <Route path="/__e2e/crash" element={<E2ECrashRoute />} />
                 <Route
                   path="/app"
                   element={
                     <ProtectedRoute>
-                      <Suspense fallback={<main aria-label="App loading"><h1 style={{ margin: 24 }}>ContentForge</h1><SkeletonList /></main>}>
+                      <Suspense fallback={<RouteFallback title="ContentForge Workspace" />}>
                         <Index />
                       </Suspense>
                     </ProtectedRoute>
@@ -72,7 +73,7 @@ const App = () => {
                   path="/profile"
                   element={
                     <ProtectedRoute>
-                      <Suspense fallback={<main aria-label="Profile loading"><h1 style={{ margin: 24 }}>Profile</h1><SkeletonList /></main>}>
+                      <Suspense fallback={<RouteFallback title="Profile Settings" />}>
                         <Profile />
                       </Suspense>
                     </ProtectedRoute>
@@ -82,14 +83,7 @@ const App = () => {
                   path="/my-calendars"
                   element={
                     <ProtectedRoute>
-                      <Suspense
-                        fallback={
-                          <main aria-label="My calendars loading">
-                            <h1 style={{ margin: 24 }}>My calendars</h1>
-                            <SkeletonList />
-                          </main>
-                        }
-                      >
+                      <Suspense fallback={<RouteFallback title="My Calendars" />}>
                         <MyCalendars />
                       </Suspense>
                     </ProtectedRoute>
@@ -99,7 +93,7 @@ const App = () => {
                   path="/calendar/:id"
                   element={
                     <ProtectedRoute>
-                      <Suspense fallback={<main aria-label="Calendar loading"><h1 style={{ margin: 24 }}>Calendar details</h1><SkeletonList /></main>}>
+                      <Suspense fallback={<RouteFallback title="Calendar Workspace" />}>
                         <CalendarDetail />
                       </Suspense>
                     </ProtectedRoute>
@@ -109,21 +103,14 @@ const App = () => {
                   path="/schedule"
                   element={
                     <ProtectedRoute>
-                      <Suspense
-                        fallback={
-                          <main aria-label="Schedule loading">
-                            <h1 style={{ margin: 24 }}>My schedule</h1>
-                            <SkeletonList />
-                          </main>
-                        }
-                      >
+                      <Suspense fallback={<RouteFallback title="Scheduling & Queue" />}>
                         <Schedule />
                       </Suspense>
                     </ProtectedRoute>
                   }
                 />
-                <Route path="/admin" element={<ProtectedRoute><AdminRoute><Suspense fallback={<SkeletonList />}><Admin /></Suspense></AdminRoute></ProtectedRoute>} />
-                <Route path="*" element={<Suspense fallback={<div style={{ padding: 24, color: '#edeae3' }}>Loading...</div>}><NotFound /></Suspense>} />
+                <Route path="/admin" element={<ProtectedRoute><AdminRoute><Suspense fallback={<RouteFallback title="Admin Dashboard" />}><Admin /></Suspense></AdminRoute></ProtectedRoute>} />
+                <Route path="*" element={<Suspense fallback={<RouteFallback title="Not Found" />}><NotFound /></Suspense>} />
               </Routes>
             </AuthProvider>
           </ErrorBoundary>
@@ -134,3 +121,4 @@ const App = () => {
 };
 
 export default App;
+

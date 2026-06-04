@@ -1,45 +1,44 @@
-import { Suspense, useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { Suspense, useState, useRef, useEffect, useMemo, useCallback, lazy } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { getE2EAuthFlag, E2E_USER_ID, E2E_CALENDAR } from "@/lib/e2eFixtures";
+import { getE2EAuthFlag, E2E_USER_ID } from "@/lib/e2eFixtures";
 import e2eStore from "@/lib/e2eStore";
 import { toast } from "sonner";
 import storageService from "@/lib/storageService";
 import { createScopedLogger } from "@/lib/logger";
 import { getUserFriendlyMessage } from "@/lib/errors";
-import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
 import telemetry from "@/lib/telemetry";
 import { downloadIcs, nextMonday, toDateInputValue, parseLocalDate, dateForDow, shortDateLabel } from "@/lib/calendarSchedule";
 import { formatForPlatform, writeToClipboard, PLATFORM_LIMITS, resolvePlatform, niceLabelFor, buildRawMarkdown, stripMarkdown } from "@/lib/platformCopy";
 import { suggestedTimeForDay } from "@/lib/postingTimes";
 import { getVoiceStylePreview } from "@/lib/voiceStylePreview";
-import { generateLocalPosts } from "@/lib/localPostGenerator";
-import { DraftRecoveryDialog } from "@/components/DraftRecoveryDialog";
-import { BatchEditModal, type BatchEditPayload } from "@/components/BatchEditModal";
-import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
-import PostInsights from "@/components/PostInsights";
-import { DiffView } from "@/components/DiffView";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { ToneConsistencyChecker } from "@/components/ToneConsistencyChecker";
-import { InspirationBank } from "@/components/InspirationBank";
 import GenerateSkeleton from "@/components/GenerateSkeleton";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useCreateCalendarMutation, useRegeneratePostMutation } from "@/hooks/useAppQueries";
 import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dragDrop";
-import { SAMPLE_FORM, SAMPLE_POSTS, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
 import { calculatePerformanceScore, getWeakestPerformanceMetric, type PerformanceFocusMetric, getRegenerationGuidance, getWeakestMetrics } from "@/lib/postPerformanceScore";
 import { createSeedFromPost, storeSeed, readAndClearSeed } from "@/lib/seedFromPost";
 import { isEnabled } from "@/lib/featureFlags";
 import { buildBrandMemoryPrompt } from "@/lib/brandMemory";
-import mediaManager from "@/lib/mediaManager";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { FontStyle, applyStyle } from "@/lib/unicodeFonts";
 import { useWizardStore } from "@/stores/useWizardStore";
-import { CoverImageGenerator } from "@/components/wizard/CoverImageGenerator";
+
+// Lazy load components to optimize bundle size
+const DraftRecoveryDialog = lazy(() => import("@/components/DraftRecoveryDialog").then(m => ({ default: m.DraftRecoveryDialog })));
+const BatchEditModal = lazy(() => import("@/components/BatchEditModal").then(m => ({ default: m.BatchEditModal })));
+const PerformanceScoreCard = lazy(() => import("@/components/PerformanceScoreCard").then(m => ({ default: m.PerformanceScoreCard })));
+const PostInsights = lazy(() => import("@/components/PostInsights"));
+const DiffView = lazy(() => import("@/components/DiffView").then(m => ({ default: m.DiffView })));
+const ToneConsistencyChecker = lazy(() => import("@/components/ToneConsistencyChecker").then(m => ({ default: m.ToneConsistencyChecker })));
+const InspirationBank = lazy(() => import("@/components/InspirationBank").then(m => ({ default: m.InspirationBank })));
+const CoverImageGenerator = lazy(() => import("@/components/wizard/CoverImageGenerator").then(m => ({ default: m.CoverImageGenerator })));
+const IndexResults = lazy(() => import("./IndexResults"));
 
 import "./Index.css";
 import {
@@ -71,10 +70,6 @@ import {
 import { SelectField } from "@/components/wizard/SelectField";
 import { MultiSelect } from "@/components/wizard/MultiSelect";
 import { ReformatBar } from "@/components/wizard/ReformatBar";
-import { WeekStrip } from "@/components/wizard/WeekStrip";
-import { SidebarSummary } from "@/components/wizard/SidebarSummary";
-import { PlatformPreview, renderLinkedInPreviewText } from "@/components/wizard/PlatformPreview";
-import { PostDetailCard, postText, hasEmoji, formatBadgeForPlatform } from "@/components/wizard/PostDetailCard";
 
 function Check() {
   return (
@@ -998,10 +993,11 @@ const Index = () => {
       setIsGenerating(false);
     };
 
-    const localFallback = (message: string) => {
+    const localFallback = async (message: string) => {
       const DOW_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const targetDateObj = form.mode === "day" ? (parseLocalDate(form.targetDate) || new Date()) : null;
       const localTargetDow = targetDateObj ? DOW_NAMES[targetDateObj.getDay()] : "Mon";
+      const { generateLocalPosts } = await import("@/lib/localPostGenerator");
       const fallbackPosts = generateLocalPosts({
         industry: form.industry,
         industryLabel: selectedIndustry?.label || form.industry,
@@ -1397,13 +1393,13 @@ const Index = () => {
     toast.success("Brand memory cleared");
   }
 
-  function toggleLock(day: number) {
+  const toggleLock = useCallback((day: number) => {
     setLockedDays(prev => {
       const next = new Set(prev);
       if (next.has(day)) next.delete(day); else next.add(day);
       return next;
     });
-  }
+  }, [setLockedDays]);
 
   async function regenerateUnlocked() {
     if (regenIdx !== null || reformatting) return;
@@ -1646,7 +1642,7 @@ const Index = () => {
     ].join("\n\n");
   }
 
-  async function copyPost(i: number) {
+  const copyPost = useCallback(async (i: number) => {
     const p = posts[i];
     if (!p) return;
     const formatted = formatForPlatform(p, form.platform, { style: getClipboardStyle() });
@@ -1659,8 +1655,8 @@ const Index = () => {
     } else {
       toast.success(`Copied for ${formatted.platformLabel} ✓`);
     }
-  }
-  async function copyAll() {
+  }, [posts, form.platform, getClipboardStyle]);
+  const copyAll = useCallback(async () => {
     const all = posts.map(p => {
       const f = formatForPlatform(p, form.platform, { style: getClipboardStyle() });
       return `=== Day ${p.day} — ${p.dow} | ${p.topic} ===\n${f.text}`;
@@ -1669,23 +1665,17 @@ const Index = () => {
     if (!ok) { toast.error("Could not copy to clipboard"); return; }
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
-    toast.success(`All 7 copied for ${niceLabelFor(form.platform)} ✓`);
-  }
-  function downloadTxt() {
-    const header = `CONTENTFORGE — 7-DAY ${form.platform.toUpperCase()} CONTENT CALENDAR
-Industry: ${selectedIndustry?.label || "—"}  |  Niche: ${form.coreIdea}
-Platform: ${form.platform}  |  Generated: ${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-${"═".repeat(52)}\n\n`;
+    toast.success(`All ${posts.length} copied for ${niceLabelFor(form.platform)} ✓`);
+  }, [posts, form.platform, getClipboardStyle]);
+  const downloadTxt = useCallback(() => {
+    const style = getClipboardStyle();
+    const textFor = (p: Post) => {
+      const raw = `${p.title}\n\n${p.hook}\n\n${p.body}\n\n${p.cta}\n\n${p.hashtags}`;
+      return style === FontStyle.None ? raw : applyStyle(raw, style);
+    };
+    const header = `CONTENTFORGE — 7-DAY ${form.platform.toUpperCase()} CONTENT CALENDAR\nIndustry: ${selectedIndustry?.label || "—"}  |  Niche: ${form.coreIdea}\nPlatform: ${form.platform}  |  Generated: ${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}\n${"═".repeat(52)}\n\n`;
     const body = posts.map(p =>
-      `${"─".repeat(52)}
-DAY ${p.day} — ${p.dow.toUpperCase()}  |  ${p.topic.toUpperCase()}
-Format: ${p.format}
-${"─".repeat(52)}
-
-${postText(p)}
-
-📌 ${p.rationale}
-`).join("\n\n");
+      `${"─".repeat(52)}\nDAY ${p.day} — ${p.dow.toUpperCase()}  |  ${p.topic.toUpperCase()}\nFormat: ${p.format}\n${"─".repeat(52)}\n\n${textFor(p)}\n\n📌 ${p.rationale}\n`).join("\n\n");
     const blob = new Blob([header + body], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1693,7 +1683,7 @@ ${postText(p)}
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
     try { toast.success("Download started"); } catch (e) { /* noop */ }
-  }
+  }, [posts, form.platform, form.industry, form.coreIdea, selectedIndustry, getClipboardStyle]);
 
   async function saveCalendar() {
     if (!user || posts.length === 0) return;
@@ -1733,7 +1723,7 @@ ${postText(p)}
     }
   }
 
-  function exportIcs() {
+  const exportIcs = useCallback(() => {
     const weekStart = parseLocalDate(form.weekStart) || nextMonday();
     const title = form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`;
     downloadIcs({
@@ -1742,7 +1732,7 @@ ${postText(p)}
       postTimes,
       platform: form.platform,
     }, posts);
-  }
+  }, [form.weekStart, form.coreIdea, form.platform, selectedIndustry, postTimes, posts]);
 
   const weekStartDate = useMemo(() => parseLocalDate(form.weekStart) || nextMonday(), [form.weekStart]);
 
@@ -2351,271 +2341,67 @@ ${postText(p)}
           {/* ── STEP 4 ── */}
           <div className={`screen ${step === 4 ? "active" : ""}`}>
             {posts.length > 0 && (
-              <div className="step4-layout">
-                <div className="step4-main">
-                  <>
-                {generationMeta?.inferredTopics && !sampleMode && (
-                  <div className="sample-banner" style={{ marginBottom: 14 }}>
-                    <div className="sample-banner-text">
-                      <strong>Topics were inferred.</strong> The generator filled the gap from your core idea and industry, so you can still refine the angles later.
-                    </div>
-                  </div>
-                )}
-                {sampleMode && (
-                  <div className="sample-banner">
-                    <div className="sample-banner-text">
-                      <strong>Sample calendar.</strong> This is a pre-baked example to show you the layout.
-                      Save isn't available — start your own to keep results.
-                    </div>
-                    <button type="button" className="sample-cta" onClick={exitSample}>Start my own →</button>
-                  </div>
-                )}
-
-                {!sampleMode && (
-                  <div className="reformat-bar">
-                    <span className="reformat-label">Reformat for</span>
-                    <select
-                      className="reformat-sel"
-                      value={reformatTarget}
-                      onChange={(e) => setReformatTarget(e.target.value)}
-                      disabled={reformatting || regenIdx !== null}
-                      aria-label="Choose another platform to reformat for"
-                    >
-                      <option value="">Another platform…</option>
-                      {PLATFORM_OPTIONS.filter(po => po.id !== form.platform).map(po => (
-                        <option key={po.id} value={po.id}>{po.label}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className="reformat-btn"
-                      disabled={!reformatTarget || reformatting || regenIdx !== null || !user}
-                      onClick={() => reformatAllForPlatform(reformatTarget)}
-                      title={!user ? "Sign in — saved as a new calendar" : "Re-runs all 7 posts; saved as a new calendar"}
-                    >
-                      {reformatting ? `Reformatting… ${regenIdx !== null ? `(${regenIdx + 1}/${posts.length})` : ""}` : `Reformat all ${posts.length} →`}
-                    </button>
-                    <span style={{ flex: 1 }} />
-                    <button
-                      type="button"
-                      className="reformat-btn"
-                      style={{ background: "transparent", color: "var(--text2)", borderColor: "var(--border2)" }}
-                      disabled={reformatting || regenIdx !== null || lockedDays.size === posts.length}
-                      onClick={regenerateUnlocked}
-                      title="Re-roll only the days you haven't pinned"
-                    >
-                      ↻ Regenerate unlocked ({posts.length - lockedDays.size})
-                    </button>
-                  </div>
-                )}
-
-                {posts.length > 1 && (
-                  <WeekStrip
-                    posts={posts}
-                    activeDay={activeDay}
-                    setActiveDay={setActiveDay}
-                    lockedDays={lockedDays}
-                    draggedIndex={draggedIndex}
-                    setDraggedIndex={setDraggedIndex}
-                    handleDayDrop={handleDayDrop}
-                    handleDragStart={handleDragStart}
-                    handleDragOver={handleDragOver}
-                    handleDrop={handleDrop}
-                  />
-                )}
-                {p && (
-                  <div>
-                    <PostDetailCard
-                      post={p}
-                      activeDay={activeDay}
-                      form={form}
-                      weekStartDate={weekStartDate}
-                      postTimes={postTimes}
-                      setPostTimes={setPostTimes}
-                      lockedDays={lockedDays}
-                      toggleLock={toggleLock}
-                      regenerateDay={regenerateDay}
-                      regenIdx={regenIdx}
-                      reformatting={reformatting}
-                      tweakOpenIdx={tweakOpenIdx}
-                      setTweakOpenIdx={setTweakOpenIdx}
-                      getClipboardStyle={getClipboardStyle}
-                      copyPost={copyPost}
-                      copiedIdx={copiedIdx}
-                      copyMenuOpen={copyMenuOpen}
-                      setCopyMenuOpen={setCopyMenuOpen}
-                      showRationale={showRationale}
-                      setShowRationale={setShowRationale}
-                      enhanceCurrentPost={enhanceCurrentPost}
-                      tweakRef={tweakRef}
-                      copyMenuRef={copyMenuRef}
-                      onFocusedRegenerate={handleFocusedRegenerate}
-                      onApplyCta={(newCta) => handleApplyCta(activeDay, newCta)}
-                      onUseAsSeed={() => handleUseAsSeed(p)}
-                      onApplyImage={(imageUrl) => handleApplyImage(activeDay, imageUrl)}
-                      calendarId={savedId || undefined}
-                    />
-                    <ToneConsistencyChecker posts={posts} />
-                  </div>
-                )}
-
-                <div className="bbar">
-                  <button className="restart" onClick={() => { clearDraft(); setPostsWithHistory([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setSampleMode(false); setStep(1); setError(""); }}>← Start over</button>
-                  <button className="restart" onClick={() => { setError(""); setStep(2); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ marginLeft: 8 }}>✎ Edit inputs</button>
-                  <div className="bactions">
-                    <button className="dlbtn" onClick={saveCalendar} disabled={saving || !!savedId || sampleMode} title={sampleMode ? "Sample mode — start your own to save" : ""}>
-                      {sampleMode ? "Save (sample only)" : savedId ? "Saved ✓" : saving ? "Saving…" : "Save calendar"}
-                    </button>
-                    <button className="dlbtn" onClick={downloadTxt}>
-                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M6.5 1v7M4 5.5l2.5 2.5L9 5.5M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" />
-                      </svg>
-                      .txt
-                    </button>
-                    <button
-                      className="dlbtn"
-                      onClick={() => {
-                        try {
-                          downloadMd({
-                            title: form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
-                            industryLabel: selectedIndustry?.label,
-                            platform: form.platform,
-                            coreIdea: form.coreIdea,
-                          }, posts, { style: getClipboardStyle() });
-                          toast.success("Downloaded .md ✓");
-                        } catch (e) {
-                          toast.error(e instanceof Error ? e.message : "Download .md failed");
-                        }
-                      }}
-                    >
-                      .md
-                    </button>
-                    <button
-                      className="dlbtn"
-                      onClick={() => {
-                        try {
-                          downloadPdf({
-                            title: form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
-                            industryLabel: selectedIndustry?.label,
-                            platform: form.platform,
-                            coreIdea: form.coreIdea,
-                          }, posts);
-                          toast.success("Downloaded .pdf ✓");
-                        } catch (e) {
-                          toast.error(e instanceof Error ? e.message : "Download .pdf failed");
-                        }
-                      }}
-                    >
-                      .pdf
-                    </button>
-                    <button className="dlbtn" onClick={() => { try { exportIcs(); toast.success("Downloaded .ics ✓"); } catch (e) { toast.error(e instanceof Error ? e.message : "Download .ics failed"); } }} title="Export to Google Calendar / Outlook / Apple Cal">
-                      📅 .ics
-                    </button>
-                    <button
-                      className="dlbtn"
-                      onClick={() => setBatchEditOpen(true)}
-                      title="Apply brand mention, hashtag, or CTA to all 7 posts at once (Ctrl+Shift+E)"
-                    >
-                      ⚙️ Batch edit
-                    </button>
-                    <button className="btn btn-p" style={{ fontSize: 13 }} onClick={copyAll}>
-                      {copiedAll ? "All copied ✓" : `Copy all 7 for ${niceLabelFor(form.platform)}`}
-                    </button>
-                  </div>
-                </div>
-              </>
-                </div>
-                <div className="step4-side">
-                  {/* Toggle buttons for Summary / Performance */}
-                  <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                    <button
-                      className={`cpbtn ${!showPerformance ? "done" : ""}`}
-                      onClick={() => setShowPerformance(false)}
-                      style={{ flex: 1, textAlign: "center" }}
-                      title="Week summary and stats"
-                    >
-                      Week Summary
-                    </button>
-                    <button
-                      className={`cpbtn ${showPerformance ? "done" : ""}`}
-                      onClick={() => setShowPerformance(true)}
-                      style={{ flex: 1, textAlign: "center" }}
-                      title="Performance score for current post"
-                      disabled={!posts[activeDay]}
-                    >
-                      Performance
-                    </button>
-                  </div>
-
-                  {!showPerformance ? (
-                    <div className="summary-card">
-                      <div className="summary-head">
-                        <div>
-                          <div className="sh" style={{ marginBottom: 6 }}>Week at a glance</div>
-                          <div className="time-hint">A fast read before you copy, tweak, or save.</div>
-                        </div>
-                        <div className="summary-stat">
-                          <b>{weekSummary.totalPosts}</b>
-                          <span>Posts</span>
-                        </div>
-                      </div>
-                      <div className="summary-list">
-                        <div className="summary-row"><span>Average length</span><strong>{weekSummary.avgChars} chars</strong></div>
-                        <div className="summary-row"><span>Within platform limit</span><strong>{weekSummary.withinLimitPct}%</strong></div>
-                        <div className="summary-row"><span>Hashtags per post</span><strong>{weekSummary.hashtagCounts.length ? weekSummary.hashtagCounts.join(" · ") : "—"}</strong></div>
-                      </div>
-                      <div className="summary-meta">
-                        {Object.entries(weekSummary.formatCounts).slice(0, 4).map(([label, count]) => (
-                          <span key={label} className="summary-pill">{count} {label.toLowerCase()}</span>
-                        ))}
-                      </div>
-                      <div className="summary-list" style={{ marginTop: 14 }}>
-                        {weekSummary.postingTimes.map(slot => (
-                          <div key={slot.day} className="summary-row">
-                            <span>Day {slot.day} · {slot.dow}</span>
-                            <strong>{slot.time}</strong>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : posts[activeDay] ? (
-                    <>
-                      <PerformanceScoreCard post={posts[activeDay]} topic={form.coreIdea} onEnhance={enhanceCurrentPost} />
-                      <div style={{ marginTop: 12 }}>
-                        <PostInsights post={posts[activeDay]} platform={form.platform} topic={form.coreIdea} />
-                      </div>
-                    </>
-                  ) : null}
-
-                  {posts[activeDay] && (
-                    <div className="li-preview">
-                      <div className="li-head">
-                        <div className="li-avatar">{(selectedIndustry?.label || form.platform || "C").slice(0, 1)}</div>
-                        <div>
-                          <div className="li-name">{selectedIndustry?.label || "ContentForge"}</div>
-                          <div className="li-meta">{niceLabelFor(form.platform)} preview</div>
-                        </div>
-                        <div className="li-dot" />
-                      </div>
-                      <div className="li-body">
-                        {(() => {
-                          const previewSource = [posts[activeDay].title, posts[activeDay].hook, posts[activeDay].body, posts[activeDay].cta].join("\n\n");
-                          const previewPlain = stripMarkdown(previewSource);
-                          return (
-                            <>
-                              <div className="li-content">{renderLinkedInPreviewText(previewSource)}</div>
-                              {previewPlain.length > 210 && <><div className="li-fade" /><div className="li-more">See more</div></>}
-                            </>
-                          );
-                        })()}
-                      </div>
-                      <div className="li-tags">
-                        {posts[activeDay].hashtags.split(/\s+/).filter(Boolean).map(tag => <span key={tag} className="li-tag">{tag}</span>)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <Suspense fallback={<div className="gen-wrap" style={{ minHeight: 300 }}><div className="gen-orb" /><div className="gen-title" style={{ marginTop: 16 }}>Loading results…</div></div>}>
+                <IndexResults
+                  posts={posts}
+                  activeDay={activeDay}
+                  setActiveDay={setActiveDay}
+                  lockedDays={lockedDays}
+                  toggleLock={toggleLock}
+                  form={form}
+                  savedId={savedId}
+                  setSavedId={setSavedId}
+                  sampleMode={sampleMode}
+                  exitSample={exitSample}
+                  reformatTarget={reformatTarget}
+                  setReformatTarget={setReformatTarget}
+                  reformatting={reformatting}
+                  regenIdx={regenIdx}
+                  regenerateUnlocked={regenerateUnlocked}
+                  reformatAllForPlatform={reformatAllForPlatform}
+                  draggedIndex={draggedIndex}
+                  setDraggedIndex={setDraggedIndex}
+                  handleDayDrop={(idx) => handleDayDrop(draggedIndex, idx)}
+                  postTimes={postTimes}
+                  setPostTimes={setPostTimes}
+                  getClipboardStyle={getClipboardStyle}
+                  copyPost={copyPost}
+                  copiedIdx={copiedIdx}
+                  copyMenuOpen={copyMenuOpen}
+                  setCopyMenuOpen={setCopyMenuOpen}
+                  showRationale={showRationale}
+                  setShowRationale={setShowRationale}
+                  enhanceCurrentPost={enhanceCurrentPost}
+                  tweakRef={tweakRef}
+                  copyMenuRef={copyMenuRef}
+                  handleFocusedRegenerate={handleFocusedRegenerate}
+                  handleApplyCta={handleApplyCta}
+                  handleUseAsSeed={handleUseAsSeed}
+                  handleApplyImage={handleApplyImage}
+                  saveCalendar={saveCalendar}
+                  saving={saving}
+                  downloadTxt={downloadTxt}
+                  exportIcs={exportIcs}
+                  setBatchEditOpen={setBatchEditOpen}
+                  copyAll={copyAll}
+                  copiedAll={copiedAll}
+                  showPerformance={showPerformance}
+                  setShowPerformance={setShowPerformance}
+                  weekSummary={weekSummary}
+                  selectedIndustry={selectedIndustry}
+                  setStep={setStep}
+                  clearDraft={clearDraft}
+                  setPostsWithHistory={setPostsWithHistory}
+                  setLockedDays={setLockedDays}
+                  setError={setError}
+                  generationMeta={generationMeta}
+                  weekStartDate={weekStartDate}
+                  toggleLockedDay={toggleLockedDay}
+                  handleDragStart={handleDragStart}
+                  handleDragOver={handleDragOver}
+                  handleDrop={handleDrop}
+                />
+              </Suspense>
             )}
           </div>
         </div>

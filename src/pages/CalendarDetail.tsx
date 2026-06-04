@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCalendarQuery, useProfileQuery, useProfileUpdateMutation, useScheduledPostsQuery, useCreateCalendarMutation, useRegeneratePostMutation, useUpdateSavedCalendarMutation, useRepurposePostMutation, useGeneratePostImageMutation, useInlineRewriteMutation } from "@/hooks/useAppQueries";
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
-import { downloadMd, downloadPdf } from "@/lib/exportCalendar";
+
 import {
   downloadIcs,
   parseLocalDate,
@@ -29,7 +29,7 @@ import { buildTrackingUrl } from "@/lib/utm";
 import { useAuth } from "@/contexts/AuthContext";
 import { getE2EAuthFlag } from "@/lib/e2eFixtures";
 import e2eStore from "@/lib/e2eStore";
-import { generateLocalPosts } from "@/lib/localPostGenerator";
+
 import FeedbackModal from "@/components/FeedbackModal";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -507,56 +507,66 @@ export default function CalendarDetail() {
       return;
     }
 
-    const loadedPosts = (calendarData.posts as unknown as Post[]) || [];
-    const isE2E = typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true";
-    const hydratedPosts = loadedPosts.length > 0
-      ? loadedPosts
-      : isE2E
-        ? generateLocalPosts({
-            industry: (calendarData as { industry?: string | null }).industry || "",
-            industryLabel: calendarData.industry_label || "",
-            platform: calendarData.platform || "LinkedIn",
-            language: (calendarData.form_payload as { language?: string } | null)?.language || "English",
-            coreIdea: calendarData.core_idea || calendarData.title || "",
-            audiences: (calendarData.form_payload as { audiences?: string[] } | null)?.audiences || [],
-            voice: (calendarData.form_payload as { voice?: string } | null)?.voice || "",
-            style: (calendarData.form_payload as { style?: string } | null)?.style || "",
-            goals: (calendarData.form_payload as { goals?: string[] } | null)?.goals || [],
-            topics: (calendarData.form_payload as { topics?: string[] } | null)?.topics || [],
-            format: (calendarData.form_payload as { format?: string } | null)?.format || "Balanced mix",
-            cta: (calendarData.form_payload as { cta?: string } | null)?.cta || "Share & repost bait",
-            length: (calendarData.form_payload as { length?: string } | null)?.length || "medium",
-            structure: (calendarData.form_payload as { structure?: string } | null)?.structure || "mixed",
-            extra: (calendarData.form_payload as { extra?: string } | null)?.extra || "",
-            bannedWords: (calendarData.form_payload as { bannedWords?: string[] } | null)?.bannedWords || [],
-            requiredWords: (calendarData.form_payload as { requiredWords?: string[] } | null)?.requiredWords || [],
-            targetTopic: (calendarData.form_payload as { topics?: string[] } | null)?.topics?.[0] || calendarData.core_idea || calendarData.title || "",
-            targetDow: "Mon",
-          })
-        : [];
-    setPosts(hydratedPosts);
-    setTitle(calendarData.title);
-    setPlatform(calendarData.platform || "");
-    setIndustryLabel(calendarData.industry_label || "");
-    setFormPayload((calendarData.form_payload as unknown as FormPayload) || {});
-    setMeta(`${calendarData.industry_label || ""} · ${calendarData.platform || ""} · ${new Date(calendarData.created_at).toLocaleDateString()}`);
-    const dx = calendarData as { is_favorite?: boolean; timezone?: string | null; tracking_url?: string | null; locked_hashtags?: Record<string, string[]> | null };
-    setIsFavorite(!!dx.is_favorite);
-    setTrackingUrl(dx.tracking_url || "");
-    setLockedHashtags(dx.locked_hashtags || {});
-    const fp = (calendarData.form_payload as { weekStart?: string } | null);
-    const ws = (calendarData as { week_start_date?: string | null }).week_start_date
-      || fp?.weekStart
-      || toDateInputValue(nextMonday());
-    setWeekStart(ws);
-    const storedTimes = (calendarData as { post_times?: Record<string, string> | null }).post_times;
-    if (storedTimes && typeof storedTimes === "object") {
-      setPostTimes(storedTimes);
-    } else {
-      const seed: Record<string, string> = {};
-      for (const p of hydratedPosts) seed[String(p.day)] = suggestedTimeForDay(Number(p.day) || 1);
-      setPostTimes(seed);
-    }
+    let cancelled = false;
+    const load = async () => {
+      const loadedPosts = (calendarData.posts as unknown as Post[]) || [];
+      const isE2E = typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true";
+      let hydratedPosts: Post[] = loadedPosts.length > 0
+        ? loadedPosts
+        : isE2E
+          ? await (async () => {
+              const { generateLocalPosts } = await import("@/lib/localPostGenerator");
+              return generateLocalPosts({
+                industry: (calendarData as { industry?: string | null }).industry || "",
+                industryLabel: calendarData.industry_label || "",
+                platform: calendarData.platform || "LinkedIn",
+                language: (calendarData.form_payload as { language?: string } | null)?.language || "English",
+                coreIdea: calendarData.core_idea || calendarData.title || "",
+                audiences: (calendarData.form_payload as { audiences?: string[] } | null)?.audiences || [],
+                voice: (calendarData.form_payload as { voice?: string } | null)?.voice || "",
+                style: (calendarData.form_payload as { style?: string } | null)?.style || "",
+                goals: (calendarData.form_payload as { goals?: string[] } | null)?.goals || [],
+                topics: (calendarData.form_payload as { topics?: string[] } | null)?.topics || [],
+                format: (calendarData.form_payload as { format?: string } | null)?.format || "Balanced mix",
+                cta: (calendarData.form_payload as { cta?: string } | null)?.cta || "Share & repost bait",
+                length: (calendarData.form_payload as { length?: string } | null)?.length || "medium",
+                structure: (calendarData.form_payload as { structure?: string } | null)?.structure || "mixed",
+                extra: (calendarData.form_payload as { extra?: string } | null)?.extra || "",
+                bannedWords: (calendarData.form_payload as { bannedWords?: string[] } | null)?.bannedWords || [],
+                requiredWords: (calendarData.form_payload as { requiredWords?: string[] } | null)?.requiredWords || [],
+                targetTopic: (calendarData.form_payload as { topics?: string[] } | null)?.topics?.[0] || calendarData.core_idea || calendarData.title || "",
+                targetDow: "Mon",
+              });
+            })()
+          : [];
+
+      if (cancelled) return;
+      setPosts(hydratedPosts);
+      setTitle(calendarData.title);
+      setPlatform(calendarData.platform || "");
+      setIndustryLabel(calendarData.industry_label || "");
+      setFormPayload((calendarData.form_payload as unknown as FormPayload) || {});
+      setMeta(`${calendarData.industry_label || ""} · ${calendarData.platform || ""} · ${new Date(calendarData.created_at).toLocaleDateString()}`);
+      const dx = calendarData as { is_favorite?: boolean; timezone?: string | null; tracking_url?: string | null; locked_hashtags?: Record<string, string[]> | null };
+      setIsFavorite(!!dx.is_favorite);
+      setTrackingUrl(dx.tracking_url || "");
+      setLockedHashtags(dx.locked_hashtags || {});
+      const fp = (calendarData.form_payload as { weekStart?: string } | null);
+      const ws = (calendarData as { week_start_date?: string | null }).week_start_date
+        || fp?.weekStart
+        || toDateInputValue(nextMonday());
+      setWeekStart(ws);
+      const storedTimes = (calendarData as { post_times?: Record<string, string> | null }).post_times;
+      if (storedTimes && typeof storedTimes === "object") {
+        setPostTimes(storedTimes);
+      } else {
+        const seed: Record<string, string> = {};
+        for (const p of hydratedPosts) seed[String(p.day)] = suggestedTimeForDay(Number(p.day) || 1);
+        setPostTimes(seed);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
   }, [calendarData, calendarError, navigate]);
 
   // Handle profile data loading
@@ -1083,8 +1093,10 @@ export default function CalendarDetail() {
     setExportingFormat(format);
     try {
       if (format === "md") {
+        const { downloadMd } = await import("@/lib/exportCalendar");
         downloadMd({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts);
       } else if (format === "pdf") {
+        const { downloadPdf } = await import("@/lib/exportCalendar");
         downloadPdf({ title, industryLabel, platform, coreIdea: formPayload.coreIdea }, posts);
       } else {
         const ws = parseLocalDate(weekStart) || nextMonday();
