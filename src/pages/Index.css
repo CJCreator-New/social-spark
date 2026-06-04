@@ -182,9 +182,18 @@
 .cf-app .htags { font-size:12px;color:rgba(200,240,154,.38);line-height:2;font-weight:300; }
 .cf-app .rationale { font-size:12px;color:var(--text3);font-style:italic;border-top:1px solid var(--border);padding-top:13px;font-weight:300;line-height:1.6; }
 
-.cf-app .step4-layout { display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:18px;align-items:start; }
+.cf-app .step4-layout { display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:18px;align-items:start; container-type: inline-size; container-name: step4; }
 .cf-app .step4-main { min-width:0; }
 .cf-app .step4-side { position:sticky;top:18px;display:flex;flex-direction:column;gap:14px; }
+
+@container step4 (max-width: 768px) {
+  .cf-app .step4-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .cf-app .step4-side {
+    position: static !important;
+  }
+}
 .cf-app .summary-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px; }
 .cf-app .summary-head { display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px; }
 .cf-app .summary-stat { display:flex;flex-direction:column;gap:2px; }

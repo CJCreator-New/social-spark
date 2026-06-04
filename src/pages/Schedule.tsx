@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -22,6 +23,7 @@ import { downloadScheduleCsv } from "@/lib/exportSchedule";
 import { buildTrackingUrl } from "@/lib/utm";
 import { useCancelScheduledPostMutation, useScheduleInfiniteQuery, useUpdateScheduledPostStatusMutation, useUpdateScheduledPostTimeMutation } from "@/hooks/useAppQueries";
 import { resolveScheduleTimezone, saveScheduleTimezone } from "@/lib/schedulePreferences";
+import "@/styles/pages.css";
 
 type WorkflowStatus = "drafted" | "approved" | "published" | "failed";
 type SortKey = "date-asc" | "date-desc" | "platform" | "status";
@@ -56,63 +58,6 @@ interface SchedulePage {
   profileTz: string;
   nextCursor: ScheduleCursor;
 }
-
-const css = `
-.sc-app { min-height:100vh; background:radial-gradient(circle at 18% 18%, rgba(216,255,121,0.08), transparent 24%), linear-gradient(180deg, #05060a 0%, #0a0d14 100%); color:#edeae3; font-family:'Sora',sans-serif; padding:52px 24px 100px; }
-.sc-inner { max-width:880px; margin:0 auto; }
-.sc-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; gap:16px; flex-wrap:wrap; }
-.sc-title { font-family:'Playfair Display',serif; font-size:32px; font-weight:400; margin:0; }
-.sc-title em { font-style:italic; color:#c8f09a; }
-.sc-back { font-size:12px; color:#7a7a8e; text-decoration:none; }
-.sc-back:hover { color:#c8f09a; }
-.sc-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:0 0 18px; }
-.sc-summary-card { padding:14px 16px; border-radius:14px; background:#0d0f18; border:1px solid rgba(255,255,255,0.055); }
-.sc-summary-label { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
-.sc-summary-value { font-family:'Playfair Display',serif; font-size:24px; color:#edeae3; margin-top:4px; }
-.sc-summary-sub { font-size:11px; color:#7a7a8e; margin-top:4px; line-height:1.4; }
-.sc-empty { text-align:center; padding:60px 20px; color:#7a7a8e; font-size:14px; font-weight:300; border:1px dashed rgba(255,255,255,0.08); border-radius:16px; }
-.sc-empty-illus { width:84px; height:84px; margin:0 auto 22px; border-radius:50%; background:radial-gradient(circle at 30% 30%, rgba(200,240,154,0.18), rgba(200,240,154,0.04) 65%, transparent 80%); border:1px solid rgba(200,240,154,0.18); display:flex; align-items:center; justify-content:center; font-size:34px; color:#c8f09a; }
-.sc-empty-title { font-family:'Playfair Display',serif; font-size:22px; color:#edeae3; margin:0 0 8px; font-weight:400; }
-.sc-empty-sub { font-size:13px; color:#7a7a8e; max-width:420px; margin:0 auto 22px; line-height:1.65; font-weight:300; }
-.sc-empty-cta { display:inline-block; background:#c8f09a; color:#07080d; padding:11px 22px; border-radius:8px; font-size:13px; font-weight:500; text-decoration:none; font-family:'Sora',sans-serif; transition:transform .15s; }
-.sc-empty-cta:hover { transform:translateY(-1px); }
-.sc-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:18px; padding:10px 14px; background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:12px; }
-.sc-tool-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
-.sc-sel { background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px 10px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; cursor:pointer; }
-.sc-sel:focus { border-color:rgba(200,240,154,0.4); }
-.sc-csv-btn { margin-left:auto; background:rgba(200,240,154,.12); border:1px solid rgba(200,240,154,.32); color:#c8f09a; padding:7px 14px; border-radius:8px; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; font-weight:500; }
-.sc-csv-btn:hover { background:rgba(200,240,154,.2); }
-.sc-csv-btn:disabled { opacity:.5; cursor:not-allowed; }
-.sc-group { margin-bottom:22px; }
-.sc-group-h { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; margin:0 0 10px; }
-.sc-row { background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:12px; padding:14px 18px; display:flex; gap:14px; align-items:flex-start; margin-bottom:8px; flex-wrap:wrap; }
-.sc-time { font-family:'Playfair Display',serif; font-size:18px; color:#c8f09a; min-width:88px; font-variant-numeric:tabular-nums; display:flex; flex-direction:column; gap:2px; }
-.sc-time-tz { font-family:'Sora',sans-serif; font-size:9px; color:#5a5a72; letter-spacing:.06em; }
-.sc-meta { flex:1; min-width:200px; }
-.sc-meta-title { font-size:14px; color:#edeae3; margin:0 0 4px; }
-.sc-meta-sub { font-size:11px; color:#7a7a8e; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-.sc-tag { display:inline-block; padding:2px 8px; border-radius:99px; background:rgba(200,240,154,0.1); color:#c8f09a; font-size:10px; letter-spacing:.04em; }
-.sc-status { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; font-size:10px; letter-spacing:.04em; border:1px solid; font-weight:500; }
-.sc-status.drafted { color:#9a9aae; border-color:rgba(255,255,255,0.18); background:rgba(255,255,255,.02); }
-.sc-status.approved { color:#9ab5f0; border-color:rgba(154,181,240,.32); background:rgba(154,181,240,.06); }
-.sc-status.published { color:#c8f09a; border-color:rgba(200,240,154,.32); background:rgba(200,240,154,.06); }
-.sc-status.failed { color:#f09a9a; border-color:rgba(240,154,154,.35); background:rgba(240,154,154,.08); }
-.sc-act { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:6px 12px; border-radius:6px; font-size:11px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
-.sc-act:hover { border-color:rgba(200,240,154,0.32); color:#c8f09a; }
-.sc-act-p { background:rgba(200,240,154,.12); border-color:rgba(200,240,154,.32); color:#c8f09a; }
-.sc-act-danger { color:#f09a9a; }
-.sc-act-danger:hover { border-color:rgba(240,154,154,.35); color:#f09a9a; }
-.sc-menu-trigger { width:34px; height:34px; padding:0; display:inline-flex; align-items:center; justify-content:center; }
-.sc-menu-content { min-width:190px; background:#0d0f18; border:1px solid rgba(255,255,255,0.12); color:#edeae3; box-shadow:0 18px 44px rgba(0,0,0,.45); }
-.sc-menu-item { display:flex; gap:9px; align-items:center; font-family:'Sora',sans-serif; font-size:12px; color:#edeae3; cursor:pointer; }
-.sc-menu-item:focus { background:rgba(200,240,154,.12); color:#c8f09a; }
-.sc-menu-item.danger { color:#f09a9a; }
-.sc-menu-sep { background:rgba(255,255,255,0.08); }
-.sc-edit { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px; padding:8px; background:#07080d; border:1px solid rgba(255,255,255,0.08); border-radius:8px; width:100%; }
-.sc-edit input { background:transparent; border:1px solid rgba(255,255,255,0.1); border-radius:5px; padding:5px 8px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; color-scheme:dark; }
-.sc-edit input:focus { border-color:rgba(200,240,154,0.4); }
-.sc-empty-line { font-size:11px; color:#5a5a72; padding:8px 0; }
-`;
 
 const STATUS_LABEL: Record<WorkflowStatus, string> = {
   drafted: "Drafted",
@@ -286,7 +231,10 @@ export default function Schedule() {
 
   return (
     <>
-      <style>{css}</style>
+      <Helmet>
+        <title>Publishing schedule queue — ContentForge</title>
+        <meta name="description" content="Manage your publishing queue, review scheduled posts, edit posting times, select time zones, and export calendars." />
+      </Helmet>
       <WorkspacePage size="wide">
         <div className="sc-head">
           <h1 className="sc-title">My <em>schedule</em></h1>

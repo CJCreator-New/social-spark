@@ -10,17 +10,17 @@ import { AdminRoute } from "@/components/AdminRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SkeletonList } from "@/components/SkeletonList";
 import { setupGlobalErrorHandlers } from "@/lib/logger";
-import Auth from "./pages/Auth";
-import ResetPassword from "./pages/ResetPassword";
-import NotFound from "./pages/NotFound";
-import Landing from "./pages/Landing";
+import { lazy } from "react";
+const Auth = lazy(() => import("./pages/Auth"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Landing = lazy(() => import("./pages/Landing"));
 
 function E2ECrashRoute(): JSX.Element {
   throw new Error("Test error");
 }
 
 // Lazy load pages for code splitting
-import { lazy } from "react";
 const Index = lazy(() => import("./pages/Index"));
 const Profile = lazy(() => import("./pages/Profile"));
 const MyCalendars = lazy(() => import("./pages/MyCalendars"));
@@ -54,9 +54,9 @@ const App = () => {
           <ErrorBoundary>
             <AuthProvider>
               <Routes>
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/" element={<Landing />} />
+                <Route path="/auth" element={<Suspense fallback={<div style={{ padding: 24, color: '#edeae3' }}>Loading...</div>}><Auth /></Suspense>} />
+                <Route path="/reset-password" element={<Suspense fallback={<div style={{ padding: 24, color: '#edeae3' }}>Loading...</div>}><ResetPassword /></Suspense>} />
+                <Route path="/" element={<Suspense fallback={<div style={{ padding: 24, color: '#edeae3' }}>Loading...</div>}><Landing /></Suspense>} />
                 <Route path="/__e2e/crash" element={<E2ECrashRoute />} />
                 <Route
                   path="/app"
@@ -123,7 +123,7 @@ const App = () => {
                   }
                 />
                 <Route path="/admin" element={<ProtectedRoute><AdminRoute><Suspense fallback={<SkeletonList />}><Admin /></Suspense></AdminRoute></ProtectedRoute>} />
-                <Route path="*" element={<NotFound />} />
+                <Route path="*" element={<Suspense fallback={<div style={{ padding: 24, color: '#edeae3' }}>Loading...</div>}><NotFound /></Suspense>} />
               </Routes>
             </AuthProvider>
           </ErrorBoundary>

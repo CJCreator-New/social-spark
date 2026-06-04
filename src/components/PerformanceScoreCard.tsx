@@ -1,15 +1,48 @@
 import React, { useMemo } from "react";
 import { Post } from "@/lib/calendarSchedule";
-import { calculatePerformanceScore, getScoreColor, getReadabilityLabel } from "@/lib/postPerformanceScore";
+import {
+  calculatePerformanceScore,
+  getScoreColor,
+  getReadabilityLabel,
+  getRegenerationGuidance,
+  getWeakestMetrics,
+  suggestBetterCta,
+  PerformanceFocusMetric
+} from "@/lib/postPerformanceScore";
 
 interface PerformanceScoreCardProps {
   post: Post;
   topic?: string;
   onEnhance?: () => void;
+  onFocusedRegenerate?: (metric: PerformanceFocusMetric, guidance: string) => void;
+  onApplyCta?: (newCta: string) => void;
 }
 
-export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({ post, topic = "", onEnhance }) => {
+const METRIC_LABELS: Record<PerformanceFocusMetric, string> = {
+  hookStrength: "Weak Hook",
+  ctaEffectiveness: "Weak CTA",
+  hashtagRelevance: "Hashtags",
+  readability: "Readability",
+};
+
+export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
+  post,
+  topic = "",
+  onEnhance,
+  onFocusedRegenerate,
+  onApplyCta,
+}) => {
   const score = useMemo(() => calculatePerformanceScore(post, topic), [post, topic]);
+
+  const weakestMetrics = useMemo(() => getWeakestMetrics(score), [score]);
+  const weakestMetric = weakestMetrics[0];
+
+  const suggestedCtaText = useMemo(() => {
+    if (score.ctaEffectiveness < 6) {
+      return suggestBetterCta(post.cta, topic || post.topic, post.platform);
+    }
+    return null;
+  }, [score.ctaEffectiveness, post.cta, topic, post.topic, post.platform]);
 
   return (
     <div className="performance-card">
@@ -24,7 +57,7 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({ post
               }deg, var(--border2) ${(score.overallScore / 10) * 360}deg)`,
             }}
           >
-            <div className="perf-score-inner">{score.overallScore}</div>
+            <div className="perf-score-inner tabular-nums">{score.overallScore}</div>
           </div>
           <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 500 }}>
             {score.overallScore >= 8 ? "Great" : score.overallScore >= 6 ? "Good" : "Fair"}
@@ -36,7 +69,7 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({ post
         <div className="perf-metric">
           <div className="perf-metric-label">
             <span>Hook Strength</span>
-            <span className="perf-metric-value" style={{ color: getScoreColor(score.hookStrength) }}>
+            <span className="perf-metric-value tabular-nums" style={{ color: getScoreColor(score.hookStrength) }}>
               {score.hookStrength}/10
             </span>
           </div>
@@ -54,7 +87,7 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({ post
         <div className="perf-metric">
           <div className="perf-metric-label">
             <span>CTA Effectiveness</span>
-            <span className="perf-metric-value" style={{ color: getScoreColor(score.ctaEffectiveness) }}>
+            <span className="perf-metric-value tabular-nums" style={{ color: getScoreColor(score.ctaEffectiveness) }}>
               {score.ctaEffectiveness}/10
             </span>
           </div>
@@ -67,12 +100,25 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({ post
               }}
             />
           </div>
+          {suggestedCtaText && onApplyCta && (
+            <div className="cta-suggestion-container" style={{ marginTop: 6 }}>
+              <span style={{ fontSize: 10, color: "var(--text3)" }}>Suggested CTA:</span>
+              <button
+                className="cta-suggestion-chip"
+                onClick={() => onApplyCta(suggestedCtaText)}
+                title="Click to apply this suggestion"
+                type="button"
+              >
+                "{suggestedCtaText.length > 50 ? suggestedCtaText.slice(0, 50) + "..." : suggestedCtaText}" →
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="perf-metric">
           <div className="perf-metric-label">
             <span>Hashtag Relevance</span>
-            <span className="perf-metric-value" style={{ color: getScoreColor(score.hashtagRelevance / 10) }}>
+            <span className="perf-metric-value tabular-nums" style={{ color: getScoreColor(score.hashtagRelevance / 10) }}>
               {score.hashtagRelevance}%
             </span>
           </div>
@@ -91,7 +137,7 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({ post
           <div className="perf-metric-label">
             <span>Readability</span>
             <span className="perf-metric-value" style={{ color: "rgba(200,240,154,.7)" }}>
-              {getReadabilityLabel(score.readability)} (Grade {score.readability})
+              {getReadabilityLabel(score.readability)} (<span className="tabular-nums">Grade {score.readability}</span>)
             </span>
           </div>
           <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>
@@ -122,13 +168,30 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({ post
       <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 10, fontStyle: "italic" }}>
         💡 Tip: Higher scores mean better engagement potential. Aim for 7+.
       </div>
-      {typeof onEnhance === "function" && (
-        <div style={{ marginTop: 10 }}>
-          <button className="cpbtn" onClick={onEnhance} style={{ fontSize: 13 }}>
+
+      <div className="perf-actions" style={{ marginTop: 12, display: "flex", gap: 8, flexDirection: "column" }}>
+        {typeof onEnhance === "function" && (
+          <button className="cpbtn" onClick={onEnhance} style={{ fontSize: 13, width: "100%" }}>
             ✨ Enhance for performance
           </button>
-        </div>
-      )}
+        )}
+
+        {score.overallScore < 7 && weakestMetric && onFocusedRegenerate && (
+          <button
+            className="cpbtn font-mono"
+            onClick={() => onFocusedRegenerate(weakestMetric, getRegenerationGuidance(weakestMetric))}
+            style={{
+              fontSize: 12,
+              width: "100%",
+              borderColor: "var(--text-accent)",
+              background: "rgba(200, 240, 154, 0.05)",
+              color: "var(--text-accent)"
+            }}
+          >
+            🎯 Fix: {METRIC_LABELS[weakestMetric]}
+          </button>
+        )}
+      </div>
     </div>
   );
 };

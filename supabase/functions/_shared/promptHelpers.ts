@@ -555,11 +555,6 @@ export function buildSystemMessage(
                  now.getMonth() >= 5 && now.getMonth() <= 7 ? "Summer" :
                  now.getMonth() >= 8 && now.getMonth() <= 10 ? "Autumn" : "Winter";
 
-  const persona = `You are a senior ${payload.platform} content strategist for ${payload.industryLabel || payload.industry || 'the industry'} who writes for ${payload.audiences.length ? payload.audiences.join(', ') : 'the target audience'}. Follow the strategic framework and content rules strictly.
-CONTEXT:
-- Today's Date: ${dateStr}
-- Current Season: ${season}`;
-
   const framework = buildStrategicPromptFramework(payload);
   const contentRules = buildContentRules(payload.platform, payload.language);
   const languageRules = buildLanguageRules(payload.language);
@@ -582,9 +577,33 @@ CONTRASTIVE GUIDANCE:
 - WEAK HOOK: "In today's fast-paced world...", "Have you ever wondered...", or generic statements. Avoid these at all costs.`
     : "";
 
-  const frameworkNote = payload.framework && payload.framework !== "Auto" ? `\nFRAMEWORK: Use ${payload.framework} for the post structure.` : "\nFRAMEWORK: Auto — choose the best framework if unsure.";
+  const frameworkNote = payload.framework && payload.framework !== "Auto" ? `FRAMEWORK: Use ${payload.framework} for the post structure.` : "FRAMEWORK: Auto — choose the best framework if unsure.";
 
-  return [persona, framework, contentRules, languageRules, stylePreset, frameworkNote, antiMimicry, exemplarBlock, banned, getPlatformPreset(payload.platform)].join("\n\n");
+  return `[ROLE]
+You are a senior ${payload.platform} content strategist for ${payload.industryLabel || payload.industry || 'the industry'} who writes for ${payload.audiences.length ? payload.audiences.join(', ') : 'the target audience'}.
+
+[CONTEXT]
+- Today's Date: ${dateStr}
+- Current Season: ${season}
+- Platform Constraints: ${payload.platform} style conventions apply.
+
+[INSTRUCTIONS]
+Follow the strategic framework and content rules strictly:
+${framework}
+${contentRules}
+${languageRules}
+${stylePreset}
+- ${frameworkNote}
+
+[CONSTRAINTS]
+${banned}
+${antiMimicry}
+- Never output markdown bold/italic formatting in the post copy.
+- Stay strictly on topic. Do not drift into generic summaries.
+
+[EXAMPLES]
+${exemplarBlock}
+${getPlatformPreset(payload.platform)}`;
 }
 
 export const EXEMPLARS: Record<string, Record<string, string[]>> = {

@@ -36,11 +36,22 @@ const buttonVariants = cva(
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  static?: boolean;
 }
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ className, variant, size, asChild = false, ...props }, ref) => {
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ className, variant, size, asChild = false, static: isStatic = false, ...props }, ref) => {
   const Comp = asChild ? Slot : 'button';
-  return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...(props as React.ComponentPropsWithoutRef<'button'>)} />;
+  return (
+    <Comp
+      className={cn(
+        buttonVariants({ variant, size }),
+        !isStatic && 'active:scale-[0.96] transition-transform duration-150 ease-out',
+        className
+      )}
+      ref={ref}
+      {...(props as React.ComponentPropsWithoutRef<'button'>)}
+    />
+  );
 });
 Button.displayName = 'Button';
 

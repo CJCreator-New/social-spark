@@ -275,6 +275,11 @@ export const FEATURES = {
   failureReasonDisplay: true,
   keyboardShortcuts: true,
   exportICSWithTZ: true,
+  performanceDrivenRegeneration: true,
+  topicGapIndicator: true,
+  suggestedCta: true,
+  brandMemory: true,
+  seedFromPost: true,
 } as const;
 
 // ============================================================================

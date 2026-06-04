@@ -259,3 +259,70 @@ export function getReadabilityLabel(grade: number): string {
   if (grade < 14) return "Challenging";
   return "Very Difficult";
 }
+
+/**
+ * Maps a performance focus metric to targeted instructions.
+ */
+export function getRegenerationGuidance(metric: PerformanceFocusMetric): string {
+  switch (metric) {
+    case "hookStrength":
+      return "Make the opening line (hook) significantly stronger and more engaging. Start with a compelling question, a counter-intuitive stat, or a bold assertion to immediately capture attention.";
+    case "ctaEffectiveness":
+      return "Refine the call-to-action (CTA) to be more specific, actionable, and clear. Encourage direct conversation, a clear next step, or a response to a specific question rather than a generic prompt.";
+    case "hashtagRelevance":
+      return "Optimize the hashtags to be highly relevant to the core topic. Remove generic tags and include standard, search-friendly terms matching the subject matter.";
+    case "readability":
+      return "Improve readability by using shorter sentences, simpler words, and clear formatting (bullet points, line breaks). Aim for an accessible Flesch-Kincaid style.";
+    default:
+      return "";
+  }
+}
+
+/**
+ * Returns all weak metrics below a certain threshold.
+ */
+export function getWeakestMetrics(score: PerformanceScore, threshold: number = 6): PerformanceFocusMetric[] {
+  const candidates: Array<{ metric: PerformanceFocusMetric; gap: number; scoreVal: number }> = [
+    { metric: "hookStrength", gap: 10 - score.hookStrength, scoreVal: score.hookStrength },
+    { metric: "ctaEffectiveness", gap: 10 - score.ctaEffectiveness, scoreVal: score.ctaEffectiveness },
+    { metric: "hashtagRelevance", gap: Math.max(0, (100 - score.hashtagRelevance) / 10), scoreVal: score.hashtagRelevance / 10 },
+    { metric: "readability", gap: score.readability < 8 ? 8 - score.readability : score.readability > 12 ? score.readability - 12 : 0, scoreVal: score.readability < 8 ? score.readability : score.readability > 12 ? 12 - (score.readability - 12) : 10 },
+  ];
+
+  return candidates
+    .filter(c => c.scoreVal < threshold)
+    .sort((a, b) => b.gap - a.gap)
+    .map(c => c.metric);
+}
+
+/**
+ * Suggests a stronger CTA based on the topic and platform.
+ */
+export function suggestBetterCta(currentCta: string, topic: string, platform?: string): string {
+  const topicLower = topic.toLowerCase();
+  
+  if (topicLower.includes("tech") || topicLower.includes("code") || topicLower.includes("build") || topicLower.includes("ai")) {
+    return "What's in your current tech stack? Drop a comment below! 👇";
+  }
+  if (topicLower.includes("growth") || topicLower.includes("marketing") || topicLower.includes("sales") || topicLower.includes("audience")) {
+    return "What is your main growth channel right now? Let's discuss in the comments!";
+  }
+  if (topicLower.includes("design") || topicLower.includes("ux") || topicLower.includes("art")) {
+    return "Which design trend are you loving (or hating) lately? Comment below!";
+  }
+  if (topicLower.includes("productivity") || topicLower.includes("routine") || topicLower.includes("habit")) {
+    return "What is the single best productivity hack you've adopted this year? 👇";
+  }
+  if (topicLower.includes("career") || topicLower.includes("job") || topicLower.includes("hiring")) {
+    return "What is the biggest lesson you've learned in your career journey? Tell me below!";
+  }
+
+  if (platform?.toLowerCase() === "linkedin") {
+    return "Agree or disagree? Share your thoughts in the comments. 👇";
+  }
+  if (platform?.toLowerCase() === "twitter" || platform?.toLowerCase() === "x") {
+    return "Reply with your thoughts below!";
+  }
+
+  return "What is your #1 takeaway from this? Let me know in the comments! 👇";
+}

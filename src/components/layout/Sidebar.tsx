@@ -58,9 +58,10 @@ export function Sidebar() {
               key={item.label}
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
+              whileTap={{ scale: 0.96 }}
               transition={{ delay: index * 0.05 }}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group",
+                "w-full flex items-center pl-2.5 pr-3 py-3 rounded-xl transition-all duration-200 group",
                 item.active 
                   ? "bg-primary/10 text-primary" 
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
@@ -86,7 +87,7 @@ export function Sidebar() {
         {/* Collapse Button */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center justify-center w-full py-3 text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center justify-center w-full py-3 text-muted-foreground hover:text-foreground active:scale-95 transition-all"
         >
           <ChevronLeft className={cn(
             "w-5 h-5 transition-transform duration-300",
@@ -109,9 +110,12 @@ export function Sidebar() {
             <p className="text-xs text-muted-foreground mb-3">
               Unlock unlimited generations & advanced features
             </p>
-            <button className="w-full py-2 rounded-lg glass-button text-xs font-semibold text-primary-foreground">
+            <motion.button 
+              whileTap={{ scale: 0.96 }}
+              className="w-full py-2 rounded-lg glass-button text-xs font-semibold text-primary-foreground"
+            >
               Get Pro
-            </button>
+            </motion.button>
           </motion.div>
         )}
       </div>

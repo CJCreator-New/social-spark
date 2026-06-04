@@ -18,6 +18,12 @@ import { suggestedTimeForDay } from "@/lib/postingTimes";
 import { applyPolicy, parsePolicyList, parseHashtagsString, normalizeTag, displayTag, HashtagPolicy } from "@/lib/hashtagPolicy";
 import { insightFor } from "@/lib/postInsights";
 import PostInsights from "@/components/PostInsights";
+import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
+import { TopicGapBadge } from "@/components/TopicGapBadge";
+import { PerformanceFocusMetric, calculatePerformanceScore, getWeakestPerformanceMetric, getRegenerationGuidance } from "@/lib/postPerformanceScore";
+import { buildBrandMemoryPrompt } from "@/lib/brandMemory";
+import { createSeedFromPost, storeSeed } from "@/lib/seedFromPost";
+import { isEnabled } from "@/lib/featureFlags";
 import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
 import { buildTrackingUrl } from "@/lib/utm";
 import { useAuth } from "@/contexts/AuthContext";
@@ -85,6 +91,7 @@ interface FormPayload {
   bannedWords?: string[];
   requiredWords?: string[];
   weekStart?: string;
+  topics?: string[];
 }
 
 
@@ -670,7 +677,14 @@ export default function CalendarDetail() {
     }
   }
 
-  async function regenerateDay(tweak?: TweakKind, feedback?: string, category?: string, rating?: number) {
+  async function regenerateDay(
+    tweak?: TweakKind,
+    feedback?: string,
+    category?: string,
+    rating?: number,
+    focusMetric?: PerformanceFocusMetric,
+    guidance?: string
+  ) {
     const log = createScopedLogger('CalendarDetail-RegenerateDay');
     if (!id || regenerating || editing) return;
     const target = posts[active];
@@ -715,6 +729,7 @@ export default function CalendarDetail() {
         extra: formPayload.extra || "",
         bannedWords: formPayload.bannedWords || [],
         requiredWords: formPayload.requiredWords || [],
+        brandMemory: isEnabled("brandMemory") && profileData ? buildBrandMemoryPrompt(profileData as any) : "",
         post: target,
         siblings: posts,
         tweak,
@@ -722,6 +737,9 @@ export default function CalendarDetail() {
         feedbackCategory: category,
         feedbackRating: rating,
         calendarId: id,
+        ...(tweak === "enhance" ? { focusMetric: focusMetric || getWeakestPerformanceMetric(calculatePerformanceScore(target, formPayload.coreIdea || title)) } : {}),
+        ...(focusMetric ? { focusMetric } : {}),
+        ...(guidance ? { guidance } : {}),
       };
       let data: unknown = {};
       try {
@@ -1508,7 +1526,15 @@ export default function CalendarDetail() {
         {p && !editing && (
           <div className="cd-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
-                <span className="cd-date-pill">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  <span className="cd-date-pill">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
+                  <span className="ptag pt-topic" style={{ fontSize: 11 }}>{p.topic}</span>
+                  <TopicGapBadge
+                    topic={p.topic}
+                    rationale={p.rationale}
+                    isInferred={isEnabled("topicGapIndicator") && (!formPayload.topics || !formPayload.topics.some((t: string) => t && t.trim().toLowerCase() === p.topic.trim().toLowerCase()))}
+                  />
+                </div>
                 <button
                   type="button"
                   className={`cd-pin-btn ${lockedDays.has(p.day) ? "on" : ""}`}

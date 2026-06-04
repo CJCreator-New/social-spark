@@ -40,11 +40,19 @@ Deno.serve(async (req) => {
     if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI not configured." }, 500);
 
     const post = body.post || {};
-    const systemMsg = [
-      "You are an expert social-media editor.",
-      "Rewrite only the selected text. Keep the user's voice, preserve factual meaning, and avoid adding markdown wrappers.",
-      "Return only the rewritten selection through the tool.",
-    ].join(" ");
+    const systemMsg = `[ROLE]
+You are an expert social-media editor.
+
+[CONTEXT]
+We are doing an inline rewrite of a draft post's field selection.
+
+[INSTRUCTIONS]
+Rewrite ONLY the selected text according to the user's instruction. Keep the user's voice and preserve factual meaning.
+
+[CONSTRAINTS]
+- Avoid adding markdown wrappers.
+- Do not output headers or commentary.
+- Return only the rewritten selection through the tool.`;
 
     const userMsg = `Rewrite this selected ${field} text for ${platform}.
 

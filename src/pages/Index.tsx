@@ -30,11 +30,16 @@ import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useCreateCalendarMutation, useRegeneratePostMutation } from "@/hooks/useAppQueries";
 import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dragDrop";
 import { SAMPLE_FORM, SAMPLE_POSTS, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
-import { calculatePerformanceScore, getWeakestPerformanceMetric, type PerformanceFocusMetric } from "@/lib/postPerformanceScore";
+import { calculatePerformanceScore, getWeakestPerformanceMetric, type PerformanceFocusMetric, getRegenerationGuidance, getWeakestMetrics } from "@/lib/postPerformanceScore";
+import { createSeedFromPost, storeSeed, readAndClearSeed } from "@/lib/seedFromPost";
+import { isEnabled } from "@/lib/featureFlags";
+import { buildBrandMemoryPrompt } from "@/lib/brandMemory";
 import mediaManager from "@/lib/mediaManager";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { FontStyle, applyStyle } from "@/lib/unicodeFonts";
+import { useWizardStore } from "@/stores/useWizardStore";
+import { CoverImageGenerator } from "@/components/wizard/CoverImageGenerator";
 
 import "./Index.css";
 import {
@@ -400,36 +405,40 @@ function calculateScore(scores: Record<string, number>): number {
 }
 
 const Index = () => {
-  const [step, setStep] = useState(1);
-  const [form, setForm] = useState<WizardForm>(() => ({ ...INITIAL_FORM }));
-  const [customTopic, setCustomTopic] = useState("");
-  const [extraTopics, setExtraTopics] = useState<string[]>([]);
+  const {
+    step, setStep,
+    form, setForm,
+    customTopic, setCustomTopic,
+    extraTopics, setExtraTopics,
+    posts, setPosts,
+    postTimes, setPostTimes,
+    activeDay, setActiveDay,
+    lockedDays, toggleLockedDay, setLockedDays,
+    sampleMode, setSampleMode,
+    savedId, setSavedId,
+    autosaveStatus, setAutosaveStatus,
+    loadSnapshot, reset
+  } = useWizardStore();
+
   const [recentCalendars, setRecentCalendars] = useState<{ id: string; title: string; platform: string | null; industry_label: string | null; created_at: string }[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [postTimes, setPostTimes] = useState<Record<string, string>>({}); // {"1":"09:00",...}
-  const [activeDay, setActiveDay] = useState(0);
   const [genMsg, setGenMsg] = useState("");
   const [genStep, setGenStep] = useState(0);
   const [error, setError] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
     const [lastGenerationError, setLastGenerationError] = useState<unknown>(null);
   const [saving, setSaving] = useState(false);
-  const [savedId, setSavedId] = useState<string | null>(null);
   const [regenIdx, setRegenIdx] = useState<number | null>(null);
   const [tweakOpenIdx, setTweakOpenIdx] = useState<number | null>(null);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
-  const [lockedDays, setLockedDays] = useState<Set<number>>(new Set());
-  const [sampleMode, setSampleMode] = useState(false);
   const [e2eNetworkError, setE2eNetworkError] = useState(false);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const [reformatTarget, setReformatTarget] = useState<string>("");
   const [reformatting, setReformatting] = useState(false);
   const [recoveryDraft, setRecoveryDraft] = useState<WizardDraftSnapshot | null>(null);
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
-  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const autosaveClearTimer = useRef<number | null>(null);
   const [showRationale, setShowRationale] = useState(false);
   const [showSubtopicConfirm, setShowSubtopicConfirm] = useState(false);
@@ -468,6 +477,66 @@ const Index = () => {
   useEffect(() => {
     setBrandMemory(readBrandMemory(user?.id));
   }, [user?.id]);
+
+  useEffect(() => {
+    const seed = readAndClearSeed(user?.id);
+    if (seed) {
+      setForm(prev => ({
+        ...prev,
+        coreIdea: seed.coreIdea,
+        topics: seed.topic ? [seed.topic] : [],
+        format: seed.format || prev.format,
+        platform: seed.platform || prev.platform,
+      }));
+      toast.success("Loaded seeded post configuration ✓");
+    }
+  }, [user?.id]);  const handleFocusedRegenerate = useCallback(async (metric: PerformanceFocusMetric, guidance: string) => {
+    if (isEnabled("performanceDrivenRegeneration")) {
+      await regenerateDay(activeDay, "enhance", metric, guidance);
+    } else {
+      await regenerateDay(activeDay, "enhance");
+    }
+  }, [activeDay, regenerateDay]);
+
+  const handleApplyCta = useCallback((idx: number, newCta: string) => {
+    if (!isEnabled("suggestedCta")) return;
+    const updated = [...posts];
+    if (updated[idx]) {
+      updated[idx] = { ...updated[idx], cta: newCta };
+      setPostsWithHistory(updated);
+      toast.success("Suggested CTA applied ✓");
+    }
+  }, [posts, setPostsWithHistory]);
+
+  const handleApplyImage = useCallback((idx: number, imageUrl: string) => {
+    const updated = [...posts];
+    if (updated[idx]) {
+      updated[idx] = { ...updated[idx], cover_image: imageUrl };
+      setPostsWithHistory(updated);
+      toast.success(imageUrl ? "Cover image applied ✓" : "Cover image removed");
+    }
+  }, [posts, setPostsWithHistory]);
+
+  const handleUseAsSeed = useCallback((post: Post) => {
+    if (!isEnabled("seedFromPost")) return;
+    const seed = createSeedFromPost(post, form.platform);
+    storeSeed(seed, user?.id);
+    setForm(prev => ({
+      ...prev,
+      coreIdea: seed.coreIdea,
+      topics: seed.topic ? [seed.topic] : [],
+      format: seed.format || prev.format,
+      platform: seed.platform || prev.platform,
+    }));
+    setPostsWithHistory([]);
+    setActiveDay(0);
+    setSavedId(null);
+    setLockedDays(new Set());
+    setSampleMode(false);
+    setStep(1);
+    toast.success("Post marked as seed. Loading new wizard form...");
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [form.platform, user?.id, setPostsWithHistory]);
 
   // Keyboard shortcuts for undo/redo and batch edit
   useEffect(() => {
@@ -603,7 +672,7 @@ const Index = () => {
       if (!user) return null;
       const { data } = await supabase
         .from("profiles")
-        .select("default_voice, default_style, default_audiences, default_goals, brand_examples, default_framework")
+        .select("default_voice, default_style, default_audiences, default_goals, brand_examples, default_framework, forbidden_phrases, proof_points, cta_preferences, preferred_structures")
         .eq("user_id", user.id)
         .maybeSingle();
       return data;
@@ -1058,8 +1127,11 @@ const Index = () => {
         requiredWords: form.requiredWords,
         brand_examples: profileData?.brand_examples || [],
         framework: profileData?.default_framework || "Auto",
-        quality: form.quality || "draft",
-        brandMemory: brandMemoryToPrompt(brandMemory),
+        quality: form.quality || "polished",
+        brandMemory: [
+          brandMemoryToPrompt(brandMemory),
+          isEnabled("brandMemory") && profileData ? buildBrandMemoryPrompt(profileData as any) : ""
+        ].filter(Boolean).join("\n\n"),
       };
 
       let body: Record<string, unknown> = isDay
@@ -1201,7 +1273,12 @@ const Index = () => {
     if (abortRef.current) abortRef.current.abort("user");
   }
 
-  async function regenerateDay(idx: number, tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting" | "enhance", focusMetric?: PerformanceFocusMetric) {
+  async function regenerateDay(
+    idx: number,
+    tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting" | "enhance",
+    focusMetric?: PerformanceFocusMetric,
+    guidance?: string
+  ) {
     if (regenIdx !== null) return;
     const target = posts[idx];
     if (!target) return;
@@ -1243,10 +1320,15 @@ const Index = () => {
             extra: form.extra,
             bannedWords: form.bannedWords,
             requiredWords: form.requiredWords,
-            brandMemory: brandMemoryToPrompt(brandMemory),
+            brandMemory: [
+              brandMemoryToPrompt(brandMemory),
+              isEnabled("brandMemory") && profileData ? buildBrandMemoryPrompt(profileData as any) : ""
+            ].filter(Boolean).join("\n\n"),
             post: target,
             siblings: next,
             ...(tweak === "enhance" ? { focusMetric: targetFocusMetric } : {}),
+            ...(focusMetric ? { focusMetric } : {}),
+            ...(guidance ? { guidance } : {}),
           };
           try {
             const newPost = await regenerateMutation.mutateAsync(payload);
@@ -2328,220 +2410,52 @@ ${postText(p)}
                 )}
 
                 {posts.length > 1 && (
-                  <div className="week-strip" role="tablist" aria-label="Days of the week">
-                    {posts.map((post, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        role="tab"
-                        aria-selected={i === activeDay}
-                        className={`dtab ${i === activeDay ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""} ${draggedIndex === i ? "dragging" : ""}`}
-                        onClick={() => setActiveDay(i)}
-                        draggable
-                        onDragStart={(e) => {
-                          handleDragStart(e, i);
-                          setDraggedIndex(i);
-                        }}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => {
-                          const sourcIdx = handleDrop(e, i);
-                          if (sourcIdx !== null) {
-                            handleDayDrop(sourcIdx, i);
-                          }
-                        }}
-                        onDragEnd={() => setDraggedIndex(null)}
-                        title="Drag to reorder days"
-                      >
-                        <div className="dtab-dow">{post.dow}</div>
-                        <div className="dtab-n">{i + 1}</div>
-                      </button>
-                    ))}
-                  </div>
+                  <WeekStrip
+                    posts={posts}
+                    activeDay={activeDay}
+                    setActiveDay={setActiveDay}
+                    lockedDays={lockedDays}
+                    draggedIndex={draggedIndex}
+                    setDraggedIndex={setDraggedIndex}
+                    handleDayDrop={handleDayDrop}
+                    handleDragStart={handleDragStart}
+                    handleDragOver={handleDragOver}
+                    handleDrop={handleDrop}
+                  />
                 )}
                 {p && (
                   <div>
-                    <div className="pcard">
-                    <div className="ph">
-                      <div className="ptags">
-                        <span className="ptag pt-day">Day {p.day} · {p.dow}</span>
-                        <span className="ptag pt-date">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
-                        <span className="ptag pt-topic">{p.topic}</span>
-                        <span className="ptag pt-fmt">{formatBadgeForPlatform(p.format, form.platform)}</span>
-                        {p.variant_scores && p.chosen_index !== undefined && p.variant_scores[p.chosen_index] && (() => {
-                          const s = p.variant_scores[p.chosen_index];
-                          const avg = calculateScore(s);
-                          const breakdown = Object.entries(s)
-                            .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}/5`)
-                            .join("\n");
-                          return (
-                            <span className="ptag pt-fmt" style={{ background: "rgba(255, 215, 0, 0.15)", color: "#FFD700", border: "1px solid rgba(255, 215, 0, 0.3)" }} title={`AI Quality Score (LLM-as-judge)\n\n${breakdown}\n\nSelected from ${p.variant_scores.length} variants.`}>
-                              ✨ {avg}/5.0
-                            </span>
-                          );
-                        })()}
-                      </div>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", position: "relative" }} ref={tweakOpenIdx === activeDay ? tweakRef : undefined}>
-                        <button
-                          type="button"
-                          className={`pin-btn ${lockedDays.has(p.day) ? "on" : ""}`}
-                          onClick={() => toggleLock(p.day)}
-                          title={lockedDays.has(p.day) ? "Pinned — won't be touched by 'Regenerate unlocked'" : "Pin this post to protect it"}
-                          aria-pressed={lockedDays.has(p.day)}
-                        >
-                          {lockedDays.has(p.day) ? "📌" : "📍"}
-                        </button>
-                        <button
-                          className="cpbtn"
-                          onClick={() => regenerateDay(activeDay)}
-                          disabled={regenIdx !== null || reformatting}
-                          title="Re-roll this single day without touching the other six"
-                        >
-                          {regenIdx === activeDay ? "Regenerating…" : "↻ Regenerate"}
-                        </button>
-                        <div className="tweak-wrap">
-                          <button
-                            className="cpbtn"
-                            disabled={regenIdx !== null || reformatting}
-                            onClick={() => setTweakOpenIdx(tweakOpenIdx === activeDay ? null : activeDay)}
-                            aria-haspopup="menu"
-                            aria-expanded={tweakOpenIdx === activeDay}
-                            title="Quick tweaks that preserve the angle"
-                          >
-                            ⚡ Tweak ▾
-                          </button>
-                          {tweakOpenIdx === activeDay && (
-                            <div className="tweak-menu" role="menu">
-                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "shorter")}>Make shorter</button>
-                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "punchier")}>Make punchier</button>
-                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "add-stat")}>Add a stat</button>
-                              <button
-                                className="tweak-opt"
-                                onClick={() => regenerateDay(activeDay, "remove-emoji")}
-                                disabled={!hasEmoji(posts[activeDay].title + " " + posts[activeDay].hook + " " + posts[activeDay].body + " " + posts[activeDay].cta)}
-                                title={!hasEmoji(posts[activeDay].title + " " + posts[activeDay].hook + " " + posts[activeDay].body + " " + posts[activeDay].cta) ? "No emoji detected" : "Remove emojis from this post"}
-                              >
-                                Remove emoji
-                              </button>
-                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "clean-formatting")}>Clean formatting symbols</button>
-                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "more-personal")}>More personal</button>
-                              <button className="tweak-opt" onClick={() => regenerateDay(activeDay, "enhance")}>Enhance for performance</button>
-                            </div>
-                          )}
-                        </div>
-                        {(() => {
-                          const niceLabel = niceLabelFor(form.platform);
-                          const f = formatForPlatform(posts[activeDay], form.platform, { style: getClipboardStyle() });
-                          const ratio = f.charCount / f.limit;
-                          const budgetCls = f.charCount > f.limit ? "over" : ratio >= 0.9 ? "warn" : "";
-                          return (
-                            <>
-                              <span
-                                className={`budget ${budgetCls}`}
-                                title={`Post-format length for ${niceLabel}`}
-                                aria-label={`${f.charCount} of ${f.limit} characters used for ${niceLabel}`}
-                              >
-                                <span className="budget-dot" aria-hidden="true" />
-                                {f.charCount.toLocaleString()} / {f.limit.toLocaleString()}
-                              </span>
-                              <div className="copy-split" ref={copyMenuOpen ? copyMenuRef : undefined}>
-                                <button
-                                  className={`cpbtn copy-split-main ${copiedIdx === activeDay ? "done" : ""}`}
-                                  onClick={() => copyPost(activeDay)}
-                                  title={`${f.charCount} / ${f.limit} chars`}
-                                >
-                                  {copiedIdx === activeDay ? "Copied ✓" : `Copy for ${niceLabel}`}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="copy-split-caret"
-                                  onClick={() => setCopyMenuOpen(o => !o)}
-                                  aria-haspopup="menu"
-                                  aria-expanded={copyMenuOpen}
-                                  aria-label="More copy options"
-                                >
-                                  ▾
-                                </button>
-                                {copyMenuOpen && (
-                                  <div className="copy-menu" role="menu">
-                                    <button
-                                      type="button"
-                                      className="copy-menu-opt"
-                                      onClick={async () => {
-                                        const ok = await writeToClipboard(buildRawMarkdown(posts[activeDay]));
-                                        setCopyMenuOpen(false);
-                                        if (ok) toast.success("Copied raw markdown ✓");
-                                        else toast.error("Could not copy");
-                                      }}
-                                    >
-                                      Copy as raw markdown
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="copy-menu-opt"
-                                      onClick={async () => {
-                                        const ok = await writeToClipboard(postText(posts[activeDay]));
-                                        setCopyMenuOpen(false);
-                                        if (ok) toast.success("Copied as plain text ✓");
-                                        else toast.error("Could not copy");
-                                      }}
-                                    >
-                                      Copy as plain text (no formatting)
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-
-                    <div className="time-row">
-                      <span className="time-label">Post time</span>
-                      <input
-                        type="time"
-                        className="time-input"
-                        value={postTimes[String(p.day)] || suggestedTimeForDay(p.day)}
-                        onChange={e => setPostTimes(prev => ({ ...prev, [String(p.day)]: e.target.value }))}
-                      />
-                      <span className="time-hint">{shortDateLabel(dateForDow(weekStartDate, p.dow))} at {postTimes[String(p.day)] || suggestedTimeForDay(p.day)}</span>
-                    </div>
-
-                    <div className="ptitle" style={{ marginTop: 18 }}>{p.title}</div>
-
-                    <div className="blabel">Hook</div>
-                    <div className="hook-block"><div className="hook-text">{p.hook}</div></div>
-
-                    <div className="blabel">Post body</div>
-                    <div className="body-text">{p.body}</div>
-
-                    <div className="blabel">CTA</div>
-                    <div className="cta-block">{p.cta}</div>
-
-                    <div className="blabel">Hashtags</div>
-                    <div className="htags">{p.hashtags}</div>
-
-                    <div className="blabel" style={{ marginTop: 16 }}>Why this works</div>
-                    <button
-                      type="button"
-                      className="restart"
-                      onClick={() => setShowRationale(v => !v)}
-                      style={{ marginTop: 0 }}
-                    >
-                      {showRationale ? "Hide reasoning ↑" : "See why this works →"}
-                    </button>
-                    {showRationale && <div className="rationale">{p.rationale}</div>}
-
-                    <div className="blabel" style={{ marginTop: 16 }}>Cinematic image prompt</div>
-                    <div className="rationale" style={{ whiteSpace: 'pre-wrap' }}>{p.image_prompt || "No image prompt generated yet."}</div>
-
-                    <PerformanceScoreCard post={p} topic={form.coreIdea} onEnhance={enhanceCurrentPost} />
-                    <div style={{ marginTop: 12 }}>
-                      <PostInsights post={p} platform={form.platform} topic={form.coreIdea} />
-                    </div>
-                  </div>
-
-                  <ToneConsistencyChecker posts={posts} />
+                    <PostDetailCard
+                      post={p}
+                      activeDay={activeDay}
+                      form={form}
+                      weekStartDate={weekStartDate}
+                      postTimes={postTimes}
+                      setPostTimes={setPostTimes}
+                      lockedDays={lockedDays}
+                      toggleLock={toggleLock}
+                      regenerateDay={regenerateDay}
+                      regenIdx={regenIdx}
+                      reformatting={reformatting}
+                      tweakOpenIdx={tweakOpenIdx}
+                      setTweakOpenIdx={setTweakOpenIdx}
+                      getClipboardStyle={getClipboardStyle}
+                      copyPost={copyPost}
+                      copiedIdx={copiedIdx}
+                      copyMenuOpen={copyMenuOpen}
+                      setCopyMenuOpen={setCopyMenuOpen}
+                      showRationale={showRationale}
+                      setShowRationale={setShowRationale}
+                      enhanceCurrentPost={enhanceCurrentPost}
+                      tweakRef={tweakRef}
+                      copyMenuRef={copyMenuRef}
+                      onFocusedRegenerate={handleFocusedRegenerate}
+                      onApplyCta={(newCta) => handleApplyCta(activeDay, newCta)}
+                      onUseAsSeed={() => handleUseAsSeed(p)}
+                      onApplyImage={(imageUrl) => handleApplyImage(activeDay, imageUrl)}
+                      calendarId={savedId || undefined}
+                    />
+                    <ToneConsistencyChecker posts={posts} />
                   </div>
                 )}
 

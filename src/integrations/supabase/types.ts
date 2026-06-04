@@ -31,6 +31,10 @@ export type Database = {
           required_hashtags: string[] | null
           updated_at: string
           user_id: string
+          forbidden_phrases: string[] | null
+          proof_points: string[] | null
+          cta_preferences: string[] | null
+          preferred_structures: string[] | null
         }
         Insert: {
           avatar_url?: string | null
@@ -48,6 +52,10 @@ export type Database = {
           required_hashtags?: string[] | null
           updated_at?: string
           user_id: string
+          forbidden_phrases?: string[] | null
+          proof_points?: string[] | null
+          cta_preferences?: string[] | null
+          preferred_structures?: string[] | null
         }
         Update: {
           avatar_url?: string | null
@@ -65,6 +73,10 @@ export type Database = {
           required_hashtags?: string[] | null
           updated_at?: string
           user_id?: string
+          forbidden_phrases?: string[] | null
+          proof_points?: string[] | null
+          cta_preferences?: string[] | null
+          preferred_structures?: string[] | null
         }
         Relationships: []
       }

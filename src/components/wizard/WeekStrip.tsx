@@ -14,7 +14,7 @@ interface WeekStripProps {
   handleDrop: (e: React.DragEvent, target: number) => number | null;
 }
 
-export function WeekStrip({
+export const WeekStrip = React.memo(function WeekStrip({
   posts,
   activeDay,
   setActiveDay,
@@ -57,4 +57,4 @@ export function WeekStrip({
       ))}
     </div>
   );
-}
+});

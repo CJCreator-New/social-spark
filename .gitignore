@@ -29,3 +29,6 @@ blob-report/
  
 # Local env files
 .env
+
+# Agent skills
+.agents/

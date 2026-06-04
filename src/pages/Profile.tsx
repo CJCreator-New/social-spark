@@ -8,57 +8,11 @@ import { toast } from "sonner";
 import { normalizeTag, displayTag, parsePolicyList } from "@/lib/hashtagPolicy";
 import { listTimezones, browserTimezone, tzLabel } from "@/lib/timezones";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
+import "@/styles/pages.css";
 
 const VOICE_OPTIONS = ["Technical & analytical", "Conversational & warm", "PM / product thinking", "Opinionated & bold", "Data-driven", "Storytelling-first", "Educational & clear", "Contrarian / challenger", "Founder POV", "Academic & research-backed", "Humorous & witty", "Inspirational & motivating"];
 const STYLE_OPTIONS = ["Short punchy lines", "Long-form narrative", "Lists & frameworks", "Thread-style breakdown", "Stats-led", "Case study format", "Question-led", "First-person story", "Industry insight", "Myth-busting", "How-to guide", "Behind-the-scenes"];
 const GOAL_OPTIONS = ["Awareness", "Engagement", "Drive traffic", "Lead generation", "Thought leadership", "Community building", "Sales & conversion"];
-
-const css = `
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&family=Sora:wght@300;400;500;600&display=swap');
-.pf-app { min-height:100vh; background:radial-gradient(circle at 18% 18%, rgba(216,255,121,0.08), transparent 24%), linear-gradient(180deg, #05060a 0%, #0a0d14 100%); color:#edeae3; font-family:'Sora',sans-serif; padding:40px 24px 100px; }
-.pf-inner { max-width:560px; margin:0 auto; }
-.pf-back { font-size:12px; color:#7a7a8e; text-decoration:none; }
-.pf-back:hover { color:#c8f09a; }
-.pf-title { font-family:'Playfair Display',serif; font-size:28px; font-weight:400; margin:14px 0 6px; }
-.pf-sub { font-size:13px; color:#7a7a8e; margin-bottom:28px; }
-.pf-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
-.pf-summary-card { padding:14px 16px; border-radius:14px; background:#0d0f18; border:1px solid rgba(255,255,255,0.055); }
-.pf-summary-label { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
-.pf-summary-value { font-family:'Playfair Display',serif; font-size:20px; color:#edeae3; margin-top:4px; }
-.pf-summary-sub { font-size:11px; color:#7a7a8e; margin-top:4px; line-height:1.4; }
-.pf-card { background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:16px; padding:28px; margin-bottom:14px; }
-.pf-section-h { font-family:'Playfair Display',serif; font-size:18px; font-weight:400; margin:0 0 6px; }
-.pf-section-sub { font-size:12px; color:#7a7a8e; margin-bottom:18px; font-weight:300; }
-.pf-row { display:flex; align-items:center; gap:18px; margin-bottom:24px; }
-.pf-avatar { width:80px; height:80px; border-radius:50%; background:#07080d; border:1px solid rgba(255,255,255,0.1); object-fit:cover; display:flex; align-items:center; justify-content:center; font-family:'Playfair Display',serif; font-size:28px; color:#7a7a8e; }
-.pf-uplabel { font-size:12px; color:#c8f09a; cursor:pointer; padding:7px 12px; border:1px solid rgba(200,240,154,0.32); border-radius:8px; background:rgba(200,240,154,0.06); display:inline-block; }
-.pf-uplabel:hover { background:rgba(200,240,154,0.12); }
-.pf-uplabel:focus-within { outline:2px solid rgba(200,240,154,0.6); outline-offset:2px; }
-.pf-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; margin-bottom:7px; font-weight:500; }
-.pf-input { width:100%; background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:11px 13px; font-size:13px; color:#edeae3; font-family:'Sora',sans-serif; font-weight:300; outline:none; box-sizing:border-box; margin-bottom:16px; }
-.pf-input:focus { border-color:rgba(200,240,154,0.4); box-shadow:0 0 0 3px rgba(200,240,154,0.08); }
-.pf-input:disabled { opacity:.6; cursor:not-allowed; }
-.pf-select { width:100%; background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:11px 13px; font-size:13px; color:#edeae3; font-family:'Sora',sans-serif; font-weight:300; outline:none; box-sizing:border-box; margin-bottom:16px; appearance:auto; cursor:pointer; }
-.pf-select:focus { border-color:rgba(200,240,154,0.4); box-shadow:0 0 0 3px rgba(200,240,154,0.08); }
-.pf-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
-.pf-chip { padding:6px 14px; border-radius:99px; border:1px solid rgba(255,255,255,0.1); font-size:12px; color:#9a9aae; cursor:pointer; background:transparent; font-family:'Sora',sans-serif; font-weight:300; transition:all .15s; }
-.pf-chip:hover { border-color:rgba(200,240,154,0.28); color:#edeae3; }
-.pf-chip.on { background:rgba(200,240,154,0.12); border-color:rgba(200,240,154,0.4); color:#c8f09a; font-weight:400; }
-.pf-chip:focus-visible { outline:2px solid rgba(200,240,154,0.6); outline-offset:2px; }
-.pf-tagrow { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; min-height:32px; padding:6px 8px; background:#07080d; border:1px solid rgba(255,255,255,0.1); border-radius:8px; }
-.pf-tag { background:rgba(200,240,154,0.12); border:1px solid rgba(200,240,154,0.3); color:#c8f09a; border-radius:5px; padding:3px 9px; font-size:11px; display:inline-flex; align-items:center; gap:6px; }
-.pf-tag-x { cursor:pointer; color:rgba(200,240,154,0.6); font-size:14px; line-height:1; background:none; border:none; padding:0; }
-.pf-tag-x:hover { color:#c8f09a; }
-.pf-tagrow-empty { color:#3a3a50; font-size:12px; padding:4px 4px; font-weight:300; }
-.pf-add-row { display:flex; gap:8px; margin-bottom:16px; }
-.pf-add-row .pf-input { margin-bottom:0; flex:1; }
-.pf-add-btn { padding:0 16px; background:rgba(200,240,154,0.1); border:1px solid rgba(200,240,154,0.28); border-radius:8px; color:#c8f09a; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; white-space:nowrap; font-weight:400; }
-.pf-add-btn:hover { background:rgba(200,240,154,0.18); }
-.pf-btn { padding:11px 18px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; border:none; background:#c8f09a; color:#07080d; }
-.pf-btn:disabled { opacity:.5; cursor:not-allowed; }
-.pf-btn:focus-visible { outline:2px solid rgba(200,240,154,0.6); outline-offset:2px; }
-.pf-meta { font-size:11px; color:#6a6a82; margin-top:10px; }
-`;
 
 function TemplatesList() {
   const { user } = useAuth();
@@ -136,6 +90,14 @@ export default function Profile() {
   const [brandExamples, setBrandExamples] = useState<string[]>([]);
   const [brandExampleInput, setBrandExampleInput] = useState("");
   const [defaultFramework, setDefaultFramework] = useState<string>("Auto");
+  const [forbiddenPhrases, setForbiddenPhrases] = useState<string[]>([]);
+  const [forbiddenPhraseInput, setForbiddenPhraseInput] = useState("");
+  const [proofPoints, setProofPoints] = useState<string[]>([]);
+  const [proofPointInput, setProofPointInput] = useState("");
+  const [ctaPreferences, setCtaPreferences] = useState<string[]>([]);
+  const [ctaPreferenceInput, setCtaPreferenceInput] = useState("");
+  const [preferredStructures, setPreferredStructures] = useState<string[]>([]);
+  const [preferredStructureInput, setPreferredStructureInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const tzList = listTimezones();
@@ -163,12 +125,26 @@ export default function Profile() {
     setDefaultStyle(profileData.default_style || "");
     setDefaultAudiences(profileData.default_audiences || []);
     setDefaultGoals(profileData.default_goals || []);
-    const d = profileData as { banned_hashtags?: string[] | null; required_hashtags?: string[] | null; default_timezone?: string | null; brand_examples?: string[] | null; default_framework?: string | null } | null;
+    const d = profileData as {
+      banned_hashtags?: string[] | null;
+      required_hashtags?: string[] | null;
+      default_timezone?: string | null;
+      brand_examples?: string[] | null;
+      default_framework?: string | null;
+      forbidden_phrases?: string[] | null;
+      proof_points?: string[] | null;
+      cta_preferences?: string[] | null;
+      preferred_structures?: string[] | null;
+    } | null;
     setBannedHashtags(parsePolicyList(d?.banned_hashtags));
     setRequiredHashtags(parsePolicyList(d?.required_hashtags));
     setDefaultTimezone(d?.default_timezone || browserTimezone());
     setBrandExamples(d?.brand_examples || []);
     setDefaultFramework(d?.default_framework || "Auto");
+    setForbiddenPhrases(d?.forbidden_phrases || []);
+    setProofPoints(d?.proof_points || []);
+    setCtaPreferences(d?.cta_preferences || []);
+    setPreferredStructures(d?.preferred_structures || []);
   }, [profileData]);
 
   useEffect(() => {
@@ -256,6 +232,38 @@ export default function Profile() {
     setBrandExampleInput('');
   }
 
+  function addForbiddenPhrase() {
+    const v = forbiddenPhraseInput.trim();
+    if (!v) return;
+    if (forbiddenPhrases.includes(v)) return;
+    setForbiddenPhrases(p => [...p, v]);
+    setForbiddenPhraseInput("");
+  }
+
+  function addProofPoint() {
+    const v = proofPointInput.trim();
+    if (!v) return;
+    if (proofPoints.includes(v)) return;
+    setProofPoints(p => [...p, v]);
+    setProofPointInput("");
+  }
+
+  function addCtaPreference() {
+    const v = ctaPreferenceInput.trim();
+    if (!v) return;
+    if (ctaPreferences.includes(v)) return;
+    setCtaPreferences(p => [...p, v]);
+    setCtaPreferenceInput("");
+  }
+
+  function addPreferredStructure() {
+    const v = preferredStructureInput.trim();
+    if (!v) return;
+    if (preferredStructures.includes(v)) return;
+    setPreferredStructures(p => [...p, v]);
+    setPreferredStructureInput("");
+  }
+
   function removeAudience(a: string) {
     setDefaultAudiences(p => p.filter(x => x !== a));
   }
@@ -293,6 +301,10 @@ export default function Profile() {
         banned_hashtags: bannedHashtags.length ? bannedHashtags : null,
         required_hashtags: requiredHashtags.length ? requiredHashtags : null,
         default_timezone: defaultTimezone || null,
+        forbidden_phrases: forbiddenPhrases.length ? forbiddenPhrases : null,
+        proof_points: proofPoints.length ? proofPoints : null,
+        cta_preferences: ctaPreferences.length ? ctaPreferences : null,
+        preferred_structures: preferredStructures.length ? preferredStructures : null,
       };
       if (brandExamples.length) updates.brand_examples = brandExamples;
       if (defaultFramework) updates.default_framework = defaultFramework;
@@ -311,7 +323,6 @@ export default function Profile() {
 
   return (
     <>
-      <style>{css}</style>
       <WorkspacePage size="narrow">
         <Link to="/app" className="pf-back">← Back to ContentForge</Link>
         <h1 className="pf-title">Your profile</h1>
@@ -450,6 +461,109 @@ export default function Profile() {
               <div className="pf-add-row">
                 <input className="pf-input" placeholder="Paste one of your best posts" value={brandExampleInput} onChange={e => setBrandExampleInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addBrandExample())} />
                 <button className="pf-add-btn" onClick={() => addBrandExample()}>Add</button>
+              </div>
+
+              {/* Brand Memory & Style Lock */}
+              <div style={{ height: 16 }} />
+              <h3 className="pf-section-h" style={{ fontSize: 14 }}>Style Lock & Brand Memory</h3>
+              <div className="pf-section-sub">
+                Lock specific phrases, proofs, CTAs, or formats across all generated content to maintain brand consistency.
+              </div>
+
+              {/* Forbidden Phrases */}
+              <div className="pf-label" id="pf-forbidden-label">Forbidden Phrases (Never use)</div>
+              <div className="pf-tagrow" role="list" aria-labelledby="pf-forbidden-label">
+                {forbiddenPhrases.length === 0
+                  ? <span className="pf-tagrow-empty">No forbidden phrases locked</span>
+                  : forbiddenPhrases.map(p => (
+                    <span key={p} className="pf-tag" role="listitem" style={{ background: "rgba(240,154,154,0.1)", borderColor: "rgba(240,154,154,0.3)", color: "#f09a9a" }}>
+                      "{p}"
+                      <button className="pf-tag-x" onClick={() => setForbiddenPhrases(prev => prev.filter(x => x !== p))} aria-label={`Remove ${p}`} style={{ color: "rgba(240,154,154,0.6)" }}>×</button>
+                    </span>
+                  ))}
+              </div>
+              <div className="pf-add-row">
+                <input
+                  className="pf-input"
+                  placeholder='+ e.g. "delight", "synergy", "game-changer"'
+                  value={forbiddenPhraseInput}
+                  onChange={e => setForbiddenPhraseInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addForbiddenPhrase())}
+                  aria-label="New forbidden phrase"
+                />
+                <button className="pf-add-btn" onClick={addForbiddenPhrase}>Add</button>
+              </div>
+
+              {/* Proof Points */}
+              <div className="pf-label" id="pf-proof-label">Key Proof Points & Data Points</div>
+              <div className="pf-tagrow" role="list" aria-labelledby="pf-proof-label">
+                {proofPoints.length === 0
+                  ? <span className="pf-tagrow-empty">No proof points saved</span>
+                  : proofPoints.map(p => (
+                    <span key={p} className="pf-tag" role="listitem">
+                      {p}
+                      <button className="pf-tag-x" onClick={() => setProofPoints(prev => prev.filter(x => x !== p))} aria-label={`Remove ${p}`}>×</button>
+                    </span>
+                  ))}
+              </div>
+              <div className="pf-add-row">
+                <input
+                  className="pf-input"
+                  placeholder="+ e.g. 10k+ active users, 99.9% uptime, bootstrapped"
+                  value={proofPointInput}
+                  onChange={e => setProofPointInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addProofPoint())}
+                  aria-label="New proof point"
+                />
+                <button className="pf-add-btn" onClick={addProofPoint}>Add</button>
+              </div>
+
+              {/* Preferred CTAs */}
+              <div className="pf-label" id="pf-cta-label">Preferred CTA Styles / Phrases</div>
+              <div className="pf-tagrow" role="list" aria-labelledby="pf-cta-label">
+                {ctaPreferences.length === 0
+                  ? <span className="pf-tagrow-empty">No preferred CTAs saved</span>
+                  : ctaPreferences.map(c => (
+                    <span key={c} className="pf-tag" role="listitem">
+                      {c}
+                      <button className="pf-tag-x" onClick={() => setCtaPreferences(prev => prev.filter(x => x !== c))} aria-label={`Remove ${c}`}>×</button>
+                    </span>
+                  ))}
+              </div>
+              <div className="pf-add-row">
+                <input
+                  className="pf-input"
+                  placeholder="+ e.g. DM to get the list, Try it for free"
+                  value={ctaPreferenceInput}
+                  onChange={e => setCtaPreferenceInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addCtaPreference())}
+                  aria-label="New preferred CTA"
+                />
+                <button className="pf-add-btn" onClick={addCtaPreference}>Add</button>
+              </div>
+
+              {/* Preferred Structures */}
+              <div className="pf-label" id="pf-structure-label">Preferred Formats / Structures</div>
+              <div className="pf-tagrow" role="list" aria-labelledby="pf-structure-label">
+                {preferredStructures.length === 0
+                  ? <span className="pf-tagrow-empty">No preferred structures saved</span>
+                  : preferredStructures.map(s => (
+                    <span key={s} className="pf-tag" role="listitem">
+                      {s}
+                      <button className="pf-tag-x" onClick={() => setPreferredStructures(prev => prev.filter(x => x !== s))} aria-label={`Remove ${s}`}>×</button>
+                    </span>
+                  ))}
+              </div>
+              <div className="pf-add-row">
+                <input
+                  className="pf-input"
+                  placeholder="+ e.g. before-after comparison, bulleted takeaways"
+                  value={preferredStructureInput}
+                  onChange={e => setPreferredStructureInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addPreferredStructure())}
+                  aria-label="New preferred structure"
+                />
+                <button className="pf-add-btn" onClick={addPreferredStructure}>Add</button>
               </div>
 
               <div style={{ height: 8 }} />

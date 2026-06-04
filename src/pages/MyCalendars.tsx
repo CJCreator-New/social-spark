@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -16,9 +17,11 @@ import {
   useToggleCalendarFavoriteMutation,
 } from "@/hooks/useAppQueries";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { CalendarItem } from "@/components/calendar/CalendarItem";
 import type { Json } from "@/integrations/supabase/types";
+import "@/styles/pages.css";
 
-interface SavedCalendar {
+export interface SavedCalendar {
   id: string;
   title: string;
   industry_label: string | null;
@@ -34,51 +37,6 @@ interface SavedCalendar {
 type SortKey = "newest" | "oldest" | "title" | "favorites";
 const PAGE_SIZE = 20;
 
-const css = `
-.mc-app { min-height:100vh; background:radial-gradient(circle at 18% 18%, rgba(216,255,121,0.08), transparent 24%), linear-gradient(180deg, #05060a 0%, #0a0d14 100%); color:#edeae3; font-family:'Sora',sans-serif; padding:52px 24px 100px; }
-.mc-inner { max-width:760px; margin:0 auto; }
-.mc-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; gap:16px; flex-wrap:wrap; }
-.mc-title { font-family:'Playfair Display',serif; font-size:32px; font-weight:400; margin:0; }
-.mc-title em { font-style:italic; color:#c8f09a; }
-.mc-back { font-size:12px; color:#7a7a8e; text-decoration:none; transition:color .15s; }
-.mc-back:hover { color:#c8f09a; }
-.mc-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:0 0 20px; }
-.mc-summary-card { padding:14px 16px; border-radius:14px; background:#0d0f18; border:1px solid rgba(255,255,255,0.055); }
-.mc-summary-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7a7a8e; font-weight:500; }
-.mc-summary-value { font-family:'Playfair Display',serif; font-size:24px; color:#edeae3; margin-top:4px; }
-.mc-summary-sub { font-size:11px; color:#7a7a8e; margin-top:4px; line-height:1.4; }
-.mc-empty { text-align:center; padding:60px 20px; color:#7a7a8e; font-size:14px; font-weight:300; border:1px dashed rgba(255,255,255,0.08); border-radius:16px; }
-.mc-empty-illus { width:84px; height:84px; margin:0 auto 22px; border-radius:50%; background:radial-gradient(circle at 30% 30%, rgba(200,240,154,0.18), rgba(200,240,154,0.04) 65%, transparent 80%); border:1px solid rgba(200,240,154,0.18); display:flex; align-items:center; justify-content:center; font-size:34px; color:#c8f09a; }
-.mc-empty-title { font-family:'Playfair Display',serif; font-size:22px; color:#edeae3; margin:0 0 8px; font-weight:400; }
-.mc-empty-title em { font-style:italic; color:#c8f09a; }
-.mc-empty-sub { font-size:13px; color:#7a7a8e; max-width:380px; margin:0 auto 22px; line-height:1.65; font-weight:300; }
-.mc-empty-cta { display:inline-block; background:#c8f09a; color:#07080d; padding:11px 22px; border-radius:8px; font-size:13px; font-weight:500; text-decoration:none; font-family:'Sora',sans-serif; transition:transform .15s; }
-.mc-empty-cta:hover { transform:translateY(-1px); }
-.mc-list { display:flex; flex-direction:column; gap:10px; }
-.mc-item { background:#0d0f18; border:1px solid rgba(255,255,255,0.055); border-radius:12px; padding:18px 20px; transition:border-color .15s; display:flex; justify-content:space-between; align-items:flex-start; gap:14px; }
-.mc-item:hover { border-color:rgba(200,240,154,0.2); }
-.mc-item-title { font-family:'Playfair Display',serif; font-size:17px; color:#edeae3; margin:0 0 4px; font-weight:400; }
-.mc-meta { font-size:11px; color:#7a7a8e; font-weight:300; }
-.mc-tag { display:inline-block; padding:2px 8px; border-radius:99px; background:rgba(200,240,154,0.1); color:#c8f09a; font-size:10px; margin-right:6px; letter-spacing:.04em; }
-.mc-actions { display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
-.mc-act { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:6px 12px; border-radius:6px; font-size:11px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; flex-shrink:0; }
-.mc-act:hover { border-color:rgba(200,240,154,0.32); color:#c8f09a; }
-.mc-del { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:6px 12px; border-radius:6px; font-size:11px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; flex-shrink:0; }
-.mc-del:hover { border-color:rgba(240,154,154,0.3); color:#f09a9a; }
-.mc-rename-input { width:100%; background:#07080d; border:1px solid rgba(200,240,154,0.32); border-radius:6px; padding:8px 10px; font-size:14px; color:#edeae3; font-family:'Playfair Display',serif; outline:none; box-sizing:border-box; }
-.mc-dialog-danger { background:#f09a9a !important; color:#07080d !important; border:1px solid #f09a9a !important; }
-.mc-filter-row { display:flex; gap:8px; align-items:center; margin-bottom:18px; flex-wrap:wrap; }
-.mc-search { flex:1; min-width:200px; background:#0d0f18; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:9px 13px; font-size:13px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; }
-.mc-search:focus { border-color:rgba(200,240,154,0.32); }
-.mc-chip { background:transparent; border:1px solid rgba(255,255,255,0.1); color:#7a7a8e; padding:8px 14px; border-radius:99px; font-size:12px; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
-.mc-chip.on { background:rgba(200,240,154,0.1); border-color:rgba(200,240,154,0.32); color:#c8f09a; }
-.mc-sort { background:#0d0f18; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 28px 8px 12px; font-size:12px; color:#edeae3; font-family:'Sora',sans-serif; outline:none; appearance:none; cursor:pointer; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 11 11' fill='none' stroke='%237a7a8e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M2.5 4l3 3 3-3'/></svg>"); background-repeat:no-repeat; background-position:right 9px center; }
-.mc-sort:focus { border-color:rgba(200,240,154,0.32); }
-.mc-star { background:transparent; border:none; cursor:pointer; font-size:18px; color:#3a3a50; padding:4px 6px; transition:color .15s; line-height:1; }
-.mc-star.on { color:#c8f09a; }
-.mc-star:hover { color:#c8f09a; }
-`;
-
 export default function MyCalendars() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -92,8 +50,16 @@ export default function MyCalendars() {
   const [renameSaving, setRenameSaving] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [favOnly, setFavOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>("newest");
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 200);
+    return () => clearTimeout(handler);
+  }, [search]);
   const toggleFavoriteMutation = useToggleCalendarFavoriteMutation(user?.id);
   const deleteCalendarMutation = useDeleteCalendarMutation(user?.id);
   const restoreCalendarMutation = useRestoreCalendarMutation(user?.id);
@@ -112,8 +78,8 @@ export default function MyCalendars() {
     return items
       .filter((it) => {
         if (favOnly && !it.is_favorite) return false;
-        if (search.trim()) {
-          const q = search.toLowerCase();
+        if (debouncedSearch.trim()) {
+          const q = debouncedSearch.toLowerCase();
           return (
             it.title.toLowerCase().includes(q) ||
             (it.industry_label || "").toLowerCase().includes(q) ||
@@ -132,12 +98,12 @@ export default function MyCalendars() {
         if (sortBy === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
-  }, [items, favOnly, search, sortBy]);
+  }, [items, favOnly, debouncedSearch, sortBy]);
   const favoriteCount = useMemo(() => items.filter((item) => item.is_favorite).length, [items]);
   const totalPosts = useMemo(() => items.reduce((count, item) => count + (Array.isArray(item.posts) ? item.posts.length : 0), 0), [items]);
   const visibleCount = filteredItems.length;
 
-  async function toggleFavorite(it: SavedCalendar) {
+  const toggleFavorite = useCallback(async (it: SavedCalendar) => {
     const next = !it.is_favorite;
     try {
       await toggleFavoriteMutation.mutateAsync({ id: it.id, isFavorite: next });
@@ -147,7 +113,7 @@ export default function MyCalendars() {
       log.error("Failed to toggle favorite", error, { calendarId: it.id });
       toast.error(error instanceof Error ? error.message : "Toggle favorite failed");
     }
-  }
+  }, [toggleFavoriteMutation, refetch, log]);
 
   async function confirmDelete() {
     if (!pendingDelete) return;
@@ -219,12 +185,12 @@ export default function MyCalendars() {
     toast.success("Restored");
   }
 
-  function startRename(it: SavedCalendar) {
+  const startRename = useCallback((it: SavedCalendar) => {
     setRenamingId(it.id);
     setRenameValue(it.title);
-  }
+  }, []);
 
-  async function saveRename() {
+  const saveRename = useCallback(async () => {
     if (!renamingId) return;
     const value = renameValue.trim();
     if (!value) {
@@ -247,9 +213,9 @@ export default function MyCalendars() {
     setRenamingId(null);
     await refetch();
     toast.success("Renamed");
-  }
+  }, [renamingId, renameValue, renameCalendarMutation, refetch, log]);
 
-  async function duplicate(it: SavedCalendar) {
+  const duplicate = useCallback(async (it: SavedCalendar) => {
     if (!user || duplicatingId) return;
     setDuplicatingId(it.id);
 
@@ -283,78 +249,33 @@ export default function MyCalendars() {
     log.info("Calendar duplicated", { sourceCalendarId: it.id });
     await refetch();
     toast.success("Duplicated");
-  }
+  }, [user, duplicatingId, duplicateCalendarMutation, refetch, log]);
 
-  function renderCalendarItem(it: SavedCalendar, index: number) {
+  const renderCalendarItem = useCallback((it: SavedCalendar, index: number) => {
     return (
-      <div key={it.id} className="mc-item">
-        <button
-          type="button"
-          className={`mc-star ${it.is_favorite ? "on" : ""}`}
-          onClick={() => toggleFavorite(it)}
-          aria-pressed={!!it.is_favorite}
-          aria-label={it.is_favorite ? "Unstar" : "Star"}
-          title={it.is_favorite ? "Unstar" : "Star"}
-        >
-          {it.is_favorite ? "★" : "☆"}
-        </button>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {renamingId === it.id ? (
-            <input
-              className="mc-rename-input"
-              autoFocus
-              value={renameValue}
-              disabled={renameSaving}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  saveRename();
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  setRenamingId(null);
-                }
-              }}
-              onBlur={saveRename}
-            />
-          ) : (
-            <Link to={`/calendar/${it.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-              <h2 className="mc-item-title">{it.title}</h2>
-            </Link>
-          )}
-          <div className="mc-meta" style={{ marginTop: 4 }}>
-            {Array.isArray(it.posts) && it.posts.length === 1 && <span className="mc-tag">1-day</span>}
-            {it.industry_label && <span className="mc-tag">{it.industry_label}</span>}
-            {it.platform && <span className="mc-tag">{it.platform}</span>}
-            <span>{new Date(it.created_at).toLocaleDateString()}</span>
-          </div>
-        </div>
-        <div className="mc-actions">
-          {renamingId === it.id ? (
-            <button className="mc-act" onClick={() => setRenamingId(null)} disabled={renameSaving}>
-              {renameSaving ? "Saving…" : "Cancel"}
-            </button>
-          ) : (
-            <>
-              <button className="mc-act" onClick={() => startRename(it)}>
-                Rename
-              </button>
-              <button className="mc-act" onClick={() => duplicate(it)} disabled={duplicatingId === it.id}>
-                {duplicatingId === it.id ? "Copying…" : "Duplicate"}
-              </button>
-              <button className="mc-del" onClick={() => setPendingDelete(it)}>
-                Delete
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+      <CalendarItem
+        it={it}
+        renamingId={renamingId}
+        renameValue={renameValue}
+        renameSaving={renameSaving}
+        setRenameValue={setRenameValue}
+        saveRename={saveRename}
+        setRenamingId={setRenamingId}
+        startRename={startRename}
+        duplicate={duplicate}
+        duplicatingId={duplicatingId}
+        setPendingDelete={setPendingDelete}
+        toggleFavorite={toggleFavorite}
+      />
     );
-  }
+  }, [renamingId, renameValue, renameSaving, saveRename, startRename, duplicate, duplicatingId, toggleFavorite]);
 
   return (
     <>
+      <Helmet>
+        <title>My content calendars — ContentForge</title>
+        <meta name="description" content="View and manage your saved AI content calendars. Search, star, rename, duplicate, or delete your content archives." />
+      </Helmet>
       {lastDeleted && (
         <div style={{ maxWidth: 760, margin: '0 auto 12px', padding: 12, background: '#121218', border: '1px solid rgba(200,240,154,0.06)', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ color: '#c8f09a' }}>
@@ -362,7 +283,6 @@ export default function MyCalendars() {
           </div>
         </div>
       )}
-      <style>{css}</style>
       <WorkspacePage size="medium">
         <div className="mc-head">
           <div>

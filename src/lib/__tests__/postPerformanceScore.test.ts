@@ -4,6 +4,9 @@ import {
   getWeakestPerformanceMetric,
   getScoreColor,
   getReadabilityLabel,
+  getRegenerationGuidance,
+  getWeakestMetrics,
+  suggestBetterCta,
 } from "../postPerformanceScore";
 import { Post } from "../calendarSchedule";
 
@@ -76,6 +79,37 @@ describe("postPerformanceScore tests", () => {
       };
       const weakest = getWeakestPerformanceMetric(scores);
       expect(weakest).toBe("hookStrength");
+    });
+  });
+
+  describe("getWeakestMetrics", () => {
+    it("should return sorted metrics based on lowest scores", () => {
+      const scores = {
+        hookStrength: 4,
+        ctaEffectiveness: 2,
+        hashtagRelevance: 90,
+        readability: 8,
+        overallScore: 6,
+        feedback: [],
+      };
+      const weakestList = getWeakestMetrics(scores);
+      expect(weakestList[0]).toBe("ctaEffectiveness");
+      expect(weakestList[1]).toBe("hookStrength");
+    });
+  });
+
+  describe("getRegenerationGuidance", () => {
+    it("should return guidance text for each focus metric", () => {
+      expect(getRegenerationGuidance("hookStrength")).toContain("hook");
+      expect(getRegenerationGuidance("ctaEffectiveness")).toContain("call-to-action");
+    });
+  });
+
+  describe("suggestBetterCta", () => {
+    it("should suggest platform-specific CTA", () => {
+      const suggestion = suggestBetterCta("Click here", "SaaS Growth", "twitter");
+      expect(suggestion).toBeTruthy();
+      expect(typeof suggestion).toBe("string");
     });
   });
 

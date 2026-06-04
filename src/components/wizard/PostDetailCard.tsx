@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Post, WizardForm } from "./constants";
 import { FontStyle, applyStyle } from "@/lib/unicodeFonts";
 import { resolvePlatform, niceLabelFor, formatForPlatform, buildRawMarkdown, writeToClipboard } from "@/lib/platformCopy";
@@ -9,6 +9,8 @@ import { toast } from "sonner";
 
 import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
 import PostInsights from "@/components/PostInsights";
+import { TopicGapBadge } from "@/components/TopicGapBadge";
+import { CoverImageGenerator } from "./CoverImageGenerator";
 
 export function hasEmoji(text: string): boolean {
   return /\p{Emoji}/u.test(text);
@@ -56,9 +58,14 @@ interface PostDetailCardProps {
   enhanceCurrentPost: () => void | Promise<void>;
   tweakRef: React.RefObject<HTMLDivElement | null>;
   copyMenuRef: React.RefObject<HTMLDivElement | null>;
+  onFocusedRegenerate?: (metric: any, guidance: string) => void;
+  onApplyCta?: (newCta: string) => void;
+  onUseAsSeed?: () => void;
+  onApplyImage?: (imageUrl: string) => void;
+  calendarId?: string;
 }
 
-export function PostDetailCard({
+export const PostDetailCard = React.memo(function PostDetailCard({
   post,
   activeDay,
   form,
@@ -82,19 +89,28 @@ export function PostDetailCard({
   enhanceCurrentPost,
   tweakRef,
   copyMenuRef,
+  onFocusedRegenerate,
+  onApplyCta,
+  onUseAsSeed,
+  onApplyImage,
+  calendarId,
 }: PostDetailCardProps) {
+  const [showImageGen, setShowImageGen] = useState(false);
   const niceLabel = niceLabelFor(form.platform);
   const f = formatForPlatform(post, form.platform, { style: getClipboardStyle() });
   const ratio = f.charCount / f.limit;
   const budgetCls = f.charCount > f.limit ? "over" : ratio >= 0.9 ? "warn" : "";
 
+  const isInferred = !form.topics.some(t => t && t.trim().toLowerCase() === post.topic.trim().toLowerCase());
+
   return (
     <div className="pcard">
       <div className="ph">
-        <div className="ptags">
+        <div className="ptags" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <span className="ptag pt-day">Day {post.day} · {post.dow}</span>
           <span className="ptag pt-date">{shortDateLabel(dateForDow(weekStartDate, post.dow))}</span>
           <span className="ptag pt-topic">{post.topic}</span>
+          <TopicGapBadge topic={post.topic} rationale={post.rationale} isInferred={isInferred} />
           <span className="ptag pt-fmt">{formatBadgeForPlatform(post.format, form.platform)}</span>
           {post.variant_scores && post.chosen_index !== undefined && post.variant_scores[post.chosen_index] && (() => {
             const s = post.variant_scores[post.chosen_index];
@@ -110,6 +126,17 @@ export function PostDetailCard({
           })()}
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", position: "relative" }} ref={tweakOpenIdx === activeDay ? tweakRef as any : undefined}>
+          {onUseAsSeed && (
+            <button
+              type="button"
+              className="cpbtn"
+              onClick={onUseAsSeed}
+              title="Start a new calendar using this post as seed"
+              style={{ padding: "6px 10px", fontSize: 11 }}
+            >
+              🔄 Use as seed
+            </button>
+          )}
           <button
             type="button"
             className={`pin-btn ${lockedDays.has(post.day) ? "on" : ""}`}
@@ -251,13 +278,52 @@ export function PostDetailCard({
       </button>
       {showRationale && <div className="rationale">{post.rationale}</div>}
 
-      <div className="blabel" style={{ marginTop: 16 }}>Cinematic image prompt</div>
+      <div className="blabel" style={{ marginTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span>Cinematic image prompt</span>
+        <button
+          type="button"
+          className="cpbtn"
+          style={{ padding: "4px 10px", fontSize: 11 }}
+          onClick={() => setShowImageGen(true)}
+        >
+          {post.cover_image ? "🎨 Regenerate Image" : "🎨 Generate Cover Image"}
+        </button>
+      </div>
       <div className="rationale" style={{ whiteSpace: 'pre-wrap' }}>{post.image_prompt || "No image prompt generated yet."}</div>
 
-      <PerformanceScoreCard post={post} topic={form.coreIdea} onEnhance={enhanceCurrentPost} />
+      {post.cover_image && (
+        <div style={{ marginTop: 12, border: "2px solid var(--color-border)", borderRadius: 4, overflow: "hidden", position: "relative" }}>
+          <img src={post.cover_image} alt="Generated cover" style={{ width: "100%", height: "auto", display: "block" }} />
+          <button
+            type="button"
+            className="cpbtn"
+            style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.8)", color: "#fff", border: "1px solid #333", padding: "4px 8px", fontSize: 11 }}
+            onClick={() => onApplyImage && onApplyImage("")}
+          >
+            Remove Image
+          </button>
+        </div>
+      )}
+
+      {showImageGen && onApplyImage && (
+        <CoverImageGenerator
+          post={post}
+          calendarId={calendarId || "guest-calendar"}
+          onApplyImage={onApplyImage}
+          onClose={() => setShowImageGen(false)}
+        />
+      )}
+
+      <PerformanceScoreCard
+        post={post}
+        topic={form.coreIdea}
+        onEnhance={enhanceCurrentPost}
+        onFocusedRegenerate={onFocusedRegenerate}
+        onApplyCta={onApplyCta}
+      />
       <div style={{ marginTop: 12 }}>
         <PostInsights post={post} platform={form.platform} topic={form.coreIdea} />
       </div>
     </div>
   );
-}
+});

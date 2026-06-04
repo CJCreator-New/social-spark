@@ -85,6 +85,7 @@ export interface IcsPost {
   body: string;
   cta: string;
   hashtags: string;
+  platform?: string;
 }
 
 export type Post = IcsPost;

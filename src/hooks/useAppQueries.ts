@@ -161,7 +161,7 @@ export function useProfileQuery(userId?: string) {
       if (!userId) return null;
       const { data, error } = await supabase
         .from("profiles")
-        .select("display_name, avatar_url, default_voice, default_style, default_audiences, default_goals, banned_hashtags, required_hashtags, default_timezone, brand_examples, default_framework")
+        .select("display_name, avatar_url, default_voice, default_style, default_audiences, default_goals, banned_hashtags, required_hashtags, default_timezone, brand_examples, default_framework, forbidden_phrases, proof_points, cta_preferences, preferred_structures")
         .eq("user_id", userId)
         .maybeSingle();
       if (error) throw error;
@@ -358,8 +358,49 @@ export function useToggleCalendarFavoriteMutation(userId?: string) {
       if (error) throw error;
       return { id, isFavorite };
     },
-    onSuccess: () => {
-      if (userId) qc.invalidateQueries({ queryKey: ["saved-calendars", userId] });
+    onMutate: async ({ id, isFavorite }) => {
+      if (!userId) return;
+      await qc.cancelQueries({ queryKey: ["saved-calendars", userId] });
+      await qc.cancelQueries({ queryKey: ["recent-calendars", userId] });
+
+      const previousSaved = qc.getQueryData(["saved-calendars", userId]);
+      const previousRecent = qc.getQueryData(["recent-calendars", userId]);
+
+      qc.setQueryData(["saved-calendars", userId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            items: page.items.map((item: any) =>
+              item.id === id ? { ...item, is_favorite: isFavorite } : item
+            ),
+          })),
+        };
+      });
+
+      qc.setQueryData(["recent-calendars", userId], (old: any) => {
+        if (!old) return old;
+        return old.map((item: any) =>
+          item.id === id ? { ...item, is_favorite: isFavorite } : item
+        );
+      });
+
+      return { previousSaved, previousRecent };
+    },
+    onError: (_err, _variables, context) => {
+      if (userId && context?.previousSaved) {
+        qc.setQueryData(["saved-calendars", userId], context.previousSaved);
+      }
+      if (userId && context?.previousRecent) {
+        qc.setQueryData(["recent-calendars", userId], context.previousRecent);
+      }
+    },
+    onSettled: () => {
+      if (userId) {
+        qc.invalidateQueries({ queryKey: ["saved-calendars", userId] });
+        qc.invalidateQueries({ queryKey: ["recent-calendars", userId] });
+      }
     },
   });
 }
@@ -413,8 +454,49 @@ export function useRenameCalendarMutation(userId?: string) {
       if (error) throw error;
       return { id, title };
     },
-    onSuccess: () => {
-      if (userId) qc.invalidateQueries({ queryKey: ["saved-calendars", userId] });
+    onMutate: async ({ id, title }) => {
+      if (!userId) return;
+      await qc.cancelQueries({ queryKey: ["saved-calendars", userId] });
+      await qc.cancelQueries({ queryKey: ["recent-calendars", userId] });
+
+      const previousSaved = qc.getQueryData(["saved-calendars", userId]);
+      const previousRecent = qc.getQueryData(["recent-calendars", userId]);
+
+      qc.setQueryData(["saved-calendars", userId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            items: page.items.map((item: any) =>
+              item.id === id ? { ...item, title } : item
+            ),
+          })),
+        };
+      });
+
+      qc.setQueryData(["recent-calendars", userId], (old: any) => {
+        if (!old) return old;
+        return old.map((item: any) =>
+          item.id === id ? { ...item, title } : item
+        );
+      });
+
+      return { previousSaved, previousRecent };
+    },
+    onError: (_err, _variables, context) => {
+      if (userId && context?.previousSaved) {
+        qc.setQueryData(["saved-calendars", userId], context.previousSaved);
+      }
+      if (userId && context?.previousRecent) {
+        qc.setQueryData(["recent-calendars", userId], context.previousRecent);
+      }
+    },
+    onSettled: () => {
+      if (userId) {
+        qc.invalidateQueries({ queryKey: ["saved-calendars", userId] });
+        qc.invalidateQueries({ queryKey: ["recent-calendars", userId] });
+      }
     },
   });
 }
