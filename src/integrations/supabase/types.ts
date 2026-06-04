@@ -18,10 +18,8 @@ export type Database = {
         Row: {
           avatar_url: string | null
           banned_hashtags: string[] | null
-          brand_examples: string[] | null
           created_at: string
           default_audiences: string[] | null
-          default_framework: string | null
           default_goals: string[] | null
           default_style: string | null
           default_timezone: string | null
@@ -31,18 +29,12 @@ export type Database = {
           required_hashtags: string[] | null
           updated_at: string
           user_id: string
-          forbidden_phrases: string[] | null
-          proof_points: string[] | null
-          cta_preferences: string[] | null
-          preferred_structures: string[] | null
         }
         Insert: {
           avatar_url?: string | null
           banned_hashtags?: string[] | null
-          brand_examples?: string[] | null
           created_at?: string
           default_audiences?: string[] | null
-          default_framework?: string | null
           default_goals?: string[] | null
           default_style?: string | null
           default_timezone?: string | null
@@ -52,18 +44,12 @@ export type Database = {
           required_hashtags?: string[] | null
           updated_at?: string
           user_id: string
-          forbidden_phrases?: string[] | null
-          proof_points?: string[] | null
-          cta_preferences?: string[] | null
-          preferred_structures?: string[] | null
         }
         Update: {
           avatar_url?: string | null
           banned_hashtags?: string[] | null
-          brand_examples?: string[] | null
           created_at?: string
           default_audiences?: string[] | null
-          default_framework?: string | null
           default_goals?: string[] | null
           default_style?: string | null
           default_timezone?: string | null
@@ -73,10 +59,6 @@ export type Database = {
           required_hashtags?: string[] | null
           updated_at?: string
           user_id?: string
-          forbidden_phrases?: string[] | null
-          proof_points?: string[] | null
-          cta_preferences?: string[] | null
-          preferred_structures?: string[] | null
         }
         Relationships: []
       }
