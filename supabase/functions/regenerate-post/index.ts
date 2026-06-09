@@ -74,8 +74,10 @@ Deno.serve(async (req) => {
     }
 
     // Rate limiting: 30 requests per minute per user (regenerate is frequent)
-    const authHeader = req.headers.get("authorization") || "anonymous";
-    const userId = authHeader.replace("Bearer ", "").slice(0, 32) || "anonymous";
+    const authHeader = req.headers.get("authorization") || "";
+    const token = authHeader.replace("Bearer ", "");
+    const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
+    const userId = token.slice(0, 32) || "anonymous";
     const rateLimitCheck = await checkRateLimit(userId, "regenerate-post", {
       maxRequests: 30,
       windowMs: 60 * 1000,
@@ -189,7 +191,15 @@ CRITIQUE & REWRITE GUIDANCE:
       [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }],
       tool,
       LOVABLE_API_KEY,
-      { model, temperature }
+      {
+        model,
+        temperature,
+        userApiKey: payload.userApiKey,
+        userApiProvider: payload.userApiProvider,
+        quality: payload.quality,
+        userToken: token || null,
+        userIp: ipAddress
+      }
     );
     if (aiRes.status !== 200) {
       return jsonResponse({ error: aiRes.error }, aiRes.status);
@@ -237,7 +247,15 @@ CRITIQUE & REWRITE GUIDANCE:
         const polishRes = await callAIGateway([
           { role: "system", content: polishSystem },
           { role: "user", content: polishUser },
-        ], tool, LOVABLE_API_KEY, { model: "google/gemini-2.5-pro", temperature: 0.4 });
+        ], tool, LOVABLE_API_KEY, {
+          model: "google/gemini-2.5-pro",
+          temperature: 0.4,
+          userApiKey: payload.userApiKey,
+          userApiProvider: payload.userApiProvider,
+          quality: payload.quality,
+          userToken: token || null,
+          userIp: ipAddress
+        });
 
         if (polishRes.status === 200) {
           const polishParse = parseAIResponse(polishRes.data || {}, "return_post");

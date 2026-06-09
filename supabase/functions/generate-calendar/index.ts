@@ -40,8 +40,10 @@ Deno.serve(async (req) => {
     }
 
     // Rate limiting: 10 requests per minute per user
-    const authHeader = req.headers.get("authorization") || "anonymous";
-    const userId = authHeader.replace("Bearer ", "").slice(0, 32) || "anonymous";
+    const authHeader = req.headers.get("authorization") || "";
+    const token = authHeader.replace("Bearer ", "");
+    const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
+    const userId = token.slice(0, 32) || "anonymous";
     const rateLimitCheck = await checkRateLimit(userId, "generate-calendar", {
       maxRequests: 10,
       windowMs: 60 * 1000,
@@ -155,7 +157,15 @@ Deno.serve(async (req) => {
     const aiRes = await callAIGateway([
       { role: "system", content: systemMsg },
       { role: "user", content: userMsg },
-    ], tool, LOVABLE_API_KEY, { model, temperature });
+    ], tool, LOVABLE_API_KEY, {
+      model,
+      temperature,
+      userApiKey: payload.userApiKey,
+      userApiProvider: payload.userApiProvider,
+      quality: payload.quality,
+      userToken: token || null,
+      userIp: ipAddress
+    });
     if (aiRes.status !== 200) {
       return jsonResponse({ error: aiRes.error }, aiRes.status);
     }
@@ -203,7 +213,13 @@ Deno.serve(async (req) => {
         const polishRes = await callAIGateway([
           { role: "system", content: polishSystem },
           { role: "user", content: polishUser },
-        ], tool, LOVABLE_API_KEY, { model: "google/gemini-2.5-pro", temperature: 0.45 });
+        ], tool, LOVABLE_API_KEY, {
+          model: "google/gemini-2.5-pro",
+          temperature: 0.45,
+          userApiKey: payload.userApiKey,
+          userApiProvider: payload.userApiProvider,
+          quality: payload.quality
+        });
 
         if (polishRes.status === 200) {
           const polishParse = parseAIResponse(polishRes.data || {}, "return_calendar");

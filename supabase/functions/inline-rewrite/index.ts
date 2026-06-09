@@ -28,8 +28,10 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing selected text or rewrite instruction." }, 400);
     }
 
-    const authHeader = req.headers.get("authorization") || "anonymous";
-    const userId = authHeader.replace("Bearer ", "").slice(0, 32) || "anonymous";
+    const authHeader = req.headers.get("authorization") || "";
+    const token = authHeader.replace("Bearer ", "");
+    const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
+    const userId = token.slice(0, 32) || "anonymous";
     const rateLimitCheck = await checkRateLimit(userId, "inline-rewrite", {
       maxRequests: 20,
       windowMs: 60 * 1000,
@@ -81,11 +83,21 @@ ${text}`;
       },
     };
 
+    const userApiKey = body.userApiKey ? String(body.userApiKey).trim() : undefined;
+    const userApiProvider = body.userApiProvider ? String(body.userApiProvider).trim() : undefined;
+
     const aiRes = await callAIGateway(
       [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }],
       tool,
       LOVABLE_API_KEY,
-      { model: "google/gemini-2.5-flash", temperature: 0.55 }
+      {
+        model: "google/gemini-2.5-flash",
+        temperature: 0.55,
+        userApiKey,
+        userApiProvider,
+        userToken: token || null,
+        userIp: ipAddress
+      }
     );
 
     if (aiRes.status !== 200) return jsonResponse({ error: aiRes.error }, aiRes.status);

@@ -45,3 +45,100 @@ export function buildBrandMemoryPrompt(profile?: Partial<ProfileRow> | null): st
 
   return sections.join("\n");
 }
+
+/**
+ * Executes an AI generation call with platform-to-user-key fallback.
+ */
+import { resolveAiClient } from "./aiClientResolver";
+import { supabase } from "@/integrations/supabase/client";
+
+export async function generateWithFallback<T = any>(
+  endpoint: string,
+  body: any,
+  abortSignal?: AbortSignal
+): Promise<{ data: T; usedFallback: boolean }> {
+  const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+  const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
+  const { data: { session } } = await supabase.auth.getSession();
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    apikey: SUPABASE_KEY,
+    ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+  };
+
+  // 1. Try with platform first
+  let isPlatformUp = true;
+  try {
+    await resolveAiClient(isPlatformUp);
+  } catch (err) {
+    if (err instanceof Error && err.message === "AI_UNAVAILABLE") {
+      throw err;
+    }
+    throw err;
+  }
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: abortSignal,
+    });
+
+    if (!res.ok && (res.status === 429 || res.status >= 500)) {
+      throw new Error(`Platform failed with status ${res.status}`);
+    }
+
+    const data = await res.json();
+    if (data?.error) {
+      throw new Error(data.error);
+    }
+
+    return { data, usedFallback: false };
+  } catch (err) {
+    // If request was aborted by user, don't fallback, just throw the abort error
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw err;
+    }
+
+    console.warn(`Platform AI call failed (${err instanceof Error ? err.message : String(err)}). Attempting fallback key...`);
+
+    // 2. Platform failed, resolve user fallback key
+    isPlatformUp = false;
+    let fallbackClient;
+    try {
+      fallbackClient = await resolveAiClient(isPlatformUp);
+    } catch (fallbackErr) {
+      // If no fallback key is set, or useOwnKey is false, resolveAiClient throws AI_UNAVAILABLE
+      throw new Error("AI_UNAVAILABLE");
+    }
+
+    // Call Edge Function again with user fallback credentials
+    const fallbackBody = {
+      ...body,
+      userApiKey: fallbackClient.apiKey,
+      userApiProvider: fallbackClient.provider,
+    };
+
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(fallbackBody),
+      signal: abortSignal,
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.error || `Fallback generation failed (${res.status})`);
+    }
+
+    const data = await res.json();
+    if (data?.error) {
+      throw new Error(data.error);
+    }
+
+    return { data, usedFallback: true };
+  }
+}
+

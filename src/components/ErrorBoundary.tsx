@@ -69,7 +69,10 @@ function DefaultErrorFallback({
   error: Error;
   reset: () => void;
 }) {
-  const message = getUserFriendlyMessage(error);
+  const isAiUnavailable = error.message === "AI_UNAVAILABLE";
+  const message = isAiUnavailable
+    ? "AI generation is currently unavailable. Add your own API key in Profile → API Keys to continue."
+    : getUserFriendlyMessage(error);
   const showDetails = import.meta.env.DEV && typeof window !== 'undefined' && window.localStorage.getItem('ss:show-error-details') === 'true';
 
   return (
@@ -95,7 +98,9 @@ function DefaultErrorFallback({
           textAlign: "center",
         }}
       >
-        <div style={{ fontSize: "48px", marginBottom: "16px" }}>!</div>
+        <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+          {isAiUnavailable ? "⚙️" : "!"}
+        </div>
 
         <h1
           style={{
@@ -106,7 +111,7 @@ function DefaultErrorFallback({
             margin: 0,
           }}
         >
-          Something Went Wrong
+          {isAiUnavailable ? "AI Generation Unavailable" : "Something Went Wrong"}
         </h1>
 
         <p
@@ -120,7 +125,7 @@ function DefaultErrorFallback({
           {message}
         </p>
 
-        {showDetails && (
+        {showDetails && !isAiUnavailable && (
           <details
             style={{
               fontSize: "12px",
@@ -142,54 +147,109 @@ function DefaultErrorFallback({
         )}
 
         <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            onClick={reset}
-            style={{
-              flex: 1,
-              background: "#c8f09a",
-              color: "#07080d",
-              border: "1px solid #c8f09a",
-              borderRadius: "8px",
-              padding: "12px 16px",
-              fontSize: "14px",
-              fontWeight: 500,
-              cursor: "pointer",
-              fontFamily: "var(--font-body)",
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              (e.target as HTMLButtonElement).style.background = "#b9e289";
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLButtonElement).style.background = "#c8f09a";
-            }}
-          >
-            Try Again
-          </button>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              flex: 1,
-              background: "transparent",
-              color: "#edeae3",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: "8px",
-              padding: "12px 16px",
-              fontSize: "14px",
-              fontWeight: 500,
-              cursor: "pointer",
-              fontFamily: "var(--font-body)",
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              (e.target as HTMLButtonElement).style.borderColor = "rgba(200, 240, 154, 0.3)";
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLButtonElement).style.borderColor = "rgba(255, 255, 255, 0.1)";
-            }}
-          >
-            Reload App
-          </button>
+          {isAiUnavailable ? (
+            <>
+              <button
+                onClick={() => window.location.assign('/profile?tab=api-keys')}
+                style={{
+                  flex: 1,
+                  background: "#c8f09a",
+                  color: "#07080d",
+                  border: "1px solid #c8f09a",
+                  borderRadius: "8px",
+                  padding: "12px 16px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  fontFamily: "var(--font-body)",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLButtonElement).style.background = "#b9e289";
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLButtonElement).style.background = "#c8f09a";
+                }}
+              >
+                Go to API Keys
+              </button>
+              <button
+                onClick={() => window.location.assign('/app')}
+                style={{
+                  flex: 1,
+                  background: "transparent",
+                  color: "#edeae3",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "8px",
+                  padding: "12px 16px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  fontFamily: "var(--font-body)",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLButtonElement).style.borderColor = "rgba(200, 240, 154, 0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLButtonElement).style.borderColor = "rgba(255, 255, 255, 0.1)";
+                }}
+              >
+                Back to Dashboard
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={reset}
+                style={{
+                  flex: 1,
+                  background: "#c8f09a",
+                  color: "#07080d",
+                  border: "1px solid #c8f09a",
+                  borderRadius: "8px",
+                  padding: "12px 16px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  fontFamily: "var(--font-body)",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLButtonElement).style.background = "#b9e289";
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLButtonElement).style.background = "#c8f09a";
+                }}
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  flex: 1,
+                  background: "transparent",
+                  color: "#edeae3",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "8px",
+                  padding: "12px 16px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  fontFamily: "var(--font-body)",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLButtonElement).style.borderColor = "rgba(200, 240, 154, 0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLButtonElement).style.borderColor = "rgba(255, 255, 255, 0.1)";
+                }}
+              >
+                Reload App
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

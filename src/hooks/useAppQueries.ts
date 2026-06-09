@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { getE2EAuthFlag, E2E_CALENDAR, E2E_SCHEDULE_ROWS } from "@/lib/e2eFixtures";
+import { useWizardStore } from "@/stores/useWizardStore";
 
 function isE2EMode() {
   return import.meta.env.DEV && typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true";
@@ -660,6 +661,8 @@ export function useUpdateScheduledPostTimeMutation(calendarId?: string) {
 
 export function useRegeneratePostMutation(calendarId?: string) {
   const qc = useQueryClient();
+  const setKeySource = useWizardStore((state) => state.setKeySource);
+  
   return useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
       if (isE2EMode()) {
@@ -670,20 +673,10 @@ export function useRegeneratePostMutation(calendarId?: string) {
           : { id: `e2e-reg-${Date.now()}`, day: 1, title: 'E2E regenerated', hook: 'E2E hook', body: 'E2E regenerated body', cta: 'No CTA' };
         return post;
       }
-      const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
-      const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_KEY,
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.error) throw new Error(data?.error || `Regenerate failed (${res.status})`);
+
+      const { generateWithFallback } = await import("@/lib/brandMemory");
+      const { data, usedFallback } = await generateWithFallback("regenerate-post", payload);
+      setKeySource(usedFallback ? "user" : "platform");
       return data.post;
     },
     onSuccess: () => {
@@ -693,6 +686,7 @@ export function useRegeneratePostMutation(calendarId?: string) {
 }
 
 export function useRepurposePostMutation() {
+  const setKeySource = useWizardStore((state) => state.setKeySource);
   return useMutation({
     mutationFn: async (payload: RepurposePayload) => {
       if (isE2EMode()) {
@@ -706,20 +700,9 @@ export function useRepurposePostMutation() {
           cta: post.cta || "Save this for later.",
         };
       }
-      const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
-      const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/repurpose-post`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_KEY,
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.error) throw new Error(data?.error || `Repurpose failed (${res.status})`);
+      const { generateWithFallback } = await import("@/lib/brandMemory");
+      const { data, usedFallback } = await generateWithFallback("repurpose-post", payload);
+      setKeySource(usedFallback ? "user" : "platform");
       return data.post;
     },
   });
@@ -756,25 +739,15 @@ export function useGeneratePostImageMutation() {
 }
 
 export function useInlineRewriteMutation() {
+  const setKeySource = useWizardStore((state) => state.setKeySource);
   return useMutation({
     mutationFn: async (payload: InlineRewritePayload) => {
       if (isE2EMode()) {
         return `${payload.text.trim()} (${payload.instruction})`;
       }
-      const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
-      const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/inline-rewrite`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_KEY,
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.error) throw new Error(data?.error || `Rewrite failed (${res.status})`);
+      const { generateWithFallback } = await import("@/lib/brandMemory");
+      const { data, usedFallback } = await generateWithFallback("inline-rewrite", payload);
+      setKeySource(usedFallback ? "user" : "platform");
       return String(data.rewrittenText || "");
     },
   });

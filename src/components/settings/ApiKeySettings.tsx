@@ -1,0 +1,361 @@
+import React, { useState, useEffect, useRef } from "react";
+import { saveUserApiKey, getUserApiKey, setUseOwnKey, deleteUserApiKey } from "@/lib/apiKeyManager";
+import { toast } from "sonner";
+import { Eye, EyeOff, Save, Key, CheckCircle2, AlertCircle, Loader2, Trash2, ShieldCheck, Info } from "lucide-react";
+
+export function ApiKeySettings() {
+  const [provider, setProvider] = useState<'openai' | 'anthropic' | 'openrouter'>("openai");
+  const [showKey, setShowKey] = useState(false);
+  const [useOwnKey, setUseOwnKeyVal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const [savedKeyPreview, setSavedKeyPreview] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  // Use uncontrolled input via ref to keep the raw key out of the React DevTools state tree
+  const keyInputRef = useRef<HTMLInputElement>(null);
+
+  // Load existing key settings on mount
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const data = await getUserApiKey();
+        if (data.provider) setProvider(data.provider);
+        setUseOwnKeyVal(data.useOwnKey);
+        if (data.apiKey) {
+          // Mask the key: show only last 4 chars, e.g. ••••••••xQ3Z
+          const last4 = data.apiKey.slice(-4);
+          setSavedKeyPreview(`••••••••${last4}`);
+        }
+      } catch (err) {
+        console.error("Failed to load user API key settings:", err);
+      } finally {
+        setFetching(false);
+      }
+    }
+    loadSettings();
+  }, []);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setStatusMsg(null);
+
+    try {
+      const rawKey = keyInputRef.current?.value?.trim() ?? "";
+      const isNewKey = rawKey && !rawKey.startsWith("••••");
+
+      if (isNewKey) {
+        await saveUserApiKey(rawKey, provider);
+        const last4 = rawKey.slice(-4);
+        setSavedKeyPreview(`••••••••${last4}`);
+      }
+
+      await setUseOwnKey(useOwnKey);
+
+      setStatusMsg({
+        text: "API Key settings saved successfully!",
+        type: "success"
+      });
+      toast.success("API Key settings saved!");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to save API key";
+      setStatusMsg({
+        text: msg === "INVALID_KEY_FORMAT"
+          ? `Invalid key format for ${provider}. Please check your API key and try again.`
+          : msg,
+        type: "error"
+      });
+      toast.error(msg === "INVALID_KEY_FORMAT" ? "Invalid API key format" : "Failed to save API key settings");
+    } finally {
+      setLoading(false);
+      // SECURITY: Clear raw key from the DOM input immediately after save (success or error)
+      if (keyInputRef.current) {
+        keyInputRef.current.value = "";
+      }
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    setStatusMsg(null);
+    try {
+      await deleteUserApiKey();
+      setSavedKeyPreview(null);
+      setUseOwnKeyVal(false);
+      setConfirmDelete(false);
+      if (keyInputRef.current) keyInputRef.current.value = "";
+      setStatusMsg({ text: "API key removed successfully.", type: "success" });
+      toast.success("API key removed.");
+    } catch (err) {
+      setStatusMsg({ text: err instanceof Error ? err.message : "Failed to remove key", type: "error" });
+      toast.error("Failed to remove API key.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  if (fetching) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#7a7a8e", fontSize: 13, padding: "20px 0" }}>
+        <Loader2 className="animate-spin" size={16} />
+        <span>Loading API key configurations...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pf-card" style={{ marginTop: 14 }}>
+      <h2 className="pf-section-h" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Key size={18} style={{ color: "#c8f09a" }} />
+        <span>User API Key Fallback</span>
+      </h2>
+
+      {/* Inline Privacy Notice */}
+      <div
+        role="note"
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 10,
+          padding: "10px 14px",
+          borderRadius: "8px",
+          fontSize: "12px",
+          background: "rgba(200, 240, 154, 0.05)",
+          border: "1px solid rgba(200, 240, 154, 0.15)",
+          color: "#9fa08d",
+          marginTop: 8,
+          marginBottom: 14,
+        }}
+      >
+        <ShieldCheck size={14} style={{ color: "#c8f09a", flexShrink: 0, marginTop: 1 }} />
+        <span>
+          Your API key is encrypted with AES-256 and stored securely. It is never logged, shared, or used for
+          any purpose other than generating content on your behalf. You can delete it at any time.
+        </span>
+      </div>
+
+      <div className="pf-section-sub" style={{ marginBottom: 16 }}>
+        Configure your own AI API key to be used as a fallback if the platform-level generation is rate-limited or unavailable.
+      </div>
+
+      <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {statusMsg && (
+          <div
+            role={statusMsg.type === "error" ? "alert" : "status"}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 14px",
+              borderRadius: "8px",
+              fontSize: "12px",
+              background: statusMsg.type === "error" ? "rgba(240, 154, 154, 0.08)" : "rgba(200, 240, 154, 0.08)",
+              border: statusMsg.type === "error" ? "1px solid rgba(240, 154, 154, 0.2)" : "1px solid rgba(200, 240, 154, 0.2)",
+              color: statusMsg.type === "error" ? "#f09a9a" : "#c8f09a",
+            }}
+          >
+            {statusMsg.type === "error" ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
+            <span>{statusMsg.text}</span>
+          </div>
+        )}
+
+        <div>
+          <label className="pf-label" htmlFor="api-provider">
+            API Provider
+          </label>
+          <select
+            id="api-provider"
+            className="pf-select"
+            value={provider}
+            onChange={(e) => {
+              const val = e.target.value as 'openai' | 'anthropic' | 'openrouter';
+              setProvider(val);
+              // Clear input when switching provider
+              if (keyInputRef.current) keyInputRef.current.value = "";
+            }}
+            style={{ marginBottom: 0 }}
+          >
+            <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+            <option value="anthropic">Anthropic (Claude 3.5 Sonnet / Haiku)</option>
+            <option value="openrouter">OpenRouter (Any available models)</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="pf-label" htmlFor="api-key">
+            API Key
+          </label>
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <input
+              id="api-key"
+              ref={keyInputRef}
+              type={showKey ? "text" : "password"}
+              className="pf-input"
+              placeholder={savedKeyPreview ? "Enter new API key to overwrite" : "sk-..."}
+              style={{ paddingRight: "40px", marginBottom: 0 }}
+              // SECURITY: Prevent password managers and OS spell-check from capturing the key
+              autoComplete="new-password"
+              data-1p-ignore
+              data-lpignore="true"
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey(!showKey)}
+              aria-label={showKey ? "Hide API key" : "Show API key"}
+              style={{
+                position: "absolute",
+                right: "12px",
+                background: "none",
+                border: "none",
+                color: "#7a7a8e",
+                cursor: "pointer",
+                padding: 0,
+                display: "flex",
+                alignItems: "center"
+              }}
+            >
+              {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          {savedKeyPreview && (
+            <div style={{ fontSize: "11px", color: "#6a6a82", marginTop: "4px" }}>
+              Currently configured key ends in <span className="font-mono">{savedKeyPreview.slice(-4)}</span>
+            </div>
+          )}
+          {provider === "openai" && (
+            <div style={{ fontSize: "11px", color: "#6a6a82", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              <Info size={11} /> Format: <code>sk-...</code> (32+ characters)
+            </div>
+          )}
+          {provider === "anthropic" && (
+            <div style={{ fontSize: "11px", color: "#6a6a82", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              <Info size={11} /> Format: <code>sk-ant-...</code>
+            </div>
+          )}
+          {provider === "openrouter" && (
+            <div style={{ fontSize: "11px", color: "#6a6a82", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              <Info size={11} /> Format: <code>sk-or-...</code>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "6px 0" }}>
+          <input
+            id="use-own-key"
+            type="checkbox"
+            checked={useOwnKey}
+            onChange={(e) => setUseOwnKeyVal(e.target.checked)}
+            style={{
+              width: "16px",
+              height: "16px",
+              accentColor: "#c8f09a",
+              cursor: "pointer",
+            }}
+          />
+          <label
+            htmlFor="use-own-key"
+            style={{
+              fontSize: "13px",
+              color: "#edeae3",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            Enable custom API key as fallback
+          </label>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+          <button
+            type="submit"
+            className="pf-btn"
+            disabled={loading}
+            style={{ display: "flex", alignItems: "center", gap: 6 }}
+          >
+            {loading ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+            <span>{loading ? "Saving..." : "Save API configuration"}</span>
+          </button>
+
+          {savedKeyPreview && !confirmDelete && (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: "13px",
+                padding: "8px 14px",
+                borderRadius: "8px",
+                background: "rgba(240, 154, 154, 0.08)",
+                border: "1px solid rgba(240, 154, 154, 0.2)",
+                color: "#f09a9a",
+                cursor: "pointer",
+              }}
+            >
+              <Trash2 size={13} />
+              <span>Remove Key</span>
+            </button>
+          )}
+
+          {confirmDelete && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "10px 14px",
+                borderRadius: "8px",
+                background: "rgba(240, 154, 154, 0.08)",
+                border: "1px solid rgba(240, 154, 154, 0.2)",
+                fontSize: "12px",
+                color: "#f09a9a",
+              }}
+            >
+              <AlertCircle size={13} />
+              <span>Are you sure? This cannot be undone.</span>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  background: "#f09a9a",
+                  color: "#0a0a14",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "4px 10px",
+                  fontSize: "11px",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                {deleting ? "Removing..." : "Yes, remove"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                style={{
+                  background: "transparent",
+                  color: "#7a7a8e",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "6px",
+                  padding: "4px 10px",
+                  fontSize: "11px",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+}

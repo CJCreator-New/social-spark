@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import mediaManager from "@/lib/mediaManager";
@@ -8,8 +8,10 @@ import { toast } from "sonner";
 import { normalizeTag, displayTag, parsePolicyList } from "@/lib/hashtagPolicy";
 import { listTimezones, browserTimezone, tzLabel } from "@/lib/timezones";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
+import { ApiKeySettings } from "@/components/settings/ApiKeySettings";
 import { motion, AnimatePresence } from "framer-motion";
 import "@/styles/pages.css";
+
 
 const VOICE_OPTIONS = ["Technical & analytical", "Conversational & warm", "PM / product thinking", "Opinionated & bold", "Data-driven", "Storytelling-first", "Educational & clear", "Contrarian / challenger", "Founder POV", "Academic & research-backed", "Humorous & witty", "Inspirational & motivating"];
 const STYLE_OPTIONS = ["Short punchy lines", "Long-form narrative", "Lists & frameworks", "Thread-style breakdown", "Stats-led", "Case study format", "Question-led", "First-person story", "Industry insight", "Myth-busting", "How-to guide", "Behind-the-scenes"];
@@ -75,6 +77,13 @@ function TemplatesList() {
 export default function Profile() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = (searchParams.get("tab") as 'profile' | 'brand' | 'api-keys') || 'profile';
+
+  const setActiveTab = (tab: 'profile' | 'brand' | 'api-keys') => {
+    setSearchParams({ tab });
+  };
+
   const fileRef = useRef<HTMLInputElement>(null);
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -329,61 +338,123 @@ export default function Profile() {
         <h1 className="pf-title">Your profile</h1>
         <div className="pf-sub">Update how you appear inside ContentForge and set brand defaults to pre-fill the wizard.</div>
 
-        <div className="pf-summary">
-          <div className="pf-summary-card">
-            <div className="pf-summary-label">Defaults set</div>
-            <div className="pf-summary-value">{activeDefaults}</div>
-            <div className="pf-summary-sub">Profile fields that will pre-fill the next calendar.</div>
+        {activeTab !== 'api-keys' && (
+          <div className="pf-summary">
+            <div className="pf-summary-card">
+              <div className="pf-summary-label">Defaults set</div>
+              <div className="pf-summary-value">{activeDefaults}</div>
+              <div className="pf-summary-sub">Profile fields that will pre-fill the next calendar.</div>
+            </div>
+            <div className="pf-summary-card">
+              <div className="pf-summary-label">Audiences</div>
+              <div className="pf-summary-value">{defaultAudiences.length}</div>
+              <div className="pf-summary-sub">Reusable audience presets.</div>
+            </div>
+            <div className="pf-summary-card">
+              <div className="pf-summary-label">Hashtag rules</div>
+              <div className="pf-summary-value">{bannedHashtags.length + requiredHashtags.length}</div>
+              <div className="pf-summary-sub">Guardrails applied across generations.</div>
+            </div>
           </div>
-          <div className="pf-summary-card">
-            <div className="pf-summary-label">Audiences</div>
-            <div className="pf-summary-value">{defaultAudiences.length}</div>
-            <div className="pf-summary-sub">Reusable audience presets.</div>
-          </div>
-          <div className="pf-summary-card">
-            <div className="pf-summary-label">Hashtag rules</div>
-            <div className="pf-summary-value">{bannedHashtags.length + requiredHashtags.length}</div>
-            <div className="pf-summary-sub">Guardrails applied across generations.</div>
-          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 20, paddingBottom: 8 }}>
+          <button
+            onClick={() => setActiveTab('profile')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: activeTab === 'profile' ? '#c8f09a' : '#7c8294',
+              borderBottom: activeTab === 'profile' ? '2px solid #c8f09a' : '2px solid transparent',
+              padding: '8px 16px',
+              cursor: 'pointer',
+              fontWeight: activeTab === 'profile' ? 600 : 400,
+              fontSize: 14,
+              marginBottom: -10,
+              transition: 'all 0.15s'
+            }}
+          >
+            Account Info
+          </button>
+          <button
+            onClick={() => setActiveTab('brand')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: activeTab === 'brand' ? '#c8f09a' : '#7c8294',
+              borderBottom: activeTab === 'brand' ? '2px solid #c8f09a' : '2px solid transparent',
+              padding: '8px 16px',
+              cursor: 'pointer',
+              fontWeight: activeTab === 'brand' ? 600 : 400,
+              fontSize: 14,
+              marginBottom: -10,
+              transition: 'all 0.15s'
+            }}
+          >
+            Brand Defaults
+          </button>
+          <button
+            onClick={() => setActiveTab('api-keys')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: activeTab === 'api-keys' ? '#c8f09a' : '#7c8294',
+              borderBottom: activeTab === 'api-keys' ? '2px solid #c8f09a' : '2px solid transparent',
+              padding: '8px 16px',
+              cursor: 'pointer',
+              fontWeight: activeTab === 'api-keys' ? 600 : 400,
+              fontSize: 14,
+              marginBottom: -10,
+              transition: 'all 0.15s'
+            }}
+          >
+            API Keys
+          </button>
         </div>
 
-        <div className="pf-card">
-          {profileLoading ? (
-            <div style={{ color: "#7a7a8e", fontSize: 13 }}>Loading…</div>
-          ) : (
-            <>
-              <div className="pf-row">
-                {avatarUrl
-                  ? <img className="pf-avatar" src={avatarUrl} alt="Your avatar" />
-                  : <div className="pf-avatar" aria-hidden="true">{initial}</div>}
-                <div>
-                  <label className="pf-uplabel">
-                    {uploading ? "Uploading…" : "Upload new avatar"}
-                    <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} style={{ display: "none" }} disabled={uploading} aria-label="Upload new avatar" />
-                  </label>
-                  <div className="pf-meta">PNG, JPEG, or WebP, up to 2MB.</div>
+        {activeTab === 'profile' && (
+          <div className="pf-card">
+            {profileLoading ? (
+              <div style={{ color: "#7a7a8e", fontSize: 13 }}>Loading…</div>
+            ) : (
+              <>
+                <div className="pf-row">
+                  {avatarUrl
+                    ? <img className="pf-avatar" src={avatarUrl} alt="Your avatar" />
+                    : <div className="pf-avatar" aria-hidden="true">{initial}</div>}
+                  <div>
+                    <label className="pf-uplabel">
+                      {uploading ? "Uploading…" : "Upload new avatar"}
+                      <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} style={{ display: "none" }} disabled={uploading} aria-label="Upload new avatar" />
+                    </label>
+                    <div className="pf-meta">PNG, JPEG, or WebP, up to 2MB.</div>
+                  </div>
                 </div>
-              </div>
 
-              <label className="pf-label" htmlFor="pf-name">Display name</label>
-              <input id="pf-name" className="pf-input" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your name" />
+                <label className="pf-label" htmlFor="pf-name">Display name</label>
+                <input id="pf-name" className="pf-input" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your name" />
 
-              <label className="pf-label" htmlFor="pf-email">Email</label>
-              <input id="pf-email" className="pf-input" value={user?.email || ""} disabled />
+                <label className="pf-label" htmlFor="pf-email">Email</label>
+                <input id="pf-email" className="pf-input" value={user?.email || ""} disabled />
 
-              <label className="pf-label" htmlFor="pf-tz">Default timezone</label>
-              <select id="pf-tz" className="pf-select" value={defaultTimezone} onChange={e => setDefaultTimezone(e.target.value)}>
-                <option value="">— Browser default ({browserTimezone()}) —</option>
-                {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
-              </select>
-              <div className="pf-meta" style={{ marginTop: -8, marginBottom: 8 }}>
-                Used as the fallback when scheduling. Each calendar can override this.
-              </div>
-            </>
-          )}
-        </div>
+                <label className="pf-label" htmlFor="pf-tz">Default timezone</label>
+                <select id="pf-tz" className="pf-select" value={defaultTimezone} onChange={e => setDefaultTimezone(e.target.value)}>
+                  <option value="">— Browser default ({browserTimezone()}) —</option>
+                  {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
+                </select>
+                <div className="pf-meta" style={{ marginTop: -8, marginBottom: 8 }}>
+                  Used as the fallback when scheduling. Each calendar can override this.
+                </div>
 
-        {!profileLoading && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                  <button className="pf-btn" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'brand' && !profileLoading && (
           <div className="pf-card">
             <h2 className="pf-section-h">Brand defaults</h2>
             <div className="pf-section-sub">Pre-fill the wizard with your usual voice, style, audiences, and goals. You can still change them per calendar.</div>
@@ -646,6 +717,10 @@ export default function Profile() {
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'api-keys' && !profileLoading && (
+          <ApiKeySettings />
         )}
       </WorkspacePage>
     </>

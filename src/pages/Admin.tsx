@@ -12,10 +12,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Activity, TrendingUp, Users, Calendar, Zap } from 'lucide-react';
+import { AlertCircle, Activity, TrendingUp, Users, Calendar, Zap, Key } from 'lucide-react';
 import { fetchAdminStats, AdminStats } from '@/lib/admin';
 import { SkeletonList } from '@/components/SkeletonList';
 import telemetry from '@/lib/telemetry';
+import { supabase } from '@/integrations/supabase/client';
+
+interface ApiKeyStatusRow {
+  user_id: string;
+  api_provider: string | null;
+  use_own_key: boolean;
+  has_own_key: boolean;
+  updated_at: string;
+}
+
+interface AuditLogRow {
+  id: string;
+  user_id: string;
+  action: string;
+  provider: string | null;
+  source: string | null;
+  ip_address: string | null;
+  created_at: string;
+}
 
 const AdminCharts = lazy(() => import("./admin/AdminCharts"));
 
@@ -29,6 +48,8 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [apiKeyStatuses, setApiKeyStatuses] = useState<ApiKeyStatusRow[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogRow[]>([]);
 
   // Fetch stats on mount and periodically
   useEffect(() => {
@@ -53,6 +74,26 @@ export function AdminDashboard() {
     };
 
     loadStats();
+
+    // Fetch API key metadata from admin view (no raw keys)
+    const loadApiKeyData = async () => {
+      try {
+        const { data: statuses } = await supabase
+          .from('admin_user_key_status' as any)
+          .select('*');
+        if (statuses) setApiKeyStatuses(statuses as ApiKeyStatusRow[]);
+
+        const { data: logs } = await supabase
+          .from('api_key_audit_log' as any)
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (logs) setAuditLogs(logs as AuditLogRow[]);
+      } catch (err) {
+        console.error('Failed to load API key admin data:', err);
+      }
+    };
+    loadApiKeyData();
 
     // Refresh every 30 seconds
     const interval = setInterval(loadStats, 30000);
@@ -323,6 +364,74 @@ export function AdminDashboard() {
           <p className="text-sm">
             ✓ Active users (today): <strong>{stats.overview.activeUsersToday}</strong>
           </p>
+        </CardContent>
+      </Card>
+
+      {/* User Fallback API Keys Section */}
+      <Card className="border-l-4 border-l-lime-500">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="h-4 w-4" />
+            User Fallback API Keys
+          </CardTitle>
+          <CardDescription>
+            Key status metadata per user — no raw keys are shown. Audit log of last 50 events.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {apiKeyStatuses.length === 0 ? (
+            <p className="text-sm text-gray-500">No users have configured a fallback key.</p>
+          ) : (
+            <div className="space-y-3">
+              {apiKeyStatuses.slice(0, 20).map((row) => {
+                const userLogs = auditLogs.filter(l => l.user_id === row.user_id).slice(0, 5);
+                return (
+                  <div key={row.user_id} className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs text-slate-400">{row.user_id.slice(0, 8)}…</span>
+                        {row.has_own_key ? (
+                          <Badge variant="outline" className="text-lime-400 border-lime-400/40 text-[10px]">Key set</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-slate-500 text-[10px]">No key</Badge>
+                        )}
+                        {row.use_own_key && (
+                          <Badge variant="outline" className="text-sky-400 border-sky-400/40 text-[10px]">Fallback ON</Badge>
+                        )}
+                        {row.api_provider && (
+                          <Badge variant="outline" className="text-[10px]">{row.api_provider}</Badge>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-600">
+                        Updated {new Date(row.updated_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {userLogs.length > 0 && (
+                      <div className="space-y-1">
+                        {userLogs.map((log) => (
+                          <div key={log.id} className="flex items-center gap-2 text-[11px] text-slate-500">
+                            <span
+                              className={`inline-block w-2 h-2 rounded-full ${
+                                log.action === 'saved' ? 'bg-lime-400' :
+                                log.action === 'deleted' ? 'bg-red-400' :
+                                log.action === 'used' ? 'bg-sky-400' : 'bg-yellow-400'
+                              }`}
+                            />
+                            <span className="capitalize font-medium">{log.action}</span>
+                            {log.provider && <span className="text-slate-600">· {log.provider}</span>}
+                            {log.source && <span className="text-slate-600">· via {log.source}</span>}
+                            <span className="ml-auto text-slate-700">
+                              {new Date(log.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
       </div>

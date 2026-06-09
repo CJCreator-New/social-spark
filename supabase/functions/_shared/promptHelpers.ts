@@ -316,6 +316,8 @@ export interface GenerationPayload {
   bannedHashtags: string[];
   requiredHashtags: string[];
   quality: "draft" | "polished"; // draft: single-call, polished: two-pass critique+rewrite
+  userApiKey?: string;
+  userApiProvider?: "openai" | "anthropic" | "openrouter";
 }
 
 const BRITISH_TO_AMERICAN: Record<string, string> = {
@@ -403,6 +405,8 @@ export function cleanPayload(body: unknown): GenerationPayload {
     requiredWords: cleanList(payload.requiredWords, 10),
     bannedHashtags: cleanTagList(payload.bannedHashtags, 30),
     requiredHashtags: cleanTagList(payload.requiredHashtags, 10),
+    userApiKey: payload.userApiKey ? String(payload.userApiKey).trim() : undefined,
+    userApiProvider: payload.userApiProvider ? (String(payload.userApiProvider).trim() as any) : undefined,
   };
 }
 
@@ -438,6 +442,8 @@ export function getPayloadDefaults(): GenerationPayload {
     requiredWords: [],
     bannedHashtags: [],
     requiredHashtags: [],
+    userApiKey: undefined,
+    userApiProvider: undefined,
   };
 }
 
@@ -653,16 +659,32 @@ export function buildUserMessage(
  * Perform a cheap pre-call to gemini-2.5-flash-lite to turn coreIdea + topics[] 
  * into 7 differentiated angles for a calendar.
  */
-export async function enrichTopics(
-  payload: GenerationPayload,
-  apiKey: string
-): Promise<string[]> {
-  const model = "google/gemini-2.5-flash-lite";
-  const system = `You are a senior content strategist. Given a core idea and a list of topics, return exactly 7 unique, highly differentiated post angles for a 7-day calendar. Each angle should be one sentence, focusing on a specific fact, story, or contrarian point. Do not repeat themes. Return as a simple JSON array of strings.`;
-  const user = `Core Idea: ${payload.coreIdea}\nTopics: ${payload.topics.join(", ")}\nIndustry: ${payload.industryLabel || payload.industry}`;
+export function getProviderModel(provider: string, quality: string): string {
+  if (provider === "openai") {
+    return quality === "polished" ? "gpt-4o" : "gpt-4o-mini";
+  }
+  if (provider === "anthropic") {
+    return quality === "polished" ? "claude-3-5-sonnet-latest" : "claude-3-5-haiku-latest";
+  }
+  if (provider === "openrouter") {
+    return quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+  }
+  return quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+}
 
+async function callOpenAiCompatibleDirect(
+  url: string,
+  messages: Array<{ role: string; content: string }>,
+  tool: Record<string, unknown> | null,
+  apiKey: string,
+  model: string,
+  temperature: number
+): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
+  const hasTool = tool && Object.keys(tool).length > 0;
+  const functionName = hasTool ? (((tool as any).function?.name || "") as string) : "";
+  
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -670,17 +692,193 @@ export async function enrichTopics(
       },
       body: JSON.stringify({
         model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        temperature: 0.8,
+        messages,
+        tools: hasTool ? [tool] : undefined,
+        tool_choice: hasTool ? { type: "function", function: { name: functionName } } : undefined,
+        temperature,
       }),
     });
-
-    if (!res.ok) return payload.topics.length >= 7 ? payload.topics.slice(0, 7) : payload.topics;
-
+    
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`Direct call to ${url} failed ${res.status}:`, text);
+      return { status: res.status, error: `API error: ${res.status}` };
+    }
+    
     const data = await res.json();
+    return { status: 200, data };
+  } catch (e) {
+    console.error(`Direct call to ${url} encountered network error:`, e);
+    return { status: 500, error: e instanceof Error ? e.message : "Network error" };
+  }
+}
+
+async function callAnthropicDirect(
+  messages: Array<{ role: string; content: string }>,
+  tool: Record<string, unknown> | null,
+  apiKey: string,
+  model: string,
+  temperature: number
+): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
+  const systemMessage = messages.find(m => m.role === "system")?.content || "";
+  const regularMessages = messages.filter(m => m.role !== "system");
+  
+  const hasTool = tool && Object.keys(tool).length > 0;
+  let anthropicTools: any[] | undefined = undefined;
+  let toolChoice: any = undefined;
+  
+  if (hasTool) {
+    const oaiFunction = ((tool as any).function || {}) as any;
+    anthropicTools = [{
+      name: oaiFunction.name,
+      description: oaiFunction.description,
+      input_schema: oaiFunction.parameters
+    }];
+    toolChoice = { type: "tool", name: oaiFunction.name };
+  }
+  
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        messages: regularMessages,
+        system: systemMessage || undefined,
+        tools: anthropicTools,
+        tool_choice: toolChoice,
+        temperature,
+        max_tokens: 4000
+      })
+    });
+    
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("Anthropic direct API call failed:", text);
+      return { status: res.status, error: `Anthropic error: ${res.status}` };
+    }
+    
+    const data = await res.json();
+    
+    if (hasTool) {
+      const toolUseContent = data.content?.find((c: any) => c.type === "tool_use");
+      if (!toolUseContent) {
+        return { status: 500, error: "Anthropic did not invoke the requested tool" };
+      }
+      
+      const mappedData = {
+        choices: [
+          {
+            message: {
+              tool_calls: [
+                {
+                  function: {
+                    name: toolUseContent.name,
+                    arguments: typeof toolUseContent.input === "string" ? toolUseContent.input : JSON.stringify(toolUseContent.input)
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      };
+      
+      return { status: 200, data: mappedData };
+    } else {
+      const textContent = data.content?.find((c: any) => c.type === "text")?.text || "";
+      const mappedData = {
+        choices: [
+          {
+            message: {
+              content: textContent
+            }
+          }
+        ]
+      };
+      return { status: 200, data: mappedData };
+    }
+  } catch (e) {
+    console.error("Anthropic direct call encountered network error:", e);
+    return { status: 500, error: e instanceof Error ? e.message : "Network error" };
+  }
+}
+
+export async function callAI(
+  messages: Array<{ role: string; content: string }>,
+  tool: Record<string, unknown> | null,
+  apiKey: string,
+  opts: {
+    provider: "openai" | "anthropic" | "openrouter";
+    quality?: string;
+    model?: string;
+    temperature?: number;
+    timeoutMs?: number;
+  }
+): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
+  const provider = opts.provider;
+  const quality = opts.quality || "draft";
+  const temperature = typeof opts.temperature === "number" ? opts.temperature : 0.7;
+  const model = opts.model || getProviderModel(provider, quality);
+  
+  if (provider === "openai") {
+    return callOpenAiCompatibleDirect("https://api.openai.com/v1/chat/completions", messages, tool, apiKey, model, temperature);
+  } else if (provider === "openrouter") {
+    return callOpenAiCompatibleDirect("https://openrouter.ai/api/v1/chat/completions", messages, tool, apiKey, model, temperature);
+  } else if (provider === "anthropic") {
+    return callAnthropicDirect(messages, tool, apiKey, model, temperature);
+  }
+  
+  return { status: 400, error: `Unsupported API provider: ${provider}` };
+}
+
+export async function enrichTopics(
+  payload: GenerationPayload,
+  apiKey: string
+): Promise<string[]> {
+  const model = payload.userApiProvider ? getProviderModel(payload.userApiProvider, "draft") : "google/gemini-2.5-flash-lite";
+  const system = `You are a senior content strategist. Given a core idea and a list of topics, return exactly 7 unique, highly differentiated post angles for a 7-day calendar. Each angle should be one sentence, focusing on a specific fact, story, or contrarian point. Do not repeat themes. Return as a simple JSON array of strings.`;
+  const user = `Core Idea: ${payload.coreIdea}\nTopics: ${payload.topics.join(", ")}\nIndustry: ${payload.industryLabel || payload.industry}`;
+
+  const messages = [
+    { role: "system", content: system },
+    { role: "user", content: user },
+  ];
+
+  try {
+    let data: any;
+    if (payload.userApiKey && payload.userApiProvider) {
+      const aiRes = await callAI(messages, null, payload.userApiKey, {
+        provider: payload.userApiProvider,
+        quality: "draft",
+        model,
+      });
+      if (aiRes.status === 200) {
+        data = aiRes.data;
+      } else {
+        return payload.topics.length >= 7 ? payload.topics.slice(0, 7) : payload.topics;
+      }
+    } else {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.8,
+        }),
+      });
+
+      if (!res.ok) return payload.topics.length >= 7 ? payload.topics.slice(0, 7) : payload.topics;
+      data = await res.json();
+    }
+
     const content = data?.choices?.[0]?.message?.content || "";
     const m = content.match(/\[[\s\S]*\]/);
     if (m) {
@@ -696,17 +894,14 @@ export async function enrichTopics(
   return payload.topics.length >= 7 ? payload.topics.slice(0, 7) : payload.topics;
 }
 
-/**
- * Perform a tiny judge call to score generated variants and pick the winner.
- */
 export async function scoreVariants(
   variants: string[],
-  brief: { coreIdea?: string; topic?: string; platform: string; industry?: string; goals?: string[] },
+  brief: { coreIdea?: string; topic?: string; platform: string; industry?: string; goals?: string[]; userApiKey?: string; userApiProvider?: string },
   apiKey: string
 ): Promise<{ scores: Record<string, number>[], winner_index: number }> {
   if (!variants.length) return { scores: [], winner_index: 0 };
   
-  const model = "google/gemini-2.5-flash-lite";
+  const model = brief.userApiProvider ? getProviderModel(brief.userApiProvider, "draft") : "google/gemini-2.5-flash-lite";
   const system = `You are a critical content editor. Score the following ${variants.length} post variants on 5 criteria (0-5 scale): 
 1. hook_strength (creates curiosity/impact)
 2. specificity (avoiding fluff)
@@ -720,22 +915,44 @@ Return a JSON object with a "results" array containing the scores for each varia
 VARIANTS:
 ${variants.map((v, i) => `[Variant ${i}]: ${v.slice(0, 1000)}`).join("\n\n")}`;
 
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "system", content: system }, { role: "user", content: user }],
-        temperature: 0.1, // High precision
-      }),
-    });
+  const messages = [{ role: "system", content: system }, { role: "user", content: user }];
 
-    if (res.ok) {
-      const data = await res.json();
+  try {
+    let data: any;
+    if (brief.userApiKey && brief.userApiProvider) {
+      const aiRes = await callAI(messages, null, brief.userApiKey, {
+        provider: brief.userApiProvider as any,
+        quality: "draft",
+        model,
+        temperature: 0.1,
+      });
+      if (aiRes.status === 200) {
+        data = aiRes.data;
+      } else {
+        throw new Error(aiRes.error);
+      }
+    } else {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.1, // High precision
+        }),
+      });
+
+      if (res.ok) {
+        data = await res.json();
+      } else {
+        throw new Error(`Status ${res.status}`);
+      }
+    }
+
+    if (data) {
       const content = data?.choices?.[0]?.message?.content || "";
       const m = content.match(/\{[\s\S]*\}/);
       if (m) {
@@ -759,15 +976,71 @@ ${variants.map((v, i) => `[Variant ${i}]: ${v.slice(0, 1000)}`).join("\n\n")}`;
   };
 }
 
-/**
- * Call the Lovable AI Gateway with unified error handling
- */
 export async function callAIGateway(
   messages: Array<{ role: string; content: string }>,
   tool: Record<string, unknown>,
   apiKey: string,
-  opts: { timeoutMs?: number; model?: string; temperature?: number; top_p?: number } = {}
+  opts: {
+    timeoutMs?: number;
+    model?: string;
+    temperature?: number;
+    top_p?: number;
+    userApiKey?: string | null;
+    userApiProvider?: string | null;
+    quality?: string;
+    userToken?: string | null;
+    userIp?: string | null;
+  } = {}
 ): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
+  // If userApiKey is provided, route through callAI helper
+  if (opts.userApiKey && opts.userApiProvider) {
+    // Asynchronously log the fallback usage to the audit log
+    const supabaseUrl = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_URL") : null;
+    const supabaseServiceKey = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") : null;
+    
+    if (supabaseUrl && supabaseServiceKey && opts.userToken) {
+      try {
+        const parts = opts.userToken.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          const userId = payload.sub;
+          if (userId) {
+            // Asynchronous logging so it doesn't block the AI response
+            (async () => {
+              try {
+                const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+                const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+                const { error: logErr } = await adminClient.from("api_key_audit_log").insert({
+                  user_id: userId,
+                  action: "used",
+                  provider: opts.userApiProvider,
+                  source: "user",
+                  ip_address: opts.userIp || null,
+                });
+                if (logErr) {
+                  console.error("Failed to insert used audit log:", logErr);
+                }
+              } catch (err) {
+                console.error("Failed to dynamically create admin client or log event:", err);
+              }
+            })();
+          }
+        }
+      } catch (e) {
+        console.error("Failed to log used audit event:", e);
+      }
+    }
+
+    return callAI(messages, tool, opts.userApiKey, {
+      provider: opts.userApiProvider as any,
+      quality: opts.quality,
+      model: opts.model,
+      temperature: opts.temperature,
+      timeoutMs: opts.timeoutMs,
+    });
+  }
+
+  // Fallback to standard Lovable AI Gateway
   const timeoutMs = opts.timeoutMs ?? 90000;
   const model = opts.model || "google/gemini-2.5-flash";
   const temperature = typeof opts.temperature === "number" ? opts.temperature : 0.8;
@@ -787,8 +1060,8 @@ export async function callAIGateway(
       body: JSON.stringify({
         model,
         messages,
-        tools: [tool],
-        tool_choice: { type: "function", function: { name: functionName } },
+        tools: tool && Object.keys(tool).length > 0 ? [tool] : undefined,
+        tool_choice: tool && Object.keys(tool).length > 0 ? { type: "function", function: { name: functionName } } : undefined,
         temperature,
         top_p,
       }),

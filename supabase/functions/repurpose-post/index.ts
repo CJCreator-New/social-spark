@@ -25,8 +25,10 @@ Deno.serve(async (req) => {
     }
 
     // Rate limiting
-    const authHeader = req.headers.get("authorization") || "anonymous";
-    const userId = authHeader.replace("Bearer ", "").slice(0, 32) || "anonymous";
+    const authHeader = req.headers.get("authorization") || "";
+    const token = authHeader.replace("Bearer ", "");
+    const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
+    const userId = token.slice(0, 32) || "anonymous";
     const rateLimitCheck = await checkRateLimit(userId, "repurpose-post", {
       maxRequests: 10,
       windowMs: 60 * 1000,
@@ -96,7 +98,15 @@ Return the result as a single post object using return_post.`;
       [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }],
       tool,
       LOVABLE_API_KEY,
-      { model: "google/gemini-2.5-flash", temperature: 0.7 }
+      {
+        model: "google/gemini-2.5-flash",
+        temperature: 0.7,
+        userApiKey: targetPayload.userApiKey,
+        userApiProvider: targetPayload.userApiProvider,
+        quality: targetPayload.quality,
+        userToken: token || null,
+        userIp: ipAddress
+      }
     );
 
     if (aiRes.status !== 200) return jsonResponse({ error: aiRes.error }, aiRes.status);

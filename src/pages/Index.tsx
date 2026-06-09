@@ -25,7 +25,7 @@ import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dr
 import { calculatePerformanceScore, getWeakestPerformanceMetric, type PerformanceFocusMetric, getRegenerationGuidance, getWeakestMetrics } from "@/lib/postPerformanceScore";
 import { createSeedFromPost, storeSeed, readAndClearSeed } from "@/lib/seedFromPost";
 import { isEnabled } from "@/lib/featureFlags";
-import { buildBrandMemoryPrompt } from "@/lib/brandMemory";
+import { buildBrandMemoryPrompt, generateWithFallback } from "@/lib/brandMemory";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { FontStyle, applyStyle } from "@/lib/unicodeFonts";
@@ -429,8 +429,14 @@ const Index = () => {
     sampleMode, setSampleMode,
     savedId, setSavedId,
     autosaveStatus, setAutosaveStatus,
-    loadSnapshot, reset
+    loadSnapshot, reset,
+    keySource, setKeySource
   } = useWizardStore();
+
+  const [errorForBoundary, setErrorForBoundary] = useState<Error | null>(null);
+  if (errorForBoundary) {
+    throw errorForBoundary;
+  }
 
   const [recentCalendars, setRecentCalendars] = useState<{ id: string; title: string; platform: string | null; industry_label: string | null; created_at: string }[]>([]);
   const [genMsg, setGenMsg] = useState("");
@@ -1213,26 +1219,9 @@ const Index = () => {
         return;
       }
 
-      const res = await fetchWithGenerationRetry(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
-        },
-        body: JSON.stringify(body),
-        signal: ac.signal,
-      });
-
-      const data = await res.json().catch(() => ({}));
+      const { data, usedFallback } = await generateWithFallback(endpoint, body, ac.signal);
       cleanup();
-
-      if (!res.ok || data?.error) {
-        const errorMsg = data?.error || `Generation failed (${res.status}).`;
-        log.warn(`Generation failed`, new Error(errorMsg), { mode, status: res.status, endpoint });
-        localFallback(errorMsg);
-        return;
-      }
+      setKeySource(usedFallback ? "user" : "platform");
 
       // Normalize: single-post endpoint returns { post }, week endpoint returns { posts }
       const inferredTopics = Boolean((data as { meta?: { inferredTopics?: boolean } })?.meta?.inferredTopics);
@@ -1258,6 +1247,10 @@ const Index = () => {
         `${isRetry ? 'Regenerated' : 'Generated'} ${isDay ? 'post' : 'week'} successfully${inferredTopics ? " — topics were inferred from your core idea" : ""}`,
       );
     } catch (err) {
+      if (err instanceof Error && err.message === "AI_UNAVAILABLE") {
+        setErrorForBoundary(err);
+        return;
+      }
       if (typeof telemetry?.sendEvent === "function") telemetry.sendEvent("generate_error", { user: user?.id, mode: form.mode, error: String(err) });
       cleanup();
       const aborted = err instanceof DOMException && err.name === "AbortError";

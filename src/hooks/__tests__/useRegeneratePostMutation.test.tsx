@@ -24,10 +24,15 @@ function TestRunner({ payload }: { payload: RegeneratePayload }) {
 
 describe("useRegeneratePostMutation", () => {
   const OLD = global.fetch;
+  const OLD_ENV = import.meta.env.VITE_PLATFORM_AI_KEY;
+  
   beforeEach(() => {
+    import.meta.env.VITE_PLATFORM_AI_KEY = "test-platform-key";
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ post: { day: 1, dow: "Mon", title: "ok" } }) })));
   });
+  
   afterEach(() => {
+    import.meta.env.VITE_PLATFORM_AI_KEY = OLD_ENV;
     vi.stubGlobal("fetch", OLD);
   });
 

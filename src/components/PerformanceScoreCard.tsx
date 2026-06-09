@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { Post } from "@/lib/calendarSchedule";
+import { useWizardStore } from "@/stores/useWizardStore";
 import {
   calculatePerformanceScore,
   getScoreColor,
@@ -32,6 +33,8 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
   onFocusedRegenerate,
   onApplyCta,
 }) => {
+  const keySource = useWizardStore((state) => state.keySource);
+
   const score = useMemo(() => calculatePerformanceScore(post, topic), [post, topic]);
 
   const weakestMetrics = useMemo(() => getWeakestMetrics(score), [score]);
@@ -47,7 +50,24 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
   return (
     <div className="performance-card">
       <div className="perf-header">
-        <h3 style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>Performance Score</h3>
+        <h3 style={{ margin: 0, fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+          <span>Performance Score</span>
+          {keySource === "user" && (
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: "600",
+                background: "rgba(200, 240, 154, 0.12)",
+                color: "#c8f09a",
+                padding: "2px 6px",
+                borderRadius: "4px",
+                border: "1px solid rgba(200, 240, 154, 0.2)"
+              }}
+            >
+              Using your key
+            </span>
+          )}
+        </h3>
         <div className="perf-overall">
           <div
             className="perf-score-ring"

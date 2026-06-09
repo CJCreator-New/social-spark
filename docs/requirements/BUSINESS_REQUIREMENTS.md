@@ -1,8 +1,8 @@
 # Business Requirements — Social Spark
 
 Project overview
-- Product: Social Spark — social content calendar, scheduling, and insights platform for teams and agencies.
-- Purpose: Help teams plan, create, schedule, and measure social content efficiently.
+- **Product**: Social Spark — social content calendar, scheduling, and AI-driven insights platform for content creators, teams, and agencies.
+- **Purpose**: Help teams plan, create, schedule, optimize, and measure social content efficiently.
 
 Stakeholders
 - Product Manager: owns roadmap and prioritization.
@@ -11,37 +11,35 @@ Stakeholders
 - Sales/Customer Success: adoption and feedback.
 
 Business goals (SMART)
-- Increase paid conversions by 15% in 12 months via premium analytics and scheduling features.
-- Reduce time-to-schedule (task completion) by 30% for power users within 6 months.
-- Reach NPS ≥ 40 for core scheduling flows by end of year.
+- **Increase Paid Conversions**: Increase paid conversions by 15% in 12 months via premium analytics, AI image generation, platform repurposing, and brand memory features.
+- **Reduce Time-to-Schedule**: Reduce time-to-schedule (task completion) by 30% for power users within 6 months through a centralized wizard state (`useWizardStore`) and draft recovery mechanisms.
+- **Reach NPS ≥ 40**: Reach NPS ≥ 40 for core scheduling flows by end of year by delivering actionable post scoring insights and topic gap recommendations.
 
 Key success metrics
-- Activation rate (user schedules first post within 7 days).
-- Conversion rate from free→paid.
-- Weekly active users (WAU) and retention at 7/30 days.
-- Feature-specific metrics: posts scheduled per user, calendar interactions, analytics views.
+- **Activation Rate**: User schedules first post within 7 days.
+- **AI Feature Adoption**: Percentage of users utilizing image generation, inline rewrite, and platform repurposing.
+- **Conversion Rate**: Free-tier to paid-tier conversions.
+- **Weekly Active Users (WAU)** and retention at 7/30 days.
 
 User segments
-- Solo creators: occasional scheduling, simple analytics.
-- Social media managers at agencies: multi-calendar support, team workflows, advanced analytics.
-- Small/medium businesses: integrated scheduling and basic analytics.
+- **Solo creators**: Occasional scheduling, simple analytics, basic AI rewrites.
+- **Social media managers at agencies**: Multi-calendar support, team workflows, custom brand memory profiles, and bulk generation.
+- **Small/medium businesses**: Integrated scheduling, basic analytics, and automated image generation.
 
 Primary use cases
-- Create and schedule posts across platforms.
-- Build and share editorial calendars.
-- Review and approve content with collaborators.
-- Track content performance and trending topics.
+- Create and schedule posts across platforms (LinkedIn, Twitter, Facebook, Instagram).
+- Store and apply brand identities (voice guidelines, forbidden terms) via Brand Memory.
+- Score draft quality in real-time and adapt posts using platform-specific style guides.
+- Generate post-tailored cover images directly in the composer.
+- Review performance insights and highlight topic gaps on calendars.
+- Protect draft progress with automatic autosave and recovery flows.
 
 Constraints & assumptions
-- Uses Supabase for auth and serverless functions (repo `supabase/functions`).
-- Frontend is React + TypeScript + Vite + Tailwind.
-- Integrations with external platforms will require OAuth and platform APIs.
+- Primary technology stack uses Supabase for database, authentication, and edge functions.
+- Client is React + TypeScript + Vite.
+- Edge functions call third-party AI endpoints; requires rate limiting and cost management.
 
-Risks
-- API rate limits from social platforms may constrain realtime posting.
-- Data privacy/regulatory constraints for user content and analytics.
-
-Prioritized next steps (quarterly)
-1. Deliver robust calendar + scheduling MVP with multi-calendar support.
-2. Add basic analytics dashboard for scheduled posts.
-3. Pilot premium features for agencies (team workflows, exportable reports).
+Risks & Mitigations
+- **API Rate Limits**: Platform rate limits can prevent real-time posting. *Mitigation*: Robust scheduling queue.
+- **AI Token Costs**: Generation functions can become expensive. *Mitigation*: Server-side per-user rate limits (e.g., 10 req/min for key functions).
+- **Data Privacy**: Brand memory data and metrics must be secure. *Mitigation*: Row-Level Security (RLS) on metrics and brand memory tables.

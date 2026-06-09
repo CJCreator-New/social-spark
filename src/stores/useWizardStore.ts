@@ -14,6 +14,7 @@ interface WizardState {
   sampleMode: boolean;
   savedId: string | null;
   autosaveStatus: "idle" | "saving" | "saved" | "error";
+  keySource: "platform" | "user" | null;
 
   setStep: (step: number | ((prev: number) => number)) => void;
   setForm: (form: Partial<WizardForm> | ((prev: WizardForm) => WizardForm)) => void;
@@ -27,6 +28,7 @@ interface WizardState {
   setSampleMode: (mode: boolean) => void;
   setSavedId: (id: string | null) => void;
   setAutosaveStatus: (status: "idle" | "saving" | "saved" | "error") => void;
+  setKeySource: (source: "platform" | "user" | null) => void;
   loadSnapshot: (snapshot: WizardDraftSnapshot) => void;
   reset: () => void;
 }
@@ -43,6 +45,7 @@ export const useWizardStore = create<WizardState>((set) => ({
   sampleMode: false,
   savedId: null,
   autosaveStatus: "idle",
+  keySource: null,
 
   setStep: (step) =>
     set((state) => ({
@@ -86,6 +89,7 @@ export const useWizardStore = create<WizardState>((set) => ({
   setSampleMode: (sampleMode) => set({ sampleMode }),
   setSavedId: (savedId) => set({ savedId }),
   setAutosaveStatus: (autosaveStatus) => set({ autosaveStatus }),
+  setKeySource: (keySource) => set({ keySource }),
   loadSnapshot: (snapshot) =>
     set({
       form: { ...snapshot.form },
@@ -97,6 +101,7 @@ export const useWizardStore = create<WizardState>((set) => ({
       lockedDays: new Set<number>(),
       sampleMode: false,
       savedId: null,
+      keySource: null,
     }),
   reset: () =>
     set({
@@ -111,5 +116,6 @@ export const useWizardStore = create<WizardState>((set) => ({
       sampleMode: false,
       savedId: null,
       autosaveStatus: "idle",
+      keySource: null,
     }),
 }));
