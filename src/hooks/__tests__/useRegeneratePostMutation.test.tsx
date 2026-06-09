@@ -4,6 +4,19 @@ import { render, waitFor } from "@testing-library/react";
 import { vi, beforeEach, afterEach, describe, it, expect } from "vitest";
 import { useRegeneratePostMutation } from "@/hooks/useAppQueries";
 
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn(() => Promise.resolve({ data: { session: null } })),
+    },
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+      })),
+    })),
+  },
+}));
+
 type RegeneratePayload = {
   calendarId: string;
   post: {

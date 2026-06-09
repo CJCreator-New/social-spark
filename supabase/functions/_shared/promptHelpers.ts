@@ -897,7 +897,7 @@ export async function callAI(
   return { status: 400, error: `Unsupported API provider: ${provider}` };
 }
 
-function padTopics(topics: string[], coreIdea: string): string[] {
+export function padTopics(topics: string[], coreIdea: string): string[] {
   const result = [...topics];
   if (result.length >= 7) return result.slice(0, 7);
   

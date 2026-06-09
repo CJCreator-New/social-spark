@@ -128,4 +128,76 @@ describe("promptHelpers engagement guidance", () => {
     const p = cleanPayload({ industry: "SaaS", coreIdea: "x" });
     expect(p.quality).toBe("draft");
   });
+
+  describe("getUserIdFromToken", () => {
+    it("returns JWT sub claim if valid token is provided", () => {
+      // Mock valid JWT with sub = "user-123-abc"
+      // Header: {"alg":"HS256","typ":"JWT"}
+      // Payload: {"sub":"user-123-abc","exp":1718292837}
+      const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMy1hYmMiLCJleHAiOjE3MTgyOTI4Mzd9.signature";
+      const { getUserIdFromToken } = require("./promptHelpers.ts");
+      expect(getUserIdFromToken(token)).toBe("user-123-abc");
+    });
+
+    it("falls back to sliced token if no sub is present", () => {
+      const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiJEb2UifQ.signature";
+      const { getUserIdFromToken } = require("./promptHelpers.ts");
+      expect(getUserIdFromToken(token)).toBe(token.slice(0, 32));
+    });
+
+    it("returns anonymous if token is null, empty or undefined", () => {
+      const { getUserIdFromToken } = require("./promptHelpers.ts");
+      expect(getUserIdFromToken(null)).toBe("anonymous");
+      expect(getUserIdFromToken(undefined)).toBe("anonymous");
+      expect(getUserIdFromToken("")).toBe("anonymous");
+    });
+  });
+
+  describe("requiredWords", () => {
+    it("builds required words prompt block correctly", () => {
+      const { buildRequiredWordsBlock } = require("./promptHelpers.ts");
+      const block = buildRequiredWordsBlock(["growth", "startup"]);
+      expect(block).toContain("REQUIRED WORDS");
+      expect(block).toContain("- \"growth\"");
+      expect(block).toContain("- \"startup\"");
+    });
+
+    it("flags missing required words in normalizePost", () => {
+      const { normalizePost } = require("./promptHelpers.ts");
+      const post = {
+        title: "Growth tips",
+        hook: "How to grow",
+        body: "We built a great product.",
+        cta: "Comment",
+        hashtags: "#startup",
+        dow: "Mon",
+        day: 1
+      };
+      
+      const payload = {
+        platform: "LinkedIn",
+        bannedHashtags: [],
+        requiredHashtags: [],
+        length: "medium",
+        requiredWords: ["scaleup", "retention"]
+      };
+
+      const result = normalizePost(post, "Mon", payload);
+      expect(result.self_check.checks_passed).toBe(false);
+      expect(result.self_check.forbidden_violations).toContain('Missing required word: "scaleup"');
+      expect(result.self_check.forbidden_violations).toContain('Missing required word: "retention"');
+    });
+  });
+
+  describe("padTopics padding", () => {
+    it("pads short topics list to exactly 7 items", () => {
+      const { padTopics } = require("./promptHelpers.ts");
+      const topics = ["AI", "SaaS"];
+      const padded = padTopics(topics, "Core Idea");
+      expect(padded).toHaveLength(7);
+      expect(padded.slice(0, 2)).toEqual(["AI", "SaaS"]);
+      expect(padded[2]).toContain("AI");
+      expect(padded[3]).toContain("SaaS");
+    });
+  });
 });
