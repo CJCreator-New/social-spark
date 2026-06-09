@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getE2EAuthFlag } from "@/lib/e2eFixtures";
 
 /**
  * Validates the API key format client-side before any network calls.
@@ -9,13 +10,22 @@ import { supabase } from "@/integrations/supabase/client";
 export function validateApiKeyFormat(key: string, provider: 'openai' | 'anthropic' | 'openrouter'): boolean {
   const patterns = {
     // OpenAI: sk- followed by alphanumeric and hyphens, min 20 total chars (covers sk-proj-... variants)
-    openai: /^sk-[a-zA-Z0-9\-]{20,}$/,
+    openai: /^sk-[a-zA-Z0-9-]{20,}$/,
     // Anthropic: sk-ant- followed by alphanumeric and hyphens, min 32 chars after prefix
-    anthropic: /^sk-ant-[a-zA-Z0-9\-]{32,}$/,
+    anthropic: /^sk-ant-[a-zA-Z0-9-]{32,}$/,
     // OpenRouter: sk-or- followed by alphanumeric and hyphens, min 32 chars after prefix
-    openrouter: /^sk-or-[a-zA-Z0-9\-]{32,}$/,
+    openrouter: /^sk-or-[a-zA-Z0-9-]{32,}$/,
   };
   return patterns[provider]?.test(key) ?? false;
+}
+
+/** Returns the access token for the current session, with E2E bypass support. */
+async function getAccessToken(): Promise<string | null> {
+  if (import.meta.env.DEV && window.localStorage.getItem(getE2EAuthFlag()) === "true") {
+    return "e2e-access-token";
+  }
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
 }
 
 export async function saveUserApiKey(apiKey: string, provider: 'openai' | 'anthropic' | 'openrouter'): Promise<void> {
@@ -24,8 +34,8 @@ export async function saveUserApiKey(apiKey: string, provider: 'openai' | 'anthr
     throw new Error("INVALID_KEY_FORMAT");
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  const token = await getAccessToken();
+  if (!token) {
     throw new Error("User session not found");
   }
 
@@ -37,7 +47,7 @@ export async function saveUserApiKey(apiKey: string, provider: 'openai' | 'anthr
     headers: {
       "Content-Type": "application/json",
       apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ apiKey, provider }),
   });
@@ -49,8 +59,8 @@ export async function saveUserApiKey(apiKey: string, provider: 'openai' | 'anthr
 }
 
 export async function getUserApiKey(): Promise<{ apiKey: string | null; provider: 'openai' | 'anthropic' | 'openrouter' | null; useOwnKey: boolean }> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  const token = await getAccessToken();
+  if (!token) {
     return { apiKey: null, provider: null, useOwnKey: false };
   }
 
@@ -63,7 +73,7 @@ export async function getUserApiKey(): Promise<{ apiKey: string | null; provider
     headers: {
       "Content-Type": "application/json",
       apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${token}`,
     },
   }).then(async (res) => {
     if (!res.ok) {
@@ -80,7 +90,7 @@ export async function getUserApiKey(): Promise<{ apiKey: string | null; provider
     .maybeSingle()
     .then(({ data, error }) => {
       if (error) throw error;
-      return data?.use_own_key || false;
+      return (data as unknown as { use_own_key: boolean } | null)?.use_own_key || false;
     });
 
   const [decrypted, useOwnKey] = await Promise.all([decPromise, settingsPromise]);
@@ -93,8 +103,8 @@ export async function getUserApiKey(): Promise<{ apiKey: string | null; provider
 }
 
 export async function setUseOwnKey(enabled: boolean): Promise<void> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  const token = await getAccessToken();
+  if (!token) {
     throw new Error("User session not found");
   }
 
@@ -106,7 +116,7 @@ export async function setUseOwnKey(enabled: boolean): Promise<void> {
     headers: {
       "Content-Type": "application/json",
       apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       action: "toggle",
@@ -121,8 +131,8 @@ export async function setUseOwnKey(enabled: boolean): Promise<void> {
 }
 
 export async function deleteUserApiKey(): Promise<void> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  const token = await getAccessToken();
+  if (!token) {
     throw new Error("User session not found");
   }
 
@@ -134,7 +144,7 @@ export async function deleteUserApiKey(): Promise<void> {
     headers: {
       "Content-Type": "application/json",
       apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${token}`,
     },
   });
 

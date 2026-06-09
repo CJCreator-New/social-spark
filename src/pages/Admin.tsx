@@ -81,14 +81,14 @@ export function AdminDashboard() {
         const { data: statuses } = await supabase
           .from('admin_user_key_status' as any)
           .select('*');
-        if (statuses) setApiKeyStatuses(statuses as ApiKeyStatusRow[]);
+        if (statuses) setApiKeyStatuses(statuses as unknown as ApiKeyStatusRow[]);
 
         const { data: logs } = await supabase
           .from('api_key_audit_log' as any)
           .select('*')
           .order('created_at', { ascending: false })
           .limit(50);
-        if (logs) setAuditLogs(logs as AuditLogRow[]);
+        if (logs) setAuditLogs(logs as unknown as AuditLogRow[]);
       } catch (err) {
         console.error('Failed to load API key admin data:', err);
       }

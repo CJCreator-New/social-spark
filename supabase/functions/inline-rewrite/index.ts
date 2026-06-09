@@ -108,7 +108,7 @@ ${text}`;
     if (!rewrittenText) return jsonResponse({ error: "Rewrite returned empty text." }, 500);
     return jsonResponse({ rewrittenText });
   } catch (e) {
-    console.error("inline-rewrite error", e);
-    return jsonResponse({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    console.error("inline-rewrite error", e instanceof Error ? e.stack : e);
+    return jsonResponse({ error: "An unexpected error occurred." }, 500);
   }
 });

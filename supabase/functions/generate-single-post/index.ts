@@ -222,10 +222,7 @@ Deno.serve(async (req) => {
 
     return jsonResponse(responseBody);
   } catch (e) {
-    console.error("generate-single-post error", e, e instanceof Error ? e.stack : undefined);
-    return jsonResponse(
-      { error: e instanceof Error ? e.message : "Unknown error" },
-      500
-    );
+    console.error("generate-single-post error", e instanceof Error ? e.stack : e);
+    return jsonResponse({ error: "An unexpected error occurred." }, 500);
   }
 });

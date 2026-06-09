@@ -118,7 +118,7 @@ Return the result as a single post object using return_post.`;
     return jsonResponse({ post: normalized });
 
   } catch (e) {
-    console.error("repurpose-post error", e);
-    return jsonResponse({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    console.error("repurpose-post error", e instanceof Error ? e.stack : e);
+    return jsonResponse({ error: "An unexpected error occurred." }, 500);
   }
 });

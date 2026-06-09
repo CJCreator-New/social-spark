@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (e) {
-    console.error("generate-post-image error", e);
-    return jsonResponse({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    console.error("generate-post-image error", e instanceof Error ? e.stack : e);
+    return jsonResponse({ error: "An unexpected error occurred." }, 500);
   }
 });

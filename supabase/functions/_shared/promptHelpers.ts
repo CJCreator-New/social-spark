@@ -1018,7 +1018,8 @@ export async function callAIGateway(
                   ip_address: opts.userIp || null,
                 });
                 if (logErr) {
-                  console.error("Failed to insert used audit log:", logErr);
+                  // Only log the error code/hint, never the full error object which may contain query metadata
+                  console.error("Failed to insert used audit log:", logErr?.code || logErr?.message || "db_error");
                 }
               } catch (err) {
                 console.error("Failed to dynamically create admin client or log event:", err);
@@ -1100,8 +1101,8 @@ export async function callAIGateway(
       console.error("AI request timeout");
       return { status: 500, error: "AI request timeout" };
     }
-    console.error("AI gateway call failed:", e);
-    return { status: 500, error: e instanceof Error ? e.message : "Unknown error" };
+    console.error("AI gateway call failed:", e instanceof Error ? e.stack : e);
+    return { status: 500, error: "An unexpected error occurred." };
   }
 }
 
