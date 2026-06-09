@@ -430,7 +430,7 @@ const Index = () => {
     savedId, setSavedId,
     autosaveStatus, setAutosaveStatus,
     loadSnapshot, reset,
-    keySource, setKeySource
+    keySource, setKeySource, setKeyMode
   } = useWizardStore();
 
   const [errorForBoundary, setErrorForBoundary] = useState<Error | null>(null);
@@ -1219,9 +1219,10 @@ const Index = () => {
         return;
       }
 
-      const { data, usedFallback } = await generateWithFallback(endpoint, body, ac.signal);
+      const { data, usedFallback, keyMode } = await generateWithFallback(endpoint, body, ac.signal);
       cleanup();
       setKeySource(usedFallback ? "user" : "platform");
+      setKeyMode(keyMode);
 
       // Normalize: single-post endpoint returns { post }, week endpoint returns { posts }
       const inferredTopics = Boolean((data as { meta?: { inferredTopics?: boolean } })?.meta?.inferredTopics);

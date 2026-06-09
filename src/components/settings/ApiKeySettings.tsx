@@ -7,6 +7,7 @@ export function ApiKeySettings() {
   const [provider, setProvider] = useState<'openai' | 'anthropic' | 'openrouter'>("openai");
   const [showKey, setShowKey] = useState(false);
   const [useOwnKey, setUseOwnKeyVal] = useState(false);
+  const [keyMode, setKeyMode] = useState<'fallback' | 'always'>('fallback');
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -24,6 +25,7 @@ export function ApiKeySettings() {
         const data = await getUserApiKey();
         if (data.provider) setProvider(data.provider);
         setUseOwnKeyVal(data.useOwnKey);
+        if (data.keyMode) setKeyMode(data.keyMode);
         if (data.apiKey) {
           // Mask the key: show only last 4 chars, e.g. ••••••••xQ3Z
           const last4 = data.apiKey.slice(-4);
@@ -53,7 +55,7 @@ export function ApiKeySettings() {
         setSavedKeyPreview(`••••••••${last4}`);
       }
 
-      await setUseOwnKey(useOwnKey);
+      await setUseOwnKey(useOwnKey, keyMode);
 
       setStatusMsg({
         text: "API Key settings saved successfully!",
@@ -114,22 +116,7 @@ export function ApiKeySettings() {
       </h2>
 
       {/* Inline Privacy Notice */}
-      <div
-        role="note"
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          gap: 10,
-          padding: "10px 14px",
-          borderRadius: "8px",
-          fontSize: "12px",
-          background: "rgba(200, 240, 154, 0.05)",
-          border: "1px solid rgba(200, 240, 154, 0.15)",
-          color: "#9fa08d",
-          marginTop: 8,
-          marginBottom: 14,
-        }}
-      >
+      <div role="note" className="pf-notice">
         <ShieldCheck size={14} style={{ color: "#c8f09a", flexShrink: 0, marginTop: 1 }} />
         <span>
           Your API key is encrypted with AES-256 and stored securely. It is never logged, shared, or used for
@@ -267,9 +254,38 @@ export function ApiKeySettings() {
               userSelect: "none",
             }}
           >
-            Enable custom API key as fallback
+            Enable custom API key
           </label>
         </div>
+
+        {useOwnKey && (
+          <div>
+            <label className="pf-label" htmlFor="key-mode">
+              Key usage mode
+              <span className={`pf-mode-badge ${keyMode === 'always' ? 'active' : 'standby'}`}>
+                {keyMode === 'always' ? 'Active' : 'Standby'}
+              </span>
+            </label>
+            <div data-mode={keyMode === 'always' ? 'always' : undefined}>
+              <select
+                id="key-mode"
+                className="pf-select"
+                value={keyMode}
+                onChange={(e) => setKeyMode(e.target.value as 'fallback' | 'always')}
+                style={{ marginBottom: 0 }}
+              >
+                <option value="fallback">Fallback only — use my key when platform is unavailable</option>
+                <option value="always">Always — use my key for all content generation</option>
+              </select>
+            </div>
+            <div style={{ fontSize: "11px", color: "#6a6a82", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              <Info size={11} />
+              {keyMode === "always"
+                ? "Your key will be used directly. Platform credits are not consumed."
+                : "Your key activates only if the platform is rate-limited or unavailable."}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
           <button

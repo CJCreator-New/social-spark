@@ -34,6 +34,7 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
   onApplyCta,
 }) => {
   const keySource = useWizardStore((state) => state.keySource);
+  const keyMode = useWizardStore((state) => state.keyMode);
 
   const score = useMemo(() => calculatePerformanceScore(post, topic), [post, topic]);
 
@@ -63,8 +64,9 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
                 borderRadius: "4px",
                 border: "1px solid rgba(200, 240, 154, 0.2)"
               }}
+              title={keyMode === "always" ? "Your API key is set as the primary provider" : "Your API key was used as a fallback"}
             >
-              Using your key
+              {keyMode === "always" ? "Your key · Always" : "Your key · Fallback"}
             </span>
           )}
         </h3>

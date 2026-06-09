@@ -88,11 +88,14 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Invalid request parameters." }, 400);
       }
 
+      const rawKeyMode = String(body.keyMode || "").trim();
+      const keyMode = rawKeyMode === "always" ? "always" : "fallback";
+
       // Upsert the toggle configuration in user_settings table
       const { error: dbError } = await adminClient
         .from("user_settings")
         .upsert(
-          { user_id: user.id, use_own_key: useOwnKey, updated_at: new Date().toISOString() },
+          { user_id: user.id, use_own_key: useOwnKey, key_mode: keyMode, updated_at: new Date().toISOString() },
           { onConflict: "user_id" }
         );
 

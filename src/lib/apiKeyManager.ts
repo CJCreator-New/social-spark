@@ -58,10 +58,15 @@ export async function saveUserApiKey(apiKey: string, provider: 'openai' | 'anthr
   }
 }
 
-export async function getUserApiKey(): Promise<{ apiKey: string | null; provider: 'openai' | 'anthropic' | 'openrouter' | null; useOwnKey: boolean }> {
+export async function getUserApiKey(): Promise<{
+  apiKey: string | null;
+  provider: 'openai' | 'anthropic' | 'openrouter' | null;
+  useOwnKey: boolean;
+  keyMode: 'fallback' | 'always';
+}> {
   const token = await getAccessToken();
   if (!token) {
-    return { apiKey: null, provider: null, useOwnKey: false };
+    return { apiKey: null, provider: null, useOwnKey: false, keyMode: 'fallback' };
   }
 
   const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
@@ -83,26 +88,31 @@ export async function getUserApiKey(): Promise<{ apiKey: string | null; provider
     return res.json() as Promise<{ apiKey: string | null; provider: 'openai' | 'anthropic' | 'openrouter' | null }>;
   });
 
-  // Query the user_settings table to check if use_own_key is enabled
+  // Query the user_settings table for use_own_key and key_mode
   const settingsPromise = supabase
     .from("user_settings" as any)
-    .select("use_own_key")
+    .select("use_own_key, key_mode")
     .maybeSingle()
     .then(({ data, error }) => {
       if (error) throw error;
-      return (data as unknown as { use_own_key: boolean } | null)?.use_own_key || false;
+      const row = data as unknown as { use_own_key: boolean; key_mode?: string } | null;
+      return {
+        useOwnKey: row?.use_own_key || false,
+        keyMode: (row?.key_mode === 'always' ? 'always' : 'fallback') as 'fallback' | 'always',
+      };
     });
 
-  const [decrypted, useOwnKey] = await Promise.all([decPromise, settingsPromise]);
+  const [decrypted, settings] = await Promise.all([decPromise, settingsPromise]);
 
   return {
     apiKey: decrypted.apiKey,
     provider: decrypted.provider,
-    useOwnKey,
+    useOwnKey: settings.useOwnKey,
+    keyMode: settings.keyMode,
   };
 }
 
-export async function setUseOwnKey(enabled: boolean): Promise<void> {
+export async function setUseOwnKey(enabled: boolean, keyMode: 'fallback' | 'always' = 'fallback'): Promise<void> {
   const token = await getAccessToken();
   if (!token) {
     throw new Error("User session not found");
@@ -121,6 +131,7 @@ export async function setUseOwnKey(enabled: boolean): Promise<void> {
     body: JSON.stringify({
       action: "toggle",
       useOwnKey: enabled,
+      keyMode,
     }),
   });
 

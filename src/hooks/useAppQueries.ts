@@ -662,6 +662,7 @@ export function useUpdateScheduledPostTimeMutation(calendarId?: string) {
 export function useRegeneratePostMutation(calendarId?: string) {
   const qc = useQueryClient();
   const setKeySource = useWizardStore((state) => state.setKeySource);
+  const setKeyMode = useWizardStore((state) => state.setKeyMode);
   
   return useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
@@ -675,8 +676,9 @@ export function useRegeneratePostMutation(calendarId?: string) {
       }
 
       const { generateWithFallback } = await import("@/lib/brandMemory");
-      const { data, usedFallback } = await generateWithFallback("regenerate-post", payload);
+      const { data, usedFallback, keyMode } = await generateWithFallback("regenerate-post", payload);
       setKeySource(usedFallback ? "user" : "platform");
+      setKeyMode(keyMode);
       return data.post;
     },
     onSuccess: () => {
@@ -687,6 +689,7 @@ export function useRegeneratePostMutation(calendarId?: string) {
 
 export function useRepurposePostMutation() {
   const setKeySource = useWizardStore((state) => state.setKeySource);
+  const setKeyMode = useWizardStore((state) => state.setKeyMode);
   return useMutation({
     mutationFn: async (payload: RepurposePayload) => {
       if (isE2EMode()) {
@@ -701,8 +704,9 @@ export function useRepurposePostMutation() {
         };
       }
       const { generateWithFallback } = await import("@/lib/brandMemory");
-      const { data, usedFallback } = await generateWithFallback("repurpose-post", payload);
+      const { data, usedFallback, keyMode } = await generateWithFallback("repurpose-post", payload);
       setKeySource(usedFallback ? "user" : "platform");
+      setKeyMode(keyMode);
       return data.post;
     },
   });
@@ -740,14 +744,16 @@ export function useGeneratePostImageMutation() {
 
 export function useInlineRewriteMutation() {
   const setKeySource = useWizardStore((state) => state.setKeySource);
+  const setKeyMode = useWizardStore((state) => state.setKeyMode);
   return useMutation({
     mutationFn: async (payload: InlineRewritePayload) => {
       if (isE2EMode()) {
         return `${payload.text.trim()} (${payload.instruction})`;
       }
       const { generateWithFallback } = await import("@/lib/brandMemory");
-      const { data, usedFallback } = await generateWithFallback("inline-rewrite", payload);
+      const { data, usedFallback, keyMode } = await generateWithFallback("inline-rewrite", payload);
       setKeySource(usedFallback ? "user" : "platform");
+      setKeyMode(keyMode);
       return String(data.rewrittenText || "");
     },
   });

@@ -56,7 +56,7 @@ export async function generateWithFallback<T = any>(
   endpoint: string,
   body: any,
   abortSignal?: AbortSignal
-): Promise<{ data: T; usedFallback: boolean }> {
+): Promise<{ data: T; usedFallback: boolean; keyMode: "always" | "fallback" | null }> {
   const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
   const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
   const { data: { session } } = await supabase.auth.getSession();
@@ -67,17 +67,32 @@ export async function generateWithFallback<T = any>(
     ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
   };
 
-  // 1. Try with platform first
-  let isPlatformUp = true;
-  try {
-    await resolveAiClient(isPlatformUp);
-  } catch (err) {
-    if (err instanceof Error && err.message === "AI_UNAVAILABLE") {
-      throw err;
+  // Resolve user key settings upfront (needed to check key_mode)
+  const userKeyInfo = await resolveAiClient(false).catch(() => null);
+
+  // If user has configured "always use my key", inject immediately and skip platform
+  if (userKeyInfo && userKeyInfo.source === "user") {
+    const alwaysBody = {
+      ...body,
+      userApiKey: userKeyInfo.apiKey,
+      userApiProvider: userKeyInfo.provider,
+    };
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(alwaysBody),
+      signal: abortSignal,
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.error || `Generation failed (${res.status})`);
     }
-    throw err;
+    const data = await res.json();
+    if (data?.error) throw new Error(data.error);
+    return { data, usedFallback: true, keyMode: "always" };
   }
 
+  // Platform path
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
       method: "POST",
@@ -95,7 +110,7 @@ export async function generateWithFallback<T = any>(
       throw new Error(data.error);
     }
 
-    return { data, usedFallback: false };
+    return { data, usedFallback: false, keyMode: null };
   } catch (err) {
     // If request was aborted by user, don't fallback, just throw the abort error
     if (err instanceof DOMException && err.name === "AbortError") {
@@ -104,17 +119,15 @@ export async function generateWithFallback<T = any>(
 
     console.warn(`Platform AI call failed (${err instanceof Error ? err.message : String(err)}). Attempting fallback key...`);
 
-    // 2. Platform failed, resolve user fallback key
-    isPlatformUp = false;
-    let fallbackClient;
+    // Platform failed — try user key as fallback
+    let fallbackClient: Awaited<ReturnType<typeof resolveAiClient>>;
     try {
-      fallbackClient = await resolveAiClient(isPlatformUp);
-    } catch (fallbackErr) {
-      // If no fallback key is set, or useOwnKey is false, resolveAiClient throws AI_UNAVAILABLE
+      fallbackClient = await resolveAiClient(false);
+    } catch {
+      // No fallback key available
       throw new Error("AI_UNAVAILABLE");
     }
 
-    // Call Edge Function again with user fallback credentials
     const fallbackBody = {
       ...body,
       userApiKey: fallbackClient.apiKey,
@@ -138,7 +151,7 @@ export async function generateWithFallback<T = any>(
       throw new Error(data.error);
     }
 
-    return { data, usedFallback: true };
+    return { data, usedFallback: true, keyMode: "fallback" };
   }
 }
 

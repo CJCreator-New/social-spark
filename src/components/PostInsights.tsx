@@ -22,6 +22,7 @@ interface Post {
 
 export default function PostInsights({ post, platform, topic }: { post: Post; platform?: string; topic?: string }) {
   const keySource = useWizardStore((state) => state.keySource);
+  const keyMode = useWizardStore((state) => state.keyMode);
   const ins = insightFor(post, platform || "LinkedIn");
   const f = formatForPlatform(post, platform || "LinkedIn");
 
@@ -41,8 +42,9 @@ export default function PostInsights({ post, platform, topic }: { post: Post; pl
                 borderRadius: "4px",
                 border: "1px solid rgba(200, 240, 154, 0.2)"
               }}
+              title={keyMode === "always" ? "Your API key is set as the primary provider" : "Your API key was used as a fallback"}
             >
-              Using your key
+              {keyMode === "always" ? "Your key · Always" : "Your key · Fallback"}
             </span>
           )}
         </div>
