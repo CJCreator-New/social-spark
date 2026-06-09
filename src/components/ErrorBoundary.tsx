@@ -81,7 +81,7 @@ function DefaultErrorFallback({
         justifyContent: "center",
         backgroundColor: "#07080d",
         color: "#edeae3",
-        fontFamily: "Sora, sans-serif",
+        fontFamily: "var(--font-body)",
         padding: "24px",
       }}
     >
@@ -99,7 +99,7 @@ function DefaultErrorFallback({
 
         <h1
           style={{
-            fontFamily: "Playfair Display, serif",
+            fontFamily: "var(--font-display)",
             fontSize: "24px",
             fontWeight: 400,
             marginBottom: "16px",
@@ -154,7 +154,7 @@ function DefaultErrorFallback({
               fontSize: "14px",
               fontWeight: 500,
               cursor: "pointer",
-              fontFamily: "Sora, sans-serif",
+              fontFamily: "var(--font-body)",
               transition: "all 0.15s",
             }}
             onMouseEnter={(e) => {
@@ -178,7 +178,7 @@ function DefaultErrorFallback({
               fontSize: "14px",
               fontWeight: 500,
               cursor: "pointer",
-              fontFamily: "Sora, sans-serif",
+              fontFamily: "var(--font-body)",
               transition: "all 0.15s",
             }}
             onMouseEnter={(e) => {

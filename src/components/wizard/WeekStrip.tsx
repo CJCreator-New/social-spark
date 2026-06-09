@@ -1,5 +1,6 @@
 import React from "react";
 import { Post } from "./constants";
+import { motion } from "framer-motion";
 
 interface WeekStripProps {
   posts: Post[];
@@ -29,7 +30,7 @@ export const WeekStrip = React.memo(function WeekStrip({
   return (
     <div className="week-strip" role="tablist" aria-label="Days of the week">
       {posts.map((post, i) => (
-        <button
+        <motion.button
           key={i}
           type="button"
           role="tab"
@@ -37,8 +38,11 @@ export const WeekStrip = React.memo(function WeekStrip({
           className={`dtab ${i === activeDay ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""} ${draggedIndex === i ? "dragging" : ""}`}
           onClick={() => setActiveDay(i)}
           draggable
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
+          transition={{ type: "spring", stiffness: 400, damping: 15 }}
           onDragStart={(e) => {
-            handleDragStart(e, i);
+            handleDragStart(e as unknown as React.DragEvent<HTMLElement>, i);
             setDraggedIndex(i);
           }}
           onDragOver={handleDragOver}
@@ -52,8 +56,8 @@ export const WeekStrip = React.memo(function WeekStrip({
           title="Drag to reorder days"
         >
           <div className="dtab-dow">{post.dow}</div>
-          <div className="dtab-n">{i + 1}</div>
-        </button>
+          <div className="dtab-n tabular-nums">{i + 1}</div>
+        </motion.button>
       ))}
     </div>
   );

@@ -35,7 +35,7 @@ interface IndexResultsProps {
   postTimes: Record<string, string>;
   setPostTimes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   getClipboardStyle: () => any;
-  copyPost: (post: Post, idx: number) => void;
+  copyPost: (idx: number) => void;
   copiedIdx: number | null;
   copyMenuOpen: boolean;
   setCopyMenuOpen: (o: boolean) => void;
@@ -69,7 +69,7 @@ interface IndexResultsProps {
   toggleLockedDay: (day: number) => void;
   handleDragStart: (e: React.DragEvent, index: number) => void;
   handleDragOver: (e: React.DragEvent) => void;
-  handleDrop: (e: React.DragEvent, targetIndex: number) => void;
+  handleDrop: (e: React.DragEvent, targetIndex: number) => number | null;
 }
 
 export function IndexResults({

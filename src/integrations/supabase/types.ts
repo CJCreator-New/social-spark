@@ -18,14 +18,20 @@ export type Database = {
         Row: {
           avatar_url: string | null
           banned_hashtags: string[] | null
+          brand_examples: string[] | null
           created_at: string
           default_audiences: string[] | null
+          default_framework: string | null
           default_goals: string[] | null
           default_style: string | null
           default_timezone: string | null
           default_voice: string | null
           display_name: string | null
+          forbidden_phrases: string[] | null
           id: string
+          preferred_structures: string[] | null
+          proof_points: string[] | null
+          cta_preferences: string[] | null
           required_hashtags: string[] | null
           updated_at: string
           user_id: string
@@ -33,14 +39,20 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           banned_hashtags?: string[] | null
+          brand_examples?: string[] | null
           created_at?: string
           default_audiences?: string[] | null
+          default_framework?: string | null
           default_goals?: string[] | null
           default_style?: string | null
           default_timezone?: string | null
           default_voice?: string | null
           display_name?: string | null
+          forbidden_phrases?: string[] | null
           id?: string
+          preferred_structures?: string[] | null
+          proof_points?: string[] | null
+          cta_preferences?: string[] | null
           required_hashtags?: string[] | null
           updated_at?: string
           user_id: string
@@ -48,14 +60,20 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           banned_hashtags?: string[] | null
+          brand_examples?: string[] | null
           created_at?: string
           default_audiences?: string[] | null
+          default_framework?: string | null
           default_goals?: string[] | null
           default_style?: string | null
           default_timezone?: string | null
           default_voice?: string | null
           display_name?: string | null
+          forbidden_phrases?: string[] | null
           id?: string
+          preferred_structures?: string[] | null
+          proof_points?: string[] | null
+          cta_preferences?: string[] | null
           required_hashtags?: string[] | null
           updated_at?: string
           user_id?: string

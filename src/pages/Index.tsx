@@ -3,10 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { getE2EAuthFlag, E2E_USER_ID } from "@/lib/e2eFixtures";
+import { getE2EAuthFlag, E2E_USER_ID, E2E_CALENDAR } from "@/lib/e2eFixtures";
 import e2eStore from "@/lib/e2eStore";
 import { toast } from "sonner";
 import storageService from "@/lib/storageService";
+import mediaManager from "@/lib/mediaManager";
+import { SAMPLE_POSTS, SAMPLE_FORM, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
+import type { BatchEditPayload } from "@/components/BatchEditModal";
 import { createScopedLogger } from "@/lib/logger";
 import { getUserFriendlyMessage } from "@/lib/errors";
 import telemetry from "@/lib/telemetry";
@@ -16,7 +19,6 @@ import { suggestedTimeForDay } from "@/lib/postingTimes";
 import { getVoiceStylePreview } from "@/lib/voiceStylePreview";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import GenerateSkeleton from "@/components/GenerateSkeleton";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useCreateCalendarMutation, useRegeneratePostMutation } from "@/hooks/useAppQueries";
 import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dragDrop";
@@ -28,6 +30,7 @@ import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { FontStyle, applyStyle } from "@/lib/unicodeFonts";
 import { useWizardStore } from "@/stores/useWizardStore";
+import { motion } from "framer-motion";
 
 // Lazy load components to optimize bundle size
 const DraftRecoveryDialog = lazy(() => import("@/components/DraftRecoveryDialog").then(m => ({ default: m.DraftRecoveryDialog })));
@@ -398,6 +401,20 @@ function calculateScore(scores: Record<string, number>): number {
   const sum = keys.reduce((acc, k) => acc + scores[k], 0);
   return Number((sum / keys.length).toFixed(1));
 }
+
+const screenVariants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { 
+      type: "spring", 
+      stiffness: 100, 
+      damping: 18,
+      staggerChildren: 0.05
+    } 
+  }
+} as const;
 
 const Index = () => {
   const {
@@ -1820,7 +1837,7 @@ const Index = () => {
                 {autosaveStatus === "saving" ? "Saving draft…" : autosaveStatus === "saved" ? "Draft saved" : "Draft save failed"}
               </span>
             )}
-            <button onClick={async () => { await signOut(); navigate("/auth"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#9a9aae", padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "Sora, sans-serif" }}>Sign out</button>
+            <button onClick={async () => { await signOut(); navigate("/auth"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#9a9aae", padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "var(--font-body)" }}>Sign out</button>
           </div>
 
           {/* BRAND */}
@@ -1889,7 +1906,12 @@ const Index = () => {
           </div>
 
           {/* ── STEP 1 ── */}
-          <div className={`screen ${step === 1 ? "active" : ""}`}>
+          <motion.div 
+            className={`screen ${step === 1 ? "active" : ""}`}
+            variants={screenVariants}
+            initial="hidden"
+            animate={step === 1 ? "visible" : "hidden"}
+          >
             {recentCalendars.length > 0 && (
               <div className="recent-strip">
                 <div className="recent-head">
@@ -2050,10 +2072,15 @@ const Index = () => {
             <div className="brow">
               <button className="btn btn-p" onClick={() => { if (validate(1)) { setError(""); setStep(2); } }}>Next step →</button>
             </div>
-          </div>
+          </motion.div>
 
           {/* ── STEP 2 ── */}
-          <div className={`screen ${step === 2 ? "active" : ""}`}>
+          <motion.div 
+            className={`screen ${step === 2 ? "active" : ""}`}
+            variants={screenVariants}
+            initial="hidden"
+            animate={step === 2 ? "visible" : "hidden"}
+          >
             <div className="card">
               <div className="sh">Pick your <span>{form.mode === "day" ? "single-day topic" : "weekly topics"}</span></div>
 
@@ -2241,7 +2268,7 @@ const Index = () => {
                         cursor: isGenerating ? 'not-allowed' : 'pointer',
                         opacity: isGenerating ? 0.6 : 1,
                         fontSize: '12px',
-                        fontFamily: '"Sora", sans-serif',
+                        fontFamily: 'var(--font-body)',
                         transition: 'all 0.15s'
                       }}
                       onMouseEnter={(e) => {
@@ -2278,7 +2305,7 @@ const Index = () => {
                 }}>Save as template</button>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {showSubtopicConfirm && (
             <Modal onClose={() => setShowSubtopicConfirm(false)} className="modal-content">
@@ -2302,19 +2329,50 @@ const Index = () => {
           )}
 
           {/* ── STEP 3 ── */}
-          <div className={`screen ${step === 3 ? "active" : ""}`}>
+          <motion.div
+            className={`screen ${step === 3 ? "active" : ""}`}
+            variants={screenVariants}
+            initial="hidden"
+            animate={step === 3 ? "visible" : "hidden"}
+          >
             <div className="gen-wrap">
-              <div className="gen-orb">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.4">
-                  <path d="M12 2l3 7.5L22 12l-7.5 3L12 22l-3-7.5L2 12l7.5-3z" strokeLinejoin="round" />
-                </svg>
+              {/* Pulsing structural skeleton loader */}
+              <div 
+                className="animate-pulse-glow"
+                style={{
+                  width: "100%",
+                  maxWidth: "480px",
+                  background: "rgba(18, 20, 32, 0.65)",
+                  border: "1px solid rgba(255, 255, 255, 0.06)",
+                  borderRadius: "20px",
+                  padding: "24px",
+                  margin: "0 auto 28px",
+                  textAlign: "left",
+                  boxShadow: "0 20px 50px rgba(0, 0, 0, 0.45)"
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <div style={{ height: "16px", width: "40px", background: "rgba(200, 240, 154, 0.15)", borderRadius: "99px" }} />
+                    <div style={{ height: "16px", width: "70px", background: "rgba(255, 255, 255, 0.05)", borderRadius: "99px" }} />
+                  </div>
+                  <div style={{ height: "24px", width: "24px", background: "rgba(255, 255, 255, 0.05)", borderRadius: "50%" }} />
+                </div>
+                <div style={{ height: "20px", width: "75%", background: "rgba(255, 255, 255, 0.08)", borderRadius: "6px", marginBottom: "16px" }} />
+                <div style={{ display: "grid", gap: "8px", marginBottom: "20px" }}>
+                  <div style={{ height: "12px", width: "100%", background: "rgba(255, 255, 255, 0.04)", borderRadius: "4px" }} />
+                  <div style={{ height: "12px", width: "95%", background: "rgba(255, 255, 255, 0.04)", borderRadius: "4px" }} />
+                  <div style={{ height: "12px", width: "80%", background: "rgba(255, 255, 255, 0.04)", borderRadius: "4px" }} />
+                </div>
+                <div style={{ height: "36px", width: "100%", background: "rgba(200, 240, 154, 0.06)", border: "1px solid rgba(200, 240, 154, 0.12)", borderRadius: "10px" }} />
               </div>
+
               <div className="gen-title">{form.mode === "day" ? "Writing your post" : "Writing your week"}</div>
               <div className="gen-msg">{genMsg}</div>
-              <div className="prog-track">
+              <div className="prog-track" style={{ marginBottom: 20 }}>
                 <div className="prog-indet" />
               </div>
-              <div className="gen-checklist">
+              <div className="gen-checklist" style={{ margin: "0 auto" }}>
                 {GEN_LABELS.map((l, i) => (
                   <div key={i} className={`gci ${i < genStep ? "done" : ""}`}>
                     <span className="gci-dot" />
@@ -2322,24 +2380,22 @@ const Index = () => {
                   </div>
                 ))}
               </div>
-              {/* Visual skeleton of calendar so users see expected output shape while waiting */}
-              <div style={{ marginTop: 18 }}>
-                {/* Lazy-load the skeleton to keep bundle small */}
-                <Suspense fallback={null}>
-                  <GenerateSkeleton />
-                </Suspense>
-              </div>
               <button
                 onClick={cancelGeneration}
-                style={{ marginTop: 24, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#7a7a8e", padding: "7px 16px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "Sora, sans-serif" }}
+                style={{ marginTop: 24, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#7a7a8e", padding: "7px 16px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "var(--font-body)" }}
               >
                 Cancel and try again
               </button>
             </div>
-          </div>
+          </motion.div>
 
           {/* ── STEP 4 ── */}
-          <div className={`screen ${step === 4 ? "active" : ""}`}>
+          <motion.div 
+            className={`screen ${step === 4 ? "active" : ""}`}
+            variants={screenVariants}
+            initial="hidden"
+            animate={step === 4 ? "visible" : "hidden"}
+          >
             {posts.length > 0 && (
               <Suspense fallback={<div className="gen-wrap" style={{ minHeight: 300 }}><div className="gen-orb" /><div className="gen-title" style={{ marginTop: 16 }}>Loading results…</div></div>}>
                 <IndexResults
@@ -2403,7 +2459,7 @@ const Index = () => {
                 />
               </Suspense>
             )}
-          </div>
+          </motion.div>
         </div>
 
         {/* Batch Edit Modal */}

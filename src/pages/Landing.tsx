@@ -1,7 +1,58 @@
 import { Link, Navigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/contexts/AuthContext";
+import { motion } from "framer-motion";
 import "@/styles/pages.css";
+
+const containerVariants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.06,
+    },
+  },
+} as const;
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+      damping: 15,
+    },
+  },
+} as const;
+
+const heroVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      stiffness: 70,
+      damping: 14,
+    },
+  },
+} as const;
+
+const previewVariants = {
+  hidden: { opacity: 0, scale: 0.96, y: 20 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      stiffness: 60,
+      damping: 16,
+      delay: 0.15,
+    },
+  },
+} as const;
 
 export default function Landing() {
   const { user, loading } = useAuth();
@@ -43,7 +94,12 @@ export default function Landing() {
         <div className="orb three" />
 
         <div className="wrap">
-          <nav className="nav">
+          <motion.nav 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="nav"
+          >
             <div className="brand">
               <div className="mark">CF</div>
               <div className="brand-text">
@@ -53,20 +109,31 @@ export default function Landing() {
             </div>
             <div className="nav-actions">
               <Link to="/auth" className="nav-link">Sign in</Link>
-              <Link to="/auth" className="nav-cta">Get started</Link>
+              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                <Link to="/auth" className="nav-cta">Get started</Link>
+              </motion.div>
             </div>
-          </nav>
+          </motion.nav>
 
           <header className="hero">
-            <div className="hero-copy">
+            <motion.div 
+              variants={heroVariants}
+              initial="hidden"
+              animate="visible"
+              className="hero-copy"
+            >
               <div className="eyebrow">Editorial-grade content workflows</div>
               <h1 className="text-balance">One brief.<br />A whole week of <em>finished</em> posts.</h1>
               <p className="lede text-pretty">
                 ContentForge turns a single idea into a polished, platform-native content calendar for LinkedIn, X, Instagram, Facebook, newsletters, and blogs. Generate, refine, schedule, and export without losing the thread of your brand voice.
               </p>
               <div className="cta-row">
-                <Link to="/auth" className="cta-primary">Start free →</Link>
-                <a href="#how-it-works" className="cta-secondary">See the workflow</a>
+                <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                  <Link to="/auth" className="cta-primary">Start free →</Link>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                  <a href="#how-it-works" className="cta-secondary">See the workflow</a>
+                </motion.div>
               </div>
               <div className="trust">
                 <span className="trust-chip"><strong>No credit card</strong> required</span>
@@ -87,9 +154,15 @@ export default function Landing() {
                   <div className="stat-label">Brand defaults, hashtag rules, and draft recovery included</div>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            <aside className="hero-card outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10" aria-label="Product preview">
+            <motion.aside 
+              variants={previewVariants}
+              initial="hidden"
+              animate="visible"
+              className="hero-card outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10" 
+              aria-label="Product preview"
+            >
               <div className="card-top">
                 <div>
                   <div className="card-badge">Live preview</div>
@@ -137,7 +210,7 @@ export default function Landing() {
                   </div>
                 </div>
 
-                <div className="metrics-row">
+                <div className="metrics-row font-mono tabular-nums">
                   <div className="metric">
                     <div className="metric-value">7</div>
                     <div className="metric-label">post calendar</div>
@@ -156,48 +229,62 @@ export default function Landing() {
                   </div>
                 </div>
               </div>
-            </aside>
+            </motion.aside>
           </header>
 
           <section className="section section-shell">
-            <div className="section-head">
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.5 }}
+              className="section-head"
+            >
               <h2 className="section-h text-balance">Built for people who need content to feel <em>finished</em>.</h2>
               <p className="section-sub text-pretty">
                 Every part of the workflow is designed around speed, brand consistency, and the reality that one post becomes a system when you do this every week.
               </p>
-            </div>
-            <div className="features">
-              <article className="feat">
+            </motion.div>
+            
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-80px" }}
+              className="features"
+            >
+              <motion.article variants={itemVariants} className="feat" whileHover={{ y: -4, scale: 1.015 }} whileTap={{ scale: 0.985 }}>
                 <div className="feat-icon">◬</div>
                 <h3 className="feat-h">Brand-aware generation</h3>
                 <p className="feat-p">Voice, audience, goals, banned phrases, and hashtag rules persist across every calendar so the output stays recognizably yours.</p>
-              </article>
-              <article className="feat">
+              </motion.article>
+              <motion.article variants={itemVariants} className="feat" whileHover={{ y: -4, scale: 1.015 }} whileTap={{ scale: 0.985 }}>
                 <div className="feat-icon">◭</div>
                 <h3 className="feat-h">Platform-native writing</h3>
                 <p className="feat-p">Length, structure, hooks, and CTA style adapt to the chosen platform instead of forcing every channel into the same mold.</p>
-              </article>
-              <article className="feat">
+              </motion.article>
+              <motion.article variants={itemVariants} className="feat" whileHover={{ y: -4, scale: 1.015 }} whileTap={{ scale: 0.985 }}>
                 <div className="feat-icon">◫</div>
                 <h3 className="feat-h">Schedule & export</h3>
                 <p className="feat-p">Time-zone aware scheduling, CSV/Markdown/PDF/ICS export, and row-level status controls for publishing workflows.</p>
-              </article>
-              <article className="feat">
+              </motion.article>
+              <motion.article variants={itemVariants} className="feat" whileHover={{ y: -4, scale: 1.015 }} whileTap={{ scale: 0.985 }}>
                 <div className="feat-icon">◯</div>
                 <h3 className="feat-h">Reusable brief templates</h3>
                 <p className="feat-p">Save winning prompts as templates so recurring campaigns start from a polished brief instead of a blank screen.</p>
-              </article>
-              <article className="feat">
+              </motion.article>
+              <motion.article variants={itemVariants} className="feat" whileHover={{ y: -4, scale: 1.015 }} whileTap={{ scale: 0.985 }}>
                 <div className="feat-icon">◍</div>
                 <h3 className="feat-h">Single-post mode</h3>
                 <p className="feat-p">Need a post for tomorrow? Generate one fully tuned post with the same brand context and export options.</p>
-              </article>
-              <article className="feat">
+              </motion.article>
+              <motion.article variants={itemVariants} className="feat" whileHover={{ y: -4, scale: 1.015 }} whileTap={{ scale: 0.985 }}>
                 <div className="feat-icon">◎</div>
                 <h3 className="feat-h">Draft auto-recovery</h3>
                 <p className="feat-p">The wizard autosaves locally and restores recovery drafts so a refresh or crash never resets the work.</p>
-              </article>
-            </div>
+              </motion.article>
+            </motion.div>
+            
             <div className="chips">
               <span className="chip"><strong>LinkedIn</strong></span>
               <span className="chip"><strong>Twitter / X</strong></span>
@@ -209,29 +296,47 @@ export default function Landing() {
           </section>
 
           <section className="section section-shell" id="how-it-works">
-            <div className="section-head">
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.5 }}
+              className="section-head"
+            >
               <h2 className="section-h text-balance">From idea to <em>scheduled</em> in three moves.</h2>
-              <p className="section-sub text-pretty">A guided flow that gets smarter after the first brief, then becomes the fastest way to create a full weekly content plan.
-              </p>
-            </div>
-            <div className="steps">
-              <div className="step" data-step="01">
+              <p className="section-sub text-pretty">A guided flow that gets smarter after the first brief, then becomes the fastest way to create a full weekly content plan.</p>
+            </motion.div>
+            
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-80px" }}
+              className="steps"
+            >
+              <motion.div variants={itemVariants} className="step" data-step="01" whileHover={{ y: -2, scale: 1.01 }}>
                 <h3 className="step-h">Brief your week</h3>
                 <p className="step-p">Pick an industry, platform, and core idea. Add audience, goals, and tone, or let your saved defaults fill the form for you.</p>
-              </div>
-              <div className="step" data-step="02">
+              </motion.div>
+              <motion.div variants={itemVariants} className="step" data-step="02" whileHover={{ y: -2, scale: 1.01 }}>
                 <h3 className="step-h">Generate & refine</h3>
                 <p className="step-p">Get a polished weekly calendar instantly. Regenerate any post, edit inline, or copy the final version in one click.</p>
-              </div>
-              <div className="step" data-step="03">
+              </motion.div>
+              <motion.div variants={itemVariants} className="step" data-step="03" whileHover={{ y: -2, scale: 1.01 }}>
                 <h3 className="step-h">Schedule & publish</h3>
                 <p className="step-p">Save the calendar, mark posts as published, or export to your publishing stack with timezone support intact.</p>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           </section>
 
           <section className="section section-shell">
-            <div className="quote-grid">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.6 }}
+              className="quote-grid"
+            >
               <div className="quote">
                 <small>Why teams switch</small>
                 <p>“It feels less like a template generator and more like a content desk that already understands our brand.”</p>
@@ -260,15 +365,23 @@ export default function Landing() {
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </section>
 
           <section className="final">
-            <div className="final-panel">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.97 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ type: "spring", stiffness: 50, damping: 15 }}
+              className="final-panel"
+            >
               <h2 className="text-balance">Stop staring at the <em>blank page</em>.</h2>
               <p className="text-pretty">Generate your first week of content in under a minute. The interface is built to feel calm, deliberate, and worthy of the work inside it.</p>
-              <Link to="/auth" className="cta-primary">Create your first calendar →</Link>
-            </div>
+              <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} style={{ display: "inline-block" }}>
+                <Link to="/auth" className="cta-primary">Create your first calendar →</Link>
+              </motion.div>
+            </motion.div>
           </section>
 
           <footer>

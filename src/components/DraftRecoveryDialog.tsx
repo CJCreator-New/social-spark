@@ -30,7 +30,7 @@ export function DraftRecoveryDialog({ open, draft, onRestore, onDiscard }: Draft
     <div className="card" style={{ maxWidth: 640, margin: "12px auto 18px", display: "block" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 8 }}>
         <div>
-          <h3 style={{ margin: 0, fontFamily: "Fraunces, Playfair Display, serif", fontSize: 18 }}>Recover your draft?</h3>
+          <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 18 }}>Recover your draft?</h3>
           <div style={{ color: "#7a7a8e", marginTop: 6, fontSize: 13 }}>A recent wizard snapshot was found in this browser. You can restore it now or discard it and start fresh.</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>

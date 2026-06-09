@@ -337,7 +337,7 @@ export default function Schedule() {
     const isEditing = editId === row.id;
     return (
       <div key={row.id} className="sc-row">
-        <div className="sc-time">
+        <div className="sc-time tabular-nums">
           <span>{fmtTimeInTz(row.scheduled_at, tz)}</span>
           {sortBy !== "date-asc" && sortBy !== "date-desc" && (
             <span className="sc-time-tz">{fmtDateInTz(row.scheduled_at, tz)}</span>

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { normalizeTag, displayTag, parsePolicyList } from "@/lib/hashtagPolicy";
 import { listTimezones, browserTimezone, tzLabel } from "@/lib/timezones";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
+import { motion, AnimatePresence } from "framer-motion";
 import "@/styles/pages.css";
 
 const VOICE_OPTIONS = ["Technical & analytical", "Conversational & warm", "PM / product thinking", "Opinionated & bold", "Data-driven", "Storytelling-first", "Educational & clear", "Contrarian / challenger", "Founder POV", "Academic & research-backed", "Humorous & witty", "Inspirational & motivating"];
@@ -401,14 +402,18 @@ export default function Profile() {
 
               <div className="pf-label" id="pf-aud-label">Default audiences (up to 6)</div>
               <div className="pf-tagrow" role="list" aria-labelledby="pf-aud-label">
-                {defaultAudiences.length === 0
-                  ? <span className="pf-tagrow-empty">No audiences saved yet</span>
-                  : defaultAudiences.map(a => (
-                    <span key={a} className="pf-tag" role="listitem">
-                      {a}
-                      <button className="pf-tag-x" onClick={() => removeAudience(a)} aria-label={`Remove ${a}`}>×</button>
-                    </span>
-                  ))}
+                <AnimatePresence>
+                  {defaultAudiences.length === 0 ? (
+                    <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pf-tagrow-empty">No audiences saved yet</motion.span>
+                  ) : (
+                    defaultAudiences.map(a => (
+                      <motion.span layout initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ type: "spring", stiffness: 500, damping: 25 }} key={a} className="pf-tag" role="listitem">
+                        {a}
+                        <button className="pf-tag-x" onClick={() => removeAudience(a)} aria-label={`Remove ${a}`}>×</button>
+                      </motion.span>
+                    ))
+                  )}
+                </AnimatePresence>
               </div>
               <div className="pf-add-row">
                 <input
@@ -424,16 +429,19 @@ export default function Profile() {
 
               <div className="pf-label" id="pf-goals-label">Default goals</div>
               <div className="pf-chips" role="group" aria-labelledby="pf-goals-label">
-                {GOAL_OPTIONS.map(g => (
-                  <button
+                 {GOAL_OPTIONS.map(g => (
+                  <motion.button
                     key={g}
                     type="button"
                     className={`pf-chip ${defaultGoals.includes(g) ? "on" : ""}`}
                     onClick={() => toggleGoal(g)}
                     aria-pressed={defaultGoals.includes(g)}
+                    whileHover={{ scale: 1.04 }}
+                    whileTap={{ scale: 0.96 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 15 }}
                   >
                     {g}
-                  </button>
+                  </motion.button>
                 ))}
               </div>
 
@@ -574,14 +582,18 @@ export default function Profile() {
 
               <div className="pf-label">Banned hashtags ({bannedHashtags.length}/30)</div>
               <div className="pf-tagrow" role="list" aria-label="Banned hashtags">
-                {bannedHashtags.length === 0
-                  ? <span className="pf-tagrow-empty">No banned tags yet</span>
-                  : bannedHashtags.map(t => (
-                    <span key={t} className="pf-tag" role="listitem" style={{ background: "rgba(240,154,154,0.1)", borderColor: "rgba(240,154,154,0.3)", color: "#f09a9a" }}>
-                      {displayTag(t)}
-                      <button className="pf-tag-x" onClick={() => removeTag("ban", t)} aria-label={`Remove ${displayTag(t)}`} style={{ color: "rgba(240,154,154,0.6)" }}>×</button>
-                    </span>
-                  ))}
+                <AnimatePresence>
+                  {bannedHashtags.length === 0 ? (
+                    <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pf-tagrow-empty">No banned tags yet</motion.span>
+                  ) : (
+                    bannedHashtags.map(t => (
+                      <motion.span layout initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ type: "spring", stiffness: 500, damping: 25 }} key={t} className="pf-tag" role="listitem" style={{ background: "rgba(240,154,154,0.1)", borderColor: "rgba(240,154,154,0.3)", color: "#f09a9a" }}>
+                        {displayTag(t)}
+                        <button className="pf-tag-x" onClick={() => removeTag("ban", t)} aria-label={`Remove ${displayTag(t)}`} style={{ color: "rgba(240,154,154,0.6)" }}>×</button>
+                      </motion.span>
+                    ))
+                  )}
+                </AnimatePresence>
               </div>
               <div className="pf-add-row">
                 <input
@@ -597,14 +609,18 @@ export default function Profile() {
 
               <div className="pf-label">Required hashtags ({requiredHashtags.length}/10)</div>
               <div className="pf-tagrow" role="list" aria-label="Required hashtags">
-                {requiredHashtags.length === 0
-                  ? <span className="pf-tagrow-empty">No required tags yet</span>
-                  : requiredHashtags.map(t => (
-                    <span key={t} className="pf-tag" role="listitem">
-                      {displayTag(t)}
-                      <button className="pf-tag-x" onClick={() => removeTag("req", t)} aria-label={`Remove ${displayTag(t)}`}>×</button>
-                    </span>
-                  ))}
+                <AnimatePresence>
+                  {requiredHashtags.length === 0 ? (
+                    <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pf-tagrow-empty">No required tags yet</motion.span>
+                  ) : (
+                    requiredHashtags.map(t => (
+                      <motion.span layout initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ type: "spring", stiffness: 500, damping: 25 }} key={t} className="pf-tag" role="listitem">
+                        {displayTag(t)}
+                        <button className="pf-tag-x" onClick={() => removeTag("req", t)} aria-label={`Remove ${displayTag(t)}`}>×</button>
+                      </motion.span>
+                    ))
+                  )}
+                </AnimatePresence>
               </div>
               <div className="pf-add-row">
                 <input

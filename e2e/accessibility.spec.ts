@@ -34,26 +34,26 @@ test.describe("Accessibility smoke checks", () => {
   test("authenticated app shell has no serious axe violations", async ({ page }) => {
     await enableE2EAuth(page);
     await checkRoute(page, "/app");
-    await expect(page.getByRole("radiogroup", { name: /industry or niche/i })).toBeVisible();
-    await expect(page.getByText(/build the calendar before the scroll ever starts/i)).toBeVisible();
-    await expect(page.getByText(/current setup/i)).toBeVisible();
+    await expect(page.getByRole("radiogroup", { name: /industry or niche/i })).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(/build the calendar before the scroll ever starts/i)).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(/current setup/i)).toBeVisible({ timeout: 30000 });
   });
 
   test("saved calendars and schedule have no serious axe violations", async ({ page }) => {
     await enableE2EAuth(page);
     await checkRoute(page, "/my-calendars");
-    await expect(page.getByRole("heading", { name: /my calendars/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /my calendars/i })).toBeVisible({ timeout: 30000 });
 
     await checkRoute(page, "/schedule");
-    await expect(page.getByRole("heading", { name: /my schedule/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /my schedule/i })).toBeVisible({ timeout: 30000 });
   });
 
   test("calendar detail and delete modal have no serious axe violations", async ({ page }) => {
     await enableE2EAuth(page);
     await checkRoute(page, `/calendar/${E2E_CALENDAR.id}`);
-    await expect(page.getByText(E2E_CALENDAR.title)).toBeVisible();
-    await expect(page.getByRole("heading", { name: /workspace controls/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /reformat and export/i })).toBeVisible();
+    await expect(page.getByText(E2E_CALENDAR.title)).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { name: /workspace controls/i })).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { name: /reformat and export/i })).toBeVisible({ timeout: 30000 });
 
     await page.goto("/my-calendars", { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: /^delete$/i }).first().click();

@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import type { SavedCalendar } from "@/pages/MyCalendars";
+import { motion } from "framer-motion";
 
 interface CalendarItemProps {
   it: SavedCalendar;
@@ -32,7 +33,12 @@ export const CalendarItem = React.memo(function CalendarItem({
   toggleFavorite,
 }: CalendarItemProps) {
   return (
-    <div className="mc-item">
+    <motion.div 
+      className="mc-item"
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+    >
       <button
         type="button"
         className={`mc-star ${it.is_favorite ? "on" : ""}`}
@@ -94,6 +100,6 @@ export const CalendarItem = React.memo(function CalendarItem({
           </>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 });

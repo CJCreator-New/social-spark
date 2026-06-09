@@ -113,6 +113,9 @@ function getE2EScheduleRows() {
 function findE2ECalendar(id: string) {
   seedE2EStores();
   const calendar = e2eCalendars.find((item) => item.id === id);
+  if (!calendar && id === E2E_CALENDAR.id) {
+    return clone(E2E_CALENDAR);
+  }
   return calendar ? clone(calendar) : null;
 }
 
@@ -159,6 +162,25 @@ export function useProfileQuery(userId?: string) {
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       if (!userId) return null;
+      if (isE2EMode()) {
+        return {
+          display_name: "E2E User",
+          avatar_url: null,
+          default_voice: "professional",
+          default_style: "informative",
+          default_audiences: [],
+          default_goals: [],
+          banned_hashtags: [],
+          required_hashtags: [],
+          default_timezone: "UTC",
+          brand_examples: null,
+          default_framework: null,
+          forbidden_phrases: null,
+          proof_points: null,
+          cta_preferences: null,
+          preferred_structures: null,
+        };
+      }
       const { data, error } = await supabase
         .from("profiles")
         .select("display_name, avatar_url, default_voice, default_style, default_audiences, default_goals, banned_hashtags, required_hashtags, default_timezone, brand_examples, default_framework, forbidden_phrases, proof_points, cta_preferences, preferred_structures")
@@ -196,6 +218,15 @@ export function useScheduledPostsQuery(calendarId?: string) {
     staleTime: 30 * 1000,
     queryFn: async () => {
       if (!calendarId) return [];
+      if (isE2EMode()) {
+        const rows = getE2EScheduleRows().filter(
+          (row) => row.calendar_id === calendarId && row.status !== "cancelled"
+        );
+        return rows.map((row) => ({
+          post_day: row.post_day,
+          workflow_status: row.workflow_status,
+        }));
+      }
       const { data, error } = await supabase
         .from("scheduled_posts")
         .select("post_day, workflow_status")
@@ -216,6 +247,10 @@ export function useSavedCalendarsInfiniteQuery(userId?: string, pageSize = 20) {
     getNextPageParam: (lastPage: { items: SavedCalendarListItem[]; nextCursor: string | null }) => lastPage.nextCursor,
     queryFn: async ({ pageParam }) => {
       if (!userId) return { items: [], nextCursor: null as string | null };
+      if (isE2EMode()) {
+        const calendars = getE2ECalendars() as SavedCalendarListItem[];
+        return { items: calendars, nextCursor: null as string | null };
+      }
       let query = supabase
         .from("saved_calendars")
         .select("id, title, industry_label, platform, core_idea, created_at, is_favorite, posts")
@@ -231,10 +266,6 @@ export function useSavedCalendarsInfiniteQuery(userId?: string, pageSize = 20) {
       const { data, error } = await query;
       if (error) throw error;
       const items = (data as SavedCalendarListItem[] | null) || [];
-      if (items.length === 0 && isE2EMode()) {
-        const calendars = getE2ECalendars() as SavedCalendarListItem[];
-        return { items: calendars, nextCursor: null as string | null };
-      }
       const nextCursor = items.length === pageSize ? (items[items.length - 1] as { created_at?: string } | undefined)?.created_at || null : null;
       return { items, nextCursor };
     },
@@ -543,6 +574,9 @@ export function useTemplatesQuery(userId?: string) {
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       if (!userId) return [];
+      if (isE2EMode()) {
+        return [];
+      }
       const { data, error } = await supabase.from("templates").select("id, name, description, config, created_at").eq("user_id", userId).order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];
@@ -554,6 +588,9 @@ export function useDeleteTemplateMutation(userId?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isE2EMode()) {
+        return id;
+      }
       const { error } = await supabase.from("templates").delete().eq("id", id);
       if (error) throw error;
       return id;

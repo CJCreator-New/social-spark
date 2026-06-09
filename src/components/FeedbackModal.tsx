@@ -19,7 +19,7 @@ export default function FeedbackModal({ open, onClose, onSubmit, submitting }: {
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start", justifyContent: "space-between" }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(200,240,154,0.12)", background: "rgba(200,240,154,0.06)", fontSize: 11, textTransform: "uppercase", letterSpacing: ".12em", color: "#c8f09a", fontWeight: 600 }}>Regenerate feedback</div>
-          <h3 style={{ margin: "8px 0 6px", fontFamily: "Playfair Display, Fraunces, serif", fontSize: 20 }}>What should change in this post?</h3>
+          <h3 style={{ margin: "8px 0 6px", fontFamily: "var(--font-display)", fontSize: 20 }}>What should change in this post?</h3>
           <div style={{ color: "#7a7a8e", marginBottom: 8 }}>Add a short note so the rewrite can focus on tone, length, structure, or the CTA. This is optional, but specific feedback works better than a generic retry.</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
