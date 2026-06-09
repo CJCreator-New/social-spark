@@ -330,6 +330,12 @@ export default function Profile() {
 
   const initial = (displayName || user?.email || "?").charAt(0).toUpperCase();
   const activeDefaults = [defaultVoice, defaultStyle, defaultTimezone].filter(Boolean).length + (defaultAudiences.length > 0 ? 1 : 0) + (defaultGoals.length > 0 ? 1 : 0);
+  const [savedOnce, setSavedOnce] = useState(false);
+
+  const wrappedHandleSave = async () => {
+    await handleSave();
+    setSavedOnce(true);
+  };
 
   return (
     <>
@@ -358,58 +364,42 @@ export default function Profile() {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 20, paddingBottom: 8 }}>
-          <button
-            onClick={() => setActiveTab('profile')}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: activeTab === 'profile' ? '#c8f09a' : '#7c8294',
-              borderBottom: activeTab === 'profile' ? '2px solid #c8f09a' : '2px solid transparent',
-              padding: '8px 16px',
-              cursor: 'pointer',
-              fontWeight: activeTab === 'profile' ? 600 : 400,
-              fontSize: 14,
-              marginBottom: -10,
-              transition: 'all 0.15s'
-            }}
-          >
-            Account Info
-          </button>
-          <button
-            onClick={() => setActiveTab('brand')}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: activeTab === 'brand' ? '#c8f09a' : '#7c8294',
-              borderBottom: activeTab === 'brand' ? '2px solid #c8f09a' : '2px solid transparent',
-              padding: '8px 16px',
-              cursor: 'pointer',
-              fontWeight: activeTab === 'brand' ? 600 : 400,
-              fontSize: 14,
-              marginBottom: -10,
-              transition: 'all 0.15s'
-            }}
-          >
-            Brand Defaults
-          </button>
-          <button
-            onClick={() => setActiveTab('api-keys')}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: activeTab === 'api-keys' ? '#c8f09a' : '#7c8294',
-              borderBottom: activeTab === 'api-keys' ? '2px solid #c8f09a' : '2px solid transparent',
-              padding: '8px 16px',
-              cursor: 'pointer',
-              fontWeight: activeTab === 'api-keys' ? 600 : 400,
-              fontSize: 14,
-              marginBottom: -10,
-              transition: 'all 0.15s'
-            }}
-          >
-            API Keys
-          </button>
+        <div role="tablist" aria-label="Profile sections" style={{ display: 'flex', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 20, paddingBottom: 0 }}>
+          {([
+            { id: 'profile' as const, label: 'Account Info' },
+            { id: 'brand' as const, label: 'Brand Defaults' },
+            { id: 'api-keys' as const, label: 'API Keys' },
+          ]).map(tab => (
+            <button
+              key={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="pf-tab-btn"
+              style={{
+                background: 'none',
+                border: 'none',
+                borderBottom: activeTab === tab.id ? '2px solid #c8f09a' : '2px solid transparent',
+                color: activeTab === tab.id ? '#c8f09a' : '#7c8294',
+                padding: '10px 16px 8px',
+                cursor: 'pointer',
+                fontWeight: activeTab === tab.id ? 600 : 400,
+                fontSize: 13,
+                fontFamily: 'var(--font-body)',
+                marginBottom: -1,
+                transition: 'all 0.15s',
+                outline: 'none',
+                borderRadius: '4px 4px 0 0',
+                letterSpacing: '0.01em',
+              }}
+              onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 0 0 2px rgba(200,240,154,0.5)'; }}
+              onBlur={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
+              onMouseEnter={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.color = '#edeae3'; }}
+              onMouseLeave={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.color = '#7c8294'; }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {activeTab === 'profile' && (
@@ -446,8 +436,16 @@ export default function Profile() {
                   Used as the fallback when scheduling. Each calendar can override this.
                 </div>
 
-                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                  <button className="pf-btn" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+                <div style={{ display: 'flex', gap: 8, marginTop: 16, alignItems: 'center' }}>
+                  <button className="pf-btn" onClick={wrappedHandleSave} disabled={saving}>
+                    {saving ? "Saving…" : "Save changes"}
+                  </button>
+                  {savedOnce && !saving && (
+                    <span style={{ fontSize: 11, color: '#c8f09a', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 5.5L4.5 8L9.5 3"/></svg>
+                      Saved
+                    </span>
+                  )}
                 </div>
               </>
             )}
@@ -706,8 +704,14 @@ export default function Profile() {
               </div>
 
             <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="pf-btn" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button className="pf-btn" onClick={wrappedHandleSave} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+                {savedOnce && !saving && (
+                  <span style={{ fontSize: 11, color: '#c8f09a', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 5.5L4.5 8L9.5 3"/></svg>
+                    Saved
+                  </span>
+                )}
               </div>
 
               <div style={{ marginTop: 12 }}>

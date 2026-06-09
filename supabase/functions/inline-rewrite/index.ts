@@ -1,9 +1,13 @@
+declare const Deno: any;
+
 import {
   corsHeaders,
   jsonResponse,
   checkRateLimit,
   callAIGateway,
   parseAIResponse,
+  cleanPayload,
+  getUserIdFromToken,
 } from "../_shared/promptHelpers.ts";
 
 const INSTRUCTIONS: Record<string, string> = {
@@ -13,11 +17,12 @@ const INSTRUCTIONS: Record<string, string> = {
   simpler: "Rewrite the selected text in simpler, clearer language while preserving the meaning.",
 };
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const body = await req.json().catch(() => ({}));
+    const payload = cleanPayload(body);
     const text = String(body.text || "").trim();
     const instructionKey = String(body.instruction || "");
     const instruction = INSTRUCTIONS[instructionKey] || instructionKey;
@@ -31,7 +36,7 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "");
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
-    const userId = token.slice(0, 32) || "anonymous";
+    const userId = getUserIdFromToken(token);
     const rateLimitCheck = await checkRateLimit(userId, "inline-rewrite", {
       maxRequests: 20,
       windowMs: 60 * 1000,
@@ -83,9 +88,6 @@ ${text}`;
       },
     };
 
-    const userApiKey = body.userApiKey ? String(body.userApiKey).trim() : undefined;
-    const userApiProvider = body.userApiProvider ? String(body.userApiProvider).trim() : undefined;
-
     const aiRes = await callAIGateway(
       [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }],
       tool,
@@ -93,10 +95,11 @@ ${text}`;
       {
         model: "google/gemini-2.5-flash",
         temperature: 0.55,
-        userApiKey,
-        userApiProvider,
+        userApiKey: payload.userApiKey,
+        userApiProvider: payload.userApiProvider,
         userToken: token || null,
-        userIp: ipAddress
+        userIp: ipAddress,
+        max_tokens: 8192,
       }
     );
 

@@ -24,9 +24,10 @@ export interface PostInsights {
 // Sweet-spot ranges per platform (min, max). Outside = sparse / dense.
 const HASHTAG_RANGE: Record<PlatformKey, [number, number]> = {
   linkedin: [3, 5],
-  instagram: [8, 15],
+  instagram: [3, 8],
   twitter: [1, 2],
   facebook: [0, 3],
+  tiktok: [3, 8],
 };
 
 function isLongForm(p?: string | null): boolean {
@@ -80,10 +81,14 @@ export function insightFor(post: PostLike, platformInput?: string | null): PostI
   else if (limitState === "warn" || hashtagState === "sparse") health = "warn";
 
   const hook = String(post.hook || post.title || "").trim();
+  const isTwitter = platform === "twitter";
+  const minLen = isTwitter ? 20 : 35;
+  const maxLen = isTwitter ? 100 : 180;
+  
   const hookScore = Math.min(
     1,
     [
-      hook.length >= 35 && hook.length <= 180,
+      hook.length >= minLen && hook.length <= maxLen,
       /[0-9%$]/.test(hook),
       /[?]/.test(hook) || /\b(how|why|what|when|stop|start|before|after)\b/i.test(hook),
       !/^(here'?s|in this post|today|let'?s)/i.test(hook),

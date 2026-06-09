@@ -1,13 +1,14 @@
 // Platform-ready copy formatter. Turns a generated post into clipboard-ready
 // text matching each network's conventions. No markdown, no leftover hashes.
 
-export type PlatformKey = "facebook" | "instagram" | "linkedin" | "twitter";
+export type PlatformKey = "facebook" | "instagram" | "linkedin" | "twitter" | "tiktok";
 
 export const PLATFORM_LIMITS: Record<PlatformKey, number> = {
   facebook: 63206,
   instagram: 2200,
   linkedin: 3000,
   twitter: 280,
+  tiktok: 2200,
 };
 
 export const PLATFORM_LABELS: Record<PlatformKey, string> = {
@@ -15,6 +16,7 @@ export const PLATFORM_LABELS: Record<PlatformKey, string> = {
   instagram: "Instagram",
   linkedin: "LinkedIn",
   twitter: "X",
+  tiktok: "TikTok",
 };
 
 export interface PostLike {
@@ -42,6 +44,7 @@ export function resolvePlatform(input?: string | null): PlatformKey {
   if (s.includes("instagram") || s === "ig") return "instagram";
   if (s.includes("twitter") || s.includes("x/") || s === "x" || s.startsWith("x ") || s.includes("/x")) return "twitter";
   if (s.includes("facebook") || s === "fb") return "facebook";
+  if (s.includes("tiktok") || s === "tt") return "tiktok";
   return "facebook";
 }
 
@@ -194,6 +197,9 @@ export function formatForPlatform(post: PostLike, platformInput?: string | null,
       break;
     case "instagram":
       text = buildInstagram(post);
+      break;
+    case "tiktok":
+      text = buildFacebook(post); // Reuse general clean paragraph structure for TikTok description
       break;
     case "twitter": {
       const r = buildTwitter(post);

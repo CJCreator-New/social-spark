@@ -768,6 +768,28 @@
   color: var(--text);
 }
 
+/* Disabled state — explicit visual treatment for all primary/ghost buttons */
+.cf-app .btn:disabled,
+.cf-app .btn[aria-disabled="true"] {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.cf-app .btn-p:disabled,
+.cf-app .btn-p[aria-disabled="true"] {
+  background: rgba(200, 240, 154, 0.38);
+  color: rgba(7, 8, 13, 0.6);
+}
+
+.cf-app .btn-p:disabled:hover,
+.cf-app .btn-p[aria-disabled="true"]:hover {
+  background: rgba(200, 240, 154, 0.38);
+  transform: none;
+  box-shadow: none;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    ADD ROW (Input + Button)
    ───────────────────────────────────────────────────────────────────────── */

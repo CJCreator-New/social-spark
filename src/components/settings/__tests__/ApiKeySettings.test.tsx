@@ -258,7 +258,7 @@ describe("ApiKeySettings — masked preview", () => {
 describe("ApiKeySettings — enable as fallback checkbox", () => {
   it("calls setUseOwnKey on save when checkbox state changes", async () => {
     await renderAndWait();
-    const checkbox = screen.getByLabelText(/enable custom api key as fallback/i) as HTMLInputElement;
+    const checkbox = screen.getByLabelText(/enable custom api key/i) as HTMLInputElement;
 
     fireEvent.click(checkbox); // toggle on
 
@@ -269,7 +269,7 @@ describe("ApiKeySettings — enable as fallback checkbox", () => {
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(mockSetUseOwnKey).toHaveBeenCalledWith(true);
+      expect(mockSetUseOwnKey).toHaveBeenCalledWith(true, 'fallback');
     });
   });
 });

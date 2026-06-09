@@ -1,3 +1,5 @@
+declare const Deno: any;
+
 // Shared helpers used across generate-calendar, generate-single-post, regenerate-post.
 
 export const corsHeaders = {
@@ -7,6 +9,22 @@ export const corsHeaders = {
 };
 
 export const VALID_DOW = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+
+export const ENRICHMENT_MODEL = "google/gemini-2.5-flash-lite";
+
+export function getUserIdFromToken(token?: string | null): string {
+  if (!token) return "anonymous";
+  try {
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return payload.sub || token.slice(0, 32) || "anonymous";
+    }
+  } catch (e) {
+    console.error("getUserIdFromToken parsing failed:", e);
+  }
+  return token.slice(0, 32) || "anonymous";
+}
 
 export const LENGTH_GUIDE_WEEK: Record<string, string> = {
   short: "80–120 words per post (tight, punchy)",
@@ -64,6 +82,11 @@ export function bannedPhrasesBlock(): string {
   return `BANNED PHRASES — do NOT use any of these or close variants:\n${BANNED_PHRASES.map(p => `- "${p}"`).join("\n")}\nAvoid empty hype openers. Open with a specific observation, number, or contrarian claim instead.`;
 }
 
+export function buildRequiredWordsBlock(requiredWords?: string[]): string {
+  if (!requiredWords || requiredWords.length === 0) return "";
+  return `REQUIRED WORDS — you MUST include all of the following words/phrases in the generated post body:\n${requiredWords.map(w => `- "${w}"`).join("\n")}`;
+}
+
 export function buildEngagementRules(platform: string): string {
   const platformGuidance = (() => {
     switch (platform) {
@@ -75,6 +98,8 @@ export function buildEngagementRules(platform: string): string {
         return "Concise, sharp, opinionated. Keep the post tight, direct, and easy to quote or reply to.";
       case "Facebook":
         return "Warm, conversational, community-first. Sound human, approachable, and easy to react to or share.";
+      case "TikTok":
+        return "Hook-first, high energy, highly conversational. Write text that works as a voiceover/video script (1-3 lines hooks, fast setup, engaging CTA).";
       default:
         return "Native to the platform. Match the platform's expectations and keep the tone natural.";
     }
@@ -86,13 +111,15 @@ export function buildEngagementRules(platform: string): string {
 export function getPlatformPreset(platform: string): string {
   switch (platform) {
     case "LinkedIn":
-      return `\nPLATFORM PRESCRIPT: LinkedIn posts should open with a professional insight or data point, include a short explanation, and end with a discussion prompt. Example hook: "70% of startups fail because..."`;
+      return `\nPLATFORM PRESCRIPT: LinkedIn posts should open with a professional insight or data point, include a short explanation, and end with a discussion prompt.`;
     case "Instagram":
       return `\nPLATFORM PRESCRIPT: Instagram captions should start with a scroll-stopping line, include a 1-2 sentence micro-story or vivid image, and a short CTA like "Save this" or "Share your story".`;
     case "X":
       return `\nPLATFORM PRESCRIPT: X posts must be concise (one to three short sentences), bold in opinion, and formatted for quick replies and retweets. Avoid long explanations.`;
     case "Facebook":
       return `\nPLATFORM PRESCRIPT: Facebook posts can be slightly longer, warm, and community-focused. Invite comments and sharing; include a clear question.`;
+    case "TikTok":
+      return `\nPLATFORM PRESCRIPT: TikTok description / scripts should lead with a high-impact verbal hook (under 3 seconds), followed by 3 key points, and end with a highly engaging comment prompt like "Would you try this?"`;
     default:
       return `\nPLATFORM PRESCRIPT: Match the platform's native style.`;
   }
@@ -337,6 +364,22 @@ const BRITISH_TO_AMERICAN: Record<string, string> = {
   behaviour: "behavior",
   colour: "color",
   favourite: "favorite",
+  centre: "center",
+  defence: "defense",
+  licence: "license",
+  labour: "labor",
+  theatre: "theater",
+  flavour: "flavor",
+  humour: "humor",
+  neighbour: "neighbor",
+  catalogue: "catalog",
+  travelled: "traveled",
+  travelling: "traveling",
+  cancelled: "canceled",
+  modelling: "modeling",
+  standardise: "standardize",
+  standardised: "standardized",
+  standardising: "standardizing",
 };
 
 export function fixSpelling(text: string): string {
@@ -357,7 +400,18 @@ function buildContentRules(platform: string, language?: string): string {
     ? "- Keep the output fully in Tamil script and avoid mixing in English unless a product name or platform term needs it."
     : "- Use American English spelling: optimizing, organizing, recognizing, analyzing, utilizing, emphasizing.\n- Avoid British spellings such as organising, optimising, recognising, analysing, utilising, emphasising.";
 
-  return `\nCONTENT RULES:\n- Do not use markdown syntax in post text: no **bold**, *italic*, headings, or inline code.\n- Use plain-text bullets only (• or →). Do not combine bullets with markdown formatting.\n- Rotate CTA verbs across the week; do not repeat the same CTA verb on every post.\n- Stay tightly within the user's stated topic angle; do not introduce tangential sub-topics unless requested.\n- Keep the post platform-native: LinkedIn = insight-led, Instagram = visual/story-driven, X = concise/opinionated, Facebook = warm/community-first.\n- If the topic is India-specific, incorporate current Indian trends (Digital India, EV adoption, startup ecosystem), regional contexts (South/North/East/West differences), and cultural references (jugaad innovation, dharma/responsibility themes) where relevant.\n- Reference upcoming festivals (Diwali, Holi, Durga Puja) and national events (Republic Day) in seasonal content.\n${spellingRule}${buildEngagementRules(platform)}`;
+  const globalConstraints = "- Never fabricate statistics or named studies — use qualifying language ('roughly', 'studies suggest').";
+
+  let platformGuidance = "";
+  if (platform === "LinkedIn") {
+    platformGuidance = "\n- Use paragraph-chunking: write in short blocks of 1-3 sentences with blank lines in between to reward dwell time.";
+  } else if (platform === "X" || platform === "Twitter") {
+    platformGuidance = "\n- Strictly enforce the 280-character limit instruction. Never use standalone hashtag blocks at the end of the post; weave hashtags naturally if used, or omit them.";
+  } else if (platform === "Instagram") {
+    platformGuidance = "\n- Use double-newline visual spacing for clean paragraph division. Cap hashtags to 3 to 8 (modern post-2024 algorithm best practice).";
+  }
+
+  return `\nCONTENT RULES:\n- Do not use markdown syntax in post text: no **bold**, *italic*, headings, or inline code.\n- Use plain-text bullets only (• or →). Do not combine bullets with markdown formatting.\n- Rotate CTA verbs across the week; do not repeat the same CTA verb on every post.\n- Stay tightly within the user's stated topic angle; do not introduce tangential sub-topics unless requested.\n- Keep the post platform-native: LinkedIn = insight-led, Instagram = visual/story-driven, X = concise/opinionated, Facebook = warm/community-first, TikTok = script-based/high-energy.\n- If the topic is India-specific, incorporate current Indian trends (Digital India, EV adoption, startup ecosystem), regional contexts (South/North/East/West differences), and cultural references (jugaad innovation, dharma/responsibility themes) where relevant.\n- Reference upcoming festivals (Diwali, Holi, Durga Puja) and national events (Republic Day) in seasonal content.\n${globalConstraints}${platformGuidance}\n${spellingRule}${buildEngagementRules(platform)}`;
 }
 
 function buildLanguageRules(language?: string): string {
@@ -406,7 +460,9 @@ export function cleanPayload(body: unknown): GenerationPayload {
     bannedHashtags: cleanTagList(payload.bannedHashtags, 30),
     requiredHashtags: cleanTagList(payload.requiredHashtags, 10),
     userApiKey: payload.userApiKey ? String(payload.userApiKey).trim() : undefined,
-    userApiProvider: payload.userApiProvider ? (String(payload.userApiProvider).trim() as any) : undefined,
+    userApiProvider: (payload.userApiProvider && ["openai", "anthropic", "openrouter"].includes(String(payload.userApiProvider).trim()))
+      ? (String(payload.userApiProvider).trim() as any)
+      : undefined,
   };
 }
 
@@ -566,6 +622,7 @@ export function buildSystemMessage(
   const languageRules = buildLanguageRules(payload.language);
   const stylePreset = getStylePreset(payload.style);
   const banned = bannedPhrasesBlock();
+  const requiredWordsBlock = buildRequiredWordsBlock(payload.requiredWords);
   
   const antiMimicry = payload.brand_examples && payload.brand_examples.length > 0
     ? "\nANTI-MIMICRY RULE: Match the cadence, vocabulary, and sentence structure of the brand examples provided, but do NOT copy phrases or specific hooks verbatim. Freshness is key."
@@ -604,6 +661,7 @@ ${stylePreset}
 [CONSTRAINTS]
 ${banned}
 ${antiMimicry}
+${requiredWordsBlock ? `- ${requiredWordsBlock}` : ""}
 - Never output markdown bold/italic formatting in the post copy.
 - Stay strictly on topic. Do not drift into generic summaries.
 
@@ -648,7 +706,7 @@ export function buildUserMessage(
     ? `Topic: ${payload.topic || payload.coreIdea || '(not specified)'}`
     : (opts.includeTopics && payload.topics && payload.topics.length) ? `Topics: ${payload.topics.join(', ')}` : `Core idea: ${payload.coreIdea || '(not specified)'} `;
 
-  const brief = `BRIEF:\n+- Industry: ${payload.industryLabel || payload.industry || '(not specified)'}\n+- ${topicLine}\n+- Audience: ${payload.audiences.length ? payload.audiences.join(', ') : '(not specified)'}\n+- Voice: ${payload.voice || '(not specified)'}\n+- Style: ${payload.style || '(not specified)'}\n+- Goals: ${payload.goals.length ? payload.goals.join(', ') : '(not specified)'}\n+- Length target: ${payload.length || 'medium'}\n+- Structure target: ${payload.structure || 'mixed'}\n${payload.extra ? `- Extra: ${payload.extra}` : ''}\n`;
+  const brief = `BRIEF:\n- Industry: ${payload.industryLabel || payload.industry || '(not specified)'}\n- ${topicLine}\n- Audience: ${payload.audiences.length ? payload.audiences.join(', ') : '(not specified)'}\n- Voice: ${payload.voice || '(not specified)'}\n- Style: ${payload.style || '(not specified)'}\n- Goals: ${payload.goals.length ? payload.goals.join(', ') : '(not specified)'}\n- Length target: ${payload.length || 'medium'}\n- Structure target: ${payload.structure || 'mixed'}\n${payload.extra ? `- Extra: ${payload.extra}` : ''}\n`;
 
   const ask = `Return the result via the provided function tool. Include a lightweight plan first (plan.angle, plan.hook_thesis, plan.proof_points[], plan.cta_intent) before the final body. Also provide 3 hook_options, 2 cta_options, and up to 2 body_variants. Provide a self_check object listing any forbidden rule violations.`;
 
@@ -678,7 +736,8 @@ async function callOpenAiCompatibleDirect(
   tool: Record<string, unknown> | null,
   apiKey: string,
   model: string,
-  temperature: number
+  temperature: number,
+  max_tokens?: number
 ): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
   const hasTool = tool && Object.keys(tool).length > 0;
   const functionName = hasTool ? (((tool as any).function?.name || "") as string) : "";
@@ -696,6 +755,7 @@ async function callOpenAiCompatibleDirect(
         tools: hasTool ? [tool] : undefined,
         tool_choice: hasTool ? { type: "function", function: { name: functionName } } : undefined,
         temperature,
+        max_tokens,
       }),
     });
     
@@ -718,7 +778,8 @@ async function callAnthropicDirect(
   tool: Record<string, unknown> | null,
   apiKey: string,
   model: string,
-  temperature: number
+  temperature: number,
+  max_tokens?: number
 ): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
   const systemMessage = messages.find(m => m.role === "system")?.content || "";
   const regularMessages = messages.filter(m => m.role !== "system");
@@ -752,7 +813,7 @@ async function callAnthropicDirect(
         tools: anthropicTools,
         tool_choice: toolChoice,
         temperature,
-        max_tokens: 4000
+        max_tokens: max_tokens || 4000
       })
     });
     
@@ -817,6 +878,7 @@ export async function callAI(
     model?: string;
     temperature?: number;
     timeoutMs?: number;
+    max_tokens?: number;
   }
 ): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
   const provider = opts.provider;
@@ -825,21 +887,49 @@ export async function callAI(
   const model = opts.model || getProviderModel(provider, quality);
   
   if (provider === "openai") {
-    return callOpenAiCompatibleDirect("https://api.openai.com/v1/chat/completions", messages, tool, apiKey, model, temperature);
+    return callOpenAiCompatibleDirect("https://api.openai.com/v1/chat/completions", messages, tool, apiKey, model, temperature, opts.max_tokens);
   } else if (provider === "openrouter") {
-    return callOpenAiCompatibleDirect("https://openrouter.ai/api/v1/chat/completions", messages, tool, apiKey, model, temperature);
+    return callOpenAiCompatibleDirect("https://openrouter.ai/api/v1/chat/completions", messages, tool, apiKey, model, temperature, opts.max_tokens);
   } else if (provider === "anthropic") {
-    return callAnthropicDirect(messages, tool, apiKey, model, temperature);
+    return callAnthropicDirect(messages, tool, apiKey, model, temperature, opts.max_tokens);
   }
   
   return { status: 400, error: `Unsupported API provider: ${provider}` };
+}
+
+function padTopics(topics: string[], coreIdea: string): string[] {
+  const result = [...topics];
+  if (result.length >= 7) return result.slice(0, 7);
+  
+  if (result.length === 0) {
+    result.push(coreIdea || "General update");
+  }
+
+  let idx = 0;
+  const templates = [
+    (t: string) => `Deep dive into ${t}`,
+    (t: string) => `Key takeaways on ${t}`,
+    (t: string) => `Why ${t} matters now`,
+    (t: string) => `How to approach ${t}`,
+    (t: string) => `Common mistakes with ${t}`,
+    (t: string) => `Future trends in ${t}`,
+    (t: string) => `A contrarian view on ${t}`,
+  ];
+
+  while (result.length < 7) {
+    const baseTopic = result[idx % result.length];
+    const generator = templates[Math.floor(result.length / 7) % templates.length];
+    result.push(generator(baseTopic));
+    idx++;
+  }
+  return result;
 }
 
 export async function enrichTopics(
   payload: GenerationPayload,
   apiKey: string
 ): Promise<string[]> {
-  const model = payload.userApiProvider ? getProviderModel(payload.userApiProvider, "draft") : "google/gemini-2.5-flash-lite";
+  const model = payload.userApiProvider ? getProviderModel(payload.userApiProvider, "draft") : ENRICHMENT_MODEL;
   const system = `You are a senior content strategist. Given a core idea and a list of topics, return exactly 7 unique, highly differentiated post angles for a 7-day calendar. Each angle should be one sentence, focusing on a specific fact, story, or contrarian point. Do not repeat themes. Return as a simple JSON array of strings.`;
   const user = `Core Idea: ${payload.coreIdea}\nTopics: ${payload.topics.join(", ")}\nIndustry: ${payload.industryLabel || payload.industry}`;
 
@@ -859,7 +949,7 @@ export async function enrichTopics(
       if (aiRes.status === 200) {
         data = aiRes.data;
       } else {
-        return payload.topics.length >= 7 ? payload.topics.slice(0, 7) : payload.topics;
+        return padTopics(payload.topics, payload.coreIdea);
       }
     } else {
       const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -875,7 +965,7 @@ export async function enrichTopics(
         }),
       });
 
-      if (!res.ok) return payload.topics.length >= 7 ? payload.topics.slice(0, 7) : payload.topics;
+      if (!res.ok) return padTopics(payload.topics, payload.coreIdea);
       data = await res.json();
     }
 
@@ -884,14 +974,14 @@ export async function enrichTopics(
     if (m) {
       try {
         const enriched = JSON.parse(m[0]);
-        if (Array.isArray(enriched) && enriched.length >= 7) return enriched.slice(0, 7);
+        if (Array.isArray(enriched) && enriched.length > 0) return padTopics(enriched, payload.coreIdea);
       } catch (e) { /* fallback */ }
     }
   } catch (e) {
     console.warn("Topic enrichment failed:", e);
   }
 
-  return payload.topics.length >= 7 ? payload.topics.slice(0, 7) : payload.topics;
+  return padTopics(payload.topics, payload.coreIdea);
 }
 
 export async function scoreVariants(
@@ -953,16 +1043,27 @@ ${variants.map((v, i) => `[Variant ${i}]: ${v.slice(0, 1000)}`).join("\n\n")}`;
     }
 
     if (data) {
-      const content = data?.choices?.[0]?.message?.content || "";
-      const m = content.match(/\{[\s\S]*\}/);
-      if (m) {
-        const parsed = JSON.parse(m[0]);
-        if (parsed.results && Array.isArray(parsed.results)) {
-          return {
-            scores: parsed.results,
-            winner_index: typeof parsed.winner_index === "number" ? parsed.winner_index : 0
-          };
+      const content = String(data?.choices?.[0]?.message?.content || "").trim();
+      let parsed: any = null;
+      if (content.startsWith("{") || content.startsWith("[")) {
+        try {
+          parsed = JSON.parse(content);
+        } catch (e) { /* ignore */ }
+      }
+      if (!parsed) {
+        const m = content.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+        if (m) {
+          try {
+            parsed = JSON.parse(m[0]);
+          } catch (e) { /* ignore */ }
         }
+      }
+
+      if (parsed && parsed.results && Array.isArray(parsed.results)) {
+        return {
+          scores: parsed.results,
+          winner_index: typeof parsed.winner_index === "number" ? parsed.winner_index : 0
+        };
       }
     }
   } catch (e) {
@@ -990,6 +1091,7 @@ export async function callAIGateway(
     quality?: string;
     userToken?: string | null;
     userIp?: string | null;
+    max_tokens?: number;
   } = {}
 ): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
   // If userApiKey is provided, route through callAI helper
@@ -1008,6 +1110,7 @@ export async function callAIGateway(
             // Asynchronous logging so it doesn't block the AI response
             (async () => {
               try {
+                // @ts-ignore: Deno dynamic import
                 const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
                 const adminClient = createClient(supabaseUrl, supabaseServiceKey);
                 const { error: logErr } = await adminClient.from("api_key_audit_log").insert({
@@ -1038,6 +1141,7 @@ export async function callAIGateway(
       model: opts.model,
       temperature: opts.temperature,
       timeoutMs: opts.timeoutMs,
+      max_tokens: opts.max_tokens,
     });
   }
 
@@ -1065,6 +1169,7 @@ export async function callAIGateway(
         tool_choice: tool && Object.keys(tool).length > 0 ? { type: "function", function: { name: functionName } } : undefined,
         temperature,
         top_p,
+        max_tokens: opts.max_tokens,
       }),
       signal: controller.signal,
     });
@@ -1207,7 +1312,7 @@ export function parseAIResponse(
 export function normalizePost(
   post: unknown,
   overrideDow?: string,
-  payload?: Pick<GenerationPayload, "platform" | "bannedHashtags" | "requiredHashtags" | "length">,
+  payload?: Pick<GenerationPayload, "platform" | "bannedHashtags" | "requiredHashtags" | "length" | "requiredWords">,
 ): Record<string, unknown> | null {
   if (!post || typeof post !== "object") {
     return null;
@@ -1240,6 +1345,25 @@ export function normalizePost(
         console.warn(`Word count drift detected: ${actualWordCount} vs target range ${range[0]}-${range[1]}. Allowing but flagging.`);
         // For now, we flag it in self_check rather than hard rejection to avoid UX loops
       }
+    }
+  }
+
+  // Post-generation presence check for required words
+  if (payload?.requiredWords && payload.requiredWords.length > 0) {
+    const missing = payload.requiredWords.filter(word => {
+      const regex = new RegExp(word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i');
+      return !regex.test(body);
+    });
+    if (missing.length > 0) {
+      console.warn(`Post generation missing required words: ${missing.join(", ")}`);
+      const selfCheck = p.self_check && typeof p.self_check === "object"
+        ? { ...p.self_check as Record<string, unknown> }
+        : { forbidden_violations: [], checks_passed: true, notes: "" };
+      const violations = (Array.isArray(selfCheck.forbidden_violations) ? [...selfCheck.forbidden_violations] : []) as string[];
+      missing.forEach(w => violations.push(`Missing required word: "${w}"`));
+      selfCheck.forbidden_violations = violations;
+      selfCheck.checks_passed = false;
+      p.self_check = selfCheck;
     }
   }
 

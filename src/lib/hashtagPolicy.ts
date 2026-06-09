@@ -15,6 +15,7 @@ const PLATFORM_MAX: Record<PlatformKey, number> = {
   instagram: 15,
   linkedin: 5,
   twitter: 2,
+  tiktok: 5,
 };
 
 // Long-form platforms shouldn't carry hashtags at all.

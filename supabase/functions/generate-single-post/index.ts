@@ -1,3 +1,5 @@
+declare const Deno: any;
+
 // Generate a SINGLE post (one chosen day) via Lovable AI Gateway.
 import {
   corsHeaders,
@@ -19,9 +21,10 @@ import {
   normalizePost,
   scoreVariants,
   recordServerTelemetryEvent,
+  getUserIdFromToken,
 } from "../_shared/promptHelpers.ts";
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -39,7 +42,7 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "");
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
-    const userId = token.slice(0, 32) || "anonymous";
+    const userId = getUserIdFromToken(token);
     const rateLimitCheck = await checkRateLimit(userId, "generate-single-post", {
       maxRequests: 20,
       windowMs: 60 * 1000,
@@ -135,7 +138,8 @@ Deno.serve(async (req) => {
         userApiProvider: payload.userApiProvider,
         quality: payload.quality,
         userToken: token || null,
-        userIp: ipAddress
+        userIp: ipAddress,
+        max_tokens: 8192
       }
     );
     if (aiRes.status !== 200) {
@@ -190,7 +194,8 @@ Deno.serve(async (req) => {
             userApiProvider: payload.userApiProvider,
             quality: payload.quality,
             userToken: token || null,
-            userIp: ipAddress
+            userIp: ipAddress,
+            max_tokens: 8192
           }
         );
         if (polishRes.status === 200) {

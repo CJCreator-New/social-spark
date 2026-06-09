@@ -102,14 +102,25 @@ export async function getUserApiKey(): Promise<{
       };
     });
 
-  const [decrypted, settings] = await Promise.all([decPromise, settingsPromise]);
+  try {
+    const [decrypted, settings] = await Promise.all([decPromise, settingsPromise]);
+    const hasKey = !!decrypted.apiKey;
 
-  return {
-    apiKey: decrypted.apiKey,
-    provider: decrypted.provider,
-    useOwnKey: settings.useOwnKey,
-    keyMode: settings.keyMode,
-  };
+    return {
+      apiKey: decrypted.apiKey,
+      provider: decrypted.provider,
+      useOwnKey: hasKey ? settings.useOwnKey : false,
+      keyMode: settings.keyMode,
+    };
+  } catch (err) {
+    console.error("getUserApiKey failed:", err);
+    return {
+      apiKey: null,
+      provider: null,
+      useOwnKey: false,
+      keyMode: 'fallback'
+    };
+  }
 }
 
 export async function setUseOwnKey(enabled: boolean, keyMode: 'fallback' | 'always' = 'fallback'): Promise<void> {

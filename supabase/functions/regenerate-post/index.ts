@@ -1,3 +1,5 @@
+declare const Deno: any;
+
 // Regenerate a single post in a 7-day calendar via Lovable AI Gateway.
 import {
   corsHeaders,
@@ -17,6 +19,7 @@ import {
   parseAIResponse,
   buildSystemMessage,
   buildUserMessage,
+  getUserIdFromToken,
 } from "../_shared/promptHelpers.ts";
 
 interface ExistingPost {
@@ -53,7 +56,7 @@ function buildEnhanceTweakInstruction(focusMetric?: string): string {
   return [TWEAK_INSTRUCTIONS.enhance, focus].filter(Boolean).join("\n");
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -77,7 +80,7 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "");
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
-    const userId = token.slice(0, 32) || "anonymous";
+    const userId = getUserIdFromToken(token);
     const rateLimitCheck = await checkRateLimit(userId, "regenerate-post", {
       maxRequests: 30,
       windowMs: 60 * 1000,
@@ -198,7 +201,8 @@ CRITIQUE & REWRITE GUIDANCE:
         userApiProvider: payload.userApiProvider,
         quality: payload.quality,
         userToken: token || null,
-        userIp: ipAddress
+        userIp: ipAddress,
+        max_tokens: 8192
       }
     );
     if (aiRes.status !== 200) {
@@ -254,7 +258,8 @@ CRITIQUE & REWRITE GUIDANCE:
           userApiProvider: payload.userApiProvider,
           quality: payload.quality,
           userToken: token || null,
-          userIp: ipAddress
+          userIp: ipAddress,
+          max_tokens: 8192
         });
 
         if (polishRes.status === 200) {

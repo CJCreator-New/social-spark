@@ -267,7 +267,7 @@ describe("getUserApiKey", () => {
   it("returns null values when not authenticated (no session)", async () => {
     mockGetSession.mockResolvedValue(NO_SESSION);
     const result = await getUserApiKey();
-    expect(result).toEqual({ apiKey: null, provider: null, useOwnKey: false });
+    expect(result).toEqual({ apiKey: null, provider: null, useOwnKey: false, keyMode: 'fallback' });
   });
 
   it("returns null apiKey when no user_settings row exists", async () => {
@@ -312,10 +312,15 @@ describe("getUserApiKey", () => {
       json: () => Promise.resolve({ error: "An unexpected error occurred." }),
     } as Response);
 
-    // Should throw but be handled by caller — verify it propagates (not silently null)
     // Per spec: "Returns null (does not throw) if decrypt Edge Function fails gracefully"
-    // The current implementation throws when fetch fails — we document this behavior
-    await expect(getUserApiKey()).rejects.toThrow();
+    // Now that getUserApiKey is wrapped in try/catch (P2-41), it returns the default null state.
+    const result = await getUserApiKey();
+    expect(result).toEqual({
+      apiKey: null,
+      provider: null,
+      useOwnKey: false,
+      keyMode: 'fallback',
+    });
   });
 
   it("returns null apiKey when use_own_key is false even if key exists", async () => {

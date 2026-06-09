@@ -1,3 +1,5 @@
+declare const Deno: any;
+
 // repurpose-post/index.ts
 // Takes an existing post and rewrites it for a DIFFERENT target platform.
 import {
@@ -9,9 +11,11 @@ import {
   callAIGateway,
   parseAIResponse,
   normalizePost,
+  getUserIdFromToken,
+  scoreVariants,
 } from "../_shared/promptHelpers.ts";
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -28,7 +32,7 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "");
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
-    const userId = token.slice(0, 32) || "anonymous";
+    const userId = getUserIdFromToken(token);
     const rateLimitCheck = await checkRateLimit(userId, "repurpose-post", {
       maxRequests: 10,
       windowMs: 60 * 1000,
@@ -60,7 +64,7 @@ CTA: ${post.cta || ""}
 Hashtags: ${post.hashtags || ""}
 
 PLATFORM SPECIFICS:
-- If target is X: Create a concise, high-impact version. If the source is long, break it into a short 3-5 post thread format.
+- If target is X: Create a concise, high-impact single post. Do NOT write a thread; keep it fully within one post body.
 - If target is Instagram: Focus on a "Carousel Script" format - Slide 1 (Hook), Slides 2-4 (Value points), Slide 5 (CTA).
 - If target is Facebook: Warm, community-focused, and conversational.
 - If target is LinkedIn: Insight-led, professional, and formatted with white space.
@@ -88,24 +92,29 @@ Return the result as a single post object using return_post.`;
             hashtags: { type: "string" },
             rationale: { type: "string" },
             image_prompt: { type: "string" },
+            body_variants: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 2 },
           },
-          required: ["topic", "format", "title", "hook", "body", "cta", "hashtags", "rationale"],
+          required: ["topic", "format", "title", "hook", "body", "cta", "hashtags", "rationale", "image_prompt"],
         },
       },
     };
+
+    const model = targetPayload.quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+    const temperature = targetPayload.quality === "polished" ? 0.6 : 0.8;
 
     const aiRes = await callAIGateway(
       [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }],
       tool,
       LOVABLE_API_KEY,
       {
-        model: "google/gemini-2.5-flash",
-        temperature: 0.7,
+        model,
+        temperature,
         userApiKey: targetPayload.userApiKey,
         userApiProvider: targetPayload.userApiProvider,
         quality: targetPayload.quality,
         userToken: token || null,
-        userIp: ipAddress
+        userIp: ipAddress,
+        max_tokens: 8192
       }
     );
 
@@ -114,7 +123,28 @@ Return the result as a single post object using return_post.`;
     const parseResult = parseAIResponse(aiRes.data || {}, "return_post");
     if (!parseResult.success) return jsonResponse({ error: parseResult.error }, 500);
 
-    const normalized = normalizePost(parseResult.parsed, post.dow, targetPayload);
+    let parsed = parseResult.parsed as Record<string, unknown>;
+
+    // Variant scoring block
+    const candidates = [String(parsed.body || "")];
+    if (Array.isArray(parsed.body_variants)) {
+      candidates.push(...parsed.body_variants.map(v => String(v || "")));
+    }
+    
+    if (candidates.length > 1) {
+      const judgeRes = await scoreVariants(candidates, targetPayload, LOVABLE_API_KEY || "");
+      parsed.variant_scores = judgeRes.scores;
+      parsed.chosen_index = judgeRes.winner_index;
+      if (judgeRes.winner_index > 0 && judgeRes.winner_index < candidates.length) {
+        parsed.body = candidates[judgeRes.winner_index];
+      }
+    }
+
+    const normalized = normalizePost(parsed, post.dow, targetPayload);
+    if (normalized) {
+      normalized.variant_scores = parsed.variant_scores;
+      normalized.chosen_index = parsed.chosen_index;
+    }
     return jsonResponse({ post: normalized });
 
   } catch (e) {

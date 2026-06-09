@@ -1,7 +1,10 @@
+declare const Deno: any;
+
 import {
   corsHeaders,
   jsonResponse,
   checkRateLimit,
+  getUserIdFromToken,
 } from "../_shared/promptHelpers.ts";
 
 type ImageRequest = {
@@ -26,26 +29,12 @@ function sizeForAspectRatio(aspectRatio: string): string {
       return "1536x864";
     case "4:5":
       return "1024x1280";
+    case "9:16":
+      return "864x1536";
     case "1:1":
     default:
       return "1024x1024";
   }
-}
-
-async function getUserId(req: Request, supabaseUrl: string, apiKey: string): Promise<string | null> {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader) return null;
-
-  const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: {
-      authorization: authHeader,
-      apikey: apiKey,
-    },
-  });
-
-  if (!res.ok) return null;
-  const user = await res.json().catch(() => null);
-  return typeof user?.id === "string" ? user.id : null;
 }
 
 function bytesFromBase64(input: string): { bytes: Uint8Array; contentType: string } {
@@ -75,7 +64,7 @@ async function uploadToStorage(params: {
       "content-type": params.contentType,
       "x-upsert": "true",
     },
-    body: params.bytes,
+    body: params.bytes as any,
   });
 
   if (!res.ok) {
@@ -117,26 +106,27 @@ async function upsertMediaReference(params: {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    console.warn(`media_references upsert failed (${res.status})`, text);
+    throw new Error(`Failed to track media reference: (${res.status}) ${text}`.trim());
   }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || SUPABASE_SERVICE_ROLE_KEY;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return jsonResponse({ error: "Storage is not configured." }, 500);
     }
     if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI image generation is not configured." }, 500);
 
-    const userId = await getUserId(req, SUPABASE_URL, SUPABASE_ANON_KEY);
-    if (!userId) return jsonResponse({ error: "Sign in required." }, 401);
+    const authHeader = req.headers.get("authorization") || "";
+    const token = authHeader.replace("Bearer ", "");
+    const userId = getUserIdFromToken(token);
+    if (!userId || userId === "anonymous") return jsonResponse({ error: "Sign in required." }, 401);
 
     const body = await req.json().catch(() => ({})) as ImageRequest;
     const calendarId = String(body.calendarId || "");
@@ -155,35 +145,67 @@ Deno.serve(async (req) => {
     });
     if (!rateLimitCheck.allowed) return jsonResponse({ error: "Rate limit exceeded." }, 429);
 
+    let platformStyle = "";
+    if (platform === "LinkedIn") {
+      platformStyle = "Style: Professional, clean, corporate-editorial, minimalist flat illustrations or clean office/workspace photography. Muted executive colors.";
+    } else if (platform === "Instagram" || platform === "TikTok") {
+      platformStyle = "Style: Lifestyle photography, vibrant, authentic, high-contrast, modern aesthetic suitable for lifestyle grids or video thumbnails.";
+    } else if (platform === "X" || platform === "Facebook") {
+      platformStyle = "Style: Engaging, news-editorial or concept-graphic illustration, sharp contrast, clear central subject.";
+    }
+
     const finalPrompt = [
       prompt,
       `Platform: ${platform}. Aspect ratio: ${aspectRatio}.`,
+      platformStyle,
       "Create a polished editorial social-media visual. No logos, no UI mockups, no readable text, no captions, no watermarks.",
-    ].join("\n");
+    ].filter(Boolean).join("\n");
 
-    const imageRes = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        prompt: finalPrompt,
-        n: 1,
-        size: sizeForAspectRatio(aspectRatio),
-        aspect_ratio: aspectRatio,
-        response_format: "b64_json",
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+    let imageRes;
+    try {
+      imageRes = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          prompt: finalPrompt,
+          n: 1,
+          size: sizeForAspectRatio(aspectRatio),
+          aspect_ratio: aspectRatio,
+          response_format: "b64_json",
+        }),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return jsonResponse({ error: "Image generation timed out after 45 seconds." }, 504);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!imageRes.ok) {
       const text = await imageRes.text().catch(() => "");
-      console.error(`Image gateway error ${imageRes.status}`, text);
+      console.error(`Image gateway error ${imageRes.status}. Response body:`, text);
       return jsonResponse({ error: `Image generation failed (${imageRes.status}).` }, imageRes.status || 500);
     }
 
-    const imageData = await imageRes.json();
+    const imageData = await imageRes.json().catch((err) => {
+      console.error("Failed to parse image generator JSON response:", err);
+      return null;
+    });
+
+    if (!imageData) {
+      return jsonResponse({ error: "Image generator returned invalid JSON." }, 500);
+    }
+
     const item = imageData?.data?.[0] || imageData?.images?.[0] || imageData;
     const b64 = item?.b64_json || item?.base64 || item?.image;
     const url = item?.url || item?.public_url;
@@ -201,7 +223,30 @@ Deno.serve(async (req) => {
       bytes = new Uint8Array(await assetRes.arrayBuffer());
       contentType = assetRes.headers.get("content-type") || "image/png";
     } else {
+      console.error("Unknown API response shape:", JSON.stringify(imageData));
       return jsonResponse({ error: "Image generator did not return an image." }, 500);
+    }
+
+    // Orphan previous images for this calendar and post day before uploading the new one
+    const searchPathPattern = `${userId}/${calendarId}/day-${postDay}-`;
+    const orphanRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/media_references?user_id=eq.${userId}&bucket=eq.post-images&reference_kind=eq.calendar&reference_key=eq.${calendarId}&storage_path=like.${searchPathPattern}%`,
+      {
+        method: "PATCH",
+        headers: {
+          authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          reference_count: 0,
+          orphaned_at: new Date().toISOString(),
+        }),
+      }
+    );
+    if (!orphanRes.ok) {
+      const text = await orphanRes.text().catch(() => "");
+      console.warn(`Failed to orphan old media references: ${orphanRes.status}`, text);
     }
 
     const ext = contentType.includes("jpeg") ? "jpg" : contentType.includes("webp") ? "webp" : "png";

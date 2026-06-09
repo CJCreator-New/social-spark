@@ -1,4 +1,4 @@
-import { Suspense, useState, useRef, useEffect, useMemo, useCallback, lazy } from "react";
+import React, { Suspense, useState, useRef, useEffect, useMemo, useCallback, lazy } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -1888,14 +1888,28 @@ const Index = () => {
           </div>
 
           {/* STEPPER */}
-          <div className="stepper">
+          <div className="stepper" role="list" aria-label="Wizard steps">
             {STEP_LABELS.map((s, i) => (
-              <div key={s} className={`snode ${i + 1 === step ? "on" : ""}`} role="button" tabIndex={0} onClick={() => setStep(i + 1)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setStep(i + 1); }}>
-                <div className={`sdot ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>
-                  {i + 1 < step ? <Check /> : i + 1}
+              <React.Fragment key={s}>
+                <div
+                  className={`snode ${i + 1 === step ? "on" : ""}`}
+                  role="listitem"
+                  tabIndex={i + 1 < step ? 0 : -1}
+                  aria-current={i + 1 === step ? "step" : undefined}
+                  aria-label={`Step ${i + 1}: ${s}${i + 1 < step ? " (completed)" : i + 1 === step ? " (current)" : " (upcoming)"}`}
+                  onClick={() => i + 1 < step && setStep(i + 1)}
+                  onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && i + 1 < step) setStep(i + 1); }}
+                  style={{ cursor: i + 1 < step ? "pointer" : "default" }}
+                >
+                  <div className={`sdot ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>
+                    {i + 1 < step ? <Check /> : i + 1}
+                  </div>
+                  <div className={`slabel ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>{s}</div>
                 </div>
-                <div className={`slabel ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>{s}</div>
-              </div>
+                {i < STEP_LABELS.length - 1 && (
+                  <div key={`line-${i}`} className={`sline ${i + 1 < step ? "done" : ""}`} aria-hidden="true" />
+                )}
+              </React.Fragment>
             ))}
           </div>
 
@@ -1994,8 +2008,23 @@ const Index = () => {
               </div>
 
               <div className="csect" ref={coreIdeaRef}>
-                <div className="flabel">Core idea / angle</div>
-                <textarea rows={3} placeholder="What's the big idea or angle behind your content? e.g. 'helping early-stage SaaS founders ship better products faster'…" value={form.coreIdea} onChange={e => upd("coreIdea", e.target.value)} />
+                <div className="flabel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Core idea / angle</span>
+                  <span style={{ fontSize: 10, color: form.coreIdea.length > 220 ? "#f0d49a" : form.coreIdea.length > 280 ? "#f09a9a" : "var(--text3)", fontWeight: 400, letterSpacing: 0, textTransform: "none" }}>
+                    {form.coreIdea.length}/300
+                  </span>
+                </div>
+                <textarea
+                  rows={3}
+                  maxLength={300}
+                  placeholder="What's the big idea or angle behind your content? e.g. 'helping early-stage SaaS founders ship better products faster'…"
+                  value={form.coreIdea}
+                  onChange={e => upd("coreIdea", e.target.value)}
+                  aria-describedby="coreIdea-hint"
+                />
+                <div id="coreIdea-hint" className="time-hint" style={{ marginTop: 5 }}>
+                  This is the north star for all generated content — be specific for better results.
+                </div>
               </div>
 
               <div className="csect">
@@ -2062,9 +2091,22 @@ const Index = () => {
               </div>
             </div>
 
-            {error && <div className="err-box">{error}</div>}
-            <div className="brow">
-              <button className="btn btn-p" onClick={() => { if (validate(1)) { setError(""); setStep(2); } }}>Next step →</button>
+            {error && <div className="err-box" role="alert">{error}</div>}
+            <div className="brow" style={{ alignItems: "center", gap: 12 }}>
+              {(!form.industry || !form.coreIdea.trim()) && (
+                <span style={{ fontSize: 11, color: "var(--text3)", fontStyle: "italic" }}>
+                  {!form.industry ? "Select an industry first" : "Add a core idea to continue"}
+                </span>
+              )}
+              <button
+                className="btn btn-p"
+                onClick={() => { if (validate(1)) { setError(""); setStep(2); } }}
+                disabled={!form.industry || !form.coreIdea.trim()}
+                aria-disabled={!form.industry || !form.coreIdea.trim()}
+                title={!form.industry ? "Select an industry first" : !form.coreIdea.trim() ? "Add a core idea to continue" : ""}
+              >
+                Next step →
+              </button>
             </div>
           </motion.div>
 
@@ -2217,8 +2259,15 @@ const Index = () => {
                 </div>
               )}
               <div className="csect">
-                <div className="flabel">Extra context <span className="fhint">(optional)</span></div>
-                <textarea rows={2} placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
+                <div className="flabel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Extra context <span className="fhint">(optional)</span></span>
+                  {form.extra.length > 0 && (
+                    <span style={{ fontSize: 10, color: form.extra.length > 450 ? "#f0d49a" : "var(--text3)", fontWeight: 400, letterSpacing: 0, textTransform: "none" }}>
+                      {form.extra.length}/500
+                    </span>
+                  )}
+                </div>
+                <textarea rows={2} maxLength={500} placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
               </div>
 
               <div className="g2">
@@ -2363,6 +2412,9 @@ const Index = () => {
 
               <div className="gen-title">{form.mode === "day" ? "Writing your post" : "Writing your week"}</div>
               <div className="gen-msg">{genMsg}</div>
+              <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4, fontStyle: "italic" }}>
+                {form.mode === "day" ? "Usually takes 10–20 seconds" : "Usually takes 30–60 seconds"} — keep this tab open
+              </div>
               <div className="prog-track" style={{ marginBottom: 20 }}>
                 <div className="prog-indet" />
               </div>
@@ -2384,12 +2436,22 @@ const Index = () => {
           </motion.div>
 
           {/* ── STEP 4 ── */}
-          <motion.div 
+          <motion.div
             className={`screen ${step === 4 ? "active" : ""}`}
             variants={screenVariants}
             initial="hidden"
             animate={step === 4 ? "visible" : "hidden"}
           >
+            {posts.length === 0 && step === 4 && (
+              <div className="gen-wrap" style={{ minHeight: 320 }}>
+                <div style={{ width: 72, height: 72, borderRadius: "50%", background: "radial-gradient(circle at 30% 30%, rgba(200,240,154,0.18), rgba(200,240,154,0.04) 65%, transparent 80%)", border: "1px solid rgba(200,240,154,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, marginBottom: 20 }}>
+                  📅
+                </div>
+                <div className="gen-title" style={{ fontSize: 20, marginBottom: 8 }}>No posts yet</div>
+                <div className="gen-msg" style={{ maxWidth: 340 }}>Go back to step 2 and hit "Generate" to build your content calendar.</div>
+                <button className="btn btn-p" style={{ marginTop: 20 }} onClick={() => setStep(2)}>← Back to topics</button>
+              </div>
+            )}
             {posts.length > 0 && (
               <Suspense fallback={<div className="gen-wrap" style={{ minHeight: 300 }}><div className="gen-orb" /><div className="gen-title" style={{ marginTop: 16 }}>Loading results…</div></div>}>
                 <IndexResults

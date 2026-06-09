@@ -162,9 +162,19 @@ export default function AuthPage() {
                   <div className="auth-label">Email</div>
                   <input className="auth-input" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" />
                 </div>
-                {error && <div className="auth-err">{error}</div>}
-                {info && <div className="auth-ok">{info}</div>}
-                <button className="auth-btn" type="submit" disabled={loading}>{loading ? "Sending…" : "Send reset link"}</button>
+                {error && <div className="auth-err" role="alert" aria-live="assertive">{error}</div>}
+                {info && <div className="auth-ok" role="status" aria-live="polite">{info}</div>}
+                <button className="auth-btn" type="submit" disabled={loading} aria-busy={loading}>
+                  {loading ? (
+                    <span style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ animation: "spin 0.8s linear infinite" }}>
+                        <circle cx="7" cy="7" r="5.5" stroke="rgba(7,8,13,0.35)" strokeWidth="2" />
+                        <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="#07080d" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                      Sending…
+                    </span>
+                  ) : "Send reset link"}
+                </button>
                 <button type="button" className="auth-forgot" onClick={() => switchTab("signin")}>← Back to sign in</button>
               </form>
             ) : (
@@ -181,13 +191,39 @@ export default function AuthPage() {
                 </div>
                 <div className="auth-field">
                   <div className="auth-label">Password</div>
-                  <input className="auth-input" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters" />
+                  <input className="auth-input" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters" aria-describedby={tab === "signup" ? "pw-strength" : undefined} />
+                  {tab === "signup" && password.length > 0 && (
+                    <div id="pw-strength" style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ display: "flex", gap: 3 }}>
+                        {[0, 1, 2].map(i => (
+                          <div key={i} style={{
+                            width: 32, height: 3, borderRadius: 99,
+                            background: password.length >= [6, 10, 14][i]
+                              ? (password.length >= 14 ? "#c8f09a" : password.length >= 10 ? "#f0d49a" : "#f09a9a")
+                              : "rgba(255,255,255,0.08)",
+                            transition: "background 0.2s"
+                          }} />
+                        ))}
+                      </div>
+                      <span style={{ fontSize: 10, color: password.length >= 14 ? "#c8f09a" : password.length >= 10 ? "#f0d49a" : "#f09a9a" }}>
+                        {password.length < 6 ? "Too short" : password.length < 10 ? "Weak" : password.length < 14 ? "Good" : "Strong"}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 {tab === "signup" && <div className="auth-inline-note">Use a password you can keep handy, then save a brief template after your first successful calendar.</div>}
-                {error && <div className="auth-err">{error}</div>}
-                {info && <div className="auth-ok">{info}</div>}
-                <button className="auth-btn" type="submit" disabled={loading}>
-                  {loading ? "Please wait…" : tab === "signin" ? "Sign in" : "Create account"}
+                {error && <div className="auth-err" role="alert" aria-live="assertive">{error}</div>}
+                {info && <div className="auth-ok" role="status" aria-live="polite">{info}</div>}
+                <button className="auth-btn" type="submit" disabled={loading} aria-busy={loading}>
+                  {loading ? (
+                    <span style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ animation: "spin 0.8s linear infinite" }}>
+                        <circle cx="7" cy="7" r="5.5" stroke="rgba(7,8,13,0.35)" strokeWidth="2" />
+                        <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="#07080d" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                      {tab === "signin" ? "Signing in…" : "Creating account…"}
+                    </span>
+                  ) : (tab === "signin" ? "Sign in" : "Create account")}
                 </button>
                 {tab === "signin" && (
                   <button type="button" className="auth-forgot" onClick={() => switchTab("forgot")}>Forgot password?</button>

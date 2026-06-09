@@ -1,3 +1,5 @@
+declare const Deno: any;
+
 // Generate a 7-day content calendar via Lovable AI Gateway
 import {
   corsHeaders,
@@ -20,9 +22,10 @@ import {
   scoreVariants,
   normalizePost,
   recordServerTelemetryEvent,
+  getUserIdFromToken,
 } from "../_shared/promptHelpers.ts";
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -43,7 +46,7 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "");
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
-    const userId = token.slice(0, 32) || "anonymous";
+    const userId = getUserIdFromToken(token);
     const rateLimitCheck = await checkRateLimit(userId, "generate-calendar", {
       maxRequests: 10,
       windowMs: 60 * 1000,
@@ -164,7 +167,8 @@ Deno.serve(async (req) => {
       userApiProvider: payload.userApiProvider,
       quality: payload.quality,
       userToken: token || null,
-      userIp: ipAddress
+      userIp: ipAddress,
+      max_tokens: 12288
     });
     if (aiRes.status !== 200) {
       return jsonResponse({ error: aiRes.error }, aiRes.status);
@@ -218,7 +222,10 @@ Deno.serve(async (req) => {
           temperature: 0.45,
           userApiKey: payload.userApiKey,
           userApiProvider: payload.userApiProvider,
-          quality: payload.quality
+          quality: payload.quality,
+          userToken: token || null,
+          userIp: ipAddress,
+          max_tokens: 12288
         });
 
         if (polishRes.status === 200) {

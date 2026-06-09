@@ -213,6 +213,7 @@
 .auth-forgot:hover { color:#c8f09a; }
 .auth-inline-note { margin-top:10px; font-size:11px; color:#7c8294; line-height:1.6; }
 .auth-badges { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .auth-badge { padding:8px 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.03); color:#a2a6b6; font-size:11px; }
 .auth-badge strong { color:#f2efe7; }
 

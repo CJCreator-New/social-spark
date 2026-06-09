@@ -14,10 +14,14 @@ export type PerformanceFocusMetric = "hookStrength" | "ctaEffectiveness" | "hash
 /**
  * Detect if a hook creates curiosity (starts with stat, question, or strong verb)
  */
-function scoreHookStrength(hook: string): number {
+/**
+ * Detect if a hook creates curiosity (starts with stat, question, or strong verb)
+ */
+function scoreHookStrength(hook: string, platform?: string): number {
   if (!hook || hook.length < 10) return 3; // Too short = weak
 
   const hookLower = hook.toLowerCase();
+  const plat = (platform || "").toLowerCase();
 
   // High-engagement openers
   const strongOpeners = [
@@ -31,6 +35,9 @@ function scoreHookStrength(hook: string): number {
     /^the truth is/i,
     /^most people don't/i,
     /^never realized/i,
+    /^most .+ (are|don't|never)/i,
+    /^stop/i,
+    /^the (real|truth|problem)/i,
   ];
 
   let score = 5; // Baseline
@@ -43,6 +50,19 @@ function scoreHookStrength(hook: string): number {
   } else if (hookLower.split(" ").length < 5) {
     // Very short hooks often punchy
     score = 6;
+  }
+
+  // Platform specific adjustments
+  if (plat === "twitter" || plat === "x") {
+    if (hook.length >= 20 && hook.length <= 100) {
+      score += 1;
+    } else if (hook.length > 140) {
+      score -= 2;
+    }
+  } else {
+    if (hook.length >= 35 && hook.length <= 180) {
+      score += 1;
+    }
   }
 
   // Bonus for specificity (numbers, named entities)
@@ -59,11 +79,12 @@ function scoreHookStrength(hook: string): number {
 /**
  * Score CTA effectiveness (specific action vs vague engagement)
  */
-function scoreCtaEffectiveness(cta: string, topic: string): number {
+function scoreCtaEffectiveness(cta: string, topic: string, platform?: string): number {
   if (!cta || cta.length < 5) return 2; // No CTA
 
   const ctaLower = cta.toLowerCase();
   const topicLower = topic.toLowerCase();
+  const plat = (platform || "").toLowerCase();
 
   // Highest value: specific, topic-related CTAs
   const specificity = [
@@ -89,6 +110,19 @@ function scoreCtaEffectiveness(cta: string, topic: string): number {
   // Penalty for weak CTAs ("let me know", "just saying")
   if (/just saying|thanks for reading|let me know/i.test(ctaLower)) {
     score = Math.max(score - 1, 3);
+  }
+
+  // Platform specific adjustments
+  if (plat === "twitter" || plat === "x") {
+    if (cta.length > 80) {
+      score = Math.max(score - 1, 3);
+    } else {
+      score += 1;
+    }
+  } else if (plat === "linkedin") {
+    if (/thought|opinion|agree|disagree|experience/i.test(ctaLower)) {
+      score += 1;
+    }
   }
 
   // Bonus for urgency/specificity
@@ -200,16 +234,31 @@ function generateFeedback(scores: Partial<PerformanceScore>, post: Post): string
 }
 
 /**
+ * Normalize readability grade to a 0-10 score
+ */
+function scoreReadability(grade: number): number {
+  if (grade >= 8 && grade <= 12) return 10;
+  if (grade < 8) return Math.max(0, 10 - (8 - grade));
+  return Math.max(0, 10 - (grade - 12));
+}
+
+/**
  * Calculate complete performance score for a post
  */
-export function calculatePerformanceScore(post: Post, topic: string = ""): PerformanceScore {
-  const hookStrength = scoreHookStrength(post.hook);
-  const ctaEffectiveness = scoreCtaEffectiveness(post.cta, topic);
+export function calculatePerformanceScore(post: Post, topic: string = "", platform?: string): PerformanceScore {
+  const plat = platform || post.platform || "";
+  const hookStrength = scoreHookStrength(post.hook, plat);
+  const ctaEffectiveness = scoreCtaEffectiveness(post.cta, topic, plat);
   const hashtagRelevance = scoreHashtagRelevance(post.hashtags, topic || post.topic);
   const readability = estimateReadability(post.body);
+  const readabilityScoreVal = scoreReadability(readability);
 
+  // Weight formula: hook 35%, CTA 30%, hashtags 20%, readability 15%
   const overallScore = Math.round(
-    (hookStrength + ctaEffectiveness + (hashtagRelevance / 10)) / 3
+    hookStrength * 0.35 +
+    ctaEffectiveness * 0.30 +
+    (hashtagRelevance / 10) * 0.20 +
+    readabilityScoreVal * 0.15
   );
 
   const feedback = generateFeedback(
@@ -228,11 +277,12 @@ export function calculatePerformanceScore(post: Post, topic: string = ""): Perfo
 }
 
 export function getWeakestPerformanceMetric(score: PerformanceScore): PerformanceFocusMetric {
+  const readabilityScoreVal = scoreReadability(score.readability);
   const candidates: Array<{ metric: PerformanceFocusMetric; gap: number }> = [
     { metric: "hookStrength", gap: 10 - score.hookStrength },
     { metric: "ctaEffectiveness", gap: 10 - score.ctaEffectiveness },
-    { metric: "hashtagRelevance", gap: Math.max(0, (100 - score.hashtagRelevance) / 10) },
-    { metric: "readability", gap: score.readability < 8 ? 8 - score.readability : score.readability > 12 ? score.readability - 12 : 0 },
+    { metric: "hashtagRelevance", gap: 10 - (score.hashtagRelevance / 10) },
+    { metric: "readability", gap: 10 - readabilityScoreVal },
   ];
 
   return candidates.sort((a, b) => b.gap - a.gap)[0]?.metric || "hookStrength";
@@ -282,11 +332,12 @@ export function getRegenerationGuidance(metric: PerformanceFocusMetric): string 
  * Returns all weak metrics below a certain threshold.
  */
 export function getWeakestMetrics(score: PerformanceScore, threshold: number = 6): PerformanceFocusMetric[] {
+  const readabilityScoreVal = scoreReadability(score.readability);
   const candidates: Array<{ metric: PerformanceFocusMetric; gap: number; scoreVal: number }> = [
     { metric: "hookStrength", gap: 10 - score.hookStrength, scoreVal: score.hookStrength },
     { metric: "ctaEffectiveness", gap: 10 - score.ctaEffectiveness, scoreVal: score.ctaEffectiveness },
-    { metric: "hashtagRelevance", gap: Math.max(0, (100 - score.hashtagRelevance) / 10), scoreVal: score.hashtagRelevance / 10 },
-    { metric: "readability", gap: score.readability < 8 ? 8 - score.readability : score.readability > 12 ? score.readability - 12 : 0, scoreVal: score.readability < 8 ? score.readability : score.readability > 12 ? 12 - (score.readability - 12) : 10 },
+    { metric: "hashtagRelevance", gap: 10 - (score.hashtagRelevance / 10), scoreVal: score.hashtagRelevance / 10 },
+    { metric: "readability", gap: 10 - readabilityScoreVal, scoreVal: readabilityScoreVal },
   ];
 
   return candidates
