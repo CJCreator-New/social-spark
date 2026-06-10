@@ -150,13 +150,13 @@ export function AppShell({ children }: AppShellProps) {
       {/* MAIN CONTENT CONTAINER */}
       <div className="flex-1 flex flex-col min-w-0 md:h-screen md:overflow-y-auto overflow-x-hidden">
         {/* Subtle breadcrumb/topbar header on desktop */}
-        <div className="hidden md:flex items-center justify-between h-16 px-8 border-b border-white/5 backdrop-blur-xl bg-background/20 sticky top-0 z-30">
+        <header className="hidden md:flex items-center justify-between h-16 px-8 border-b border-white/5 backdrop-blur-xl bg-background/20 sticky top-0 z-30">
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span>Workspace</span>
             <span>/</span>
             <span className="text-slate-300 font-medium">{activeItem.label}</span>
           </div>
-        </div>
+        </header>
 
         {/* Real route pages */}
         <div className="flex-1 pt-20 pb-12 px-4 md:pt-6 md:px-8">

@@ -16,8 +16,8 @@ async function checkRoute(page: Page, path: string) {
   await checkA11y(page, undefined, {
     axeOptions: {
       includedImpacts: ["critical", "serious"],
-    } as any,
-  });
+    },
+  } as any);
 }
 
 test.describe("Accessibility smoke checks", () => {
@@ -61,7 +61,7 @@ test.describe("Accessibility smoke checks", () => {
     await checkA11y(page, undefined, {
       axeOptions: {
         includedImpacts: ["critical", "serious"],
-      } as any,
-    });
+      },
+    } as any);
   });
 });
