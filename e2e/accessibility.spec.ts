@@ -16,7 +16,7 @@ async function checkRoute(page: Page, path: string) {
   await checkA11y(page, undefined, {
     axeOptions: {
       includedImpacts: ["critical", "serious"],
-    },
+    } as any,
   });
 }
 
@@ -35,7 +35,7 @@ test.describe("Accessibility smoke checks", () => {
     await enableE2EAuth(page);
     await checkRoute(page, "/app");
     await expect(page.getByRole("radiogroup", { name: /industry or niche/i })).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText(/build the calendar before the scroll ever starts/i)).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(/AI content studio/i)).toBeVisible({ timeout: 30000 });
     await expect(page.getByText(/current setup/i)).toBeVisible({ timeout: 30000 });
   });
 
@@ -61,7 +61,7 @@ test.describe("Accessibility smoke checks", () => {
     await checkA11y(page, undefined, {
       axeOptions: {
         includedImpacts: ["critical", "serious"],
-      },
+      } as any,
     });
   });
 });

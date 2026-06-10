@@ -283,24 +283,15 @@ export default function MyCalendars() {
           </div>
         </div>
       )}
-      <WorkspacePage size="medium">
-        <div className="mc-head">
+      <WorkspacePage size="xwide">
+        <div className="mb-8 flex justify-between items-center">
           <div>
-            <h1 className="mc-title">My <em>calendars</em></h1>
-            <div className="mc-meta" style={{ marginTop: 6 }}>
-              {user?.email}
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <Link to="/schedule" className="mc-back">
-              📅 Schedule
-            </Link>
-            <Link to="/app" className="mc-back">
-              ← New calendar
-            </Link>
-            <button className="mc-act" onClick={async () => { await signOut(); navigate("/auth"); }}>
-              Sign out
-            </button>
+            <h1 className="text-3xl font-display font-normal">
+              My <em className="text-[#c8f09a]">calendars</em>
+            </h1>
+            <p className="text-slate-500 text-xs mt-1.5">
+              Manage your saved calendar blueprints and scheduled queue items.
+            </p>
           </div>
         </div>
 
@@ -379,17 +370,15 @@ export default function MyCalendars() {
           </div>
         ) : (
           <>
-          <div className="mc-list">
-            <VirtualizedList
-              items={filteredItems}
-              renderItem={renderCalendarItem}
-              height={600}
-              estimatedItemHeight={90}
-              ariaLabel="Saved calendars list"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            {filteredItems.map((it, idx) => (
+              <div key={it.id}>
+                {renderCalendarItem(it, idx)}
+              </div>
+            ))}
           </div>
           {hasNextPage && (
-            <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 24 }}>
               <button
                 className="mc-act"
                 onClick={() => fetchNextPage()}

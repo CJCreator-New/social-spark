@@ -3,7 +3,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AppShell } from "@/components/layout/AppShell";
+import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
@@ -60,55 +61,55 @@ const App = () => {
                 <Route path="/" element={<Suspense fallback={<RouteFallback title="ContentForge" />}><Landing /></Suspense>} />
                 <Route path="/__e2e/crash" element={<E2ECrashRoute />} />
                 <Route
-                  path="/app"
                   element={
                     <ProtectedRoute>
+                      <AppShell>
+                        <Outlet />
+                      </AppShell>
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route
+                    path="/app"
+                    element={
                       <Suspense fallback={<RouteFallback title="ContentForge Workspace" />}>
                         <Index />
                       </Suspense>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/profile"
-                  element={
-                    <ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/profile"
+                    element={
                       <Suspense fallback={<RouteFallback title="Profile Settings" />}>
                         <Profile />
                       </Suspense>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/my-calendars"
-                  element={
-                    <ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/my-calendars"
+                    element={
                       <Suspense fallback={<RouteFallback title="My Calendars" />}>
                         <MyCalendars />
                       </Suspense>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/calendar/:id"
-                  element={
-                    <ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/calendar/:id"
+                    element={
                       <Suspense fallback={<RouteFallback title="Calendar Workspace" />}>
                         <CalendarDetail />
                       </Suspense>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/schedule"
-                  element={
-                    <ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/schedule"
+                    element={
                       <Suspense fallback={<RouteFallback title="Scheduling & Queue" />}>
                         <Schedule />
                       </Suspense>
-                    </ProtectedRoute>
-                  }
-                />
+                    }
+                  />
+                </Route>
                 <Route path="/admin" element={<ProtectedRoute><AdminRoute><Suspense fallback={<RouteFallback title="Admin Dashboard" />}><Admin /></Suspense></AdminRoute></ProtectedRoute>} />
                 <Route path="*" element={<Suspense fallback={<RouteFallback title="Not Found" />}><NotFound /></Suspense>} />
               </Routes>

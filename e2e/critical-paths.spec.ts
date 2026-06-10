@@ -25,8 +25,8 @@ test.describe('Authentication Flow', () => {
 
     // Should stay on app pages — wait for main hero copy to appear
     await expect(page).not.toHaveURL(/.*auth/)
-    await page.getByText(/build the calendar before the scroll ever starts/i).waitFor({ state: 'visible', timeout: 30000 })
-    await expect(page.getByText(/build the calendar before the scroll ever starts/i)).toBeVisible()
+    await page.getByText(/AI content studio/i).waitFor({ state: 'visible', timeout: 30000 })
+    await expect(page.getByText(/AI content studio/i)).toBeVisible()
   })
 })
 

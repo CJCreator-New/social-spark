@@ -340,7 +340,6 @@ export default function Profile() {
   return (
     <>
       <WorkspacePage size="narrow">
-        <Link to="/app" className="pf-back">← Back to ContentForge</Link>
         <h1 className="pf-title">Your profile</h1>
         <div className="pf-sub">Update how you appear inside ContentForge and set brand defaults to pre-fill the wizard.</div>
 
