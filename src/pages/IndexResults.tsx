@@ -11,6 +11,8 @@ import PostInsights from "@/components/PostInsights";
 import { renderLinkedInPreviewText } from "@/components/wizard/PlatformPreview";
 import { toast } from "sonner";
 import type { Post, WizardForm } from "@/components/wizard/constants";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 interface IndexResultsProps {
   posts: Post[];
@@ -224,7 +226,14 @@ export function IndexResults({
                 onClick={regenerateUnlocked}
                 title="Re-roll only the days you haven't pinned"
               >
-                ↻ Regenerate unlocked ({posts.length - lockedDays.size})
+                {reformatting && regenIdx !== null ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Re-rolling {posts.length - lockedDays.size} posts…
+                  </span>
+                ) : (
+                  <>↻ Regenerate unlocked ({posts.length - lockedDays.size})</>
+                )}
               </button>
             </div>
           )}
@@ -279,34 +288,63 @@ export function IndexResults({
             </div>
           )}
 
-          <div className="bbar">
-            <button className="restart" onClick={() => { clearDraft(); setPostsWithHistory([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setStep(1); setError(""); }}>← Start over</button>
-            <button className="restart" onClick={() => { setError(""); setStep(2); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ marginLeft: 8 }}>✎ Edit inputs</button>
-            <div className="bactions">
-              <button className="dlbtn" onClick={saveCalendar} disabled={saving || !!savedId || sampleMode} title={sampleMode ? "Sample mode — start your own to save" : ""}>
+          <div className="flex flex-wrap items-center gap-2 mt-4">
+            <Button
+              variant="ghost"
+              size="default"
+              className="min-h-11"
+              onClick={() => { clearDraft(); setPostsWithHistory([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setStep(1); setError(""); }}
+            >
+              ← Start over
+            </Button>
+            <Button
+              variant="ghost"
+              size="default"
+              className="min-h-11"
+              onClick={() => { setError(""); setStep(2); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            >
+              ✎ Edit inputs
+            </Button>
+            <div className="flex flex-wrap items-center gap-2 ml-auto">
+              <Button
+                variant="outline"
+                size="default"
+                className="min-h-11"
+                onClick={saveCalendar}
+                disabled={saving || !!savedId || sampleMode}
+                title={sampleMode ? "Sample mode — start your own to save" : ""}
+              >
                 {sampleMode ? "Save (sample only)" : savedId ? "Saved ✓" : saving ? "Saving…" : "Save calendar"}
-              </button>
-              <button className="dlbtn" onClick={downloadTxt}>
+              </Button>
+              <Button variant="outline" size="default" className="min-h-11" onClick={downloadTxt}>
                 <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M6.5 1v7M4 5.5l2.5 2.5L9 5.5M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" />
                 </svg>
                 .txt
-              </button>
-              <button className="dlbtn" onClick={handleDownloadMd}>.md</button>
-              <button className="dlbtn" onClick={handleDownloadPdf}>.pdf</button>
-              <button className="dlbtn" onClick={exportIcs} title="Export to Google Calendar / Outlook / Apple Cal">
+              </Button>
+              <Button variant="outline" size="default" className="min-h-11" onClick={handleDownloadMd}>.md</Button>
+              <Button variant="outline" size="default" className="min-h-11" onClick={handleDownloadPdf}>.pdf</Button>
+              <Button
+                variant="outline"
+                size="default"
+                className="min-h-11"
+                onClick={exportIcs}
+                title="Export to Google Calendar / Outlook / Apple Cal"
+              >
                 📅 .ics
-              </button>
-              <button
-                className="dlbtn"
+              </Button>
+              <Button
+                variant="outline"
+                size="default"
+                className="min-h-11"
                 onClick={() => setBatchEditOpen(true)}
                 title="Apply brand mention, hashtag, or CTA to all 7 posts at once (Ctrl+Shift+E)"
               >
                 ⚙️ Batch edit
-              </button>
-              <button className="btn btn-p" style={{ fontSize: 13 }} onClick={copyAll}>
+              </Button>
+              <Button variant="default" size="default" className="min-h-11" onClick={copyAll}>
                 {copiedAll ? "All copied ✓" : `Copy all ${posts.length} for ${niceLabelFor(form.platform)}`}
-              </button>
+              </Button>
             </div>
           </div>
         </>

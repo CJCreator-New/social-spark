@@ -9,6 +9,8 @@ import { normalizeTag, displayTag, parsePolicyList } from "@/lib/hashtagPolicy";
 import { listTimezones, browserTimezone, tzLabel } from "@/lib/timezones";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import { ApiKeySettings } from "@/components/settings/ApiKeySettings";
+import { EmptyState } from "@/components/EmptyState";
+import { LayoutTemplate } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import "@/styles/pages.css";
 
@@ -54,7 +56,15 @@ function TemplatesList() {
   }
 
   if (loading) return <div style={{ color: '#7a7a8e' }}>Loading templates…</div>;
-  if (templates.length === 0) return <div className="pf-meta">No templates saved yet — save one from the wizard.</div>;
+  if (templates.length === 0) return (
+    <EmptyState
+      icon={LayoutTemplate}
+      title="No templates yet"
+      description="Save a calendar configuration as a template from the wizard to quickly reuse it later."
+      ctaLabel="Create your first calendar"
+      ctaTo="/app"
+    />
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>

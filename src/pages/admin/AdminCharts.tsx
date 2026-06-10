@@ -14,7 +14,13 @@ export function AdminCharts({ platformDistribution }: AdminChartsProps) {
     value,
   }));
 
-  const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7c7c", "#8dd1e1"];
+  const COLORS = [
+    "hsl(var(--chart-1))",
+    "hsl(var(--chart-2))",
+    "hsl(var(--chart-3))",
+    "hsl(var(--chart-4))",
+    "hsl(var(--chart-5))",
+  ];
 
   return (
     <ResponsiveContainer width="100%" height={300}>
@@ -26,7 +32,7 @@ export function AdminCharts({ platformDistribution }: AdminChartsProps) {
           labelLine={false}
           label={({ name, value }) => `${name} (${value})`}
           outerRadius={80}
-          fill="#8884d8"
+          fill="hsl(var(--chart-1))"
           dataKey="value"
         >
           {COLORS.map((color, index) => (

@@ -115,7 +115,7 @@ export const CoverImageGenerator: React.FC<CoverImageGeneratorProps> = ({
           )}
 
           {generatedUrl && !generateMutation.isPending && (
-            <div style={{ border: "2px solid var(--color-border)", borderRadius: 4, overflow: "hidden", background: "#0a0a0a" }}>
+            <div className="bg-card" style={{ border: "2px solid var(--color-border)", borderRadius: 4, overflow: "hidden" }}>
               <img
                 src={generatedUrl}
                 alt="Generated concept"

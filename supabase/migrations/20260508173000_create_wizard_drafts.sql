@@ -8,10 +8,18 @@ CREATE TABLE public.wizard_drafts (
 
 ALTER TABLE public.wizard_drafts ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users view own wizard drafts" ON public.wizard_drafts FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users insert own wizard drafts" ON public.wizard_drafts FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users update own wizard drafts" ON public.wizard_drafts FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users delete own wizard drafts" ON public.wizard_drafts FOR DELETE USING (auth.uid() = user_id);
+DO $$ BEGIN
+  CREATE POLICY "Users view own wizard drafts" ON public.wizard_drafts FOR SELECT USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Users insert own wizard drafts" ON public.wizard_drafts FOR INSERT WITH CHECK (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Users update own wizard drafts" ON public.wizard_drafts FOR UPDATE USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Users delete own wizard drafts" ON public.wizard_drafts FOR DELETE USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE INDEX idx_wizard_drafts_user ON public.wizard_drafts(user_id, updated_at DESC);
 

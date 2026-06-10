@@ -18,9 +18,9 @@ export async function handler(req: Request) {
     return new Response(JSON.stringify({ ok: false, error: 'missing fields' }), { status: 400 });
   }
 
-  // Basic auth check: expect x-service-key header matching service role (opt-in)
+  // Auth check: expect x-service-key header matching service role (fail closed)
   const svc = req.headers.get('x-service-key');
-  if (SUPABASE_SERVICE_KEY && svc !== SUPABASE_SERVICE_KEY) {
+  if (!SUPABASE_SERVICE_KEY || svc !== SUPABASE_SERVICE_KEY) {
     return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), { status: 401 });
   }
 

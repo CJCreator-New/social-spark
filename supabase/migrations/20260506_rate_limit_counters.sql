@@ -67,6 +67,7 @@ create policy "Users can view their own rate limit data"
   using (auth.uid() = user_id);
 
 -- Policy: Service role can insert (for tracking)
+-- NOTE: Superseded by 20260610080000_reenable_rate_limit_counters_rls.sql, which re-enables RLS on this table.
 alter table public.rate_limit_counters disable row level security;
 
 -- Grants

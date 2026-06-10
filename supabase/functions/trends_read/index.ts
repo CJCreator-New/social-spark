@@ -2,12 +2,22 @@
 // GET /trends_read?page=1&limit=25&industry=marketing&platform=x&q=ai
 
 import { createClient } from '@supabase/supabase-js';
+import { checkRateLimit } from '../_shared/promptHelpers.ts';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY) : null;
 
 export async function handler(req: Request) {
+  const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
+  const rateLimitCheck = await checkRateLimit(ipAddress, 'trends_read', {
+    maxRequests: 30,
+    windowMs: 60 * 1000,
+  });
+  if (!rateLimitCheck.allowed) {
+    return new Response(JSON.stringify({ ok: false, error: 'Rate limit exceeded' }), { status: 429 });
+  }
+
   const url = new URL(req.url);
   const page = Math.max(1, Number(url.searchParams.get('page') || '1'));
   const limit = Math.min(Number(url.searchParams.get('limit') || '25'), 200);

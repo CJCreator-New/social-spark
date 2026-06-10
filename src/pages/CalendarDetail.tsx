@@ -34,20 +34,7 @@ import FeedbackModal from "@/components/FeedbackModal";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Database, Json } from "@/integrations/supabase/types";
-
-interface Post {
-  day: number; dow: string; topic: string; format: string;
-  title: string; hook: string; body: string; cta: string; hashtags: string; rationale: string; image_prompt?: string;
-  image_url?: string;
-  image_storage_path?: string;
-  image_aspect_ratio?: string;
-  image_generated_at?: string;
-  hook_options?: string[];
-  cta_options?: string[];
-  variant_scores?: Record<string, number>[];
-  chosen_index?: number;
-  [key: string]: any;
-}
+import type { Post } from "@/components/wizard/constants";
 
 type SavedCalendarInsert = Database["public"]["Tables"]["saved_calendars"]["Insert"];
 

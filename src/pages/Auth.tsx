@@ -6,6 +6,7 @@ import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/contexts/AuthContext";
 import { getE2EAuthFlag } from "@/lib/e2eFixtures";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import "@/styles/pages.css";
 
 export default function AuthPage() {
@@ -144,8 +145,8 @@ export default function AuthPage() {
 
             {tab !== "forgot" && (
               <div className="auth-tabs" role="tablist" aria-label="Authentication modes">
-                <button role="tab" aria-selected={tab === "signin"} className={`auth-tab ${tab === "signin" ? "on" : ""}`} onClick={() => switchTab("signin")} type="button" aria-label="Switch to sign in mode">Sign in</button>
-                <button role="tab" aria-selected={tab === "signup"} className={`auth-tab ${tab === "signup" ? "on" : ""}`} onClick={() => switchTab("signup")} type="button" aria-label="Switch to sign up mode">Sign up</button>
+                <button id="auth-tab-signin" role="tab" aria-selected={tab === "signin"} aria-controls="auth-panel-signin" className={`auth-tab ${tab === "signin" ? "on" : ""}`} onClick={() => switchTab("signin")} type="button" aria-label="Switch to sign in mode">Sign in</button>
+                <button id="auth-tab-signup" role="tab" aria-selected={tab === "signup"} aria-controls="auth-panel-signup" className={`auth-tab ${tab === "signup" ? "on" : ""}`} onClick={() => switchTab("signup")} type="button" aria-label="Switch to sign up mode">Sign up</button>
               </div>
             )}
 
@@ -171,7 +172,12 @@ export default function AuthPage() {
                 <button type="button" className="auth-forgot" onClick={() => switchTab("signin")}>← Back to sign in</button>
               </form>
             ) : (
-              <form onSubmit={handleEmailAuth}>
+              <form
+                onSubmit={handleEmailAuth}
+                id={tab === "signin" ? "auth-panel-signin" : "auth-panel-signup"}
+                role="tabpanel"
+                aria-labelledby={tab === "signin" ? "auth-tab-signin" : "auth-tab-signup"}
+              >
                 {tab === "signup" && (
                   <div className="auth-field">
                     <div className="auth-label">Display name</div>
@@ -189,16 +195,21 @@ export default function AuthPage() {
                     <div id="pw-strength" style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ display: "flex", gap: 3 }}>
                         {[0, 1, 2].map(i => (
-                          <div key={i} style={{
-                            width: 32, height: 3, borderRadius: 99,
-                            background: password.length >= [6, 10, 14][i]
-                              ? (password.length >= 14 ? "#c8f09a" : password.length >= 10 ? "#f0d49a" : "#f09a9a")
-                              : "rgba(255,255,255,0.08)",
-                            transition: "background 0.2s"
-                          }} />
+                          <div
+                            key={i}
+                            className={cn(
+                              "h-[3px] w-8 rounded-full transition-colors duration-200",
+                              password.length >= [6, 10, 14][i]
+                                ? (password.length >= 14 ? "bg-primary" : password.length >= 10 ? "bg-yellow-400" : "bg-destructive")
+                                : "bg-white/[0.08]"
+                            )}
+                          />
                         ))}
                       </div>
-                      <span style={{ fontSize: 10, color: password.length >= 14 ? "#c8f09a" : password.length >= 10 ? "#f0d49a" : "#f09a9a" }}>
+                      <span className={cn(
+                        "text-[10px]",
+                        password.length >= 14 ? "text-primary" : password.length >= 10 ? "text-yellow-400" : "text-destructive"
+                      )}>
                         {password.length < 6 ? "Too short" : password.length < 10 ? "Weak" : password.length < 14 ? "Good" : "Strong"}
                       </span>
                     </div>

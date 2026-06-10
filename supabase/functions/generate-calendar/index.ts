@@ -10,6 +10,7 @@ import {
   buildHashtagInstr,
   buildCinematicImagePromptRules,
   jsonResponse,
+  checkContentLength,
   checkRateLimit,
   cleanPayload,
   buildPromptContext,
@@ -31,6 +32,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const sizeError = checkContentLength(req);
+    if (sizeError) return sizeError;
+
     const body = await req.json();
     const payload = cleanPayload(body);
     if (!payload.topics || payload.topics.length === 0) {
@@ -47,6 +51,7 @@ Deno.serve(async (req: Request) => {
     const token = authHeader.replace("Bearer ", "");
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
     const userId = getUserIdFromToken(token);
+    if (!userId || userId === "anonymous") return jsonResponse({ error: "Sign in required." }, 401);
     const rateLimitCheck = await checkRateLimit(userId, "generate-calendar", {
       maxRequests: 10,
       windowMs: 60 * 1000,

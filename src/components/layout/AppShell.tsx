@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCalendarQuery } from "@/hooks/useAppQueries";
 import { cn } from "@/lib/utils";
 
 interface AppShellProps {
@@ -11,6 +12,9 @@ export function AppShell({ children }: AppShellProps) {
   const { user, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { id: routeCalendarId } = useParams<{ id?: string }>();
+  const isCalendarDetail = location.pathname.startsWith("/calendar/") && !!routeCalendarId;
+  const { data: calendarData } = useCalendarQuery(isCalendarDetail ? routeCalendarId : undefined);
   const [isOpen, setIsOpen] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -38,12 +42,67 @@ export function AppShell({ children }: AppShellProps) {
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [isOpen]);
 
+  // Escape key closes mobile sidebar, and focus trap while open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const FOCUSABLE_SELECTOR =
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+        return;
+      }
+
+      if (e.key !== "Tab") return;
+
+      const container = sidebarRef.current;
+      if (!container) return;
+
+      const focusable = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+        (el) => el.offsetParent !== null
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (e.shiftKey) {
+        if (active === first || !container.contains(active)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (active === last || !container.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    // Focus first focusable element in sidebar on open
+    const container = sidebarRef.current;
+    if (container) {
+      const focusable = container.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      focusable?.focus();
+    }
+
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/auth");
   };
 
   const activeItem = menuItems.find(item => location.pathname === item.path) || menuItems[0];
+  const breadcrumbLabel = isCalendarDetail
+    ? (calendarData?.title || (calendarData ? "Untitled calendar" : "Loading…"))
+    : activeItem.label;
   const initial = (user?.email || "?").charAt(0).toUpperCase();
 
   return (
@@ -72,6 +131,15 @@ export function AppShell({ children }: AppShellProps) {
           </svg>
         </button>
       </header>
+
+      {/* MOBILE BACKDROP */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
       {/* SIDEBAR */}
       <aside
@@ -108,12 +176,12 @@ export function AppShell({ children }: AppShellProps) {
                   className={cn(
                     "flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm transition-all duration-200 relative overflow-hidden group",
                     isActive
-                      ? "text-[#c8f09a] bg-white/[0.04] font-medium border border-white/5"
+                      ? "text-[#c8f09a] bg-accent/10 font-semibold border border-white/5"
                       : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]"
                   )}
                 >
                   {/* Subtle hover glow effect */}
-                  <span className="text-base z-10">{item.icon}</span>
+                  <span className="text-base z-10" aria-hidden="true">{item.icon}</span>
                   <span className="z-10">{item.label}</span>
                   {isActive && (
                     <div className="absolute left-0 top-3 bottom-3 w-1 bg-[#c8f09a] rounded-full" />
@@ -141,7 +209,7 @@ export function AppShell({ children }: AppShellProps) {
             onClick={handleSignOut}
             className="flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-xs text-slate-500 hover:text-red-400 hover:bg-red-500/[0.05] transition-all duration-200 w-full text-left"
           >
-            <span>🚪</span>
+            <span aria-hidden="true">🚪</span>
             <span>Sign out</span>
           </button>
         </div>
@@ -154,7 +222,7 @@ export function AppShell({ children }: AppShellProps) {
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span>Workspace</span>
             <span>/</span>
-            <span className="text-slate-300 font-medium">{activeItem.label}</span>
+            <span className="text-slate-300 font-medium">{breadcrumbLabel}</span>
           </div>
         </header>
 

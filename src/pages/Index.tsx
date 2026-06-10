@@ -312,6 +312,7 @@ async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraf
     markWizardDraftServerUnavailable(error);
     return null;
   }
+  wizardDraftServerAvailable = true;
   if (!data?.snapshot) return null;
   return parseDraftEnvelope<WizardDraftSnapshot>((data as any).snapshot);
 }
@@ -325,13 +326,21 @@ async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
     },
     { onConflict: "user_id" }
   );
-  if (error) markWizardDraftServerUnavailable(error);
+  if (error) {
+    markWizardDraftServerUnavailable(error);
+  } else {
+    wizardDraftServerAvailable = true;
+  }
 }
 
 async function clearServerDraft(userId: string) {
   if (!wizardDraftServerAvailable) return;
   const { error } = await (supabase.from as any)(WIZARD_SERVER_DRAFT_TABLE).delete().eq("user_id", userId);
-  if (error) markWizardDraftServerUnavailable(error);
+  if (error) {
+    markWizardDraftServerUnavailable(error);
+  } else {
+    wizardDraftServerAvailable = true;
+  }
 }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -554,7 +563,7 @@ const Index = () => {
     setPostsWithHistory([]);
     setActiveDay(0);
     setSavedId(null);
-    setLockedDays(new Set());
+    setLockedDays([]);
     setSampleMode(false);
     setStep(1);
     toast.success("Post marked as seed. Loading new wizard form...");
@@ -1419,11 +1428,12 @@ const Index = () => {
     toast.success("Brand memory cleared");
   }
 
+  const lockedDaysSet = useMemo(() => new Set(lockedDays), [lockedDays]);
+
   const toggleLock = useCallback((day: number) => {
     setLockedDays(prev => {
-      const next = new Set(prev);
-      if (next.has(day)) next.delete(day); else next.add(day);
-      return next;
+      if (prev.includes(day)) return prev.filter(d => d !== day);
+      return [...prev, day];
     });
   }, [setLockedDays]);
 
@@ -1431,7 +1441,7 @@ const Index = () => {
     if (regenIdx !== null || reformatting) return;
     const targets = posts
       .map((p, i) => ({ p, i }))
-      .filter(({ p }) => !lockedDays.has(p.day));
+      .filter(({ p }) => !lockedDaysSet.has(p.day));
     if (targets.length === 0) {
       toast.error("All posts are locked. Unpin at least one to regenerate.");
       return;
@@ -1578,7 +1588,7 @@ const Index = () => {
     setSampleMode(true);
     setGenerationMeta(null);
     setSavedId(null);
-    setLockedDays(new Set());
+    setLockedDays([]);
     setStep(4);
     toast.success("Sample calendar loaded — explore the layout, then start your own.");
   }
@@ -2612,7 +2622,7 @@ const Index = () => {
                   posts={posts}
                   activeDay={activeDay}
                   setActiveDay={setActiveDay}
-                  lockedDays={lockedDays}
+                  lockedDays={lockedDaysSet}
                   toggleLock={toggleLock}
                   form={form}
                   savedId={savedId}
@@ -2658,7 +2668,7 @@ const Index = () => {
                   setStep={setStep}
                   clearDraft={clearDraft}
                   setPostsWithHistory={setPostsWithHistory}
-                  setLockedDays={setLockedDays}
+                  setLockedDays={(s: Set<number>) => setLockedDays(Array.from(s))}
                   setError={setError}
                   generationMeta={generationMeta}
                   weekStartDate={weekStartDate}

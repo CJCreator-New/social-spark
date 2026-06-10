@@ -81,6 +81,7 @@ Deno.serve(async (req: Request) => {
     const token = authHeader.replace("Bearer ", "");
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
     const userId = getUserIdFromToken(token);
+    if (!userId || userId === "anonymous") return jsonResponse({ error: "Sign in required." }, 401);
     const rateLimitCheck = await checkRateLimit(userId, "regenerate-post", {
       maxRequests: 30,
       windowMs: 60 * 1000,

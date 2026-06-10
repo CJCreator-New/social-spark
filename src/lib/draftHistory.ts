@@ -162,31 +162,46 @@ class DraftHistoryService {
 
     const id = this.generateId();
     const timestamp = new Date();
-    const versionNumber = await this.getVersionCount().then(count => count + 1);
-
-    const version: DraftVersion = {
-      id,
-      timestamp,
-      label: `Version ${versionNumber}`,
-      preview: (formData.coreIdea || "").slice(0, 100),
-      formData,
-      posts,
-      activeDay,
-    };
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([STORE_NAME], "readwrite");
       const store = transaction.objectStore(STORE_NAME);
-      const request = store.add(version);
 
-      request.onerror = () => {
-        reject(new Error(`Failed to save draft: ${request.error}`));
+      // Compute the version count INSIDE the same readwrite transaction as the
+      // write to avoid a race where two concurrent saves get the same version number.
+      const countRequest = store.count();
+
+      countRequest.onerror = () => {
+        reject(new Error(`Failed to count versions: ${countRequest.error}`));
       };
 
-      request.onsuccess = async () => {
-        // Clean up old versions
-        await this.cleanupOldVersions();
-        resolve(version);
+      countRequest.onsuccess = () => {
+        const versionNumber = countRequest.result + 1;
+
+        const version: DraftVersion = {
+          id,
+          timestamp,
+          label: `Version ${versionNumber}`,
+          preview: (formData.coreIdea || "").slice(0, 100),
+          formData,
+          posts,
+          activeDay,
+        };
+
+        const addRequest = store.add(version);
+
+        addRequest.onerror = () => {
+          reject(new Error(`Failed to save draft: ${addRequest.error}`));
+        };
+
+        addRequest.onsuccess = () => {
+          resolve(version);
+        };
+      };
+
+      transaction.oncomplete = () => {
+        // Clean up old versions after the write transaction has fully committed.
+        void this.cleanupOldVersions();
       };
     });
   }
@@ -342,23 +357,6 @@ class DraftHistoryService {
   // ============================================================================
   // PRIVATE HELPERS
   // ============================================================================
-
-  /**
-   * Get the count of saved versions.
-   * @private
-   */
-  private async getVersionCount(): Promise<number> {
-    if (!this.db) return 0;
-
-    return new Promise((resolve) => {
-      const transaction = this.db!.transaction([STORE_NAME], "readonly");
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.count();
-
-      request.onerror = () => resolve(0);
-      request.onsuccess = () => resolve(request.result);
-    });
-  }
 
   /**
    * Delete old versions if count exceeds MAX_VERSIONS.

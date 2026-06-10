@@ -52,13 +52,26 @@ export function buildBrandMemoryPrompt(profile?: Partial<ProfileRow> | null): st
 import { resolveAiClient } from "./aiClientResolver";
 import { supabase } from "@/integrations/supabase/client";
 
-export async function generateWithFallback<T = any>(
+export interface AiGenerationRequestBody {
+  [key: string]: unknown;
+  userApiKey?: string;
+  userApiProvider?: string | null;
+}
+
+export async function generateWithFallback<T = unknown>(
   endpoint: string,
-  body: any,
+  body: AiGenerationRequestBody,
   abortSignal?: AbortSignal
 ): Promise<{ data: T; usedFallback: boolean; keyMode: "always" | "fallback" | null }> {
   const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
   const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
+  if (!SUPABASE_KEY) {
+    console.error(
+      "generateWithFallback: VITE_SUPABASE_PUBLISHABLE_KEY is missing or empty. " +
+      "Requests to Supabase Edge Functions will fail with 401 Unauthorized. " +
+      "Check your .env configuration."
+    );
+  }
   const { data: { session } } = await supabase.auth.getSession();
 
   const headers: Record<string, string> = {

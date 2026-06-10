@@ -14,9 +14,6 @@ export type PerformanceFocusMetric = "hookStrength" | "ctaEffectiveness" | "hash
 /**
  * Detect if a hook creates curiosity (starts with stat, question, or strong verb)
  */
-/**
- * Detect if a hook creates curiosity (starts with stat, question, or strong verb)
- */
 function scoreHookStrength(hook: string, platform?: string): number {
   if (!hook || hook.length < 10) return 3; // Too short = weak
 

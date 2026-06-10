@@ -123,6 +123,12 @@ async function processJob(job: QueueJob & { id: string; lock_token?: string }) {
 
 export async function handle(req: Request) {
   try {
+    const expectedServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_KEY");
+    const svc = req.headers.get("x-service-key");
+    if (!expectedServiceKey || svc !== expectedServiceKey) {
+      return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), { status: 401 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const mode = body?.mode || (req.method === "POST" && body?.job ? "enqueue" : "process");
 

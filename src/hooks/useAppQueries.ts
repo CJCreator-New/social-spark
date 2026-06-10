@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { getE2EAuthFlag, E2E_CALENDAR, E2E_SCHEDULE_ROWS } from "@/lib/e2eFixtures";
@@ -16,6 +16,7 @@ type SavedCalendarInsert = Tables["saved_calendars"]["Insert"];
 type SavedCalendarUpdate = Tables["saved_calendars"]["Update"];
 type ProfileRow = Tables["profiles"]["Row"];
 type SavedCalendarListItem = Pick<SavedCalendarRow, "id" | "title" | "industry_label" | "platform" | "core_idea" | "created_at" | "is_favorite" | "posts">;
+type RecentCalendarItem = { id: string; title: string; platform: string | null; industry_label: string | null; created_at: string; is_favorite?: boolean };
 type GeneratedPostPayload = {
   day?: number;
   dow?: string;
@@ -239,35 +240,40 @@ export function useScheduledPostsQuery(calendarId?: string) {
   });
 }
 
+type SavedCalendarsCursor = { created_at: string; id: string } | null;
+
 export function useSavedCalendarsInfiniteQuery(userId?: string, pageSize = 20) {
   return useInfiniteQuery({
     queryKey: ["saved-calendars", userId, pageSize],
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
-    initialPageParam: null as string | null,
-    getNextPageParam: (lastPage: { items: SavedCalendarListItem[]; nextCursor: string | null }) => lastPage.nextCursor,
+    initialPageParam: null as SavedCalendarsCursor,
+    getNextPageParam: (lastPage: { items: SavedCalendarListItem[]; nextCursor: SavedCalendarsCursor }) => lastPage.nextCursor,
     queryFn: async ({ pageParam }) => {
-      if (!userId) return { items: [], nextCursor: null as string | null };
+      if (!userId) return { items: [], nextCursor: null as SavedCalendarsCursor };
       if (isE2EMode()) {
         const calendars = getE2ECalendars() as SavedCalendarListItem[];
-        return { items: calendars, nextCursor: null as string | null };
+        return { items: calendars, nextCursor: null as SavedCalendarsCursor };
       }
       let query = supabase
         .from("saved_calendars")
         .select("id, title, industry_label, platform, core_idea, created_at, is_favorite, posts")
-        .order("is_favorite", { ascending: false })
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
         .limit(pageSize);
 
       if (pageParam) {
-        query = query.lt("created_at", pageParam);
+        const { created_at, id } = pageParam;
+        query = query.or(`created_at.lt.${created_at},and(created_at.eq.${created_at},id.lt.${id})`);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       const items = (data as SavedCalendarListItem[] | null) || [];
-      const nextCursor = items.length === pageSize ? (items[items.length - 1] as { created_at?: string } | undefined)?.created_at || null : null;
+      const last = items[items.length - 1] as { created_at?: string; id?: string } | undefined;
+      const nextCursor = items.length === pageSize && last?.created_at && last?.id
+        ? { created_at: last.created_at, id: last.id }
+        : null;
       return { items, nextCursor };
     },
   });
@@ -279,17 +285,21 @@ export function useScheduleInfiniteQuery(userId?: string, pageSize = 25) {
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
     initialPageParam: null as { scheduled_at: string; id: string } | null,
-    getNextPageParam: (lastPage: { nextCursor: { scheduled_at: string; id: string } | null; rows: unknown[]; calendars: Map<string, { id: string; title: string; timezone: string | null; tracking_url: string | null }>; profileTz: string }) => lastPage.nextCursor,
+    getNextPageParam: (lastPage: { nextCursor: { scheduled_at: string; id: string } | null; rows: unknown[]; calendars: Record<string, { id: string; title: string; timezone: string | null; tracking_url: string | null }>; profileTz: string }) => lastPage.nextCursor,
     queryFn: async ({ pageParam }) => {
       if (!userId) {
-        return { rows: [], calendars: new Map(), profileTz: "", nextCursor: null };
+        return { rows: [], calendars: {}, profileTz: "", nextCursor: null };
       }
 
       if (isE2EMode()) {
         const rows = getE2EScheduleRows();
+        const calendars: Record<string, { id: string; title: string; timezone: string | null; tracking_url: string | null }> = {};
+        for (const calendar of getE2ECalendars()) {
+          (calendars as Record<string, unknown>)[calendar.id] = calendar;
+        }
         return {
           rows,
-          calendars: new Map(getE2ECalendars().map((calendar) => [calendar.id, calendar])),
+          calendars,
           profileTz: "UTC",
           nextCursor: null,
         };
@@ -317,8 +327,8 @@ export function useScheduleInfiniteQuery(userId?: string, pageSize = 25) {
       if (calendarsError) throw calendarsError;
 
       const profTz = (pr as { default_timezone?: string | null } | null)?.default_timezone || "";
-      const map = new Map<string, { id: string; title: string; timezone: string | null; tracking_url: string | null }>();
-      for (const c of (calData as Array<{ id: string; title: string; timezone: string | null; tracking_url: string | null }>) || []) map.set(c.id, c);
+      const map: Record<string, { id: string; title: string; timezone: string | null; tracking_url: string | null }> = {};
+      for (const c of (calData as Array<{ id: string; title: string; timezone: string | null; tracking_url: string | null }>) || []) map[c.id] = c;
 
       const items = (schedData as unknown[] | null) || [];
       const lastItem = items[items.length - 1] as { scheduled_at?: string; id?: string } | undefined;
@@ -398,22 +408,25 @@ export function useToggleCalendarFavoriteMutation(userId?: string) {
       const previousSaved = qc.getQueryData(["saved-calendars", userId]);
       const previousRecent = qc.getQueryData(["recent-calendars", userId]);
 
-      qc.setQueryData(["saved-calendars", userId], (old: any) => {
-        if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map((page: any) => ({
-            ...page,
-            items: page.items.map((item: any) =>
-              item.id === id ? { ...item, is_favorite: isFavorite } : item
-            ),
-          })),
-        };
-      });
+      qc.setQueryData(
+        ["saved-calendars", userId],
+        (old: InfiniteData<{ items: SavedCalendarListItem[]; nextCursor: SavedCalendarsCursor }> | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) =>
+                item.id === id ? { ...item, is_favorite: isFavorite } : item
+              ),
+            })),
+          };
+        }
+      );
 
-      qc.setQueryData(["recent-calendars", userId], (old: any) => {
+      qc.setQueryData(["recent-calendars", userId], (old: RecentCalendarItem[] | undefined) => {
         if (!old) return old;
-        return old.map((item: any) =>
+        return old.map((item) =>
           item.id === id ? { ...item, is_favorite: isFavorite } : item
         );
       });
@@ -494,22 +507,25 @@ export function useRenameCalendarMutation(userId?: string) {
       const previousSaved = qc.getQueryData(["saved-calendars", userId]);
       const previousRecent = qc.getQueryData(["recent-calendars", userId]);
 
-      qc.setQueryData(["saved-calendars", userId], (old: any) => {
-        if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map((page: any) => ({
-            ...page,
-            items: page.items.map((item: any) =>
-              item.id === id ? { ...item, title } : item
-            ),
-          })),
-        };
-      });
+      qc.setQueryData(
+        ["saved-calendars", userId],
+        (old: InfiniteData<{ items: SavedCalendarListItem[]; nextCursor: SavedCalendarsCursor }> | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) =>
+                item.id === id ? { ...item, title } : item
+              ),
+            })),
+          };
+        }
+      );
 
-      qc.setQueryData(["recent-calendars", userId], (old: any) => {
+      qc.setQueryData(["recent-calendars", userId], (old: RecentCalendarItem[] | undefined) => {
         if (!old) return old;
-        return old.map((item: any) =>
+        return old.map((item) =>
           item.id === id ? { ...item, title } : item
         );
       });

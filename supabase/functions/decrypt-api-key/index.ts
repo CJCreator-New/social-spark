@@ -1,30 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit } from "../_shared/promptHelpers.ts";
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-// In-memory rate limiting map
-const rateLimitMap = new Map<string, number[]>();
-
-function checkRateLimit(userId: string): boolean {
-  const now = Date.now();
-  const windowMs = 60 * 1000;
-  const maxRequests = 5;
-
-  const timestamps = rateLimitMap.get(userId) || [];
-  const validTimestamps = timestamps.filter(ts => now - ts < windowMs);
-
-  if (validTimestamps.length >= maxRequests) {
-    return false;
-  }
-
-  validTimestamps.push(now);
-  rateLimitMap.set(userId, validTimestamps);
-  return true;
-}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -72,7 +53,11 @@ Deno.serve(async (req) => {
     }
 
     // Rate Limiting: max 5 requests per user per minute
-    if (!checkRateLimit(user.id)) {
+    const rateLimitCheck = await checkRateLimit(user.id, "decrypt-api-key", {
+      maxRequests: 5,
+      windowMs: 60 * 1000,
+    });
+    if (!rateLimitCheck.allowed) {
       return jsonResponse({ error: "Too many requests. Please try again later." }, 429);
     }
 

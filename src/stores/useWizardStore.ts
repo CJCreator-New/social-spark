@@ -10,7 +10,7 @@ interface WizardState {
   posts: Post[];
   postTimes: Record<string, string>;
   activeDay: number;
-  lockedDays: Set<number>;
+  lockedDays: number[];
   sampleMode: boolean;
   savedId: string | null;
   autosaveStatus: "idle" | "saving" | "saved" | "error";
@@ -25,7 +25,7 @@ interface WizardState {
   setPostTimes: (times: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void;
   setActiveDay: (day: number | ((prev: number) => number)) => void;
   toggleLockedDay: (day: number) => void;
-  setLockedDays: (days: Set<number> | ((prev: Set<number>) => Set<number>)) => void;
+  setLockedDays: (days: number[] | ((prev: number[]) => number[])) => void;
   setSampleMode: (mode: boolean) => void;
   setSavedId: (id: string | null) => void;
   setAutosaveStatus: (status: "idle" | "saving" | "saved" | "error") => void;
@@ -43,7 +43,7 @@ export const useWizardStore = create<WizardState>((set) => ({
   posts: [],
   postTimes: {},
   activeDay: 0,
-  lockedDays: new Set<number>(),
+  lockedDays: [],
   sampleMode: false,
   savedId: null,
   autosaveStatus: "idle",
@@ -77,12 +77,8 @@ export const useWizardStore = create<WizardState>((set) => ({
     })),
   toggleLockedDay: (day) =>
     set((state) => {
-      const next = new Set(state.lockedDays);
-      if (next.has(day)) {
-        next.delete(day);
-      } else {
-        next.add(day);
-      }
+      const has = state.lockedDays.includes(day);
+      const next = has ? state.lockedDays.filter((d) => d !== day) : [...state.lockedDays, day];
       return { lockedDays: next };
     }),
   setLockedDays: (lockedDays) =>
@@ -102,7 +98,7 @@ export const useWizardStore = create<WizardState>((set) => ({
       posts: snapshot.posts || [],
       activeDay: snapshot.activeDay || 0,
       postTimes: snapshot.postTimes || {},
-      lockedDays: new Set<number>(),
+      lockedDays: [],
       sampleMode: false,
       savedId: null,
       keySource: null,
@@ -117,7 +113,7 @@ export const useWizardStore = create<WizardState>((set) => ({
       posts: [],
       postTimes: {},
       activeDay: 0,
-      lockedDays: new Set<number>(),
+      lockedDays: [],
       sampleMode: false,
       savedId: null,
       autosaveStatus: "idle",
@@ -125,3 +121,6 @@ export const useWizardStore = create<WizardState>((set) => ({
       keyMode: null,
     }),
 }));
+
+/** Convenience selector returning lockedDays as a Set for `.has()` checks. */
+export const selectLockedDaysSet = (state: WizardState): Set<number> => new Set(state.lockedDays);

@@ -7,14 +7,22 @@
   --panel: rgba(12, 14, 23, 0.82);      /* Muted dark slate */
   --panel-border: rgba(255, 255, 255, 0.06);
   --panel-strong: rgba(18, 21, 34, 0.94);
-  --border: rgba(255, 255, 255, 0.06);
   --border-strong: rgba(255, 255, 255, 0.12);
-  --accent: #c8f09a;       /* High-contrast neon-lime */
   --accent-dim: rgba(200, 240, 154, 0.12);
   --text: #edeae3;         /* Warm off-white */
-  --muted: #7c8294;        /* Cool slate gray */
   --muted-2: #5a5a72;      /* Dimmer muted text */
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+
+  /* NOTE: --bg, --accent, --border, --muted are intentionally NOT redeclared here.
+     index.css already defines --accent/--border/--muted as HSL component triples
+     (consumed via hsl(var(--x))) for shadcn components, while the .ld/.auth-/.pf-/.sc-/.mc-
+     rules below consume the SAME names as raw color values (e.g. var(--accent) = #c8f09a).
+     Redeclaring them here would override index.css's values for shadcn components on
+     these pages. This is pre-existing drift; resolving it fully requires renaming all
+     raw-value usages below to distinct token names (out of scope for this fix). */
+  --accent: #c8f09a;
+  --border: rgba(255, 255, 255, 0.06);
+  --muted: #7c8294;
 }
 
 /* ==========================================================================

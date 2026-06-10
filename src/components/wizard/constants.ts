@@ -13,11 +13,16 @@ export interface Post {
   hashtags: string;
   rationale: string;
   image_prompt?: string;
+  image_url?: string;
+  image_storage_path?: string;
+  image_aspect_ratio?: string;
+  image_generated_at?: string;
   hook_options?: string[];
   cta_options?: string[];
   variant_scores?: Record<string, number>[];
   chosen_index?: number;
-  [key: string]: any;
+  cover_image?: string;
+  [key: string]: unknown;
 }
 
 export interface WizardForm {

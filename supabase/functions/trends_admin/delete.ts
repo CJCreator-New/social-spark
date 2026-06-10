@@ -10,7 +10,7 @@ export async function handler(req: Request) {
   if (!body || !body.id) return new Response(JSON.stringify({ ok: false, error: 'missing id' }), { status: 400 });
 
   const svc = req.headers.get('x-service-key');
-  if (SUPABASE_SERVICE_KEY && svc !== SUPABASE_SERVICE_KEY) return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), { status: 401 });
+  if (!SUPABASE_SERVICE_KEY || svc !== SUPABASE_SERVICE_KEY) return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), { status: 401 });
 
   if (!supabase) return new Response(JSON.stringify({ ok: false, error: 'supabase not configured' }), { status: 500 });
 

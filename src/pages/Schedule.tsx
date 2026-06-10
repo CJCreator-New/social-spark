@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
-import { SkeletonList } from "@/components/SkeletonList";
+import { ScheduleSkeleton } from "@/components/ScheduleSkeleton";
 import { VirtualizedList } from "@/components/VirtualizedList";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -21,7 +21,7 @@ import { writeToClipboard, niceLabelFor } from "@/lib/platformCopy";
 import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
 import { downloadScheduleCsv } from "@/lib/exportSchedule";
 import { buildTrackingUrl } from "@/lib/utm";
-import { useCancelScheduledPostMutation, useScheduleInfiniteQuery, useUpdateScheduledPostStatusMutation, useUpdateScheduledPostTimeMutation } from "@/hooks/useAppQueries";
+import { useCancelScheduledPostMutation, useProfileQuery, useScheduleInfiniteQuery, useUpdateScheduledPostStatusMutation, useUpdateScheduledPostTimeMutation } from "@/hooks/useAppQueries";
 import { resolveScheduleTimezone, saveScheduleTimezone } from "@/lib/schedulePreferences";
 import "@/styles/pages.css";
 
@@ -54,7 +54,7 @@ interface CalendarMeta {
 
 interface SchedulePage {
   rows: ScheduledRow[];
-  calendars: Map<string, CalendarMeta>;
+  calendars: Record<string, CalendarMeta>;
   profileTz: string;
   nextCursor: ScheduleCursor;
 }
@@ -74,7 +74,7 @@ export default function Schedule() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [rows, setRows] = useState<ScheduledRow[]>([]);
-  const [calendars, setCalendars] = useState<Map<string, CalendarMeta>>(new Map());
+  const [calendars, setCalendars] = useState<Record<string, CalendarMeta>>({});
   const [profileTz, setProfileTz] = useState<string>("");
   const [viewTz, setViewTz] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortKey>("date-asc");
@@ -90,16 +90,31 @@ export default function Schedule() {
   const updateScheduledTimeMutation = useUpdateScheduledPostTimeMutation();
 
   const { data: scheduleData, isLoading: loading, error: scheduleError, fetchNextPage, hasNextPage, isFetchingNextPage } = useScheduleInfiniteQuery(user?.id, PAGE_SIZE);
+  const { data: profileData } = useProfileQuery(user?.id);
+
+  const mergedCalendars = useMemo(() => {
+    if (!scheduleData) return {} as Record<string, CalendarMeta>;
+    const merged: Record<string, CalendarMeta> = {};
+    for (const page of scheduleData.pages) {
+      for (const [id, meta] of Object.entries(page.calendars)) {
+        if (!(id in merged)) merged[id] = meta;
+      }
+    }
+    return merged;
+  }, [scheduleData]);
+
+  useEffect(() => {
+    const tz = profileData?.default_timezone || "";
+    setProfileTz(tz);
+    setViewTz((current) => current || resolveScheduleTimezone(user?.id, tz, browserTimezone()));
+  }, [profileData, user?.id]);
 
   useEffect(() => {
     if (!scheduleData) return;
     const pages = scheduleData.pages;
-    const firstPage = pages[0];
-    setProfileTz(firstPage.profileTz);
-    setViewTz((current) => current || resolveScheduleTimezone(user?.id, firstPage.profileTz, browserTimezone()));
     setRows(pages.flatMap(page => page.rows) as ScheduledRow[]);
-    setCalendars(firstPage.calendars);
-  }, [scheduleData, user?.id]);
+    setCalendars(mergedCalendars);
+  }, [scheduleData, mergedCalendars]);
 
   useEffect(() => {
     saveScheduleTimezone(user?.id, viewTz);
@@ -200,7 +215,7 @@ export default function Schedule() {
   async function saveEdit(row: ScheduledRow) {
     const log = createScopedLogger('Schedule-SaveEdit');
     if (!editDate || !editTime) return;
-    const cal = calendars.get(row.calendar_id);
+    const cal = calendars[row.calendar_id];
     const tz = cal?.timezone || profileTz || browserTimezone();
     const newIso = zonedToUtcIso(editDate, editTime, tz);
     try {
@@ -218,7 +233,7 @@ export default function Schedule() {
   function exportCsv() {
     const tz = viewTz;
     const enriched = sorted.map(r => {
-      const cal = calendars.get(r.calendar_id);
+      const cal = calendars[r.calendar_id];
       return {
         ...r,
         calendar_title: cal?.title || "",
@@ -285,7 +300,7 @@ export default function Schedule() {
         )}
 
         {loading ? (
-          <SkeletonList rows={5} />
+          <ScheduleSkeleton rows={5} />
         ) : rows.length === 0 ? (
           <div className="sc-empty">
             <div className="sc-empty-illus" aria-hidden="true">⌛</div>
@@ -332,7 +347,7 @@ export default function Schedule() {
   );
 
   function renderRow(row: ScheduledRow) {
-    const cal = calendars.get(row.calendar_id);
+    const cal = calendars[row.calendar_id];
     const tz = viewTz;
     const isEditing = editId === row.id;
     return (

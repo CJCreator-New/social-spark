@@ -114,7 +114,7 @@ describe("useWizardStore — lockedDays", () => {
     act(() => {
       useWizardStore.getState().toggleLockedDay(3);
     });
-    expect(useWizardStore.getState().lockedDays.has(3)).toBe(true);
+    expect(useWizardStore.getState().lockedDays.includes(3)).toBe(true);
   });
 
   it("toggleLockedDay removes a day if already locked", () => {
@@ -122,7 +122,7 @@ describe("useWizardStore — lockedDays", () => {
       useWizardStore.getState().toggleLockedDay(3);
       useWizardStore.getState().toggleLockedDay(3);
     });
-    expect(useWizardStore.getState().lockedDays.has(3)).toBe(false);
+    expect(useWizardStore.getState().lockedDays.includes(3)).toBe(false);
   });
 
   it("reset() clears all locked days", () => {
@@ -131,6 +131,6 @@ describe("useWizardStore — lockedDays", () => {
       useWizardStore.getState().toggleLockedDay(4);
       useWizardStore.getState().reset();
     });
-    expect(useWizardStore.getState().lockedDays.size).toBe(0);
+    expect(useWizardStore.getState().lockedDays.length).toBe(0);
   });
 });

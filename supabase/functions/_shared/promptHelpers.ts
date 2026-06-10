@@ -222,6 +222,20 @@ export function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+export const MAX_REQUEST_BODY_BYTES = 256 * 1024; // 256 KB
+
+/**
+ * Checks the Content-Length header before reading the request body.
+ * Returns a 413 response if the declared size exceeds the limit, or null if OK.
+ */
+export function checkContentLength(req: Request, maxBytes: number = MAX_REQUEST_BODY_BYTES): Response | null {
+  const contentLength = req.headers.get("content-length");
+  if (contentLength && Number(contentLength) > maxBytes) {
+    return jsonResponse({ error: "Request body too large." }, 413);
+  }
+  return null;
+}
+
 export async function recordServerTelemetryEvent(
   eventName: string,
   props: Record<string, unknown> = {},

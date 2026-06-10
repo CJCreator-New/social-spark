@@ -63,6 +63,13 @@
     
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
+    /* Chart palette */
+    --chart-1: 88 74% 77%;
+    --chart-2: 160 84% 60%;
+    --chart-3: 199 89% 48%;
+    --chart-4: 280 65% 70%;
+    --chart-5: 30 90% 65%;
+
     /* Platform colors */
     --facebook: 221 44% 41%;
     --instagram: 340 75% 54%;
@@ -149,7 +156,7 @@
   }
 
   .page-panel {
-    @apply relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.025];
+    @apply relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025];
   }
 
   .section-kicker {

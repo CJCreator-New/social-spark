@@ -76,124 +76,39 @@ function DefaultErrorFallback({
   const showDetails = import.meta.env.DEV && typeof window !== 'undefined' && window.localStorage.getItem('ss:show-error-details') === 'true';
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#07080d",
-        color: "#edeae3",
-        fontFamily: "var(--font-body)",
-        padding: "24px",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "500px",
-          background: "#0d0f18",
-          border: "1px solid rgba(255, 255, 255, 0.055)",
-          borderRadius: "16px",
-          padding: "40px",
-          textAlign: "center",
-        }}
-      >
-        <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground font-sans p-6">
+      <div className="max-w-[500px] w-full bg-card border border-border rounded-2xl p-10 text-center">
+        <div className="text-5xl mb-4">
           {isAiUnavailable ? "⚙️" : "!"}
         </div>
 
-        <h1
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "24px",
-            fontWeight: 400,
-            marginBottom: "16px",
-            margin: 0,
-          }}
-        >
+        <h1 className="font-display text-2xl font-normal mb-4">
           {isAiUnavailable ? "AI Generation Unavailable" : "Something Went Wrong"}
         </h1>
 
-        <p
-          style={{
-            fontSize: "14px",
-            color: "#7a7a8e",
-            marginBottom: "24px",
-            lineHeight: 1.6,
-          }}
-        >
+        <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
           {message}
         </p>
 
         {showDetails && !isAiUnavailable && (
-          <details
-            style={{
-              fontSize: "12px",
-              backgroundColor: "rgba(240, 154, 154, 0.08)",
-              border: "1px solid rgba(240, 154, 154, 0.3)",
-              borderRadius: "8px",
-              padding: "12px",
-              marginBottom: "24px",
-              color: "#c8a9a9",
-              textAlign: "left",
-              fontFamily: "monospace",
-              overflow: "auto",
-              maxHeight: "150px",
-            }}
-          >
+          <details className="text-xs bg-destructive/10 border border-destructive/30 rounded-lg p-3 mb-6 text-destructive text-left font-mono overflow-auto max-h-[150px]">
             <summary>Error details</summary>
-            <div style={{ marginTop: "8px" }}>{error.message}</div>
+            <div className="mt-2">{error.message}</div>
           </details>
         )}
 
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div className="flex gap-2">
           {isAiUnavailable ? (
             <>
               <button
                 onClick={() => window.location.assign('/profile?tab=api-keys')}
-                style={{
-                  flex: 1,
-                  background: "#c8f09a",
-                  color: "#07080d",
-                  border: "1px solid #c8f09a",
-                  borderRadius: "8px",
-                  padding: "12px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  fontFamily: "var(--font-body)",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  (e.target as HTMLButtonElement).style.background = "#b9e289";
-                }}
-                onMouseLeave={(e) => {
-                  (e.target as HTMLButtonElement).style.background = "#c8f09a";
-                }}
+                className="flex-1 bg-primary text-primary-foreground border border-primary rounded-lg px-4 py-3 text-sm font-medium cursor-pointer transition-colors hover:bg-primary/90"
               >
                 Go to API Keys
               </button>
               <button
                 onClick={() => window.location.assign('/app')}
-                style={{
-                  flex: 1,
-                  background: "transparent",
-                  color: "#edeae3",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "8px",
-                  padding: "12px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  fontFamily: "var(--font-body)",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  (e.target as HTMLButtonElement).style.borderColor = "rgba(200, 240, 154, 0.3)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.target as HTMLButtonElement).style.borderColor = "rgba(255, 255, 255, 0.1)";
-                }}
+                className="flex-1 bg-transparent text-foreground border border-border rounded-lg px-4 py-3 text-sm font-medium cursor-pointer transition-colors hover:border-accent/40"
               >
                 Back to Dashboard
               </button>
@@ -202,49 +117,13 @@ function DefaultErrorFallback({
             <>
               <button
                 onClick={reset}
-                style={{
-                  flex: 1,
-                  background: "#c8f09a",
-                  color: "#07080d",
-                  border: "1px solid #c8f09a",
-                  borderRadius: "8px",
-                  padding: "12px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  fontFamily: "var(--font-body)",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  (e.target as HTMLButtonElement).style.background = "#b9e289";
-                }}
-                onMouseLeave={(e) => {
-                  (e.target as HTMLButtonElement).style.background = "#c8f09a";
-                }}
+                className="flex-1 bg-primary text-primary-foreground border border-primary rounded-lg px-4 py-3 text-sm font-medium cursor-pointer transition-colors hover:bg-primary/90"
               >
                 Try Again
               </button>
               <button
                 onClick={() => window.location.reload()}
-                style={{
-                  flex: 1,
-                  background: "transparent",
-                  color: "#edeae3",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "8px",
-                  padding: "12px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  fontFamily: "var(--font-body)",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  (e.target as HTMLButtonElement).style.borderColor = "rgba(200, 240, 154, 0.3)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.target as HTMLButtonElement).style.borderColor = "rgba(255, 255, 255, 0.1)";
-                }}
+                className="flex-1 bg-transparent text-foreground border border-border rounded-lg px-4 py-3 text-sm font-medium cursor-pointer transition-colors hover:border-accent/40"
               >
                 Reload App
               </button>
