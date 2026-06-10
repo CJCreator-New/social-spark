@@ -279,7 +279,7 @@ export function useScheduleInfiniteQuery(userId?: string, pageSize = 25) {
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
     initialPageParam: null as { scheduled_at: string; id: string } | null,
-    getNextPageParam: (lastPage: { nextCursor: { scheduled_at: string; id: string } | null }) => lastPage.nextCursor,
+    getNextPageParam: (lastPage: { nextCursor: { scheduled_at: string; id: string } | null; rows: unknown[]; calendars: Map<string, { id: string; title: string; timezone: string | null; tracking_url: string | null }>; profileTz: string }) => lastPage.nextCursor,
     queryFn: async ({ pageParam }) => {
       if (!userId) {
         return { rows: [], calendars: new Map(), profileTz: "", nextCursor: null };
