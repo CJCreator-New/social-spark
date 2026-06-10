@@ -325,6 +325,7 @@ export default function CalendarDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [isE2EModeActive, setIsE2EModeActive] = useState(false);
   const [title, setTitle] = useState("");
   const [meta, setMeta] = useState("");
   const [active, setActive] = useState(0);
@@ -597,6 +598,12 @@ export default function CalendarDetail() {
     const profTz = profileData.default_timezone || browserTimezone();
     setTimezone(dx.timezone || profTz);
   }, [calendarData, profileData]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsE2EModeActive(window.localStorage.getItem(getE2EAuthFlag()) === "true");
+    }
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1292,6 +1299,51 @@ export default function CalendarDetail() {
   return (
     <>
       <style>{css}</style>
+      {isE2EModeActive && (
+        <div style={{
+          background: "rgba(240, 212, 154, 0.1)",
+          borderBottom: "1px solid rgba(240, 212, 154, 0.2)",
+          padding: "10px 16px",
+          textAlign: "center",
+          fontSize: "12px",
+          color: "#f0d49a",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: "8px",
+          zIndex: 1000,
+          position: "relative"
+        }}>
+          <span>⚠️ Sandbox Mode Active (using mock test data)</span>
+          <button 
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.localStorage.removeItem(getE2EAuthFlag());
+                window.location.reload();
+              }
+            }}
+            style={{
+              background: "rgba(240, 212, 154, 0.2)",
+              border: "1px solid rgba(240, 212, 154, 0.4)",
+              color: "#f0d49a",
+              padding: "2px 8px",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "11px",
+              fontWeight: 500,
+              transition: "all 0.15s"
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = "rgba(240, 212, 154, 0.35)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = "rgba(240, 212, 154, 0.2)";
+            }}
+          >
+            Switch to Live Database & AI
+          </button>
+        </div>
+      )}
       <WorkspacePage size="wide">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <Link to="/my-calendars" className="cd-back">← Back to my calendars</Link>

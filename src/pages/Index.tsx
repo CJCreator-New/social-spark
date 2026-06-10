@@ -136,7 +136,7 @@ function readBrandMemory(userId?: string | null): BrandMemory | null {
     return {
       voice: String(parsed.voice || ""),
       style: String(parsed.style || ""),
-      copyStyle: String(parsed.copyStyle || "None"),
+      copyStyle: String(parsed.copyStyle || "Keep plain text (recommended)"),
       cta: String(parsed.cta || ""),
       audiences: Array.isArray(parsed.audiences) ? parsed.audiences.map(v => String(v).trim()).filter(Boolean) : [],
       goals: Array.isArray(parsed.goals) ? parsed.goals.map(v => String(v).trim()).filter(Boolean) : [],
@@ -172,7 +172,7 @@ function brandMemoryToPrompt(memory: BrandMemory | null): string {
   const parts = [
     memory.voice ? `Voice: ${memory.voice}` : "",
     memory.style ? `Style: ${memory.style}` : "",
-    memory.copyStyle && memory.copyStyle !== "None" ? `Copy style: ${memory.copyStyle}` : "",
+    memory.copyStyle && memory.copyStyle !== "Keep plain text (recommended)" ? `Copy style: ${memory.copyStyle}` : "",
     memory.cta ? `CTA style: ${memory.cta}` : "",
     memory.audiences.length ? `Audience preferences: ${memory.audiences.join(", ")}` : "",
     memory.goals.length ? `Goal preferences: ${memory.goals.join(", ")}` : "",
@@ -452,9 +452,14 @@ const Index = () => {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [e2eNetworkError, setE2eNetworkError] = useState(false);
+  const [isE2EModeActive, setIsE2EModeActive] = useState(false);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showAdvancedBrand, setShowAdvancedBrand] = useState(false);
+  const [showAdvancedFormat, setShowAdvancedFormat] = useState(false);
   const [reformatTarget, setReformatTarget] = useState<string>("");
   const [reformatting, setReformatting] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const [recoveryDraft, setRecoveryDraft] = useState<WizardDraftSnapshot | null>(null);
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
   const autosaveClearTimer = useRef<number | null>(null);
@@ -666,6 +671,16 @@ const Index = () => {
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [copyMenuOpen]);
+
+  // Close account menu on outside click
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const h = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [userMenuOpen]);
 
   // Keyboard shortcuts: arrow keys navigate between days (only on step 4 when week-strip visible)
   useEffect(() => {
@@ -1765,6 +1780,7 @@ const Index = () => {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const isE2E = window.localStorage.getItem(getE2EAuthFlag()) === "true";
+    setIsE2EModeActive(isE2E);
     const hasNetworkErrorFlag = new URLSearchParams(window.location.search).has("e2e-network-error");
     setE2eNetworkError(isE2E && hasNetworkErrorFlag);
   }, []);
@@ -1775,8 +1791,55 @@ const Index = () => {
     }
   }, [e2eNetworkError]);
 
+  const disableSandboxMode = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(getE2EAuthFlag());
+      window.location.reload();
+    }
+  };
+
   return (
     <WorkspacePage size="xwide" className="cf-app">
+      {isE2EModeActive && (
+        <div style={{
+          background: "rgba(240, 212, 154, 0.1)",
+          borderBottom: "1px solid rgba(240, 212, 154, 0.2)",
+          padding: "10px 16px",
+          textAlign: "center",
+          fontSize: "12px",
+          color: "#f0d49a",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: "8px",
+          zIndex: 1000,
+          position: "relative"
+        }}>
+          <span>⚠️ Sandbox Mode Active (using mock test data)</span>
+          <button 
+            onClick={disableSandboxMode}
+            style={{
+              background: "rgba(240, 212, 154, 0.2)",
+              border: "1px solid rgba(240, 212, 154, 0.4)",
+              color: "#f0d49a",
+              padding: "2px 8px",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "11px",
+              fontWeight: 500,
+              transition: "all 0.15s"
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = "rgba(240, 212, 154, 0.35)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = "rgba(240, 212, 154, 0.2)";
+            }}
+          >
+            Switch to Live Database & AI
+          </button>
+        </div>
+      )}
       <DraftRecoveryDialog
         open={showRecoveryDialog && !!recoveryDraft}
         draft={recoveryDraft ? {
@@ -1802,90 +1865,94 @@ const Index = () => {
 
         <div className="inner">
           {/* HEADER */}
-          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginBottom: 24, fontSize: 12, color: "#7a7a8e", flexWrap: "wrap" }}>
-            <Link
-              to="/my-calendars"
-              style={{
-                color: "#c8f09a",
-                textDecoration: "none",
-                background: "rgba(200,240,154,0.10)",
-                border: "1px solid rgba(200,240,154,0.32)",
-                padding: "6px 14px",
-                borderRadius: 8,
-                fontSize: 12,
-                fontWeight: 500,
-                letterSpacing: ".02em",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              📅 My calendars
-            </Link>
-            <Link to="/schedule" style={{ color: "#7a7a8e", textDecoration: "none", padding: "6px 10px" }}>Schedule</Link>
-            <Link to="/profile" style={{ color: "#7a7a8e", textDecoration: "none", padding: "6px 10px" }}>Profile</Link>
-            <span style={{ color: "#3a3a50" }}>·</span>
-            <span style={{ color: "#9a9aae", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email}</span>
-            {autosaveStatus !== "idle" && (
-              <span style={{ fontSize: 12, color: autosaveStatus === "error" ? "#e66" : "#9a9aae", marginLeft: 8 }}>
-                {autosaveStatus === "saving" ? "Saving draft…" : autosaveStatus === "saved" ? "Draft saved" : "Draft save failed"}
-              </span>
-            )}
-            <button onClick={async () => { await signOut(); navigate("/auth"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#9a9aae", padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "var(--font-body)" }}>Sign out</button>
-          </div>
+          <header className="cf-header">
+            <div className="cf-header-logo">
+              <span className="cf-logo-icon">🔥</span>
+              <span className="cf-logo-text">ContentForge</span>
+            </div>
+            <nav className="cf-header-nav" aria-label="Main Navigation">
+              <Link to="/my-calendars" className="cf-nav-btn primary">
+                📅 My calendars
+              </Link>
+              <Link to="/schedule" className="cf-nav-link">Schedule</Link>
+              <Link to="/profile" className="cf-nav-link">Profile</Link>
+              <span className="cf-nav-divider">|</span>
+              {autosaveStatus !== "idle" && (
+                <span className={`cf-nav-status ${autosaveStatus}`}>
+                  {autosaveStatus === "saving" ? "Saving..." : autosaveStatus === "saved" ? "Saved" : "Save failed"}
+                </span>
+              )}
+              {/* USER ACCOUNT DROPDOWN */}
+              <div className="cf-user-dropdown-wrap" ref={userMenuRef}>
+                <button
+                  type="button"
+                  className={`cf-user-dropdown-trigger ${userMenuOpen ? 'active' : ''}`}
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  aria-expanded={userMenuOpen}
+                  aria-label="User account menu"
+                >
+                  <span className="cf-user-avatar">👤</span>
+                  <span className="cf-user-arrow">▼</span>
+                </button>
 
-          {/* BRAND */}
+                {userMenuOpen && (
+                  <div className="cf-user-dropdown-menu">
+                    <div className="cf-user-menu-info">
+                      <span className="cf-user-menu-label">Logged in as</span>
+                      <span className="cf-user-menu-email" title={user?.email || ""}>{user?.email}</span>
+                    </div>
+                    <div className="cf-user-menu-divider" />
+                    <button
+                      type="button"
+                      className="cf-user-menu-logout"
+                      onClick={async () => { await signOut(); navigate("/auth"); }}
+                    >
+                      🚪 Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            </nav>
+          </header>
+
+          {/* BRAND HERO */}
           <div className="brand">
             <div className="brand-eyebrow">AI content studio</div>
             <h1 className="brand-title">Content<em>Forge</em></h1>
             <div className="brand-sub">Generate a full week of platform-native posts for any niche — tailored to your voice, audience, and goals.</div>
           </div>
 
-          <div className="hero-shell">
-            <div className="hero-panel">
-              <div className="hero-kicker">Guided creation workspace</div>
-              <div className="hero-title">Build the calendar before the scroll ever starts.</div>
-              <p className="hero-copy">The workflow below stays focused: define the brief, pick the topics, then generate and refine the calendar in one place. Autosave and recovery stay on so you can pick up where you left off.</p>
-              <div className="hero-badges">
-                <span className="hero-badge"><strong>{wizardStepLabel}</strong> step active</span>
-                <span className="hero-badge"><strong>{wizardProgress}%</strong> through the flow</span>
-                <span className="hero-badge"><strong>{posts.length || 0}</strong> posts ready</span>
-                <span className="hero-badge"><strong>{recentCalendars.length}</strong> recent calendars</span>
+          {/* CONDENSED WIZARD STATUS SUMMARY */}
+          {step < 4 && (
+            <div className="compact-status-bar">
+              <div className="compact-status-left">
+                <span className="compact-status-badge"><strong>Step {step}</strong>: {wizardStepLabel}</span>
+                <span className="compact-status-text">{wizardGuidance}</span>
               </div>
-              <div className="hero-note">
-                <strong>{autosaveLabel}</strong> · {wizardGuidance}
-              </div>
-              <div className="hero-linkrow">
-                <Link to="/my-calendars" className="hero-link">Open saved calendars →</Link>
-                <button type="button" className="hero-link" onClick={loadSample} style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>See a sample calendar</button>
+              <div className="compact-status-right">
+                {form.industry && (
+                  <div className="compact-setup-pill">
+                    <span className="compact-pill-label">Niche:</span>
+                    <strong className="compact-pill-val">{selectedIndustry?.label}</strong>
+                  </div>
+                )}
+                <div className="compact-setup-pill">
+                  <span className="compact-pill-label">Platform:</span>
+                  <strong className="compact-pill-val">{form.platform}</strong>
+                </div>
+                {form.topics.length > 0 && (
+                  <div className="compact-setup-pill">
+                    <span className="compact-pill-label">Topics:</span>
+                    <strong className="compact-pill-val">{form.topics.length}</strong>
+                  </div>
+                )}
+                <div className="compact-setup-pill">
+                  <span className="compact-pill-label">Mode:</span>
+                  <strong className="compact-pill-val">{form.mode === "day" ? "Single Day" : "7-Day Week"}</strong>
+                </div>
               </div>
             </div>
-
-            <div className="hero-panel alt">
-              <div className="hero-kicker">Current setup</div>
-              <div className="hero-grid">
-                <div className="hero-stat">
-                  <span>Industry</span>
-                  <strong>{selectedIndustry?.label || "Not picked"}</strong>
-                </div>
-                <div className="hero-stat">
-                  <span>Platform</span>
-                  <strong>{form.platform || "LinkedIn"}</strong>
-                </div>
-                <div className="hero-stat">
-                  <span>Topics</span>
-                  <strong>{form.topics.length}</strong>
-                </div>
-                <div className="hero-stat">
-                  <span>Mode</span>
-                  <strong>{form.mode === "day" ? "Single day" : "Full week"}</strong>
-                </div>
-              </div>
-              <div className="hero-note">
-                <strong>{form.audiences.length || 0}</strong> audiences selected · <strong>{form.goals.length || 0}</strong> goals active · <strong>{form.voice || "default voice"}</strong> voice
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* STEPPER */}
           <div className="stepper" role="list" aria-label="Wizard steps">
@@ -1976,7 +2043,7 @@ const Index = () => {
             </div>
 
             <div className="card">
-              <div className="sh">Your <span>platform & content</span></div>
+              <div className="sh">Your <span>platform & core idea</span></div>
 
               <div className="csect">
                 <div className="flabel" id="cf-platform-label">Platform</div>
@@ -1995,16 +2062,6 @@ const Index = () => {
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div className="csect">
-                <SelectField
-                  label="Content language"
-                  options={["English", "Tamil"]}
-                  value={form.language}
-                  onChange={v => upd("language", v)}
-                  hint="(choose the script the generated content should use)"
-                />
               </div>
 
               <div className="csect" ref={coreIdeaRef}>
@@ -2026,67 +2083,124 @@ const Index = () => {
                   This is the north star for all generated content — be specific for better results.
                 </div>
               </div>
+            </div>
 
-              <div className="csect">
-                <MultiSelect label="Target audience" hint="(pick up to 4)" options={audiencePool} value={form.audiences} onChange={v => upd("audiences", v)} placeholder={form.industry ? "Who are you writing for?" : "Select industry first"} max={4} />
-              </div>
+            {/* COLLAPSIBLE TAILOR BRAND AND VOICE PANEL */}
+            <div className="accordion-panel">
+              <button
+                type="button"
+                className="accordion-trigger"
+                onClick={() => setShowAdvancedBrand(!showAdvancedBrand)}
+                aria-expanded={showAdvancedBrand}
+              >
+                <span className="accordion-trigger-title">
+                  ✨ Tailor Voice & Brand Settings
+                  {(!showAdvancedBrand && (form.voice || form.style || form.audiences.length > 0)) ? <span className="accordion-active-tag">Active</span> : <span className="accordion-opt-tag">Optional</span>}
+                </span>
+                <span className={`accordion-icon ${showAdvancedBrand ? 'open' : ''}`}>▼</span>
+              </button>
+              
+              <div className={`accordion-content ${showAdvancedBrand ? 'open' : ''}`}>
+                <div className="accordion-content-inner">
+                  <div className="csect">
+                    <SelectField
+                      label="Content language"
+                      options={["English", "Tamil"]}
+                      value={form.language}
+                      onChange={v => upd("language", v)}
+                      hint="(choose the script the generated content should use)"
+                    />
+                  </div>
 
-              <div className="g2">
-                <SelectField label="Voice / tone" options={VOICE_OPTIONS} value={form.voice} onChange={v => upd("voice", v)} placeholder="Select a voice…" />
-                <SelectField label="Writing style" options={STYLE_OPTIONS} value={form.style} onChange={v => upd("style", v)} placeholder="Select a style…" />
-                <SelectField label="Copy style" options={COPY_STYLE_OPTIONS} value={form.copyStyle} onChange={v => upd("copyStyle", v)} placeholder="Keep plain text" hint="Applied when copying or scheduling" />
-                <SelectField label="Output quality" options={["draft", "polished"]} value={form.quality} onChange={v => upd("quality", v as "draft" | "polished")} placeholder="draft" hint="Polished performs a critique+rewrite pass (slower, uses pro model)" />
-              </div>
-
-              {(() => {
-                const preview = getVoiceStylePreview(form.industry, form.voice, form.style);
-                if (!preview) {
-                  return (
-                    <div className="vsp">
-                      <div className="vsp-eyebrow">Live voice preview</div>
-                      <div className="vsp-empty">Pick a voice and style above to see a 2-line sample of how your posts will sound — before you generate.</div>
+                  <div className="csect">
+                    <div className={`form-group-gated ${!form.industry ? 'gated' : ''}`}>
+                      <MultiSelect 
+                        label="Target audience" 
+                        hint={form.industry ? "(pick up to 4)" : "(select industry first to unlock)"} 
+                        options={audiencePool} 
+                        value={form.audiences} 
+                        onChange={v => upd("audiences", v)} 
+                        placeholder={form.industry ? "Who are you writing for?" : "🔒 Select industry in Step 1 first"} 
+                        max={4}
+                        disabled={!form.industry}
+                      />
+                      {!form.industry && (
+                        <div className="gated-lock-msg">
+                          <span>🔒 Target audience settings are locked. Select an industry above to configure.</span>
+                        </div>
+                      )}
                     </div>
-                  );
-                }
-                return (
-                  <div className="vsp">
-                    <div className="vsp-eyebrow">
-                      Live voice preview · {form.voice || "default voice"} × {form.style || "default style"}
+                  </div>
+
+                  <div className="g2">
+                    <SelectField label="Voice / tone" options={VOICE_OPTIONS} value={form.voice} onChange={v => upd("voice", v)} placeholder="Select a voice…" />
+                    <SelectField label="Writing style" options={STYLE_OPTIONS} value={form.style} onChange={v => upd("style", v)} placeholder="Select a style…" />
+                    <SelectField label="Copy style" options={COPY_STYLE_OPTIONS} value={form.copyStyle} onChange={v => upd("copyStyle", v)} placeholder={null} hint="Applied when copying or scheduling" />
+                    <SelectField label="Output quality" options={[{ value: "draft", label: "Draft (fast)" }, { value: "polished", label: "Polished (critique & rewrite)" }]} value={form.quality} onChange={v => upd("quality", v as "draft" | "polished")} placeholder={null} hint="Polished performs a critique+rewrite pass (slower, uses pro model)" />
+                  </div>
+
+                  {(() => {
+                    const preview = getVoiceStylePreview(form.industry, form.voice, form.style);
+                    if (!preview) {
+                      return (
+                        <div className="vsp empty">
+                          <div className="vsp-eyebrow">Live voice preview</div>
+                          <div className="vsp-placeholder-lines">
+                            <div className="vsp-line short" />
+                            <div className="vsp-line long" />
+                          </div>
+                          <div className="vsp-empty">Pick a voice and style above to see a 2-line sample of how your posts will sound — before you generate.</div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="vsp">
+                        <div className="vsp-eyebrow">
+                          Live voice preview · {form.voice || "default voice"} × {form.style || "default style"}
+                        </div>
+                        <div className="vsp-hook">{preview.hook}</div>
+                        <div className="vsp-tail">{preview.tail}</div>
+                        {preview.stylePreset && (
+                          <div className="vsp-tail" style={{ marginTop: 8, fontSize: 12, color: '#9a9aae', fontStyle: 'italic' }}>{preview.stylePreset}</div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  <div className="csect" style={{ marginTop: 18 }}>
+                    <div className="flabel">Brand memory <span className="fhint">(saves voice, style, CTA, and phrase preferences)</span></div>
+                    <div className="time-hint" style={{ marginBottom: 10 }}>
+                      Save your brand setup once and reuse it on future generations. Brand memory is private and saved locally to this workspace.
                     </div>
-                    <div className="vsp-hook">{preview.hook}</div>
-                    <div className="vsp-tail">{preview.tail}</div>
-                    {preview.stylePreset && (
-                      <div className="vsp-tail" style={{ marginTop: 8, fontSize: 12, color: '#9a9aae', fontStyle: 'italic' }}>{preview.stylePreset}</div>
+                    <div className="bactions" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
+                      <button type="button" className="cpbtn" onClick={saveBrandMemoryFromForm}>Save brand memory</button>
+                      <button type="button" className="cpbtn" onClick={applyBrandMemoryToForm} disabled={!brandMemory}>Apply saved memory</button>
+                      <button type="button" className="cpbtn" onClick={clearBrandMemorySaved} disabled={!brandMemory}>Clear saved memory</button>
+                    </div>
+                    {brandMemory && (
+                      <div className="time-hint" style={{ marginTop: 8 }}>
+                        Saved: {brandMemory.voice || "Voice unset"} · {brandMemory.style || "Style unset"}{brandMemory.cta ? ` · ${brandMemory.cta}` : ""}
+                      </div>
                     )}
                   </div>
-                );
-              })()}
 
-              <div className="csect" style={{ marginTop: 18 }}>
-                <div className="flabel">Brand memory <span className="fhint">(saves voice, style, CTA, and phrase preferences)</span></div>
-                <div className="time-hint" style={{ marginBottom: 10 }}>
-                  Save your brand setup once and reuse it on future generations without changing the current fields.
-                </div>
-                <div className="bactions" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
-                  <button type="button" className="cpbtn" onClick={saveBrandMemoryFromForm}>Save brand memory</button>
-                  <button type="button" className="cpbtn" onClick={applyBrandMemoryToForm} disabled={!brandMemory}>Apply saved memory</button>
-                  <button type="button" className="cpbtn" onClick={clearBrandMemorySaved} disabled={!brandMemory}>Clear saved memory</button>
-                </div>
-                {brandMemory && (
-                  <div className="time-hint" style={{ marginTop: 8 }}>
-                    Saved: {brandMemory.voice || "Voice unset"} · {brandMemory.style || "Style unset"}{brandMemory.cta ? ` · ${brandMemory.cta}` : ""}
+                  <div className="divider" />
+
+                  <div className="csect">
+                    <div className={`form-group-gated ${!form.industry ? 'gated' : ''}`}>
+                      <div className="flabel">Goal <span className="fhint">(pick all that apply)</span></div>
+                      <div className="chips">
+                        {GOAL_OPTIONS.map(v => (
+                          <div key={v} className={`chip ${form.goals.includes(v) ? "on" : ""}`} onClick={() => form.industry && toggleChip("goals", v)}>{v}</div>
+                        ))}
+                      </div>
+                      {!form.industry && (
+                        <div className="gated-lock-msg">
+                          <span>🔒 Goal configuration is locked. Select an industry in Step 1 first.</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-
-              <div className="divider" />
-
-              <div className="csect">
-                <div className="flabel">Goal <span className="fhint">(pick all that apply)</span></div>
-                <div className="chips">
-                  {GOAL_OPTIONS.map(v => (
-                    <div key={v} className={`chip ${form.goals.includes(v) ? "on" : ""}`} onClick={() => toggleChip("goals", v)}>{v}</div>
-                  ))}
                 </div>
               </div>
             </div>
@@ -2164,27 +2278,37 @@ const Index = () => {
               )}
 
               <div className="csect" ref={topicsRef}>
-                <MultiSelect
-                  label={form.mode === "day" ? "Topic for this post" : "Topics to cover"}
-                  hint={form.mode === "day" ? "(optional — will infer topic from core idea if left empty)" : "(optional — pick up to 7; fewer than 7 will be expanded into related angles or inferred from your core idea)"}
-                  options={topicPool.length > 0 ? topicPool : ["Add custom topics below ↓"]}
-                  disabledOptions={topicPool.length > 0 ? [] : ["Add custom topics below ↓"]}
-                  value={form.topics}
-                  onChange={v => upd("topics", form.mode === "day" ? v.slice(-1) : v)}
-                  placeholder={form.industry ? "Select topics…" : "Select industry first"}
-                  max={form.mode === "day" ? 1 : 7}
-                />
-                <div className="add-row">
-                  <input type="text" className="ti" placeholder="+ add a custom topic, press Enter or click Add"
-                    value={customTopic}
-                    onChange={e => setCustomTopic(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && addCustomTopic()} />
-                  <button className="add-btn" onClick={addCustomTopic}>Add</button>
+                <div className={`form-group-gated ${!form.industry ? 'gated' : ''}`}>
+                  <MultiSelect
+                    label={form.mode === "day" ? "Topic for this post" : "Topics to cover"}
+                    hint={form.mode === "day" ? "(optional — will infer topic from core idea if left empty)" : "(optional — pick up to 7; fewer than 7 will be expanded into related angles or inferred from your core idea)"}
+                    options={topicPool.length > 0 ? topicPool : ["Add custom topics below ↓"]}
+                    disabledOptions={topicPool.length > 0 ? [] : ["Add custom topics below ↓"]}
+                    value={form.topics}
+                    onChange={v => upd("topics", form.mode === "day" ? v.slice(-1) : v)}
+                    placeholder={form.industry ? "Select topics…" : "🔒 Select industry in Step 1 first"}
+                    max={form.mode === "day" ? 1 : 7}
+                    disabled={!form.industry}
+                  />
+                  {!form.industry && (
+                    <div className="gated-lock-msg">
+                      <span>🔒 Topic selection is locked. Select an industry in Step 1 to load relevant topic presets.</span>
+                    </div>
+                  )}
                 </div>
+                {form.industry && (
+                  <div className="add-row">
+                    <input type="text" className="ti" placeholder="+ add a custom topic, press Enter or click Add"
+                      value={customTopic}
+                      onChange={e => setCustomTopic(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && addCustomTopic()} />
+                    <button className="add-btn" onClick={addCustomTopic}>Add</button>
+                  </div>
+                )}
               </div>
 
               {/* Inspiration Bank - Show trending topics for quick selection */}
-              {form.industry && (
+              {form.industry ? (
                 <div className="csect">
                   <InspirationBank
                     industry={form.industry}
@@ -2197,52 +2321,104 @@ const Index = () => {
                     }}
                   />
                 </div>
+              ) : (
+                <div className="csect">
+                  <div className="inspiration-bank-gated">
+                    <div className="flabel">Inspiration Bank</div>
+                    <div className="gated-lock-msg">
+                      <span>🔒 Inspiration Bank is locked. Select an industry in Step 1 to load trending topics.</span>
+                    </div>
+                  </div>
+                </div>
               )}
 
+              {/* COLLAPSIBLE ADVANCED FORMATTING & KEYWORDS PANEL */}
+              <div className="accordion-panel">
+                <button
+                  type="button"
+                  className="accordion-trigger"
+                  onClick={() => setShowAdvancedFormat(!showAdvancedFormat)}
+                  aria-expanded={showAdvancedFormat}
+                >
+                  <span className="accordion-trigger-title">
+                    ⚙️ Advanced Formatting & Keywords
+                    {(!showAdvancedFormat && (form.format !== "Balanced mix" || form.cta !== "Share & repost bait" || form.length !== "medium" || form.structure !== "mixed" || form.bannedWords.length > 0 || form.requiredWords.length > 0)) ? <span className="accordion-active-tag">Active</span> : <span className="accordion-opt-tag">Optional</span>}
+                  </span>
+                  <span className={`accordion-icon ${showAdvancedFormat ? 'open' : ''}`}>▼</span>
+                </button>
+
+                <div className={`accordion-content ${showAdvancedFormat ? 'open' : ''}`}>
+                  <div className="accordion-content-inner">
+                    <div className="g2" style={{ marginBottom: 16 }}>
+                      <SelectField label="Format mix" options={FORMAT_OPTIONS} value={form.format} onChange={v => upd("format", v)} />
+                      <SelectField label="CTA style" options={CTA_OPTIONS} value={form.cta} onChange={v => upd("cta", v)} />
+                    </div>
+
+                    <div className="csect">
+                      <div className="flabel" id="cf-length-label">Post length</div>
+                      <div className="plat-grid" role="radiogroup" aria-labelledby="cf-length-label">
+                        {LENGTH_OPTIONS.filter(o => !(form.mode === "day" && o.id === "mixed")).map(o => (
+                          <button
+                            key={o.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={form.length === o.id}
+                            className={`plat-card ${form.length === o.id ? "on" : ""}`}
+                            onClick={() => upd("length", o.id)}
+                          >
+                            <div className="plat-name">{o.label}</div>
+                            <div className="plat-hint">{o.hint}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="csect">
+                      <div className="flabel" id="cf-structure-label">Structure <span className="fhint">(paragraphs vs bullets)</span></div>
+                      <div className="plat-grid" role="radiogroup" aria-labelledby="cf-structure-label">
+                        {STRUCTURE_OPTIONS.map(o => (
+                          <button
+                            key={o.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={form.structure === o.id}
+                            className={`plat-card ${form.structure === o.id ? "on" : ""}`}
+                            onClick={() => upd("structure", o.id)}
+                          >
+                            <div className="plat-name">{o.label}</div>
+                            <div className="plat-hint">{o.hint}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="g2">
+                      <div>
+                        <div className="flabel">Never say <span className="fhint">(comma-separated, hard ban)</span></div>
+                        <input
+                          type="text"
+                          className="ti"
+                          placeholder="e.g. game-changer, synergy, leverage"
+                          value={form.bannedWords.join(", ")}
+                          onChange={e => upd("bannedWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                        />
+                      </div>
+                      <div>
+                        <div className="flabel">Must mention <span className="fhint">(comma-separated, weave in)</span></div>
+                        <input
+                          type="text"
+                          className="ti"
+                          placeholder="e.g. our product name, RAG, India"
+                          value={form.requiredWords.join(", ")}
+                          onChange={e => upd("requiredWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="divider" />
-
-              <div className="g2" style={{ marginBottom: 16 }}>
-                <SelectField label="Format mix" options={FORMAT_OPTIONS} value={form.format} onChange={v => upd("format", v)} />
-                <SelectField label="CTA style" options={CTA_OPTIONS} value={form.cta} onChange={v => upd("cta", v)} />
-              </div>
-
-              <div className="csect">
-                <div className="flabel" id="cf-length-label">Post length</div>
-                <div className="plat-grid" role="radiogroup" aria-labelledby="cf-length-label">
-                  {LENGTH_OPTIONS.filter(o => !(form.mode === "day" && o.id === "mixed")).map(o => (
-                    <button
-                      key={o.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={form.length === o.id}
-                      className={`plat-card ${form.length === o.id ? "on" : ""}`}
-                      onClick={() => upd("length", o.id)}
-                    >
-                      <div className="plat-name">{o.label}</div>
-                      <div className="plat-hint">{o.hint}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="csect">
-                <div className="flabel" id="cf-structure-label">Structure <span className="fhint">(paragraphs vs bullets)</span></div>
-                <div className="plat-grid" role="radiogroup" aria-labelledby="cf-structure-label">
-                  {STRUCTURE_OPTIONS.map(o => (
-                    <button
-                      key={o.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={form.structure === o.id}
-                      className={`plat-card ${form.structure === o.id ? "on" : ""}`}
-                      onClick={() => upd("structure", o.id)}
-                    >
-                      <div className="plat-name">{o.label}</div>
-                      <div className="plat-hint">{o.hint}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               {form.mode === "week" && (
                 <div className="csect">
@@ -2258,6 +2434,7 @@ const Index = () => {
                   </div>
                 </div>
               )}
+              
               <div className="csect">
                 <div className="flabel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span>Extra context <span className="fhint">(optional)</span></span>
@@ -2268,29 +2445,6 @@ const Index = () => {
                   )}
                 </div>
                 <textarea rows={2} maxLength={500} placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
-              </div>
-
-              <div className="g2">
-                <div>
-                  <div className="flabel">Never say <span className="fhint">(comma-separated, hard ban)</span></div>
-                  <input
-                    type="text"
-                    className="ti"
-                    placeholder="e.g. game-changer, synergy, leverage"
-                    value={form.bannedWords.join(", ")}
-                    onChange={e => upd("bannedWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
-                  />
-                </div>
-                <div>
-                  <div className="flabel">Must mention <span className="fhint">(comma-separated, weave in)</span></div>
-                  <input
-                    type="text"
-                    className="ti"
-                    placeholder="e.g. our product name, RAG, India"
-                    value={form.requiredWords.join(", ")}
-                    onChange={e => upd("requiredWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
-                  />
-                </div>
               </div>
             </div>
 

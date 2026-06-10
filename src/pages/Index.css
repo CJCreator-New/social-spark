@@ -405,4 +405,440 @@
   /* Hide inactive step labels on mobile but keep the active one for context. */
   .cf-app .stepper .slabel:not(.active){display:none;}
   .cf-app .stepper .slabel.active{font-size:11px;}
+  
+  .cf-app .cf-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .cf-app .cf-header-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .cf-app .compact-status-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
 }
+
+/* Premium Header Navigation */
+.cf-app .cf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  position: relative;
+  z-index: 10;
+}
+.cf-app .cf-header-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+}
+.cf-app .cf-logo-icon {
+  font-size: 18px;
+}
+.cf-app .cf-logo-text {
+  letter-spacing: -0.2px;
+  font-weight: 600;
+}
+.cf-app .cf-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text2);
+  flex-wrap: wrap;
+}
+.cf-app .cf-nav-btn {
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cf-app .cf-nav-btn.primary {
+  color: #07080d;
+  background: var(--accent);
+}
+.cf-app .cf-nav-btn.primary:hover {
+  background: #d4f7aa;
+  box-shadow: 0 2px 10px rgba(200, 240, 154, 0.2);
+}
+.cf-app .cf-nav-link {
+  color: var(--text2);
+  text-decoration: none;
+  padding: 6px 8px;
+  transition: color 0.15s ease;
+}
+.cf-app .cf-nav-link:hover {
+  color: var(--text);
+}
+.cf-app .cf-nav-divider {
+  color: var(--text3);
+}
+.cf-app .cf-nav-user {
+  color: var(--text2);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cf-app .cf-nav-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  transition: all 0.15s ease;
+}
+.cf-app .cf-nav-status.saving {
+  color: #f0d49a;
+  border-color: rgba(240, 212, 154, 0.2);
+  background: rgba(240, 212, 154, 0.04);
+}
+.cf-app .cf-nav-status.saved {
+  color: var(--accent);
+  border-color: rgba(200, 240, 154, 0.2);
+  background: rgba(200, 240, 154, 0.04);
+}
+.cf-app .cf-nav-status.error {
+  color: var(--err);
+  border-color: rgba(240, 154, 154, 0.2);
+  background: rgba(240, 154, 154, 0.04);
+}
+.cf-app .cf-nav-btn-logout {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text2);
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+.cf-app .cf-nav-btn-logout:hover {
+  border-color: var(--err);
+  color: var(--err);
+  background: rgba(240, 154, 154, 0.05);
+}
+
+/* Condensed Status Bar */
+.cf-app .compact-status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+.cf-app .compact-status-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.cf-app .compact-status-badge {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: var(--adim);
+  border: 1px solid rgba(200, 240, 154, 0.2);
+  color: var(--accent);
+  white-space: nowrap;
+  font-weight: 500;
+}
+.cf-app .compact-status-text {
+  font-size: 12px;
+  color: var(--text2);
+  font-weight: 300;
+}
+.cf-app .compact-status-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cf-app .compact-setup-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  color: var(--text2);
+}
+.cf-app .compact-pill-label {
+  color: var(--text3);
+}
+.cf-app .compact-pill-val {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* Accordion / Progressive Disclosure Panels */
+.cf-app .accordion-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  margin-bottom: 14px;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cf-app .accordion-panel:hover {
+  box-shadow: 0 4px 24px rgba(0,0,0,.28);
+  border-color: var(--border2);
+}
+.cf-app .accordion-trigger {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text);
+  text-align: left;
+  outline: none;
+}
+.cf-app .accordion-trigger-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+.cf-app .accordion-active-tag {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  background: var(--adim);
+  border: 1px solid rgba(200, 240, 154, 0.25);
+  color: var(--accent);
+  border-radius: 99px;
+  margin-left: 8px;
+  font-weight: 600;
+}
+.cf-app .accordion-opt-tag {
+  font-size: 10px;
+  color: var(--text3);
+  font-weight: 300;
+  margin-left: 8px;
+}
+.cf-app .accordion-icon {
+  font-size: 10px;
+  color: var(--text3);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cf-app .accordion-icon.open {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+.cf-app .accordion-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cf-app .accordion-content.open {
+  max-height: 1400px;
+}
+.cf-app .accordion-content-inner {
+  padding: 20px 24px 24px;
+  border-top: 1px solid var(--border);
+  margin-top: -1px;
+}
+
+/* Gated Inputs Visual Locks */
+.cf-app .form-group-gated {
+  position: relative;
+  transition: opacity 0.25s ease;
+}
+.cf-app .form-group-gated.gated {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cf-app .gated-lock-msg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text2);
+  opacity: 0.7;
+}
+.cf-app .msbox.disabled {
+  background: rgba(7, 8, 13, 0.45) !important;
+  border-color: var(--border) !important;
+  cursor: not-allowed !important;
+  color: var(--text3) !important;
+}
+.cf-app .inspiration-bank-gated {
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  background: rgba(7, 8, 13, 0.2);
+}
+.cf-app .inspiration-bank-gated .flabel {
+  opacity: 0.5;
+}
+
+/* User Account Dropdown */
+.cf-app .cf-user-dropdown-wrap {
+  position: relative;
+  display: inline-block;
+}
+.cf-app .cf-user-dropdown-trigger {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  outline: none;
+}
+.cf-app .cf-user-dropdown-trigger:hover,
+.cf-app .cf-user-dropdown-trigger.active {
+  border-color: rgba(200, 240, 154, 0.35);
+  color: var(--accent);
+  background: rgba(200, 240, 154, 0.04);
+}
+.cf-app .cf-user-avatar {
+  font-size: 14px;
+}
+.cf-app .cf-user-arrow {
+  font-size: 8px;
+  color: var(--text3);
+  transition: transform 0.15s ease;
+}
+.cf-app .cf-user-dropdown-trigger.active .cf-user-arrow {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+.cf-app .cf-user-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 200;
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-md);
+  padding: 12px;
+  min-width: 200px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: cfFadeUp 0.2s ease;
+}
+.cf-app .cf-user-menu-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cf-app .cf-user-menu-label {
+  font-size: 10px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.cf-app .cf-user-menu-email {
+  font-size: 12px;
+  color: var(--text);
+  word-break: break-all;
+  font-weight: 500;
+}
+.cf-app .cf-user-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 10px 0;
+}
+.cf-app .cf-user-menu-logout {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text2);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+.cf-app .cf-user-menu-logout:hover {
+  border-color: var(--err);
+  color: var(--err);
+  background: rgba(240, 154, 154, 0.05);
+}
+
+/* Empty Voice Preview Styling */
+.cf-app .vsp.empty {
+  border-style: dashed;
+  background: rgba(7, 8, 13, 0.15);
+  opacity: 0.85;
+}
+.cf-app .vsp-placeholder-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  margin-top: 4px;
+}
+.cf-app .vsp-line {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+.cf-app .vsp-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  animation: cfIndet 1.6s ease-in-out infinite;
+}
+.cf-app .vsp-line.short {
+  width: 35%;
+}
+.cf-app .vsp-line.long {
+  width: 70%;
+}
+

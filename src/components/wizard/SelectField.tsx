@@ -10,10 +10,10 @@ export function Caret() {
 
 interface SelectFieldProps {
   label: string;
-  options: string[];
+  options: (string | { value: string; label: string })[];
   value: string;
   onChange: (v: string) => void;
-  placeholder?: string;
+  placeholder?: string | null;
   hint?: string;
 }
 
@@ -23,8 +23,12 @@ export function SelectField({ label, options, value, onChange, placeholder, hint
       <div className="flabel">{label}{hint && <span className="fhint">{hint}</span>}</div>
       <div className="swrap">
         <select className="sel" aria-label={label || "Select option"} value={value} onChange={e => onChange(e.target.value)}>
-          <option value="">{placeholder || "Select…"}</option>
-          {options.map(o => <option key={o} value={o}>{o}</option>)}
+          {placeholder !== null && <option value="">{placeholder || "Select…"}</option>}
+          {options.map(o => {
+            const val = typeof o === "string" ? o : o.value;
+            const lbl = typeof o === "string" ? o : o.label;
+            return <option key={val} value={val}>{lbl}</option>;
+          })}
         </select>
         <span className="sarrow"><Caret /></span>
       </div>

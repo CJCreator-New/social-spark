@@ -53,13 +53,6 @@ export default function AuthPage() {
         toast.success("Welcome back");
       }
     } catch (err) {
-      if (import.meta.env.DEV) {
-        window.localStorage.setItem(getE2EAuthFlag(), "true");
-        toast.success("Dev Sandbox: Logged in via local mock session");
-        navigate(from, { replace: true });
-        window.location.reload();
-        return;
-      }
       const msg = err instanceof Error ? err.message : "Something went wrong";
       if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("user already")) {
         setError("This email is already registered. Try signing in instead.");

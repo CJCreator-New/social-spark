@@ -124,10 +124,10 @@ export const VOICE_OPTIONS = ["Technical & analytical", "Conversational & warm",
 export const STYLE_OPTIONS = ["Short punchy lines", "Long-form narrative", "Lists & frameworks", "Thread-style breakdown", "Stats-led", "Case study format", "Question-led", "First-person story", "Industry insight", "Myth-busting", "How-to guide", "Behind-the-scenes"];
 export const FORMAT_OPTIONS = ["Balanced mix", "Storytelling-led", "Data & insights", "How-it-works", "Opinion / POV", "List posts", "Interviews & Q&A", "Case studies"];
 export const CTA_OPTIONS = ["Share & repost bait", "Spark comments & debate", "Drive to profile / newsletter", "Collect leads", "Build community", "No hard CTA"];
-export const COPY_STYLE_OPTIONS = ["None", "Bold serif", "Italic", "Bold italic", "Monospace", "Sans-serif bold"];
+export const COPY_STYLE_OPTIONS = ["Keep plain text (recommended)", "Bold serif", "Italic", "Bold italic", "Monospace", "Sans-serif bold"];
 
 export const COPY_STYLE_MAP: Record<string, FontStyle> = {
-  None: FontStyle.None,
+  "Keep plain text (recommended)": FontStyle.None,
   "Bold serif": FontStyle.BoldSerif,
   Italic: FontStyle.Italic,
   "Bold italic": FontStyle.BoldItalic,
@@ -176,7 +176,7 @@ export const INITIAL_FORM: WizardForm = {
   topics: [],
   format: "Balanced mix",
   cta: "Share & repost bait",
-  copyStyle: "None",
+  copyStyle: "Keep plain text (recommended)",
   length: "medium",
   structure: "mixed",
   extra: "",

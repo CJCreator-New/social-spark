@@ -18,9 +18,10 @@ interface MultiSelectProps {
   max?: number;
   hint?: string;
   disabledOptions?: string[];
+  disabled?: boolean;
 }
 
-export function MultiSelect({ label, options, value, onChange, placeholder, max = 6, hint, disabledOptions = [] }: MultiSelectProps) {
+export function MultiSelect({ label, options, value, onChange, placeholder, max = 6, hint, disabledOptions = [], disabled = false }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -37,7 +38,7 @@ export function MultiSelect({ label, options, value, onChange, placeholder, max 
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
   const toggle = (v: string) => {
-    if (disabledOptions.includes(v)) return;
+    if (disabled || disabledOptions.includes(v)) return;
     if (value.includes(v)) onChange(value.filter(x => x !== v));
     else if (value.length < max) onChange([...value, v]);
   };
@@ -45,7 +46,7 @@ export function MultiSelect({ label, options, value, onChange, placeholder, max 
     <div>
       <div className="flabel">{label}{hint && <span className="fhint">{hint}</span>}</div>
       <div className="mswrap" ref={ref}>
-        <div className={`msbox ${open ? "open" : ""}`} onClick={() => setOpen(o => !o)}>
+        <div className={`msbox ${open ? "open" : ""} ${disabled ? "disabled" : ""}`} onClick={() => !disabled && setOpen(o => !o)}>
           {value.length === 0
             ? <span className="ms-ph">{placeholder || "Select…"}</span>
             : value.map(v => (
@@ -56,11 +57,11 @@ export function MultiSelect({ label, options, value, onChange, placeholder, max 
             ))}
           <span className="ms-caret"><Caret /></span>
         </div>
-        {open && (
+        {open && !disabled && (
           <div className="ms-drop">
             {options.map(o => {
-              const disabled = disabledOptions.includes(o);
-              if (disabled) {
+              const isDisabledOption = disabledOptions.includes(o);
+              if (isDisabledOption) {
                 return (
                   <div key={o} className="ms-opt" style={{ opacity: 0.5, cursor: "default", fontStyle: "italic" }} onClick={e => e.stopPropagation()}>
                     {o}
