@@ -58,6 +58,8 @@ type InlineRewritePayload = {
   context?: Record<string, unknown>;
 };
 
+type GeneratedResponse<T> = { post?: T; rewrittenText?: string };
+
 let e2eCalendars: E2ECalendar[] = [];
 let e2eScheduleRows: E2EScheduleRow[] = [];
 
@@ -695,7 +697,7 @@ export function useRegeneratePostMutation(calendarId?: string) {
       const { data, usedFallback, keyMode } = await generateWithFallback("regenerate-post", payload);
       setKeySource(usedFallback ? "user" : "platform");
       setKeyMode(keyMode);
-      return data.post;
+      return (data as GeneratedResponse<GeneratedPostPayload>).post;
     },
     onSuccess: () => {
       if (calendarId) qc.invalidateQueries({ queryKey: ["calendar", calendarId] });
@@ -723,7 +725,7 @@ export function useRepurposePostMutation() {
       const { data, usedFallback, keyMode } = await generateWithFallback("repurpose-post", payload);
       setKeySource(usedFallback ? "user" : "platform");
       setKeyMode(keyMode);
-      return data.post;
+      return (data as GeneratedResponse<GeneratedPostPayload>).post;
     },
   });
 }
@@ -770,7 +772,7 @@ export function useInlineRewriteMutation() {
       const { data, usedFallback, keyMode } = await generateWithFallback("inline-rewrite", payload);
       setKeySource(usedFallback ? "user" : "platform");
       setKeyMode(keyMode);
-      return String(data.rewrittenText || "");
+      return String((data as GeneratedResponse<never>).rewrittenText || "");
     },
   });
 }

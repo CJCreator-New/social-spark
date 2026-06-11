@@ -456,19 +456,17 @@ const Index = () => {
   const [saving, setSaving] = useState(false);
   const [regenIdx, setRegenIdx] = useState<number | null>(null);
   const [tweakOpenIdx, setTweakOpenIdx] = useState<number | null>(null);
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [e2eNetworkError, setE2eNetworkError] = useState(false);
   const [isE2EModeActive, setIsE2EModeActive] = useState(false);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showAdvancedBrand, setShowAdvancedBrand] = useState(false);
   const [showAdvancedFormat, setShowAdvancedFormat] = useState(false);
   const [reformatTarget, setReformatTarget] = useState<string>("");
   const [reformatting, setReformatting] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
   const [recoveryDraft, setRecoveryDraft] = useState<WizardDraftSnapshot | null>(null);
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
   const autosaveClearTimer = useRef<number | null>(null);
@@ -680,16 +678,6 @@ const Index = () => {
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [copyMenuOpen]);
-
-  // Close account menu on outside click
-  useEffect(() => {
-    if (!userMenuOpen) return;
-    const h = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [userMenuOpen]);
 
   // Keyboard shortcuts: arrow keys navigate between days (only on step 4 when week-strip visible)
   useEffect(() => {
@@ -1066,7 +1054,7 @@ const Index = () => {
         targetTopic: form.topics[0] || form.coreIdea,
         targetDow: localTargetDow,
       });
-      const result: Post[] = form.mode === "day" ? fallbackPosts.slice(0, 1) : fallbackPosts;
+      const result: Post[] = (form.mode === "day" ? fallbackPosts.slice(0, 1) : fallbackPosts) as unknown as Post[];
       setGenStep(GEN_LABELS.length);
       setPostsWithHistory(result);
       setGenerationMeta(null);
@@ -1582,7 +1570,7 @@ const Index = () => {
 
   function loadSample() {
     setForm(f => ({ ...f, ...SAMPLE_FORM }));
-    setPostsWithHistory(SAMPLE_POSTS);
+    setPostsWithHistory(SAMPLE_POSTS as unknown as Post[]);
     setPostTimes(SAMPLE_POST_TIMES);
     setActiveDay(0);
     setSampleMode(true);
@@ -1874,57 +1862,6 @@ const Index = () => {
         <div className="bg-glow" />
 
         <div className="inner">
-          {/* HEADER */}
-          <header className="cf-header">
-            <div className="cf-header-logo">
-              <span className="cf-logo-icon">🔥</span>
-              <span className="cf-logo-text">ContentForge</span>
-            </div>
-            <nav className="cf-header-nav" aria-label="Main Navigation">
-              <Link to="/my-calendars" className="cf-nav-btn primary">
-                📅 My calendars
-              </Link>
-              <Link to="/schedule" className="cf-nav-link">Schedule</Link>
-              <Link to="/profile" className="cf-nav-link">Profile</Link>
-              <span className="cf-nav-divider">|</span>
-              {autosaveStatus !== "idle" && (
-                <span className={`cf-nav-status ${autosaveStatus}`}>
-                  {autosaveStatus === "saving" ? "Saving..." : autosaveStatus === "saved" ? "Saved" : "Save failed"}
-                </span>
-              )}
-              {/* USER ACCOUNT DROPDOWN */}
-              <div className="cf-user-dropdown-wrap" ref={userMenuRef}>
-                <button
-                  type="button"
-                  className={`cf-user-dropdown-trigger ${userMenuOpen ? 'active' : ''}`}
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  aria-expanded={userMenuOpen}
-                  aria-label="User account menu"
-                >
-                  <span className="cf-user-avatar">👤</span>
-                  <span className="cf-user-arrow">▼</span>
-                </button>
-
-                {userMenuOpen && (
-                  <div className="cf-user-dropdown-menu">
-                    <div className="cf-user-menu-info">
-                      <span className="cf-user-menu-label">Logged in as</span>
-                      <span className="cf-user-menu-email" title={user?.email || ""}>{user?.email}</span>
-                    </div>
-                    <div className="cf-user-menu-divider" />
-                    <button
-                      type="button"
-                      className="cf-user-menu-logout"
-                      onClick={async () => { await signOut(); navigate("/auth"); }}
-                    >
-                      🚪 Sign out
-                    </button>
-                  </div>
-                )}
-              </div>
-            </nav>
-          </header>
-
           {/* BRAND HERO */}
           <div className="brand">
             <div className="brand-eyebrow">AI content studio</div>
