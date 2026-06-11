@@ -1862,57 +1862,6 @@ const Index = () => {
         <div className="bg-glow" />
 
         <div className="inner">
-          {/* HEADER */}
-          <header className="cf-header">
-            <div className="cf-header-logo">
-              <span className="cf-logo-icon">🔥</span>
-              <span className="cf-logo-text">ContentForge</span>
-            </div>
-            <nav className="cf-header-nav" aria-label="Main Navigation">
-              <Link to="/my-calendars" className="cf-nav-btn primary">
-                📅 My calendars
-              </Link>
-              <Link to="/schedule" className="cf-nav-link">Schedule</Link>
-              <Link to="/profile" className="cf-nav-link">Profile</Link>
-              <span className="cf-nav-divider">|</span>
-              {autosaveStatus !== "idle" && (
-                <span className={`cf-nav-status ${autosaveStatus}`}>
-                  {autosaveStatus === "saving" ? "Saving..." : autosaveStatus === "saved" ? "Saved" : "Save failed"}
-                </span>
-              )}
-              {/* USER ACCOUNT DROPDOWN */}
-              <div className="cf-user-dropdown-wrap" ref={userMenuRef}>
-                <button
-                  type="button"
-                  className={`cf-user-dropdown-trigger ${userMenuOpen ? 'active' : ''}`}
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  aria-expanded={userMenuOpen}
-                  aria-label="User account menu"
-                >
-                  <span className="cf-user-avatar">👤</span>
-                  <span className="cf-user-arrow">▼</span>
-                </button>
-
-                {userMenuOpen && (
-                  <div className="cf-user-dropdown-menu">
-                    <div className="cf-user-menu-info">
-                      <span className="cf-user-menu-label">Logged in as</span>
-                      <span className="cf-user-menu-email" title={user?.email || ""}>{user?.email}</span>
-                    </div>
-                    <div className="cf-user-menu-divider" />
-                    <button
-                      type="button"
-                      className="cf-user-menu-logout"
-                      onClick={async () => { await signOut(); navigate("/auth"); }}
-                    >
-                      🚪 Sign out
-                    </button>
-                  </div>
-                )}
-              </div>
-            </nav>
-          </header>
-
           {/* BRAND HERO */}
           <div className="brand">
             <div className="brand-eyebrow">AI content studio</div>
