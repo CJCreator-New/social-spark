@@ -18,11 +18,13 @@ export function createSeedFromPost(post: Post, platform?: string): WizardFormSee
   const truncated = cleanHook.length > 80 ? cleanHook.slice(0, 80) + "..." : cleanHook;
   const coreIdea = truncated ? `Build on this: "${truncated}"` : `Build on topic: ${post.topic}`;
   
+  const postPlatform = typeof post.platform === "string" ? post.platform : "LinkedIn";
+
   return {
     coreIdea,
     topic: post.topic,
     format: post.format,
-    platform: platform || post.platform || "LinkedIn",
+    platform: platform || postPlatform,
   };
 }
 

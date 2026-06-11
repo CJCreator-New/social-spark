@@ -1054,7 +1054,7 @@ const Index = () => {
         targetTopic: form.topics[0] || form.coreIdea,
         targetDow: localTargetDow,
       });
-      const result: Post[] = form.mode === "day" ? fallbackPosts.slice(0, 1) : fallbackPosts;
+      const result: Post[] = (form.mode === "day" ? fallbackPosts.slice(0, 1) : fallbackPosts) as unknown as Post[];
       setGenStep(GEN_LABELS.length);
       setPostsWithHistory(result);
       setGenerationMeta(null);
@@ -1570,7 +1570,7 @@ const Index = () => {
 
   function loadSample() {
     setForm(f => ({ ...f, ...SAMPLE_FORM }));
-    setPostsWithHistory(SAMPLE_POSTS);
+    setPostsWithHistory(SAMPLE_POSTS as unknown as Post[]);
     setPostTimes(SAMPLE_POST_TIMES);
     setActiveDay(0);
     setSampleMode(true);
