@@ -456,19 +456,17 @@ const Index = () => {
   const [saving, setSaving] = useState(false);
   const [regenIdx, setRegenIdx] = useState<number | null>(null);
   const [tweakOpenIdx, setTweakOpenIdx] = useState<number | null>(null);
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [e2eNetworkError, setE2eNetworkError] = useState(false);
   const [isE2EModeActive, setIsE2EModeActive] = useState(false);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showAdvancedBrand, setShowAdvancedBrand] = useState(false);
   const [showAdvancedFormat, setShowAdvancedFormat] = useState(false);
   const [reformatTarget, setReformatTarget] = useState<string>("");
   const [reformatting, setReformatting] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
   const [recoveryDraft, setRecoveryDraft] = useState<WizardDraftSnapshot | null>(null);
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
   const autosaveClearTimer = useRef<number | null>(null);
@@ -680,16 +678,6 @@ const Index = () => {
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [copyMenuOpen]);
-
-  // Close account menu on outside click
-  useEffect(() => {
-    if (!userMenuOpen) return;
-    const h = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [userMenuOpen]);
 
   // Keyboard shortcuts: arrow keys navigate between days (only on step 4 when week-strip visible)
   useEffect(() => {
