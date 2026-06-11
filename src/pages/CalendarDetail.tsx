@@ -524,7 +524,7 @@ export default function CalendarDetail() {
                 requiredWords: (calendarData.form_payload as { requiredWords?: string[] } | null)?.requiredWords || [],
                 targetTopic: (calendarData.form_payload as { topics?: string[] } | null)?.topics?.[0] || calendarData.core_idea || calendarData.title || "",
                 targetDow: "Mon",
-              });
+              }) as unknown as Post[];
             })()
           : [];
 

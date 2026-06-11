@@ -89,7 +89,7 @@ export async function getUserApiKey(): Promise<{
   });
 
   // Query the user_settings table for use_own_key and key_mode
-  const settingsPromise = (supabase as unknown as { from: (table: string) => typeof supabase.from }).from("user_settings")
+  const settingsPromise = (supabase.from as unknown as (table: string) => ReturnType<typeof supabase.from>)("user_settings")
     .select("use_own_key, key_mode")
     .maybeSingle()
     .then(({ data, error }) => {
