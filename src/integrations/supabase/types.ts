@@ -140,39 +140,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_settings: {
-        Row: {
-          id: string
-          user_id: string
-          api_key_enc: string | null
-          api_provider: string
-          use_own_key: boolean
-          key_mode: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          api_key_enc?: string | null
-          api_provider?: string
-          use_own_key?: boolean
-          key_mode?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          api_key_enc?: string | null
-          api_provider?: string
-          use_own_key?: boolean
-          key_mode?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       scheduled_posts: {
         Row: {
           calendar_id: string
