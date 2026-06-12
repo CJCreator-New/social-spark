@@ -20,8 +20,31 @@
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   </head>
-  <body>
-    <div id="root"></div>
+  <body style="background:#07080d;color:#e6e6f0;margin:0;">
+    <div id="root">
+      <div id="boot-fallback" style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif;">
+        <div style="text-align:center;opacity:0.7;">
+          <div style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.15);border-top-color:#3b82f6;border-radius:50%;margin:0 auto 14px;animation:cf-spin 0.9s linear infinite;"></div>
+          <div style="font-size:13px;">Loading ContentForge…</div>
+        </div>
+      </div>
+    </div>
+    <style>@keyframes cf-spin{to{transform:rotate(360deg)}}</style>
+    <script>
+      // Watchdog: if React hasn't replaced #root within 10s, show a reload prompt
+      // so users never see a permanent blank screen.
+      window.__cfBootStart = Date.now();
+      setTimeout(function () {
+        var fb = document.getElementById('boot-fallback');
+        if (fb && fb.isConnected) {
+          fb.innerHTML = '<div style="text-align:center;font-family:Inter,system-ui,sans-serif;max-width:380px;padding:24px;">' +
+            '<h1 style="font-size:18px;font-weight:600;margin:0 0 10px;color:#e6e6f0;">Taking longer than expected</h1>' +
+            '<p style="font-size:13px;opacity:0.7;margin:0 0 18px;color:#e6e6f0;">The app didn\'t finish loading. Reload to try again, or clear your browser cache if this keeps happening.</p>' +
+            '<button onclick="window.location.reload()" style="background:#3b82f6;color:white;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;">Reload</button>' +
+          '</div>';
+        }
+      }, 10000);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

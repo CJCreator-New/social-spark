@@ -12,24 +12,24 @@ import { AdminRoute } from "@/components/AdminRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { setupGlobalErrorHandlers } from "@/lib/logger";
 import { RouteFallback } from "@/components/layout/RouteFallback";
-import { lazy } from "react";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
-const Auth = lazy(() => import("./pages/Auth"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const Landing = lazy(() => import("./pages/Landing"));
+const Auth = lazyWithRetry(() => import("./pages/Auth"));
+const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
+const Landing = lazyWithRetry(() => import("./pages/Landing"));
 
 function E2ECrashRoute(): JSX.Element {
   throw new Error("Test error");
 }
 
 // Lazy load pages for code splitting
-const Index = lazy(() => import("./pages/Index"));
-const Profile = lazy(() => import("./pages/Profile"));
-const MyCalendars = lazy(() => import("./pages/MyCalendars"));
-const CalendarDetail = lazy(() => import("./pages/CalendarDetail"));
-const Schedule = lazy(() => import("./pages/Schedule"));
-const Admin = lazy(() => import("./pages/Admin").then(m => ({ default: m.AdminDashboard })));
+const Index = lazyWithRetry(() => import("./pages/Index"));
+const Profile = lazyWithRetry(() => import("./pages/Profile"));
+const MyCalendars = lazyWithRetry(() => import("./pages/MyCalendars"));
+const CalendarDetail = lazyWithRetry(() => import("./pages/CalendarDetail"));
+const Schedule = lazyWithRetry(() => import("./pages/Schedule"));
+const Admin = lazyWithRetry(() => import("./pages/Admin").then(m => ({ default: m.AdminDashboard })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,80 +49,79 @@ const App = () => {
   }, []);
 
   return (
-    <ThemeProvider attribute="class" forcedTheme="dark" enableSystem={false}>
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <ErrorBoundary>
-            <AuthProvider>
-              <Routes>
-                <Route path="/auth" element={<Suspense fallback={<RouteFallback title="Sign In" />}><Auth /></Suspense>} />
-                <Route path="/reset-password" element={<Suspense fallback={<RouteFallback title="Reset Password" />}><ResetPassword /></Suspense>} />
-                <Route path="/" element={<Suspense fallback={<RouteFallback title="ContentForge" />}><Landing /></Suspense>} />
-                <Route path="/__e2e/crash" element={<E2ECrashRoute />} />
-                <Route
-                  element={
-                    <ProtectedRoute>
-                      <AppShell>
-                        <Outlet />
-                      </AppShell>
-                    </ProtectedRoute>
-                  }
-                >
+    <ErrorBoundary>
+      <ThemeProvider attribute="class" forcedTheme="dark" enableSystem={false}>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              <AuthProvider>
+                <Routes>
+                  <Route path="/auth" element={<Suspense fallback={<RouteFallback title="Sign In" />}><Auth /></Suspense>} />
+                  <Route path="/reset-password" element={<Suspense fallback={<RouteFallback title="Reset Password" />}><ResetPassword /></Suspense>} />
+                  <Route path="/" element={<Suspense fallback={<RouteFallback title="ContentForge" />}><Landing /></Suspense>} />
+                  <Route path="/__e2e/crash" element={<E2ECrashRoute />} />
                   <Route
-                    path="/app"
                     element={
-                      <Suspense fallback={<RouteFallback title="ContentForge Workspace" />}>
-                        <Index />
-                      </Suspense>
+                      <ProtectedRoute>
+                        <AppShell>
+                          <Outlet />
+                        </AppShell>
+                      </ProtectedRoute>
                     }
-                  />
-                  <Route
-                    path="/profile"
-                    element={
-                      <Suspense fallback={<RouteFallback title="Profile Settings" />}>
-                        <Profile />
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/my-calendars"
-                    element={
-                      <Suspense fallback={<RouteFallback title="My Calendars" />}>
-                        <MyCalendars />
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/calendar/:id"
-                    element={
-                      <Suspense fallback={<RouteFallback title="Calendar Workspace" />}>
-                        <CalendarDetail />
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/schedule"
-                    element={
-                      <Suspense fallback={<RouteFallback title="Scheduling & Queue" />}>
-                        <Schedule />
-                      </Suspense>
-                    }
-                  />
-                </Route>
-                <Route path="/admin" element={<ProtectedRoute><AdminRoute><Suspense fallback={<RouteFallback title="Admin Dashboard" />}><Admin /></Suspense></AdminRoute></ProtectedRoute>} />
-                <Route path="*" element={<Suspense fallback={<RouteFallback title="Not Found" />}><NotFound /></Suspense>} />
-              </Routes>
-            </AuthProvider>
-          </ErrorBoundary>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
-    </ThemeProvider>
+                  >
+                    <Route
+                      path="/app"
+                      element={
+                        <Suspense fallback={<RouteFallback title="ContentForge Workspace" />}>
+                          <Index />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/profile"
+                      element={
+                        <Suspense fallback={<RouteFallback title="Profile Settings" />}>
+                          <Profile />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/my-calendars"
+                      element={
+                        <Suspense fallback={<RouteFallback title="My Calendars" />}>
+                          <MyCalendars />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/calendar/:id"
+                      element={
+                        <Suspense fallback={<RouteFallback title="Calendar Workspace" />}>
+                          <CalendarDetail />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/schedule"
+                      element={
+                        <Suspense fallback={<RouteFallback title="Scheduling & Queue" />}>
+                          <Schedule />
+                        </Suspense>
+                      }
+                    />
+                  </Route>
+                  <Route path="/admin" element={<ProtectedRoute><AdminRoute><Suspense fallback={<RouteFallback title="Admin Dashboard" />}><Admin /></Suspense></AdminRoute></ProtectedRoute>} />
+                  <Route path="*" element={<Suspense fallback={<RouteFallback title="Not Found" />}><NotFound /></Suspense>} />
+                </Routes>
+              </AuthProvider>
+            </BrowserRouter>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 };
 
 export default App;
-
