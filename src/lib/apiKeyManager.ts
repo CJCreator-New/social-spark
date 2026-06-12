@@ -155,7 +155,7 @@ export async function getUserApiKey(): Promise<{
         useOwnKey: row?.use_own_key || false,
         keyMode: (row?.key_mode === 'always' ? 'always' : 'fallback') as 'fallback' | 'always',
       };
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       console.warn("Failed to query user_settings table. Falling back to local storage settings.", err);
       const useOwnKey = localStorage.getItem("social_spark_use_own_key") === "true";
       const keyMode = (localStorage.getItem("social_spark_key_mode") === "always" ? "always" : "fallback") as 'fallback' | 'always';
