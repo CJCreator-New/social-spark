@@ -63,22 +63,12 @@ export async function saveUserApiKey(apiKey: string, provider: 'openai' | 'anthr
 
     if (!res.ok) {
       if (res.status === 404) {
-        console.warn("Edge function 'encrypt-api-key' not found (404). Falling back to local storage.");
-        localStorage.setItem("social_spark_user_api_key", apiKey);
-        localStorage.setItem("social_spark_user_api_provider", provider);
-        return;
+        throw new Error("Edge function 'encrypt-api-key' not found (404)");
       }
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.error || `Failed to save API key (${res.status})`);
     }
   } catch (err) {
-    const isNetworkError = err instanceof TypeError && err.message.toLowerCase().includes("failed to fetch");
-    if (isNetworkError) {
-      console.warn("Network error during encrypt-api-key fetch. Falling back to local storage.", err);
-      localStorage.setItem("social_spark_user_api_key", apiKey);
-      localStorage.setItem("social_spark_user_api_provider", provider);
-      return;
-    }
     throw err;
   }
 }
@@ -122,26 +112,12 @@ export async function getUserApiKey(): Promise<{
   }).then(async (res) => {
     if (!res.ok) {
       if (res.status === 404) {
-        console.warn("Edge function 'decrypt-api-key' not found (404). Falling back to local storage.");
-        return {
-          apiKey: localStorage.getItem("social_spark_user_api_key"),
-          provider: localStorage.getItem("social_spark_user_api_provider") as 'openai' | 'anthropic' | 'openrouter' | null
-        };
+        throw new Error("Edge function 'decrypt-api-key' not found (404)");
       }
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.error || `Failed to retrieve API key (${res.status})`);
     }
     return res.json() as Promise<{ apiKey: string | null; provider: 'openai' | 'anthropic' | 'openrouter' | null }>;
-  }).catch((err) => {
-    const isNetworkError = err instanceof TypeError && err.message.toLowerCase().includes("failed to fetch");
-    if (isNetworkError) {
-      console.warn("Network error during decrypt-api-key fetch. Falling back to local storage.", err);
-      return {
-        apiKey: localStorage.getItem("social_spark_user_api_key"),
-        provider: localStorage.getItem("social_spark_user_api_provider") as 'openai' | 'anthropic' | 'openrouter' | null
-      };
-    }
-    throw err;
   });
 
   // Query the user_settings table for use_own_key and key_mode
@@ -156,10 +132,8 @@ export async function getUserApiKey(): Promise<{
         keyMode: (row?.key_mode === 'always' ? 'always' : 'fallback') as 'fallback' | 'always',
       };
     }).catch((err: unknown) => {
-      console.warn("Failed to query user_settings table. Falling back to local storage settings.", err);
-      const useOwnKey = localStorage.getItem("social_spark_use_own_key") === "true";
-      const keyMode = (localStorage.getItem("social_spark_key_mode") === "always" ? "always" : "fallback") as 'fallback' | 'always';
-      return { useOwnKey, keyMode };
+      console.warn("Failed to query user_settings table.", err);
+      return { useOwnKey: false, keyMode: 'fallback' as const };
     });
 
   try {
@@ -173,16 +147,12 @@ export async function getUserApiKey(): Promise<{
       keyMode: settings.keyMode,
     };
   } catch (err) {
-    console.error("getUserApiKey failed, falling back entirely to local storage:", err);
-    const apiKey = localStorage.getItem("social_spark_user_api_key");
-    const provider = localStorage.getItem("social_spark_user_api_provider") as 'openai' | 'anthropic' | 'openrouter' | null;
-    const useOwnKey = localStorage.getItem("social_spark_use_own_key") === "true";
-    const keyMode = (localStorage.getItem("social_spark_key_mode") === "always" ? "always" : "fallback") as 'fallback' | 'always';
+    console.error("getUserApiKey failed:", err);
     return {
-      apiKey,
-      provider,
-      useOwnKey: apiKey ? useOwnKey : false,
-      keyMode,
+      apiKey: null,
+      provider: null,
+      useOwnKey: false,
+      keyMode: 'fallback',
     };
   }
 }
@@ -221,22 +191,12 @@ export async function setUseOwnKey(enabled: boolean, keyMode: 'fallback' | 'alwa
 
     if (!res.ok) {
       if (res.status === 404) {
-        console.warn("Edge function 'encrypt-api-key' not found (404) for toggle. Falling back to local storage.");
-        localStorage.setItem("social_spark_use_own_key", enabled ? "true" : "false");
-        localStorage.setItem("social_spark_key_mode", keyMode);
-        return;
+        throw new Error("Edge function 'encrypt-api-key' not found (404) for toggle");
       }
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.error || `Failed to update settings (${res.status})`);
     }
   } catch (err) {
-    const isNetworkError = err instanceof TypeError && err.message.toLowerCase().includes("failed to fetch");
-    if (isNetworkError) {
-      console.warn("Network error during setUseOwnKey. Falling back to local storage.", err);
-      localStorage.setItem("social_spark_use_own_key", enabled ? "true" : "false");
-      localStorage.setItem("social_spark_key_mode", keyMode);
-      return;
-    }
     throw err;
   }
 }
@@ -272,26 +232,12 @@ export async function deleteUserApiKey(): Promise<void> {
 
     if (!res.ok) {
       if (res.status === 404) {
-        console.warn("Edge function 'delete-api-key' not found (404). Falling back to local storage.");
-        localStorage.removeItem("social_spark_user_api_key");
-        localStorage.removeItem("social_spark_user_api_provider");
-        localStorage.removeItem("social_spark_use_own_key");
-        localStorage.removeItem("social_spark_key_mode");
-        return;
+        throw new Error("Edge function 'delete-api-key' not found (404)");
       }
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.error || `Failed to delete API key (${res.status})`);
     }
   } catch (err) {
-    const isNetworkError = err instanceof TypeError && err.message.toLowerCase().includes("failed to fetch");
-    if (isNetworkError) {
-      console.warn("Network error during deleteUserApiKey. Falling back to local storage.", err);
-      localStorage.removeItem("social_spark_user_api_key");
-      localStorage.removeItem("social_spark_user_api_provider");
-      localStorage.removeItem("social_spark_use_own_key");
-      localStorage.removeItem("social_spark_key_mode");
-      return;
-    }
     throw err;
   }
 }

@@ -8,6 +8,55 @@ type DraftEnvelope<T> = {
 const PREFIX = "ss:draft:";
 const CURRENT_VERSION = 1;
 
+let memoryToken: string | null = null;
+function getMemoryToken(): string {
+  if (!memoryToken) {
+    memoryToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
+  }
+  return memoryToken;
+}
+
+export function getSessionToken(): string {
+  if (typeof window === "undefined" || !window.sessionStorage) {
+    return getMemoryToken();
+  }
+  let token = window.sessionStorage.getItem("ss_session_token");
+  if (!token) {
+    token = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    try {
+      window.sessionStorage.setItem("ss_session_token", token);
+    } catch (e) {
+      console.warn("Failed to write to sessionStorage. Using transient in-memory token.", e);
+      return getMemoryToken();
+    }
+  }
+  return token;
+}
+
+// Simple symmetric encryption using a session key
+export function encryptDraftData(text: string, key: string): string {
+  let result = "";
+  for (let i = 0; i < text.length; i++) {
+    const charCode = text.charCodeAt(i) ^ key.charCodeAt(i % key.length);
+    result += String.fromCharCode(charCode);
+  }
+  return btoa(unescape(encodeURIComponent(result)));
+}
+
+export function decryptDraftData(cipher: string, key: string): string {
+  try {
+    const raw = decodeURIComponent(escape(atob(cipher)));
+    let result = "";
+    for (let i = 0; i < raw.length; i++) {
+      const charCode = raw.charCodeAt(i) ^ key.charCodeAt(i % key.length);
+      result += String.fromCharCode(charCode);
+    }
+    return result;
+  } catch (e) {
+    return "";
+  }
+}
+
 function hasLocalStorage(): boolean {
   try {
     return typeof window !== "undefined" && !!window.localStorage;
@@ -30,7 +79,10 @@ export function saveDraft<T>(key: string, data: T, ttlMs?: number) {
     data,
   };
   try {
-    window.localStorage.setItem(storageKey(key), JSON.stringify(envelope));
+    const token = getSessionToken();
+    const serialized = JSON.stringify(envelope);
+    const encrypted = encryptDraftData(serialized, token);
+    window.localStorage.setItem(storageKey(key), encrypted);
   } catch (err) {
     // best-effort: ignore quota errors
     console.warn("saveDraft failed", err);
@@ -42,7 +94,18 @@ export function loadDraft<T>(key: string): T | null {
   const raw = window.localStorage.getItem(storageKey(key));
   if (!raw) return null;
   try {
-    const env: DraftEnvelope<T> = JSON.parse(raw);
+    const token = getSessionToken();
+    let decrypted = decryptDraftData(raw, token);
+    if (!decrypted) {
+      // Backwards compatibility for unencrypted legacy drafts
+      if (raw.trim().startsWith("{")) {
+        decrypted = raw;
+        console.warn("Loaded unencrypted legacy draft configuration.");
+      } else {
+        throw new Error("Decryption failed");
+      }
+    }
+    const env: DraftEnvelope<T> = JSON.parse(decrypted);
     if (env.expiresAt && Date.now() > env.expiresAt) {
       // expired — cleanup
       window.localStorage.removeItem(storageKey(key));
@@ -50,7 +113,7 @@ export function loadDraft<T>(key: string): T | null {
     }
     return env.data as T;
   } catch (err) {
-    // corrupted — remove
+    // corrupted or wrong session — remove
     window.localStorage.removeItem(storageKey(key));
     return null;
   }

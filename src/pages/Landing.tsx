@@ -1,14 +1,15 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, lazy, Suspense } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import SmoothScroll from "@/components/landing/SmoothScroll";
-import HeroCanvas from "@/components/landing/HeroCanvas";
-import MorphCanvas from "@/components/landing/MorphCanvas";
-import FooterCanvas from "@/components/landing/FooterCanvas";
+
+const SmoothScroll = lazy(() => import("@/components/landing/SmoothScroll"));
+const HeroCanvas = lazy(() => import("@/components/landing/HeroCanvas"));
+const MorphCanvas = lazy(() => import("@/components/landing/MorphCanvas"));
+const FooterCanvas = lazy(() => import("@/components/landing/FooterCanvas"));
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -133,7 +134,9 @@ export default function Landing() {
       </Helmet>
 
       {/* Smooth scroll driver */}
-      <SmoothScroll />
+      <Suspense fallback={null}>
+        <SmoothScroll />
+      </Suspense>
 
       <main 
         ref={heroRef} 
@@ -223,7 +226,9 @@ export default function Landing() {
             <div className="lg:col-span-5 relative w-full flex items-center justify-center">
               {/* Floating WebGL sphere behind the preview card */}
               <div className="hero-canvas-container absolute inset-0 w-full h-full -z-10 opacity-70">
-                <HeroCanvas />
+                <Suspense fallback={<div className="h-full w-full bg-transparent" />}>
+                  <HeroCanvas />
+                </Suspense>
               </div>
 
               {/* Double-Bezel Preview Card */}
@@ -327,7 +332,9 @@ export default function Landing() {
 
             <div className="flex items-center justify-center relative">
               <div className="absolute inset-0 bg-radial-gradient from-violet-500/5 to-transparent blur-3xl pointer-events-none" />
-              <MorphCanvas />
+              <Suspense fallback={<div className="h-64 w-64 bg-transparent" />}>
+                <MorphCanvas />
+              </Suspense>
             </div>
 
           </div>
@@ -495,7 +502,9 @@ export default function Landing() {
               {/* Reactive floating torus knot */}
               <div className="md:col-span-5 flex justify-center items-center h-64 md:h-80 relative">
                 <div className="absolute inset-0 bg-radial-gradient from-violet-500/5 to-transparent blur-xl pointer-events-none" />
-                <FooterCanvas />
+                <Suspense fallback={<div className="h-full w-full bg-transparent" />}>
+                  <FooterCanvas />
+                </Suspense>
               </div>
             </div>
           </div>

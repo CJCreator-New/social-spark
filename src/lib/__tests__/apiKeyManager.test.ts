@@ -493,7 +493,7 @@ describe("localStorage Fallback", () => {
       vi.unstubAllEnvs();
     });
 
-    it("falls back to localStorage on save, toggle, delete and get", async () => {
+    it("throws errors on save, toggle, delete and returns default values for get", async () => {
       // Mock fetch returning 404
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
         ok: false,
@@ -501,36 +501,26 @@ describe("localStorage Fallback", () => {
         json: () => Promise.resolve({ error: "Function not found" }),
       } as Response);
 
-      // Save should fallback
-      await saveUserApiKey(VALID_ANTHROPIC_KEY, "anthropic");
-      expect(fetchSpy).toHaveBeenCalled();
-      expect(localStorage.getItem("social_spark_user_api_key")).toBe(VALID_ANTHROPIC_KEY);
-      expect(localStorage.getItem("social_spark_user_api_provider")).toBe("anthropic");
+      // Save should throw error and not save to localStorage
+      await expect(saveUserApiKey(VALID_ANTHROPIC_KEY, "anthropic")).rejects.toThrow("encrypt-api-key' not found (404)");
+      expect(localStorage.getItem("social_spark_user_api_key")).toBeNull();
 
-      // Toggle should fallback
-      fetchSpy.mockClear();
-      await setUseOwnKey(true, "fallback");
-      expect(fetchSpy).toHaveBeenCalled();
-      expect(localStorage.getItem("social_spark_use_own_key")).toBe("true");
-      expect(localStorage.getItem("social_spark_key_mode")).toBe("fallback");
+      // Toggle should throw error and not save to localStorage
+      await expect(setUseOwnKey(true, "fallback")).rejects.toThrow("encrypt-api-key' not found (404) for toggle");
+      expect(localStorage.getItem("social_spark_use_own_key")).toBeNull();
 
-      // Retrieve should fallback if database table query fails too
+      // Retrieve should return null/default settings and not pull from localStorage
       mockMaybySingle.mockRejectedValue(new Error("Table not found"));
-      fetchSpy.mockClear();
       const retrieved = await getUserApiKey();
-      expect(fetchSpy).toHaveBeenCalled();
       expect(retrieved).toEqual({
-        apiKey: VALID_ANTHROPIC_KEY,
-        provider: "anthropic",
-        useOwnKey: true,
+        apiKey: null,
+        provider: null,
+        useOwnKey: false,
         keyMode: "fallback",
       });
 
-      // Delete should fallback
-      fetchSpy.mockClear();
-      await deleteUserApiKey();
-      expect(fetchSpy).toHaveBeenCalled();
-      expect(localStorage.getItem("social_spark_user_api_key")).toBeNull();
+      // Delete should throw error
+      await expect(deleteUserApiKey()).rejects.toThrow("delete-api-key' not found (404)");
     });
   });
 
@@ -543,33 +533,31 @@ describe("localStorage Fallback", () => {
       vi.unstubAllEnvs();
     });
 
-    it("falls back to localStorage", async () => {
-      const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(
+    it("throws errors and does not fall back to localStorage", async () => {
+      vi.spyOn(globalThis, "fetch").mockRejectedValue(
         new TypeError("Failed to fetch")
       );
 
-      // Save should fallback
-      await saveUserApiKey(VALID_OPENROUTER_KEY, "openrouter");
-      expect(localStorage.getItem("social_spark_user_api_key")).toBe(VALID_OPENROUTER_KEY);
-      expect(localStorage.getItem("social_spark_user_api_provider")).toBe("openrouter");
+      // Save should throw network error
+      await expect(saveUserApiKey(VALID_OPENROUTER_KEY, "openrouter")).rejects.toThrow("Failed to fetch");
+      expect(localStorage.getItem("social_spark_user_api_key")).toBeNull();
 
-      // Toggle should fallback
-      await setUseOwnKey(true, "always");
-      expect(localStorage.getItem("social_spark_use_own_key")).toBe("true");
+      // Toggle should throw network error
+      await expect(setUseOwnKey(true, "always")).rejects.toThrow("Failed to fetch");
+      expect(localStorage.getItem("social_spark_use_own_key")).toBeNull();
 
-      // Retrieve should fallback
+      // Retrieve should return default null values
       mockMaybySingle.mockRejectedValue(new Error("DB error"));
       const retrieved = await getUserApiKey();
       expect(retrieved).toEqual({
-        apiKey: VALID_OPENROUTER_KEY,
-        provider: "openrouter",
-        useOwnKey: true,
-        keyMode: "always",
+        apiKey: null,
+        provider: null,
+        useOwnKey: false,
+        keyMode: "fallback",
       });
 
-      // Delete should fallback
-      await deleteUserApiKey();
-      expect(localStorage.getItem("social_spark_user_api_key")).toBeNull();
+      // Delete should throw network error
+      await expect(deleteUserApiKey()).rejects.toThrow("Failed to fetch");
     });
   });
 });

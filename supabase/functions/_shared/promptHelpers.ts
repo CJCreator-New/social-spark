@@ -1122,6 +1122,90 @@ export async function enrichTopics(
   return padTopics(payload.topics, payload.coreIdea);
 }
 
+function extractBalancedJSON(str: string): string | null {
+  const firstBrace = str.indexOf('{');
+  const firstBracket = str.indexOf('[');
+  
+  if (firstBrace === -1 && firstBracket === -1) {
+    return null;
+  }
+  
+  const startChar = (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) ? '{' : '[';
+  const endChar = startChar === '{' ? '}' : ']';
+  const startIdx = startChar === '{' ? firstBrace : firstBracket;
+  
+  let count = 0;
+  let inString = false;
+  let escape = false;
+  
+  for (let i = startIdx; i < str.length; i++) {
+    const char = str[i];
+    
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    
+    if (!inString) {
+      if (char === startChar) {
+        count++;
+      } else if (char === endChar) {
+        count--;
+        if (count === 0) {
+          return str.substring(startIdx, i + 1);
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
+export function extractJSONFromString(content: string): any {
+  const trimmed = content.trim();
+  
+  // 1. Direct parse
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      return JSON.parse(trimmed);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // 2. Balanced brace extraction
+  const balanced = extractBalancedJSON(trimmed);
+  if (balanced) {
+    try {
+      return JSON.parse(balanced);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // 3. Fallback to greedy regex
+  const m = trimmed.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+  if (m) {
+    try {
+      return JSON.parse(m[0]);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  return null;
+}
+
 export async function scoreVariants(
   variants: string[],
   brief: { coreIdea?: string; topic?: string; platform: string; industry?: string; goals?: string[]; userApiKey?: string; userApiProvider?: string },
@@ -1182,20 +1266,7 @@ ${variants.map((v, i) => `[Variant ${i}]: ${v.slice(0, 1000)}`).join("\n\n")}`;
 
     if (data) {
       const content = String(data?.choices?.[0]?.message?.content || "").trim();
-      let parsed: any = null;
-      if (content.startsWith("{") || content.startsWith("[")) {
-        try {
-          parsed = JSON.parse(content);
-        } catch (e) { /* ignore */ }
-      }
-      if (!parsed) {
-        const m = content.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-        if (m) {
-          try {
-            parsed = JSON.parse(m[0]);
-          } catch (e) { /* ignore */ }
-        }
-      }
+      const parsed = extractJSONFromString(content);
 
       if (parsed && parsed.results && Array.isArray(parsed.results)) {
         return {
@@ -1432,24 +1503,9 @@ export function parseAIResponse(
     // Fallback: some responses embed JSON in the message.content string
     if (!funcArgs && typeof message?.content === "string") {
       const content = String(message.content).trim();
-      // If the content is raw JSON, parse it directly
-      if (content.startsWith("{") || content.startsWith("[")) {
-        try {
-          const parsedContent = JSON.parse(content);
-          return { success: true, parsed: parsedContent as Record<string, unknown> };
-        } catch (e) {
-          // ignore and try to extract JSON substring
-        }
-      }
-      // Try to find a JSON object/array substring
-      const m = content.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-      if (m) {
-        try {
-          const parsedContent = JSON.parse(m[0]);
-          return { success: true, parsed: parsedContent as Record<string, unknown> };
-        } catch (e) {
-          // fallthrough to error below
-        }
+      const parsedContent = extractJSONFromString(content);
+      if (parsedContent) {
+        return { success: true, parsed: parsedContent as Record<string, unknown> };
       }
     }
 

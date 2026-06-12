@@ -111,6 +111,32 @@ Deploy from `supabase/functions/`:
 | `telemetry` | Capture usage events |
 | `trends_ingest` / `trends_read` / `trends_admin` | Trending topics pipeline |
 | `adapters` | Platform adapter utilities |
+| `encrypt-api-key` / `decrypt-api-key` / `delete-api-key` | Secure third-party credentials vault |
+
+### Secure API Key Architecture
+
+ContentForge implements a zero-trust credential model for third-party API keys (OpenAI, Anthropic, OpenRouter):
+- **Server-Side Encryption:** When users save their custom API keys, they are securely transmitted over HTTPS directly to the Deno Edge Function `encrypt-api-key`.
+- **Database Vaulting:** Keys are never stored in the database or local storage in plaintext. They are encrypted using an AES-256 key managed by the Supabase Vault and stored in an encrypted table.
+- **No Local Storage Plaintext Fallbacks:** In the production environment, the client application will **never** save plaintext credentials to browser `localStorage` even if the edge functions are down or return a network error. 
+- **Mock Fallback (Dev-Only):** Plaintext `localStorage` is permitted only when `VITE_SUPABASE_URL` matches the mock environment (`mock.supabase.co`) during testing.
+
+### Local Edge Function Testing
+
+To run and debug the Deno Edge Functions locally:
+1. **Start Supabase local development server:**
+   ```bash
+   supabase start
+   ```
+2. **Serve Edge Functions locally:**
+   ```bash
+   supabase functions serve
+   ```
+3. **Run local integration tests:**
+   Modify your `.env` to point to `http://localhost:54321` (your local Edge Function endpoint) and execute unit tests:
+   ```bash
+   npm run test:run
+   ```
 
 See [docs/DEPLOYMENT_SETUP.md](docs/DEPLOYMENT_SETUP.md) for deployment details.
 
