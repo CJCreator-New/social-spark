@@ -46,9 +46,10 @@ describe("useWizardStore — keySource", () => {
 });
 
 describe("useWizardStore — loadSnapshot", () => {
-  it("loadSnapshot resets keySource to null regardless of prior value", () => {
+  it("loadSnapshot preserves the user's current keySource/keyMode selection", () => {
     act(() => {
       useWizardStore.getState().setKeySource("user");
+      useWizardStore.getState().setKeyMode("always");
       useWizardStore.getState().loadSnapshot({
         form: useWizardStore.getState().form,
         step: 1,
@@ -59,7 +60,8 @@ describe("useWizardStore — loadSnapshot", () => {
         savedAt: Date.now(),
       });
     });
-    expect(useWizardStore.getState().keySource).toBeNull();
+    expect(useWizardStore.getState().keySource).toBe("user");
+    expect(useWizardStore.getState().keyMode).toBe("always");
   });
 });
 

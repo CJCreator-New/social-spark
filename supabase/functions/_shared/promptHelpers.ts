@@ -2,8 +2,13 @@ declare const Deno: any;
 
 // Shared helpers used across generate-calendar, generate-single-post, regenerate-post.
 
+// ALLOWED_ORIGIN can be set to a single origin (e.g. "https://app.socialspark.com") to
+// restrict CORS on these endpoints. Falls back to "*" when unset so local/preview
+// environments keep working without configuration.
+const allowedOrigin = (typeof Deno !== "undefined" ? Deno.env.get("ALLOWED_ORIGIN") : undefined) || "*";
+
 export const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": allowedOrigin,
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
@@ -222,6 +227,16 @@ export function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+/**
+ * Logs the full error server-side with a request ID, and returns a safe
+ * generic message plus that ID to the client for support correlation.
+ */
+export function errorResponse(context: string, e: unknown, status = 500): Response {
+  const requestId = crypto.randomUUID();
+  console.error(`[${requestId}] ${context} error:`, e instanceof Error ? e.stack : e);
+  return jsonResponse({ error: "An unexpected error occurred. Please try again.", requestId }, status);
+}
+
 export const MAX_REQUEST_BODY_BYTES = 256 * 1024; // 256 KB
 
 /**
@@ -276,6 +291,112 @@ export async function recordServerTelemetryEvent(
   } catch (e) {
     console.warn("Server telemetry error", e);
     return false;
+  }
+}
+
+// ─── BRAND MEMORY: RELEVANT EXEMPLAR SELECTION ────────────────────────────
+
+const STOPWORDS = new Set([
+  "the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "for", "with",
+  "is", "are", "was", "were", "be", "been", "being", "this", "that", "these",
+  "those", "it", "its", "as", "at", "by", "from", "your", "you", "we", "our",
+  "i", "my", "they", "their", "not", "no", "do", "does", "did", "have", "has",
+  "had", "will", "would", "can", "could", "should", "about", "into", "than",
+]);
+
+function tokenize(text: string): Set<string> {
+  return new Set(
+    (text.toLowerCase().match(/[a-z0-9]+/g) || []).filter(
+      (w) => w.length > 2 && !STOPWORDS.has(w)
+    )
+  );
+}
+
+/**
+ * From a (potentially large) list of saved brand exemplar posts, select the
+ * `limit` most relevant to the current generation topic/core idea using
+ * simple keyword overlap. Falls back to the most recent examples (end of
+ * array) when there's no meaningful overlap, and never throws.
+ */
+export function selectRelevantExamples(
+  allExamples: string[] | undefined,
+  topic: string,
+  coreIdea: string,
+  limit = 3
+): string[] {
+  try {
+    const examples = (allExamples || []).filter((e) => typeof e === "string" && e.trim().length > 0);
+    if (examples.length <= limit) return examples;
+
+    const queryTokens = new Set<string>([
+      ...tokenize(topic || ""),
+      ...tokenize(coreIdea || ""),
+    ]);
+
+    if (queryTokens.size === 0) {
+      // No topic context to match against — use the most recently saved examples.
+      return examples.slice(-limit);
+    }
+
+    const scored = examples.map((text, index) => {
+      const tokens = tokenize(text);
+      let overlap = 0;
+      for (const t of queryTokens) {
+        if (tokens.has(t)) overlap++;
+      }
+      return { text, index, overlap };
+    });
+
+    scored.sort((a, b) => b.overlap - a.overlap || b.index - a.index);
+
+    const top = scored.slice(0, limit);
+    // If nothing overlapped at all, prefer recency over arbitrary order.
+    if (top.every((s) => s.overlap === 0)) {
+      return examples.slice(-limit);
+    }
+    return top.map((s) => s.text);
+  } catch (e) {
+    console.warn("selectRelevantExamples failed, falling back to first examples", e);
+    return (allExamples || []).slice(0, limit);
+  }
+}
+
+// ─── TREND-AWARE GENERATION ───────────────────────────────────────────────
+
+/**
+ * Fetch top trending topic titles for an industry/platform from the
+ * trending_topics table, for injection into generation prompts.
+ * Returns an empty array if Supabase env vars are missing or the query fails
+ * — trend context is an enhancement, never a hard dependency.
+ */
+export async function getTrendingTopics(
+  industry?: string,
+  platform?: string,
+  limit = 5
+): Promise<string[]> {
+  try {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SERVICE_KEY) return [];
+
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    let query = supabase
+      .from("trending_topics")
+      .select("title")
+      .order("score", { ascending: false })
+      .limit(limit);
+
+    if (industry) query = query.eq("industry", industry);
+    if (platform) query = query.eq("platform", platform);
+
+    const { data, error } = await query;
+    if (error || !Array.isArray(data)) return [];
+    return data.map((row: { title: string }) => row.title).filter(Boolean);
+  } catch (e) {
+    console.warn("getTrendingTopics failed, continuing without trend context", e);
+    return [];
   }
 }
 
@@ -359,6 +480,7 @@ export interface GenerationPayload {
   quality: "draft" | "polished"; // draft: single-call, polished: two-pass critique+rewrite
   userApiKey?: string;
   userApiProvider?: "openai" | "anthropic" | "openrouter";
+  trendingTopics?: string[];
 }
 
 const BRITISH_TO_AMERICAN: Record<string, string> = {
@@ -466,7 +588,7 @@ export function cleanPayload(body: unknown): GenerationPayload {
     length: String(payload.length || "medium").trim(),
     structure: String(payload.structure || "mixed").trim(),
     extra: String(payload.extra || "").trim() || "",
-    brand_examples: cleanList(payload.brand_examples, 3),
+    brand_examples: cleanList(payload.brand_examples, 20),
     framework: String(payload.framework || "Auto").trim(),
     quality: String(payload.quality || "draft").trim() === "polished" ? "polished" : "draft",
     bannedWords: cleanList(payload.bannedWords, 20),
@@ -543,6 +665,7 @@ VARIABLE SELECTION MATRIX:
 - Brand voice: preserve ${voice} as the personality of the message.
 - Writing style: render the idea in a ${style} style without changing the thesis.
 ${payload.brandMemory ? `- Brand memory: honor these saved preferences without overwriting the core idea: ${payload.brandMemory}` : ""}
+${payload.trendingTopics && payload.trendingTopics.length ? `- Trending right now in ${industry}: ${payload.trendingTopics.join(", ")}. Where it fits naturally with the core idea, weave in a relevant trending angle or reference — but never let a trend override or dilute the core idea.` : ""}
 
 FOCUS GUARDRAILS:
 - Do not introduce secondary angles, tangents, or adjacent topics.
@@ -643,7 +766,8 @@ export function buildSystemMessage(
     : "";
 
   const exemplars = getExemplars(payload.platform, payload.style);
-  const userExamples = (payload.brand_examples || []).slice(0, 3);
+  const topicForMatching = opts.isSinglePost ? payload.topic : (payload.topics || []).join(" ");
+  const userExamples = selectRelevantExamples(payload.brand_examples, topicForMatching, payload.coreIdea, 3);
   const exemplarBlock = exemplars.length || userExamples.length
     ? `\nEXEMPLARS (Model-provided + User Brand):
 ${exemplars.map(e => `- ${e}`).join("\n")}
@@ -1091,6 +1215,10 @@ ${variants.map((v, i) => `[Variant ${i}]: ${v.slice(0, 1000)}`).join("\n\n")}`;
   };
 }
 
+type GatewayResult = { status: number; data?: Record<string, unknown>; error?: string };
+
+// Retries on transient failures (timeouts, 5xx). Does not retry on 429/402 or 4xx,
+// since those indicate quota/credit/client errors that won't succeed on retry.
 export async function callAIGateway(
   messages: Array<{ role: string; content: string }>,
   tool: Record<string, unknown>,
@@ -1106,8 +1234,45 @@ export async function callAIGateway(
     userToken?: string | null;
     userIp?: string | null;
     max_tokens?: number;
+    maxRetries?: number;
   } = {}
-): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
+): Promise<GatewayResult> {
+  const maxRetries = opts.maxRetries ?? 2;
+  let lastResult: GatewayResult = { status: 500, error: "An unexpected error occurred." };
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    lastResult = await callAIGatewayOnce(messages, tool, apiKey, opts);
+
+    const isRetryable = lastResult.status >= 500 || lastResult.error === "AI request timeout";
+    if (!isRetryable || attempt === maxRetries) {
+      return lastResult;
+    }
+
+    const delayMs = 500 * 2 ** attempt + Math.floor(Math.random() * 200);
+    console.warn(`AI gateway call failed (status ${lastResult.status}), retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  return lastResult;
+}
+
+async function callAIGatewayOnce(
+  messages: Array<{ role: string; content: string }>,
+  tool: Record<string, unknown>,
+  apiKey: string,
+  opts: {
+    timeoutMs?: number;
+    model?: string;
+    temperature?: number;
+    top_p?: number;
+    userApiKey?: string | null;
+    userApiProvider?: string | null;
+    quality?: string;
+    userToken?: string | null;
+    userIp?: string | null;
+    max_tokens?: number;
+  } = {}
+): Promise<GatewayResult> {
   // If userApiKey is provided, route through callAI helper
   if (opts.userApiKey && opts.userApiProvider) {
     // Asynchronously log the fallback usage to the audit log

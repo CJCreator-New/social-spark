@@ -5,6 +5,7 @@ import {
   jsonResponse,
   checkRateLimit,
   getUserIdFromToken,
+  errorResponse,
 } from "../_shared/promptHelpers.ts";
 
 type ImageRequest = {
@@ -279,7 +280,6 @@ Deno.serve(async (req: Request) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (e) {
-    console.error("generate-post-image error", e instanceof Error ? e.stack : e);
-    return jsonResponse({ error: "An unexpected error occurred." }, 500);
+    return errorResponse("generate-post-image", e);
   }
 });

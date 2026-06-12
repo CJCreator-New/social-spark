@@ -15,6 +15,7 @@ import {
   cleanPayload,
   buildPromptContext,
   enrichTopics,
+  getTrendingTopics,
   callAIGateway,
   buildSystemMessage,
   buildUserMessage,
@@ -24,6 +25,7 @@ import {
   normalizePost,
   recordServerTelemetryEvent,
   getUserIdFromToken,
+  errorResponse,
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
@@ -68,8 +70,11 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "AI is not configured." }, 500);
     }
 
+    // Trend-aware generation: fetch top trending topics for this industry/platform
+    const trendingTopics = await getTrendingTopics(payload.industry, payload.platform);
+
     // Phase D: Topic enrichment pre-call (calendar only)
-    let enrichedPayload = { ...payload };
+    let enrichedPayload = { ...payload, trendingTopics };
     if (payload.topics.length > 0 || payload.coreIdea) {
       const enrichedTopics = await enrichTopics(payload, LOVABLE_API_KEY);
       if (enrichedTopics && enrichedTopics.length >= 7) {
@@ -263,7 +268,6 @@ Deno.serve(async (req: Request) => {
 
     return jsonResponse(responseBody);
   } catch (e) {
-    console.error("generate-calendar error", e instanceof Error ? e.stack : e);
-    return jsonResponse({ error: "An unexpected error occurred." }, 500);
+    return errorResponse("generate-calendar", e);
   }
 });

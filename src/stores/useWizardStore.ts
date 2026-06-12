@@ -91,7 +91,7 @@ export const useWizardStore = create<WizardState>((set) => ({
   setKeySource: (keySource) => set({ keySource }),
   setKeyMode: (keyMode) => set({ keyMode }),
   loadSnapshot: (snapshot) =>
-    set({
+    set((state) => ({
       form: { ...snapshot.form },
       step: snapshot.step,
       extraTopics: snapshot.extraTopics || [],
@@ -101,9 +101,9 @@ export const useWizardStore = create<WizardState>((set) => ({
       lockedDays: [],
       sampleMode: false,
       savedId: null,
-      keySource: null,
-      keyMode: null,
-    }),
+      keySource: state.keySource,
+      keyMode: state.keyMode,
+    })),
   reset: () =>
     set({
       step: 1,

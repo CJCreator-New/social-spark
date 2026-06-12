@@ -358,6 +358,7 @@ export default function CalendarDetail() {
   const [repurposedPost, setRepurposedPost] = useState<Post | null>(null);
   const [repurposedTarget, setRepurposedTarget] = useState("");
   const [repurposing, setRepurposing] = useState(false);
+  const [repurposeStage, setRepurposeStage] = useState<"" | "rewriting" | "scoring" | "illustrating">("");
   const repurposeMutation = useRepurposePostMutation();
   const generateImageMutation = useGeneratePostImageMutation();
   const inlineRewriteMutation = useInlineRewriteMutation();
@@ -549,7 +550,7 @@ export default function CalendarDetail() {
         setPostTimes(storedTimes);
       } else {
         const seed: Record<string, string> = {};
-        for (const p of hydratedPosts) seed[String(p.day)] = suggestedTimeForDay(Number(p.day) || 1);
+        for (const p of hydratedPosts) seed[String(p.day)] = suggestedTimeForDay(Number(p.day) || 1, platform);
         setPostTimes(seed);
       }
     };
@@ -790,6 +791,7 @@ export default function CalendarDetail() {
 
     setRepurposing(true);
     setRepurposeOpen(false);
+    setRepurposeStage("rewriting");
     try {
       const payload = {
         post: sourcePost,
@@ -804,24 +806,60 @@ export default function CalendarDetail() {
       };
       const data = await repurposeMutation.mutateAsync(payload);
       const result = unwrapPost(data);
-      if (result) {
-        setRepurposedPost({
-          ...result,
-          day: sourcePost.day,
-          dow: sourcePost.dow,
-          image_url: undefined,
-          image_storage_path: undefined,
-          image_generated_at: undefined,
-        });
-        setRepurposedTarget(targetPlatform);
-      } else {
+      if (!result) {
         toast.error("Failed to parse repurposed post");
+        return;
+      }
+
+      let repurposed: Post = {
+        ...result,
+        day: sourcePost.day,
+        dow: sourcePost.dow,
+        image_url: undefined,
+        image_storage_path: undefined,
+        image_generated_at: undefined,
+      };
+
+      // Step 2: score the repurposed variant (client-side, instant; PerformanceScoreCard recomputes on render).
+      setRepurposeStage("scoring");
+
+      setRepurposedPost(repurposed);
+      setRepurposedTarget(targetPlatform);
+
+      // Step 3: generate an illustrative image for the repurposed variant, best-effort.
+      if (id && repurposed.image_prompt) {
+        setRepurposeStage("illustrating");
+        try {
+          const aspectRatio = aspectRatioForPlatform(targetPlatform);
+          const imgResult = await generateImageMutation.mutateAsync({
+            calendarId: id,
+            postDay: sourcePost.day,
+            post: repurposed,
+            prompt: repurposed.image_prompt,
+            platform: targetPlatform,
+            aspectRatio,
+          });
+          if (imgResult?.publicUrl) {
+            setRepurposedPost(prev => prev ? {
+              ...prev,
+              image_url: String(imgResult.publicUrl || ""),
+              image_storage_path: String(imgResult.storagePath || ""),
+              image_aspect_ratio: String(imgResult.aspectRatio || aspectRatio),
+              image_generated_at: String(imgResult.generatedAt || new Date().toISOString()),
+            } : prev);
+          }
+        } catch (imgErr) {
+          // Image generation is an enhancement, not a blocker — surface a soft warning only.
+          log.error("Repurpose image generation failed", imgErr);
+          toast.message("Repurposed text is ready. Visual generation failed — you can retry it after saving.");
+        }
       }
     } catch (e) {
       log.error("Repurpose failed", e);
       toast.error(e instanceof Error ? e.message : "Repurpose failed");
     } finally {
       setRepurposing(false);
+      setRepurposeStage("");
     }
   }
 
@@ -1203,7 +1241,7 @@ export default function CalendarDetail() {
       const rows = posts.map(post => {
         const d = dateForDow(ws, post.dow);
         const dateStr = toDateInputValue(d);
-        const time = postTimes[String(post.day)] || suggestedTimeForDay(post.day);
+        const time = postTimes[String(post.day)] || suggestedTimeForDay(post.day, platform);
         const f = formatForPlatform(post, platform);
         return {
           user_id: user.id,
@@ -1602,7 +1640,7 @@ export default function CalendarDetail() {
                   type="time"
                   className="cd-time-input"
                   aria-label={`Post time for day ${p.day}`}
-                  value={postTimes[String(p.day)] || suggestedTimeForDay(p.day)}
+                  value={postTimes[String(p.day)] || suggestedTimeForDay(p.day, platform)}
                   onChange={e => updatePostTime(p.day, e.target.value)}
                 />
               </div>
@@ -1984,7 +2022,7 @@ export default function CalendarDetail() {
                     type="time"
                     className="cd-modal-time"
                     aria-label={`Schedule time for day ${post.day}`}
-                    value={postTimes[String(post.day)] || suggestedTimeForDay(post.day)}
+                    value={postTimes[String(post.day)] || suggestedTimeForDay(post.day, platform)}
                     onChange={e => updatePostTime(post.day, e.target.value)}
                   />
                   <span style={{ fontSize: 11, color: "#7a7a8e", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -2026,6 +2064,14 @@ export default function CalendarDetail() {
             <h3 className="cd-title" style={{ marginTop: 0 }}>{repurposedPost.topic}</h3>
             <p className="cd-meta" style={{ marginBottom: 15 }}>Optimized for {repurposedTarget || repurposedPost.format}</p>
 
+            {repurposeStage && (
+              <p className="cd-meta" style={{ marginBottom: 12 }}>
+                {repurposeStage === "rewriting" && "✍️ Rewriting for the new platform…"}
+                {repurposeStage === "scoring" && "📊 Scoring the new variant…"}
+                {repurposeStage === "illustrating" && "🎨 Generating a cover image…"}
+              </p>
+            )}
+
             <div className="cd-blabel"><span>Repurposed Body</span></div>
             <div className="cd-card" style={{ background: "rgba(255,255,255,0.02)", padding: 15, borderRadius: 12, marginBottom: 20 }}>
               <div style={{ whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.6, color: "#edeae3" }}>
@@ -2033,7 +2079,18 @@ export default function CalendarDetail() {
               </div>
             </div>
 
-            <div className="cd-modal-actions">
+            {repurposedPost.image_url && (
+              <div style={{ marginBottom: 20, border: "2px solid var(--color-border)", borderRadius: 4, overflow: "hidden" }}>
+                <img src={repurposedPost.image_url} alt="Generated cover for repurposed post" style={{ width: "100%", height: "auto", display: "block" }} />
+              </div>
+            )}
+
+            <PerformanceScoreCard
+              post={repurposedPost}
+              topic={formPayload.coreIdea}
+            />
+
+            <div className="cd-modal-actions" style={{ marginTop: 16 }}>
               <button
                 className="cd-btn"
                 onClick={() => {

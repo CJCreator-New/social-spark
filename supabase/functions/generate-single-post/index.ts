@@ -14,6 +14,7 @@ import {
   cleanPayload,
   buildPromptContext,
   buildCinematicImagePromptRules,
+  getTrendingTopics,
   buildSystemMessage,
   buildUserMessage,
   callAIGateway,
@@ -22,6 +23,7 @@ import {
   scoreVariants,
   recordServerTelemetryEvent,
   getUserIdFromToken,
+  errorResponse,
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
@@ -63,11 +65,16 @@ Deno.serve(async (req: Request) => {
     const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: false });
 
     const dateNote = payload.date ? ` (${payload.date})` : "";
-    // If no explicit topic was provided, allow the model to infer one from the core idea
-    const contextLines = buildPromptContext(payload, { isSinglePost: true });
 
-    const systemMsg = buildSystemMessage(payload, { isSinglePost: true });
-    const userMsg = buildUserMessage(payload, { isSinglePost: true });
+    // Trend-aware generation: fetch top trending topics for this industry/platform
+    const trendingTopics = await getTrendingTopics(payload.industry, payload.platform);
+    const enrichedPayload = { ...payload, trendingTopics };
+
+    // If no explicit topic was provided, allow the model to infer one from the core idea
+    const contextLines = buildPromptContext(enrichedPayload, { isSinglePost: true });
+
+    const systemMsg = buildSystemMessage(enrichedPayload, { isSinglePost: true });
+    const userMsg = buildUserMessage(enrichedPayload, { isSinglePost: true });
 
     const tool = {
       type: "function",
@@ -228,7 +235,6 @@ Deno.serve(async (req: Request) => {
 
     return jsonResponse(responseBody);
   } catch (e) {
-    console.error("generate-single-post error", e instanceof Error ? e.stack : e);
-    return jsonResponse({ error: "An unexpected error occurred." }, 500);
+    return errorResponse("generate-single-post", e);
   }
 });

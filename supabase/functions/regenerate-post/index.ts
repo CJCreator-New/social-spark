@@ -20,6 +20,7 @@ import {
   buildSystemMessage,
   buildUserMessage,
   getUserIdFromToken,
+  errorResponse,
 } from "../_shared/promptHelpers.ts";
 
 interface ExistingPost {
@@ -316,7 +317,6 @@ CRITIQUE & REWRITE GUIDANCE:
 
     return jsonResponse({ post: regenerated });
   } catch (e) {
-    console.error("regenerate-post error", e instanceof Error ? e.stack : e);
-    return jsonResponse({ error: "An unexpected error occurred." }, 500);
+    return errorResponse("regenerate-post", e);
   }
 });

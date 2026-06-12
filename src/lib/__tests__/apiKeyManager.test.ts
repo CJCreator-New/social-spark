@@ -423,3 +423,153 @@ describe("setUseOwnKey", () => {
     await expect(setUseOwnKey(true)).rejects.toThrow("User session not found");
   });
 });
+
+// ---------------------------------------------------------------------------
+// 6. localStorage Fallback
+// ---------------------------------------------------------------------------
+describe("localStorage Fallback", () => {
+  const VALID_OPENAI_KEY = "sk-" + "a".repeat(32);
+  const VALID_ANTHROPIC_KEY = "sk-ant-" + "a".repeat(32);
+  const VALID_OPENROUTER_KEY = "sk-or-" + "a".repeat(32);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockGetSession.mockResolvedValue(VALID_SESSION);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  describe("when VITE_SUPABASE_URL contains mock.supabase.co", () => {
+    beforeEach(() => {
+      vi.stubEnv("VITE_SUPABASE_URL", "https://mock.supabase.co");
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("saves key to localStorage directly and retrieves it correctly", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+      // Save
+      await saveUserApiKey(VALID_OPENAI_KEY, "openai");
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(localStorage.getItem("social_spark_user_api_key")).toBe(VALID_OPENAI_KEY);
+      expect(localStorage.getItem("social_spark_user_api_provider")).toBe("openai");
+
+      // Set toggle
+      await setUseOwnKey(true, "always");
+      expect(localStorage.getItem("social_spark_use_own_key")).toBe("true");
+      expect(localStorage.getItem("social_spark_key_mode")).toBe("always");
+
+      // Retrieve
+      const retrieved = await getUserApiKey();
+      expect(retrieved).toEqual({
+        apiKey: VALID_OPENAI_KEY,
+        provider: "openai",
+        useOwnKey: true,
+        keyMode: "always",
+      });
+
+      // Delete
+      await deleteUserApiKey();
+      expect(localStorage.getItem("social_spark_user_api_key")).toBeNull();
+      expect(localStorage.getItem("social_spark_user_api_provider")).toBeNull();
+      expect(localStorage.getItem("social_spark_use_own_key")).toBeNull();
+      expect(localStorage.getItem("social_spark_key_mode")).toBeNull();
+    });
+  });
+
+  describe("when Edge Functions return 404 (Not Found)", () => {
+    beforeEach(() => {
+      vi.stubEnv("VITE_SUPABASE_URL", "https://real-project.supabase.co");
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("falls back to localStorage on save, toggle, delete and get", async () => {
+      // Mock fetch returning 404
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ error: "Function not found" }),
+      } as Response);
+
+      // Save should fallback
+      await saveUserApiKey(VALID_ANTHROPIC_KEY, "anthropic");
+      expect(fetchSpy).toHaveBeenCalled();
+      expect(localStorage.getItem("social_spark_user_api_key")).toBe(VALID_ANTHROPIC_KEY);
+      expect(localStorage.getItem("social_spark_user_api_provider")).toBe("anthropic");
+
+      // Toggle should fallback
+      fetchSpy.mockClear();
+      await setUseOwnKey(true, "fallback");
+      expect(fetchSpy).toHaveBeenCalled();
+      expect(localStorage.getItem("social_spark_use_own_key")).toBe("true");
+      expect(localStorage.getItem("social_spark_key_mode")).toBe("fallback");
+
+      // Retrieve should fallback if database table query fails too
+      mockMaybySingle.mockRejectedValue(new Error("Table not found"));
+      fetchSpy.mockClear();
+      const retrieved = await getUserApiKey();
+      expect(fetchSpy).toHaveBeenCalled();
+      expect(retrieved).toEqual({
+        apiKey: VALID_ANTHROPIC_KEY,
+        provider: "anthropic",
+        useOwnKey: true,
+        keyMode: "fallback",
+      });
+
+      // Delete should fallback
+      fetchSpy.mockClear();
+      await deleteUserApiKey();
+      expect(fetchSpy).toHaveBeenCalled();
+      expect(localStorage.getItem("social_spark_user_api_key")).toBeNull();
+    });
+  });
+
+  describe("when fetch throws a network error (Failed to fetch)", () => {
+    beforeEach(() => {
+      vi.stubEnv("VITE_SUPABASE_URL", "https://real-project.supabase.co");
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("falls back to localStorage", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(
+        new TypeError("Failed to fetch")
+      );
+
+      // Save should fallback
+      await saveUserApiKey(VALID_OPENROUTER_KEY, "openrouter");
+      expect(localStorage.getItem("social_spark_user_api_key")).toBe(VALID_OPENROUTER_KEY);
+      expect(localStorage.getItem("social_spark_user_api_provider")).toBe("openrouter");
+
+      // Toggle should fallback
+      await setUseOwnKey(true, "always");
+      expect(localStorage.getItem("social_spark_use_own_key")).toBe("true");
+
+      // Retrieve should fallback
+      mockMaybySingle.mockRejectedValue(new Error("DB error"));
+      const retrieved = await getUserApiKey();
+      expect(retrieved).toEqual({
+        apiKey: VALID_OPENROUTER_KEY,
+        provider: "openrouter",
+        useOwnKey: true,
+        keyMode: "always",
+      });
+
+      // Delete should fallback
+      await deleteUserApiKey();
+      expect(localStorage.getItem("social_spark_user_api_key")).toBeNull();
+    });
+  });
+});

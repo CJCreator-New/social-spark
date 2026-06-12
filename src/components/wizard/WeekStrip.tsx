@@ -10,9 +10,9 @@ interface WeekStripProps {
   draggedIndex: number | null;
   setDraggedIndex: (idx: number | null) => void;
   handleDayDrop: (source: number, target: number) => void;
-  handleDragStart: (e: React.DragEvent, idx: number) => void;
-  handleDragOver: (e: React.DragEvent) => void;
-  handleDrop: (e: React.DragEvent, target: number) => number | null;
+  handleDragStart: (e: React.DragEvent<HTMLElement>, idx: number) => void;
+  handleDragOver: (e: React.DragEvent<HTMLElement>) => void;
+  handleDrop: (e: React.DragEvent<HTMLElement>, target: number) => number | null;
 }
 
 export const WeekStrip = React.memo(function WeekStrip({

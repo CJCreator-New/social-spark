@@ -8,6 +8,7 @@ import {
   parseAIResponse,
   cleanPayload,
   getUserIdFromToken,
+  errorResponse,
 } from "../_shared/promptHelpers.ts";
 
 const INSTRUCTIONS: Record<string, string> = {
@@ -112,7 +113,6 @@ ${text}`;
     if (!rewrittenText) return jsonResponse({ error: "Rewrite returned empty text." }, 500);
     return jsonResponse({ rewrittenText });
   } catch (e) {
-    console.error("inline-rewrite error", e instanceof Error ? e.stack : e);
-    return jsonResponse({ error: "An unexpected error occurred." }, 500);
+    return errorResponse("inline-rewrite", e);
   }
 });

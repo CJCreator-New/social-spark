@@ -131,6 +131,16 @@ function scoreCtaEffectiveness(cta: string, topic: string, platform?: string): n
 }
 
 /**
+ * Strip common suffixes so word forms like "strategy"/"strategies" or
+ * "marketing"/"marketed" are recognized as related.
+ */
+function stem(word: string): string {
+  return word
+    .replace(/(ies)$/, "y")
+    .replace(/(ing|ers|er|ed|es|s)$/, "");
+}
+
+/**
  * Score hashtag relevance: % of hashtags that relate to the topic
  */
 function scoreHashtagRelevance(hashtags: string, topic: string): number {
@@ -147,10 +157,17 @@ function scoreHashtagRelevance(hashtags: string, topic: string): number {
     .toLowerCase()
     .split(/\s+/)
     .filter((w) => w.length > 3);
+  const topicStems = topicWords.map(stem);
 
-  const relatedTags = hashtagList.filter((tag) =>
-    topicWords.some((word) => tag.includes(word) || word.includes(tag))
-  );
+  const relatedTags = hashtagList.filter((tag) => {
+    const tagBody = tag.replace(/^#/, "");
+    const tagStem = stem(tagBody);
+    return topicWords.some((word, i) => {
+      if (tagBody.includes(word) || word.includes(tagBody)) return true;
+      const wordStem = topicStems[i];
+      return tagStem === wordStem || tagStem.includes(wordStem) || wordStem.includes(tagStem);
+    });
+  });
 
   return Math.round((relatedTags.length / hashtagList.length) * 100);
 }

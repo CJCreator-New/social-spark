@@ -20,7 +20,7 @@ import { getVoiceStylePreview } from "@/lib/voiceStylePreview";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { useCreateCalendarMutation, useRegeneratePostMutation } from "@/hooks/useAppQueries";
+import { useCreateCalendarMutation, useRegeneratePostMutation, useProfileQuery } from "@/hooks/useAppQueries";
 import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dragDrop";
 import { calculatePerformanceScore, getWeakestPerformanceMetric, type PerformanceFocusMetric, getRegenerationGuidance, getWeakestMetrics } from "@/lib/postPerformanceScore";
 import { createSeedFromPost, storeSeed, readAndClearSeed } from "@/lib/seedFromPost";
@@ -615,7 +615,7 @@ const Index = () => {
     const postingTimes = posts.map(post => ({
       day: post.day,
       dow: post.dow,
-      time: postTimes[String(post.day)] || suggestedTimeForDay(post.day),
+      time: postTimes[String(post.day)] || suggestedTimeForDay(post.day, form.platform),
     }));
 
     return {
@@ -695,21 +695,8 @@ const Index = () => {
     return () => document.removeEventListener("keydown", h);
   }, [step, posts.length]);
 
-  // Load user profile with React Query
-    const { data: profileData } = useQuery({
-    queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      const { data } = await supabase
-        .from("profiles")
-        .select("default_voice, default_style, default_audiences, default_goals, brand_examples, default_framework, forbidden_phrases, proof_points, cta_preferences, preferred_structures")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  // Load user profile (brand memory) with React Query — shared cache with other pages
+  const { data: profileData } = useProfileQuery(user?.id);
 
   // Fetch recent calendars with React Query
   const { data: recentCalendarsData } = useQuery({
@@ -867,8 +854,9 @@ const Index = () => {
               const hay = `${(p.title || "")} ${(p.hook || "")} ${(p.body || "")} ${(p.cta || "")}`;
               let m: RegExpExecArray | null;
               while ((m = urlRe.exec(hay))) {
+                const url = m[1];
                 void import("@/lib/mediaManager")
-                  .then(mod => mod.default.addMediaRef(wizardDraftKey, m[1]))
+                  .then(mod => mod.default.addMediaRef(wizardDraftKey, url))
                   .catch(() => {
                     /* media reference tracking is best effort */
                   });
@@ -1060,7 +1048,7 @@ const Index = () => {
       setGenerationMeta(null);
       setActiveDay(0);
       const seedTimes: Record<string, string> = {};
-      for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1);
+      for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1, form.platform);
       setPostTimes(seedTimes);
       setTimeout(() => setStep(4), 350);
       log.warn(`Using local fallback generator`, new Error(message), { mode: form.mode, postCount: result.length });
@@ -1096,7 +1084,7 @@ const Index = () => {
         setPostsWithHistory(result);
         setActiveDay(0);
         const seedTimes: Record<string, string> = {};
-        for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1);
+        for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1, form.platform);
         setPostTimes(seedTimes);
 
         const saved = await createCalendarMutation.mutateAsync({
@@ -1223,7 +1211,7 @@ const Index = () => {
         setPostsWithHistory(fakePosts);
         setActiveDay(0);
         const seedTimes: Record<string, string> = {};
-        for (const r of fakePosts) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1);
+        for (const r of fakePosts) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1, form.platform);
         setPostTimes(seedTimes);
         setTimeout(() => setStep(4), 350);
         log.info(`E2E generation completed`, { mode, postCount: fakePosts.length });
@@ -1251,7 +1239,7 @@ const Index = () => {
       setGenerationMeta({ inferredTopics });
       // Seed day-optimized default times per post (keyed by post.day)
       const seedTimes: Record<string, string> = {};
-      for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1);
+      for (const r of result) seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1, form.platform);
       setPostTimes(seedTimes);
       setTimeout(() => setStep(4), 350);
       log.info(`Generation completed successfully`, { mode, postCount: result.length });
@@ -1619,7 +1607,7 @@ const Index = () => {
     if (payload.updateTimes) {
       const newTimes: Record<string, string> = {};
       posts.forEach(post => {
-        newTimes[String(post.day)] = suggestedTimeForDay(post.day);
+        newTimes[String(post.day)] = suggestedTimeForDay(post.day, form.platform);
       });
       setPostTimes(newTimes);
       toast.success("Posting times reset to platform defaults");
@@ -2083,7 +2071,7 @@ const Index = () => {
                     <SelectField label="Voice / tone" options={VOICE_OPTIONS} value={form.voice} onChange={v => upd("voice", v)} placeholder="Select a voice…" />
                     <SelectField label="Writing style" options={STYLE_OPTIONS} value={form.style} onChange={v => upd("style", v)} placeholder="Select a style…" />
                     <SelectField label="Copy style" options={COPY_STYLE_OPTIONS} value={form.copyStyle} onChange={v => upd("copyStyle", v)} placeholder={null} hint="Applied when copying or scheduling" />
-                    <SelectField label="Output quality" options={[{ value: "draft", label: "Draft (fast)" }, { value: "polished", label: "Polished (critique & rewrite)" }]} value={form.quality} onChange={v => upd("quality", v as "draft" | "polished")} placeholder={null} hint="Polished performs a critique+rewrite pass (slower, uses pro model)" />
+                    <SelectField label="Output quality" options={[{ value: "draft", label: "Draft (fast)" }, { value: "polished", label: "Polished (critique & rewrite)" }]} value={form.quality ?? "draft"} onChange={v => upd("quality", v as "draft" | "polished")} placeholder={null} hint="Polished performs a critique+rewrite pass (slower, uses pro model)" />
                   </div>
 
                   {(() => {
@@ -2398,7 +2386,7 @@ const Index = () => {
             {error && (
               <div className="err-box">
                 {error}
-                {lastGenerationError && (
+                {Boolean(lastGenerationError) && (
                   <div style={{ marginTop: '10px', fontSize: '12px', opacity: 0.8 }}>
                     <button
                       onClick={() => generate(true)}
@@ -2444,7 +2432,7 @@ const Index = () => {
                     if (error) throw error;
                     toast.success('Template saved');
                   } catch (e) {
-                    toast.error(e?.message || 'Failed to save template');
+                    toast.error((e instanceof Error && e.message) || 'Failed to save template');
                   }
                 }}>Save as template</button>
               </div>

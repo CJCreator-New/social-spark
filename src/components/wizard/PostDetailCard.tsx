@@ -247,10 +247,10 @@ export const PostDetailCard = React.memo(function PostDetailCard({
         <input
           type="time"
           className="time-input"
-          value={postTimes[String(post.day)] || suggestedTimeForDay(post.day)}
+          value={postTimes[String(post.day)] || suggestedTimeForDay(post.day, form.platform)}
           onChange={e => setPostTimes(prev => ({ ...prev, [String(post.day)]: e.target.value }))}
         />
-        <span className="time-hint">{shortDateLabel(dateForDow(weekStartDate, post.dow))} at {postTimes[String(post.day)] || suggestedTimeForDay(post.day)}</span>
+        <span className="time-hint">{shortDateLabel(dateForDow(weekStartDate, post.dow))} at {postTimes[String(post.day)] || suggestedTimeForDay(post.day, form.platform)}</span>
       </div>
 
       <div className="ptitle" style={{ marginTop: 18 }}>{post.title}</div>

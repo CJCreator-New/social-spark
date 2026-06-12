@@ -186,7 +186,7 @@ export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
   const useTz = !!timezone;
 
   for (const p of posts) {
-    const time = postTimes[String(p.day)] || suggestedTimeForDay(p.day);
+    const time = postTimes[String(p.day)] || suggestedTimeForDay(p.day, platform);
     const localStart = postDateTime(weekStart, p.dow, time);
 
     let dtStart: string;

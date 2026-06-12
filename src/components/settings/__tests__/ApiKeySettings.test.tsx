@@ -26,17 +26,19 @@ vi.mock("sonner", () => ({
   },
 }));
 
+type ResolvedKeyState = { apiKey: string | null; provider: string | null; useOwnKey: boolean };
+
 // Default resolved state: no key saved
-const NO_KEY_STATE = { apiKey: null, provider: null, useOwnKey: false };
+const NO_KEY_STATE: ResolvedKeyState = { apiKey: null, provider: null, useOwnKey: false };
 
 // State with a saved key
-const SAVED_KEY_STATE = {
+const SAVED_KEY_STATE: ResolvedKeyState = {
   apiKey: "sk-decryptedkey1234567890abcdef",
-  provider: "openai" as const,
+  provider: "openai",
   useOwnKey: true,
 };
 
-async function renderAndWait(overrideState = NO_KEY_STATE) {
+async function renderAndWait(overrideState: ResolvedKeyState = NO_KEY_STATE) {
   mockGetUserApiKey.mockResolvedValue(overrideState);
   const result = render(<ApiKeySettings />);
   // Wait for the loading state to resolve

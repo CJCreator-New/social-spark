@@ -42,7 +42,7 @@ interface IndexResultsProps {
   copyMenuOpen: boolean;
   setCopyMenuOpen: (o: boolean) => void;
   showRationale: boolean;
-  setShowRationale: (r: boolean) => void;
+  setShowRationale: React.Dispatch<React.SetStateAction<boolean>>;
   enhanceCurrentPost: () => void;
   tweakRef: React.RefObject<HTMLDivElement | null>;
   copyMenuRef: React.RefObject<HTMLDivElement | null>;
@@ -69,9 +69,9 @@ interface IndexResultsProps {
   generationMeta: { inferredTopics?: boolean } | null;
   weekStartDate: Date;
   toggleLockedDay: (day: number) => void;
-  handleDragStart: (e: React.DragEvent, index: number) => void;
-  handleDragOver: (e: React.DragEvent) => void;
-  handleDrop: (e: React.DragEvent, targetIndex: number) => number | null;
+  handleDragStart: (e: React.DragEvent<HTMLElement>, index: number) => void;
+  handleDragOver: (e: React.DragEvent<HTMLElement>) => void;
+  handleDrop: (e: React.DragEvent<HTMLElement>, targetIndex: number) => number | null;
 }
 
 export function IndexResults({

@@ -247,7 +247,7 @@ export default function Profile() {
   function addBrandExample() {
     const v = brandExampleInput.trim();
     if (!v) return;
-    if (brandExamples.length >= 3) return toast.error('Max 3 examples');
+    if (brandExamples.length >= 20) return toast.error('Max 20 examples');
     setBrandExamples(p => [...p, v]);
     setBrandExampleInput('');
   }
@@ -535,7 +535,7 @@ export default function Profile() {
                 <option value="Story-led">Story-led</option>
               </select>
 
-              <div className="pf-label">Brand example posts (optional — up to 3)</div>
+              <div className="pf-label">Brand example posts (optional — up to 20; the most relevant ones are auto-selected per generation)</div>
               <div className="pf-tagrow" aria-hidden>
                 {brandExamples.length === 0 ? <div className="pf-tagrow-empty">No examples saved</div> : brandExamples.map((b, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
