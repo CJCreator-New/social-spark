@@ -391,3 +391,23 @@ export function suggestBetterCta(currentCta: string, topic: string, platform?: s
 
   return "What is your #1 takeaway from this? Let me know in the comments! 👇";
 }
+
+/**
+ * Feature: Engagement Prediction Badge
+ * Returns a simple High/Medium/Low prediction for use on the WeekStrip
+ */
+export function getEngagementPrediction(post: Post, platform: string = ""): "High" | "Medium" | "Low" {
+  const score = calculatePerformanceScore(post, post.topic || "", platform);
+  if (score.overallScore >= 7) return "High";
+  if (score.overallScore >= 5) return "Medium";
+  return "Low";
+}
+
+export type EngagementLevel = "High" | "Medium" | "Low";
+
+export const ENGAGEMENT_BADGE: Record<EngagementLevel, { emoji: string; color: string; bg: string }> = {
+  High:   { emoji: "🟢", color: "#c8f09a",  bg: "rgba(200,240,154,0.12)" },
+  Medium: { emoji: "🟡", color: "#f0d49a",  bg: "rgba(240,212,154,0.12)" },
+  Low:    { emoji: "🔴", color: "#f09a9a",  bg: "rgba(240,154,154,0.12)" },
+};
+

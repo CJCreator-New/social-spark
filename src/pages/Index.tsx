@@ -20,7 +20,7 @@ import { getVoiceStylePreview } from "@/lib/voiceStylePreview";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { useCreateCalendarMutation, useRegeneratePostMutation, useProfileQuery } from "@/hooks/useAppQueries";
+import { useCreateCalendarMutation, useRegeneratePostMutation, useProfileQuery, useProfileUpdateMutation } from "@/hooks/useAppQueries";
 import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dragDrop";
 import { calculatePerformanceScore, getWeakestPerformanceMetric, type PerformanceFocusMetric, getRegenerationGuidance, getWeakestMetrics } from "@/lib/postPerformanceScore";
 import { createSeedFromPost, storeSeed, readAndClearSeed } from "@/lib/seedFromPost";
@@ -547,6 +547,21 @@ const Index = () => {
     }
   }, [posts, setPostsWithHistory]);
 
+  // Feature: Hashtag editor — update a single post's hashtags
+  const handleHashtagsChange = useCallback((idx: number, newHashtags: string) => {
+    const updated = [...posts];
+    if (updated[idx]) {
+      updated[idx] = { ...updated[idx], hashtags: newHashtags };
+      setPostsWithHistory(updated);
+    }
+  }, [posts, setPostsWithHistory]);
+
+  // Feature: Tone slider — regenerate with tone-shift tweak
+  const handleToneShift = useCallback((idx: number, level: number) => {
+    const toneLabel = level === 1 ? "very-formal" : level === 2 ? "formal" : level === 4 ? "casual" : "very-casual";
+    void regenerateDay(idx, `tone-${toneLabel}`);
+  }, []);
+
   const handleUseAsSeed = useCallback((post: Post) => {
     if (!isEnabled("seedFromPost")) return;
     const seed = createSeedFromPost(post, form.platform);
@@ -697,6 +712,7 @@ const Index = () => {
 
   // Load user profile (brand memory) with React Query — shared cache with other pages
   const { data: profileData } = useProfileQuery(user?.id);
+  const profileUpdateMutation = useProfileUpdateMutation(user?.id);
 
   // Fetch recent calendars with React Query
   const { data: recentCalendarsData } = useQuery({
@@ -2111,6 +2127,30 @@ const Index = () => {
                       <button type="button" className="cpbtn" onClick={saveBrandMemoryFromForm}>Save brand memory</button>
                       <button type="button" className="cpbtn" onClick={applyBrandMemoryToForm} disabled={!brandMemory}>Apply saved memory</button>
                       <button type="button" className="cpbtn" onClick={clearBrandMemorySaved} disabled={!brandMemory}>Clear saved memory</button>
+                      {/* Feature: Cloud Persona Sync */}
+                      {user && (
+                        <button
+                          type="button"
+                          className="cpbtn done"
+                          title="Sync your voice, style, audience & goals to your profile — available on any device"
+                          onClick={async () => {
+                            try {
+                              await profileUpdateMutation.mutateAsync({
+                                default_voice: form.voice || null,
+                                default_style: form.style || null,
+                                default_audiences: form.audiences as any,
+                                default_goals: form.goals as any,
+                              });
+                              toast.success("Persona saved & synced to cloud ✓");
+                            } catch (e) {
+                              toast.error((e instanceof Error && e.message) || "Failed to sync persona");
+                            }
+                          }}
+                          disabled={profileUpdateMutation.isPending}
+                        >
+                          {profileUpdateMutation.isPending ? "Syncing…" : "☁️ Save as persona"}
+                        </button>
+                      )}
                     </div>
                     {brandMemory && (
                       <div className="time-hint" style={{ marginTop: 8 }}>
@@ -2601,6 +2641,8 @@ const Index = () => {
                   handleDragStart={handleDragStart}
                   handleDragOver={handleDragOver}
                   handleDrop={handleDrop}
+                  onHashtagsChange={handleHashtagsChange}
+                  onToneShift={handleToneShift}
                 />
               </Suspense>
             )}

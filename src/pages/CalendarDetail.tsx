@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCalendarQuery, useProfileQuery, useProfileUpdateMutation, useScheduledPostsQuery, useCreateCalendarMutation, useRegeneratePostMutation, useUpdateSavedCalendarMutation, useRepurposePostMutation, useGeneratePostImageMutation, useInlineRewriteMutation } from "@/hooks/useAppQueries";
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
+import { BufferScheduler } from "@/components/BufferScheduler";
+
 
 import {
   downloadIcs,
@@ -333,7 +335,23 @@ export default function CalendarDetail() {
   const [reformatTarget, setReformatTarget] = useState<string>("");
   const [pendingReformatTarget, setPendingReformatTarget] = useState<string | null>(null);
   const [reformatting, setReformatting] = useState(false);
+  const [personaCompareOpen, setPersonaCompareOpen] = useState(false);
   const createCalendar = useCreateCalendarMutation();
+
+  const handleApplyCompare = async (rewritten: Post) => {
+    const updated = [...posts];
+    updated[active] = rewritten;
+    setPosts(updated);
+    if (id) {
+      try {
+        await updateCalendarMutation.mutateAsync({ posts: updated as any });
+        toast.success("Calendar updated in cloud ✓");
+      } catch (e) {
+        toast.error("Failed to sync updated post to cloud");
+      }
+    }
+  };
+
   const regenerateMutation = useRegeneratePostMutation(id);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const copyMenuRef = useRef<HTMLDivElement>(null);
@@ -1516,6 +1534,15 @@ export default function CalendarDetail() {
               >
                 {reformatting ? "Reformatting all 7…" : "Reformat all 7 →"}
               </button>
+              <button
+                type="button"
+                className="cd-reformat-btn"
+                style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", color: "#c8f09a" }}
+                onClick={() => setPersonaCompareOpen(true)}
+                title="Compare this post with another persona side-by-side"
+              >
+                👥 Compare Personas
+              </button>
             </div>
             <div className="cd-toolbar-row">
               <span className="cd-reformat-label">Export</span>
@@ -1568,6 +1595,10 @@ export default function CalendarDetail() {
               {exportingFormat === "ics" ? "📅 .ics…" : "📅 .ics"}
             </button>
           </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
+            <BufferScheduler posts={posts} platform={platform} postTimes={postTimes} />
+          </div>
+
 
         <div className="cd-bulk-bar">
             {posts.length > 1 ? (
@@ -2118,6 +2149,15 @@ export default function CalendarDetail() {
           message={`This will create a new calendar reformatted for ${niceLabelFor(pendingReformatTarget)} and leave the current one untouched.`}
           onCancel={() => setPendingReformatTarget(null)}
           onConfirm={async () => { setPendingReformatTarget(null); await reformatAllForPlatform(pendingReformatTarget); }}
+        />
+      )}
+      {p && (
+        <PersonaCompare
+          post={p}
+          platform={platform}
+          isOpen={personaCompareOpen}
+          onClose={() => setPersonaCompareOpen(false)}
+          onApplyCompare={handleApplyCompare}
         />
       )}
     </>

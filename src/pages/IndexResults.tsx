@@ -1,4 +1,4 @@
-import React, { Suspense } from "react";
+import React, { Suspense, useState } from "react";
 import { formatForPlatform, niceLabelFor, stripMarkdown } from "@/lib/platformCopy";
 import { suggestedTimeForDay } from "@/lib/postingTimes";
 import { shortDateLabel, dateForDow } from "@/lib/calendarSchedule";
@@ -8,7 +8,12 @@ import { PostDetailCard } from "@/components/wizard/PostDetailCard";
 import { ToneConsistencyChecker } from "@/components/ToneConsistencyChecker";
 import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
 import PostInsights from "@/components/PostInsights";
+import { WeekBalanceScore } from "@/components/WeekBalanceScore";
+import { BufferScheduler } from "@/components/BufferScheduler";
+import { PersonaCompare } from "@/components/PersonaCompare";
 import { renderLinkedInPreviewText } from "@/components/wizard/PlatformPreview";
+
+
 import { toast } from "sonner";
 import type { Post, WizardForm } from "@/components/wizard/constants";
 import { Button } from "@/components/ui/button";
@@ -72,6 +77,8 @@ interface IndexResultsProps {
   handleDragStart: (e: React.DragEvent<HTMLElement>, index: number) => void;
   handleDragOver: (e: React.DragEvent<HTMLElement>) => void;
   handleDrop: (e: React.DragEvent<HTMLElement>, targetIndex: number) => number | null;
+  onHashtagsChange?: (idx: number, newHashtags: string) => void;
+  onToneShift?: (idx: number, level: number) => void;
 }
 
 export function IndexResults({
@@ -132,8 +139,18 @@ export function IndexResults({
   handleDragStart,
   handleDragOver,
   handleDrop,
+  onHashtagsChange,
+  onToneShift,
 }: IndexResultsProps) {
   const p = posts[activeDay];
+  const [personaCompareOpen, setPersonaCompareOpen] = useState(false);
+
+  const handleApplyCompare = (rewritten: Post) => {
+    const updated = [...posts];
+    updated[activeDay] = rewritten;
+    setPostsWithHistory(updated);
+  };
+
 
   const handleDownloadMd = async () => {
     try {
@@ -235,11 +252,22 @@ export function IndexResults({
                   <>↻ Regenerate unlocked ({posts.length - lockedDays.size})</>
                 )}
               </button>
+              <button
+                type="button"
+                className="reformat-btn"
+                style={{ background: "transparent", color: "var(--accent)", borderColor: "rgba(200,240,154,0.3)" }}
+                onClick={() => setPersonaCompareOpen(true)}
+                title="Compare this post with another persona side-by-side"
+              >
+                👥 Compare Personas
+              </button>
             </div>
           )}
 
           {posts.length > 1 && (
-            <WeekStrip
+            <>
+              <WeekBalanceScore posts={posts} />
+              <WeekStrip
               posts={posts}
               activeDay={activeDay}
               setActiveDay={setActiveDay}
@@ -250,7 +278,9 @@ export function IndexResults({
               handleDragStart={handleDragStart}
               handleDragOver={handleDragOver}
               handleDrop={handleDrop}
+              platform={form.platform}
             />
+            </>
           )}
           {p && (
             <div>
@@ -282,6 +312,8 @@ export function IndexResults({
                 onApplyCta={(newCta) => handleApplyCta(activeDay, newCta)}
                 onUseAsSeed={() => handleUseAsSeed(p)}
                 onApplyImage={(imageUrl) => handleApplyImage(activeDay, imageUrl)}
+                onHashtagsChange={onHashtagsChange ? (newTags) => onHashtagsChange(activeDay, newTags) : undefined}
+                onToneShift={onToneShift ? (level) => onToneShift(activeDay, level) : undefined}
                 calendarId={savedId || undefined}
               />
               <ToneConsistencyChecker posts={posts} />
@@ -346,7 +378,11 @@ export function IndexResults({
                 {copiedAll ? "All copied ✓" : `Copy all ${posts.length} for ${niceLabelFor(form.platform)}`}
               </Button>
             </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+              <BufferScheduler posts={posts} platform={form.platform} postTimes={postTimes} />
+            </div>
           </div>
+
         </>
       </div>
       <div className="step4-side">
@@ -436,6 +472,15 @@ export function IndexResults({
               {posts[activeDay].hashtags.split(/\s+/).filter(Boolean).map(tag => <span key={tag} className="li-tag">{tag}</span>)}
             </div>
           </div>
+        )}
+        {p && (
+          <PersonaCompare
+            post={p}
+            platform={form.platform}
+            isOpen={personaCompareOpen}
+            onClose={() => setPersonaCompareOpen(false)}
+            onApplyCompare={handleApplyCompare}
+          />
         )}
       </div>
     </div>

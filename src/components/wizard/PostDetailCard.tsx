@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { Post, WizardForm } from "./constants";
 import { FontStyle, applyStyle } from "@/lib/unicodeFonts";
 import { resolvePlatform, niceLabelFor, formatForPlatform, buildRawMarkdown, writeToClipboard } from "@/lib/platformCopy";
@@ -11,6 +11,115 @@ import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
 import PostInsights from "@/components/PostInsights";
 import { TopicGapBadge } from "@/components/TopicGapBadge";
 import { CoverImageGenerator } from "./CoverImageGenerator";
+
+// ── Hashtag Chip Editor ─────────────────────────────────────────────────────
+function platformHashtagGuidance(platform: string): { label: string; color: string } {
+  const p = resolvePlatform(platform);
+  if (p === "instagram") return { label: "Instagram: 20–30 hashtags", color: "#f0d49a" };
+  if (p === "linkedin") return { label: "LinkedIn: 3–5 hashtags", color: "#9ab5f0" };
+  if (p === "twitter") return { label: "Twitter/X: 1–2 hashtags", color: "#9aecf0" };
+  if (p === "facebook") return { label: "Facebook: 2–3 hashtags", color: "#9a9af0" };
+  if (p === "newsletter") return { label: "Newsletter: hashtags optional", color: "#c8f09a" };
+  return { label: "Blog: hashtags optional", color: "#c8f09a" };
+}
+
+function parseHashtagsFromString(raw: string): string[] {
+  return raw.split(/[\s,]+/).map(t => t.trim()).filter(t => t.length > 0).map(t => t.startsWith("#") ? t : `#${t}`);
+}
+
+interface HashtagChipEditorProps {
+  hashtags: string;
+  platform: string;
+  onChange: (newHashtags: string) => void;
+}
+
+function HashtagChipEditor({ hashtags, platform, onChange }: HashtagChipEditorProps) {
+  const [inputVal, setInputVal] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const chips = parseHashtagsFromString(hashtags);
+  const guidance = platformHashtagGuidance(platform);
+
+  const removeChip = useCallback((tag: string) => {
+    const next = chips.filter(t => t !== tag);
+    onChange(next.join(" "));
+  }, [chips, onChange]);
+
+  const addChip = useCallback(() => {
+    const val = inputVal.trim();
+    if (!val) return;
+    const newTag = val.startsWith("#") ? val : `#${val}`;
+    if (!chips.includes(newTag)) {
+      onChange([...chips, newTag].join(" "));
+    }
+    setInputVal("");
+  }, [inputVal, chips, onChange]);
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8, minHeight: 28 }}>
+        {chips.length === 0 && <span style={{ fontSize: 11, color: "var(--text3)", fontStyle: "italic" }}>No hashtags yet — add below</span>}
+        {chips.map((tag, i) => (
+          <span
+            key={i}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "3px 9px", borderRadius: 99,
+              background: "rgba(200,240,154,0.08)", border: "1px solid rgba(200,240,154,0.22)",
+              color: "rgba(200,240,154,0.85)", fontSize: 12, fontWeight: 400,
+              cursor: "default",
+            }}
+          >
+            {tag}
+            <button
+              type="button"
+              onClick={() => removeChip(tag)}
+              aria-label={`Remove ${tag}`}
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: "rgba(200,240,154,0.4)", fontSize: 14, lineHeight: 1,
+                padding: "0 0 0 2px", display: "flex", alignItems: "center",
+                transition: "color .12s",
+              }}
+              onMouseOver={e => (e.currentTarget.style.color = "rgba(200,240,154,0.9)")}
+              onMouseOut={e => (e.currentTarget.style.color = "rgba(200,240,154,0.4)")}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputVal}
+          onChange={e => setInputVal(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addChip(); } }}
+          placeholder="Add hashtag (without #)…"
+          style={{
+            flex: 1, background: "var(--bg)", border: "1px solid var(--border2)",
+            borderRadius: 6, padding: "5px 10px", fontSize: 12, color: "var(--text)",
+            fontFamily: "var(--font-body)", outline: "none",
+          }}
+        />
+        <button
+          type="button"
+          onClick={addChip}
+          style={{
+            padding: "5px 12px", borderRadius: 6, background: "rgba(200,240,154,0.1)",
+            border: "1px solid rgba(200,240,154,0.22)", color: "var(--accent)",
+            fontSize: 11, cursor: "pointer", fontFamily: "var(--font-body)", whiteSpace: "nowrap",
+          }}
+        >
+          Add
+        </button>
+      </div>
+      <div style={{ marginTop: 5, fontSize: 10, color: guidance.color, opacity: 0.75 }}>
+        📌 {guidance.label} · {chips.length} used
+      </div>
+    </div>
+  );
+}
 
 export function hasEmoji(text: string): boolean {
   return /\p{Emoji}/u.test(text);
@@ -62,6 +171,8 @@ interface PostDetailCardProps {
   onApplyCta?: (newCta: string) => void;
   onUseAsSeed?: () => void;
   onApplyImage?: (imageUrl: string) => void;
+  onHashtagsChange?: (newHashtags: string) => void;
+  onToneShift?: (level: number) => void;
   calendarId?: string;
 }
 
@@ -93,9 +204,15 @@ export const PostDetailCard = React.memo(function PostDetailCard({
   onApplyCta,
   onUseAsSeed,
   onApplyImage,
+  onHashtagsChange,
+  onToneShift,
   calendarId,
 }: PostDetailCardProps) {
   const [showImageGen, setShowImageGen] = useState(false);
+  const [pasteImageUrl, setPasteImageUrl] = useState("");
+  const [pasteImageOpen, setPasteImageOpen] = useState(false);
+  const [toneLevel, setToneLevel] = useState(3); // 1=Formal, 5=Casual
+  const toneDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const niceLabel = niceLabelFor(form.platform);
   const f = formatForPlatform(post, form.platform, { style: getClipboardStyle() });
   const ratio = f.charCount / f.limit;
@@ -264,8 +381,48 @@ export const PostDetailCard = React.memo(function PostDetailCard({
       <div className="blabel">CTA</div>
       <div className="cta-block">{post.cta}</div>
 
-      <div className="blabel">Hashtags</div>
-      <div className="htags">{post.hashtags}</div>
+      {/* ── Tone Slider ──────────────────────────────────────────────────── */}
+      {onToneShift && (
+        <div style={{ marginTop: 14, padding: "12px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--text2)", fontWeight: 500 }}>Tone</span>
+            <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 500 }}>
+              {toneLevel === 1 ? "Very Formal" : toneLevel === 2 ? "Formal" : toneLevel === 3 ? "Balanced" : toneLevel === 4 ? "Casual" : "Very Casual"}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 10, color: "var(--text3)" }}>Formal</span>
+            <input
+              type="range" min="1" max="5" step="1"
+              value={toneLevel}
+              onChange={e => {
+                const v = Number(e.target.value);
+                setToneLevel(v);
+                if (toneDebounce.current) clearTimeout(toneDebounce.current);
+                toneDebounce.current = setTimeout(() => {
+                  if (v !== 3) onToneShift(v);
+                }, 700);
+              }}
+              style={{ flex: 1, accentColor: "var(--accent)", cursor: "pointer" }}
+            />
+            <span style={{ fontSize: 10, color: "var(--text3)" }}>Casual</span>
+          </div>
+          <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 5, fontStyle: "italic" }}>Adjusts register only — content and structure stay the same</div>
+        </div>
+      )}
+
+      <div className="blabel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span>Hashtags</span>
+      </div>
+      {onHashtagsChange ? (
+        <HashtagChipEditor
+          hashtags={post.hashtags}
+          platform={form.platform}
+          onChange={onHashtagsChange}
+        />
+      ) : (
+        <div className="htags">{post.hashtags}</div>
+      )}
 
       <div className="blabel" style={{ marginTop: 16 }}>Why this works</div>
       <button
@@ -280,16 +437,80 @@ export const PostDetailCard = React.memo(function PostDetailCard({
 
       <div className="blabel" style={{ marginTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span>Cinematic image prompt</span>
-        <button
-          type="button"
-          className="cpbtn"
-          style={{ padding: "4px 10px", fontSize: 11 }}
-          onClick={() => setShowImageGen(true)}
-        >
-          {post.cover_image ? "🎨 Regenerate Image" : "🎨 Generate Cover Image"}
-        </button>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <button
+            type="button"
+            className="cpbtn"
+            style={{ padding: "4px 10px", fontSize: 11 }}
+            onClick={() => setPasteImageOpen(v => !v)}
+            title="Paste your own image URL to preview it inline"
+          >
+            🔗 Paste URL
+          </button>
+          <button
+            type="button"
+            className="cpbtn"
+            style={{ padding: "4px 10px", fontSize: 11 }}
+            onClick={() => setShowImageGen(true)}
+          >
+            {post.cover_image ? "🎨 Regenerate Image" : "🎨 Generate Cover Image"}
+          </button>
+        </div>
       </div>
       <div className="rationale" style={{ whiteSpace: 'pre-wrap' }}>{post.image_prompt || "No image prompt generated yet."}</div>
+
+      {/* ── Inline Image URL Paste ─────────────────────────────────── */}
+      {pasteImageOpen && onApplyImage && (
+        <div style={{ marginTop: 10, padding: "12px 14px", background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(200,240,154,0.2)", borderRadius: 10 }}>
+          <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--text2)", fontWeight: 500, marginBottom: 8 }}>Paste Your Own Image URL</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              type="url"
+              value={pasteImageUrl}
+              onChange={e => setPasteImageUrl(e.target.value)}
+              placeholder="https://your-image-url.com/image.jpg"
+              style={{
+                flex: 1, background: "var(--bg)", border: "1px solid var(--border2)",
+                borderRadius: 6, padding: "7px 10px", fontSize: 12, color: "var(--text)",
+                fontFamily: "var(--font-body)", outline: "none",
+              }}
+              onKeyDown={e => {
+                if (e.key === "Enter" && pasteImageUrl.startsWith("http")) {
+                  onApplyImage(pasteImageUrl);
+                  setPasteImageOpen(false);
+                  toast.success("Image URL applied ✓");
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="cpbtn done"
+              style={{ padding: "5px 12px", fontSize: 11 }}
+              disabled={!pasteImageUrl.startsWith("http")}
+              onClick={() => {
+                if (pasteImageUrl.startsWith("http")) {
+                  onApplyImage(pasteImageUrl);
+                  setPasteImageOpen(false);
+                  toast.success("Image URL applied ✓");
+                }
+              }}
+            >
+              Apply
+            </button>
+          </div>
+          {pasteImageUrl.startsWith("http") && (
+            <div style={{ marginTop: 10, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
+              <img
+                src={pasteImageUrl}
+                alt="Preview"
+                style={{ display: "block", width: "100%", maxHeight: 200, objectFit: "cover" }}
+                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 6, fontStyle: "italic" }}>Paste a direct image URL (JPG, PNG, WebP). Press Enter or click Apply.</div>
+        </div>
+      )}
 
       {post.cover_image && (
         <div style={{ marginTop: 12, border: "2px solid var(--color-border)", borderRadius: 4, overflow: "hidden", position: "relative" }}>

@@ -17,3 +17,7 @@ verify_jwt = false
 
 [functions.cleanup-media]
 verify_jwt = false
+
+[functions.generate-trends]
+verify_jwt = false
+
