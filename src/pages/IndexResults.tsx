@@ -79,6 +79,7 @@ interface IndexResultsProps {
   handleDrop: (e: React.DragEvent<HTMLElement>, targetIndex: number) => number | null;
   onHashtagsChange?: (idx: number, newHashtags: string) => void;
   onToneShift?: (idx: number, level: number) => void;
+  regenerateDay: (idx: number, tweak?: string) => void | Promise<void>;
 }
 
 export function IndexResults({
@@ -141,9 +142,11 @@ export function IndexResults({
   handleDrop,
   onHashtagsChange,
   onToneShift,
+  regenerateDay,
 }: IndexResultsProps) {
   const p = posts[activeDay];
   const [personaCompareOpen, setPersonaCompareOpen] = useState(false);
+  const [tweakOpenIdx, setTweakOpenIdx] = useState<number | null>(null);
 
   const handleApplyCompare = (rewritten: Post) => {
     const updated = [...posts];
@@ -293,11 +296,11 @@ export function IndexResults({
                 setPostTimes={setPostTimes}
                 lockedDays={lockedDays}
                 toggleLock={toggleLock}
-                regenerateDay={undefined as any} // we will pass callbacks
+                regenerateDay={regenerateDay}
                 regenIdx={regenIdx}
                 reformatting={reformatting}
-                tweakOpenIdx={null}
-                setTweakOpenIdx={() => {}}
+                tweakOpenIdx={tweakOpenIdx}
+                setTweakOpenIdx={setTweakOpenIdx}
                 getClipboardStyle={getClipboardStyle}
                 copyPost={copyPost}
                 copiedIdx={copiedIdx}

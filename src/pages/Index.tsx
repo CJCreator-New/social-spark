@@ -2666,6 +2666,7 @@ const Index = () => {
                   handleDrop={handleDrop}
                   onHashtagsChange={handleHashtagsChange}
                   onToneShift={handleToneShift}
+                  regenerateDay={regenerateDay}
                 />
               </Suspense>
             )}
