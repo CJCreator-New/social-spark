@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { saveUserApiKey, getUserApiKey, setUseOwnKey, deleteUserApiKey } from "@/lib/apiKeyManager";
+import { saveUserApiKey, getUserApiKey, setUseOwnKey, deleteUserApiKey, getQuotaStatus } from "@/lib/apiKeyManager";
 import { toast } from "sonner";
 import { Eye, EyeOff, Save, Key, CheckCircle2, AlertCircle, Loader2, Trash2, ShieldCheck, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,7 @@ export function ApiKeySettings() {
   const [fetching, setFetching] = useState(true);
   const [savedKeyPreview, setSavedKeyPreview] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [quota, setQuota] = useState<{ used: number; limit: number } | null>(null);
 
   const [customUrl, setCustomUrl] = useState(() => localStorage.getItem("contentforge_custom_supabase_url") || "");
   const [customKey, setCustomKey] = useState(() => localStorage.getItem("contentforge_custom_supabase_anon_key") || "");
@@ -86,6 +87,13 @@ export function ApiKeySettings() {
         console.error("Failed to load user API key settings:", err);
       } finally {
         setFetching(false);
+      }
+
+      try {
+        const q = await getQuotaStatus();
+        setQuota({ used: q.used, limit: q.limit });
+      } catch (err) {
+        console.error("Failed to load quota status:", err);
       }
     }
     loadSettings();
@@ -175,6 +183,34 @@ export function ApiKeySettings() {
           any purpose other than generating content on your behalf. You can delete it at any time.
         </span>
       </div>
+
+      {quota && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9a9aae", marginBottom: 4 }}>
+            <span>Free generations used</span>
+            <span>{Math.min(quota.used, quota.limit)} / {quota.limit}</span>
+          </div>
+          <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+            <div
+              style={{
+                height: "100%",
+                width: `${Math.min(100, (quota.used / quota.limit) * 100)}%`,
+                background: quota.used >= quota.limit ? "#f09a9a" : "#c8f09a",
+                transition: "width 0.3s ease",
+              }}
+            />
+          </div>
+          {quota.used >= quota.limit && !(useOwnKey && keyMode === 'always') && (
+            <div role="alert" className="pf-notice" style={{ marginTop: 10, borderColor: "rgba(240, 154, 154, 0.2)" }}>
+              <AlertCircle size={14} style={{ color: "#f09a9a", flexShrink: 0, marginTop: 1 }} />
+              <span>
+                You've used your free generations for now — more are coming soon! Add your own API key below and
+                enable "Always use my key" to keep generating in the meantime.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="pf-section-sub" style={{ marginBottom: 16 }}>
         Configure your own AI API key to be used as a fallback if the platform-level generation is rate-limited or unavailable.

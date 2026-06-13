@@ -119,6 +119,9 @@ export async function generateWithFallback<T = unknown>(
     }
 
     const data = await res.json();
+    if (data?.error === "QUOTA_EXCEEDED") {
+      throw new Error(data.message || data.error);
+    }
     if (data?.error) {
       throw new Error(data.error);
     }

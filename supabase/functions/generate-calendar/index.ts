@@ -26,6 +26,8 @@ import {
   recordServerTelemetryEvent,
   getUserIdFromToken,
   errorResponse,
+  checkQuota,
+  incrementGenerationCount,
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
@@ -63,6 +65,16 @@ Deno.serve(async (req: Request) => {
         { error: "Rate limit exceeded. Please wait a moment before trying again." },
         429
       );
+    }
+
+    const quota = await checkQuota(userId);
+    const usingSharedKey = !payload.userApiKey && !(quota.useOwnKey && quota.keyMode === "always");
+    if (usingSharedKey && !quota.allowed) {
+      return jsonResponse({
+        error: "QUOTA_EXCEEDED",
+        message: "You've used your free generations for now — more are coming soon! Add your own API key (Settings > API Keys, 'Always use my key') to keep generating in the meantime.",
+        quota: { used: quota.used, limit: quota.limit },
+      }, 402);
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -182,6 +194,10 @@ Deno.serve(async (req: Request) => {
     });
     if (aiRes.status !== 200) {
       return jsonResponse({ error: aiRes.error }, aiRes.status);
+    }
+
+    if (usingSharedKey) {
+      incrementGenerationCount(userId);
     }
 
     const parseResult = parseAIResponse(aiRes.data || {}, "return_calendar");

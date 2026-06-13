@@ -445,6 +445,62 @@ export async function checkRateLimit(userId: string, endpoint: string, config: R
   }
 }
 
+// ─── GENERATION QUOTA (PILOT) ──────────────────────────────────────────────
+
+export async function checkQuota(userId: string): Promise<{ allowed: boolean; used: number; limit: number; useOwnKey: boolean; keyMode: string }> {
+  const DEFAULT = { allowed: true, used: 0, limit: 10, useOwnKey: false, keyMode: "fallback" };
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!SUPABASE_URL || !SUPABASE_KEY) return DEFAULT;
+
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/user_settings?user_id=eq.${userId}&select=generation_count,quota_limit,use_own_key,key_mode`,
+      {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      }
+    );
+    if (!res.ok) return DEFAULT;
+    const rows = await res.json();
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) return DEFAULT;
+
+    const used = row.generation_count ?? 0;
+    const limit = row.quota_limit ?? 10;
+    const useOwnKey = !!row.use_own_key;
+    const keyMode = row.key_mode || "fallback";
+    const allowed = (useOwnKey && keyMode === "always") || used < limit;
+
+    return { allowed, used, limit, useOwnKey, keyMode };
+  } catch (e) {
+    console.warn("checkQuota failed, allowing request", e);
+    return DEFAULT;
+  }
+}
+
+export async function incrementGenerationCount(userId: string): Promise<void> {
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+
+  try {
+    await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/rpc/increment_generation_count`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+      body: JSON.stringify({ p_user_id: userId }),
+    });
+  } catch (e) {
+    console.warn("incrementGenerationCount failed", e);
+  }
+}
+
 // ─── PAYLOAD NORMALIZATION & CONTEXT BUILDING ─────────────────────────────
 
 /**

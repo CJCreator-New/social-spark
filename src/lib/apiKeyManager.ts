@@ -157,6 +157,45 @@ export async function getUserApiKey(): Promise<{
   }
 }
 
+export async function getQuotaStatus(): Promise<{
+  used: number;
+  limit: number;
+  useOwnKey: boolean;
+  keyMode: 'fallback' | 'always';
+}> {
+  const DEFAULT = { used: 0, limit: 10, useOwnKey: false, keyMode: 'fallback' as const };
+
+  const token = await getAccessToken();
+  if (!token) return DEFAULT;
+
+  const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+
+  // Check if we are in a mock Supabase environment
+  if (!SUPABASE_URL || SUPABASE_URL.includes("mock.supabase.co")) {
+    const used = Number(localStorage.getItem("social_spark_generation_count") || "0");
+    const useOwnKey = localStorage.getItem("social_spark_use_own_key") === "true";
+    const keyMode = (localStorage.getItem("social_spark_key_mode") === "always" ? "always" : "fallback") as 'fallback' | 'always';
+    return { used, limit: 10, useOwnKey, keyMode };
+  }
+
+  try {
+    const { data, error } = await (supabase.from as unknown as (table: string) => ReturnType<typeof supabase.from>)("user_settings")
+      .select("generation_count, quota_limit, use_own_key, key_mode")
+      .maybeSingle();
+    if (error) throw error;
+    const row = data as unknown as { generation_count?: number; quota_limit?: number; use_own_key?: boolean; key_mode?: string } | null;
+    return {
+      used: row?.generation_count ?? 0,
+      limit: row?.quota_limit ?? 10,
+      useOwnKey: row?.use_own_key || false,
+      keyMode: (row?.key_mode === 'always' ? 'always' : 'fallback'),
+    };
+  } catch (err) {
+    console.warn("getQuotaStatus failed:", err);
+    return DEFAULT;
+  }
+}
+
 export async function setUseOwnKey(enabled: boolean, keyMode: 'fallback' | 'always' = 'fallback'): Promise<void> {
   const token = await getAccessToken();
   if (!token) {

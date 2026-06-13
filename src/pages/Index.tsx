@@ -1275,7 +1275,14 @@ const Index = () => {
       const aborted = err instanceof DOMException && err.name === "AbortError";
       const reason = (ac.signal as AbortSignal & { reason?: unknown }).reason;
       if (!aborted) {
-        localFallback(err instanceof Error ? err.message : String(err));
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("free generations")) {
+          toast.warning(msg, {
+            duration: 8000,
+            action: { label: "Add API key", onClick: () => navigate("/profile") },
+          });
+        }
+        localFallback(msg);
         return;
       }
 
