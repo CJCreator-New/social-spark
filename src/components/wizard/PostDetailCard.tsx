@@ -10,116 +10,9 @@ import { toast } from "sonner";
 import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
 import PostInsights from "@/components/PostInsights";
 import { TopicGapBadge } from "@/components/TopicGapBadge";
-import { CoverImageGenerator } from "./CoverImageGenerator";
+import { useGeneratePostImageMutation } from "@/hooks/useAppQueries";
 
-// ── Hashtag Chip Editor ─────────────────────────────────────────────────────
-function platformHashtagGuidance(platform: string): { label: string; color: string } {
-  const p = resolvePlatform(platform);
-  if (p === "instagram") return { label: "Instagram: 20–30 hashtags", color: "#f0d49a" };
-  if (p === "linkedin") return { label: "LinkedIn: 3–5 hashtags", color: "#9ab5f0" };
-  if (p === "twitter") return { label: "Twitter/X: 1–2 hashtags", color: "#9aecf0" };
-  if (p === "facebook") return { label: "Facebook: 2–3 hashtags", color: "#9a9af0" };
-  if (p === "newsletter") return { label: "Newsletter: hashtags optional", color: "#c8f09a" };
-  return { label: "Blog: hashtags optional", color: "#c8f09a" };
-}
-
-function parseHashtagsFromString(raw: string): string[] {
-  return raw.split(/[\s,]+/).map(t => t.trim()).filter(t => t.length > 0).map(t => t.startsWith("#") ? t : `#${t}`);
-}
-
-interface HashtagChipEditorProps {
-  hashtags: string;
-  platform: string;
-  onChange: (newHashtags: string) => void;
-}
-
-function HashtagChipEditor({ hashtags, platform, onChange }: HashtagChipEditorProps) {
-  const [inputVal, setInputVal] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const chips = parseHashtagsFromString(hashtags);
-  const guidance = platformHashtagGuidance(platform);
-
-  const removeChip = useCallback((tag: string) => {
-    const next = chips.filter(t => t !== tag);
-    onChange(next.join(" "));
-  }, [chips, onChange]);
-
-  const addChip = useCallback(() => {
-    const val = inputVal.trim();
-    if (!val) return;
-    const newTag = val.startsWith("#") ? val : `#${val}`;
-    if (!chips.includes(newTag)) {
-      onChange([...chips, newTag].join(" "));
-    }
-    setInputVal("");
-  }, [inputVal, chips, onChange]);
-
-  return (
-    <div style={{ marginTop: 4 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8, minHeight: 28 }}>
-        {chips.length === 0 && <span style={{ fontSize: 11, color: "var(--text3)", fontStyle: "italic" }}>No hashtags yet — add below</span>}
-        {chips.map((tag, i) => (
-          <span
-            key={i}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              padding: "3px 9px", borderRadius: 99,
-              background: "rgba(200,240,154,0.08)", border: "1px solid rgba(200,240,154,0.22)",
-              color: "rgba(200,240,154,0.85)", fontSize: 12, fontWeight: 400,
-              cursor: "default",
-            }}
-          >
-            {tag}
-            <button
-              type="button"
-              onClick={() => removeChip(tag)}
-              aria-label={`Remove ${tag}`}
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: "rgba(200,240,154,0.4)", fontSize: 14, lineHeight: 1,
-                padding: "0 0 0 2px", display: "flex", alignItems: "center",
-                transition: "color .12s",
-              }}
-              onMouseOver={e => (e.currentTarget.style.color = "rgba(200,240,154,0.9)")}
-              onMouseOut={e => (e.currentTarget.style.color = "rgba(200,240,154,0.4)")}
-            >
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        <input
-          ref={inputRef}
-          type="text"
-          value={inputVal}
-          onChange={e => setInputVal(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addChip(); } }}
-          placeholder="Add hashtag (without #)…"
-          style={{
-            flex: 1, background: "var(--bg)", border: "1px solid var(--border2)",
-            borderRadius: 6, padding: "5px 10px", fontSize: 12, color: "var(--text)",
-            fontFamily: "var(--font-body)", outline: "none",
-          }}
-        />
-        <button
-          type="button"
-          onClick={addChip}
-          style={{
-            padding: "5px 12px", borderRadius: 6, background: "rgba(200,240,154,0.1)",
-            border: "1px solid rgba(200,240,154,0.22)", color: "var(--accent)",
-            fontSize: 11, cursor: "pointer", fontFamily: "var(--font-body)", whiteSpace: "nowrap",
-          }}
-        >
-          Add
-        </button>
-      </div>
-      <div style={{ marginTop: 5, fontSize: 10, color: guidance.color, opacity: 0.75 }}>
-        📌 {guidance.label} · {chips.length} used
-      </div>
-    </div>
-  );
-}
+import { HashtagChipEditor } from "@/components/HashtagChipEditor";
 
 export function hasEmoji(text: string): boolean {
   return /\p{Emoji}/u.test(text);
@@ -128,6 +21,13 @@ export function hasEmoji(text: string): boolean {
 export function formatBadgeForPlatform(format: string, platform: string): string {
   if (resolvePlatform(platform) !== "twitter") return format;
   return /list|bullet|thread/i.test(format) ? "THREAD FORMAT" : "SINGLE TWEET";
+}
+
+function cssAspectRatioForPlatform(platform?: string): string {
+  const normalized = resolvePlatform(platform || "");
+  if (normalized === "instagram") return "4 / 5";
+  if (normalized === "twitter") return "16 / 9";
+  return "1.91 / 1";
 }
 
 export function postText(p: Post, getClipboardStyle: () => FontStyle) {
@@ -208,10 +108,47 @@ export const PostDetailCard = React.memo(function PostDetailCard({
   onToneShift,
   calendarId,
 }: PostDetailCardProps) {
-  const [showImageGen, setShowImageGen] = useState(false);
+
   const [pasteImageUrl, setPasteImageUrl] = useState("");
   const [pasteImageOpen, setPasteImageOpen] = useState(false);
   const [toneLevel, setToneLevel] = useState(3); // 1=Formal, 5=Casual
+  const [prompt, setPrompt] = useState(post.image_prompt || `${post.title}. Modern digital art, vector illustration.`);
+  const generateMutation = useGeneratePostImageMutation();
+
+  const handleGenerate = async () => {
+    if (!prompt.trim()) {
+      toast.error("Please enter an image prompt");
+      return;
+    }
+    try {
+      const data = await generateMutation.mutateAsync({
+        calendarId: calendarId || "guest-calendar",
+        postDay: post.day,
+        post: {
+          title: post.title,
+          hook: post.hook,
+          body: post.body,
+          cta: post.cta,
+          hashtags: post.hashtags,
+          topic: post.topic,
+          format: post.format,
+        },
+        prompt: prompt.trim(),
+        aspectRatio: "1:1",
+      });
+
+      if (data?.publicUrl) {
+        if (onApplyImage) onApplyImage(data.publicUrl);
+        toast.success("Cover image generated successfully ✓");
+      } else {
+        throw new Error("No image URL returned");
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to generate image");
+    }
+  };
+
   const toneDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const niceLabel = niceLabelFor(form.platform);
   const f = formatForPlatform(post, form.platform, { style: getClipboardStyle() });
@@ -436,7 +373,7 @@ export const PostDetailCard = React.memo(function PostDetailCard({
       {showRationale && <div className="rationale">{post.rationale}</div>}
 
       <div className="blabel" style={{ marginTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span>Cinematic image prompt</span>
+        <span>Image generation prompt</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <button
             type="button"
@@ -447,19 +384,47 @@ export const PostDetailCard = React.memo(function PostDetailCard({
           >
             🔗 Paste URL
           </button>
-          <button
-            type="button"
-            className="cpbtn"
-            style={{ padding: "4px 10px", fontSize: 11 }}
-            onClick={() => setShowImageGen(true)}
-          >
-            {post.cover_image ? "🎨 Regenerate Image" : "🎨 Generate Cover Image"}
-          </button>
         </div>
       </div>
-      <div className="rationale" style={{ whiteSpace: 'pre-wrap' }}>{post.image_prompt || "No image prompt generated yet."}</div>
-
-      {/* ── Inline Image URL Paste ─────────────────────────────────── */}
+      
+      <div style={{ marginTop: 8, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 10, padding: 12 }}>
+        <textarea
+          className="text-input"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          rows={3}
+          style={{ width: "100%", fontSize: 13, padding: 10, background: "transparent", border: "none", outline: "none", resize: "none", color: "var(--text)" }}
+          placeholder="Describe the image you want to generate..."
+        />
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12, marginBottom: 12 }}>
+          {["Photorealistic", "Flat design", "3D render", "Hand-drawn", "Data visual", "Abstract"].map(style => (
+            <button
+              key={style}
+              type="button"
+              className={`chip ${prompt.includes(style) ? "on" : ""}`}
+              onClick={() => {
+                if (prompt.includes(style)) {
+                  setPrompt(prompt.replace(new RegExp(`\\b${style}\\b,?\\s*`, "gi"), "").trim());
+                } else {
+                  setPrompt(prompt ? `${prompt}, ${style}` : style);
+                }
+              }}
+              style={{ fontSize: 11, padding: "4px 10px", margin: 0, border: prompt.includes(style) ? "1px solid var(--accent)" : "1px solid var(--border)" }}
+            >
+              {style}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={generateMutation.isPending}
+          className="btn btn-p"
+          style={{ width: "100%", padding: "8px", fontSize: 13 }}
+        >
+          {generateMutation.isPending ? "Generating..." : "Generate prompt"}
+        </button>
+      </div>
       {pasteImageOpen && onApplyImage && (
         <div style={{ marginTop: 10, padding: "12px 14px", background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(200,240,154,0.2)", borderRadius: 10 }}>
           <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--text2)", fontWeight: 500, marginBottom: 8 }}>Paste Your Own Image URL</div>
@@ -499,11 +464,23 @@ export const PostDetailCard = React.memo(function PostDetailCard({
             </button>
           </div>
           {pasteImageUrl.startsWith("http") && (
-            <div style={{ marginTop: 10, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
+            <div 
+              style={{ 
+                marginTop: 10, 
+                borderRadius: 8, 
+                overflow: "hidden", 
+                border: "1px solid var(--border)",
+                aspectRatio: cssAspectRatioForPlatform(form.platform),
+                backgroundColor: "rgba(0,0,0,0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}
+            >
               <img
                 src={pasteImageUrl}
                 alt="Preview"
-                style={{ display: "block", width: "100%", maxHeight: 200, objectFit: "cover" }}
+                style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }}
                 onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
             </div>
@@ -513,8 +490,25 @@ export const PostDetailCard = React.memo(function PostDetailCard({
       )}
 
       {post.cover_image && (
-        <div style={{ marginTop: 12, border: "2px solid var(--color-border)", borderRadius: 4, overflow: "hidden", position: "relative" }}>
-          <img src={post.cover_image} alt="Generated cover" style={{ width: "100%", height: "auto", display: "block" }} />
+        <div 
+          style={{ 
+            marginTop: 12, 
+            border: "1px solid var(--border)", 
+            borderRadius: 10, 
+            overflow: "hidden", 
+            position: "relative",
+            aspectRatio: cssAspectRatioForPlatform(form.platform),
+            backgroundColor: "rgba(0,0,0,0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          <img 
+            src={post.cover_image} 
+            alt="Generated cover" 
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} 
+          />
           <button
             type="button"
             className="cpbtn"
@@ -526,14 +520,7 @@ export const PostDetailCard = React.memo(function PostDetailCard({
         </div>
       )}
 
-      {showImageGen && onApplyImage && (
-        <CoverImageGenerator
-          post={post}
-          calendarId={calendarId || "guest-calendar"}
-          onApplyImage={onApplyImage}
-          onClose={() => setShowImageGen(false)}
-        />
-      )}
+
 
       <PerformanceScoreCard
         post={post}

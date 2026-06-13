@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { saveUserApiKey, getUserApiKey, setUseOwnKey, deleteUserApiKey } from "@/lib/apiKeyManager";
 import { toast } from "sonner";
 import { Eye, EyeOff, Save, Key, CheckCircle2, AlertCircle, Loader2, Trash2, ShieldCheck, Info } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export function ApiKeySettings() {
   const [provider, setProvider] = useState<'openai' | 'anthropic' | 'openrouter'>("openai");
@@ -14,6 +15,56 @@ export function ApiKeySettings() {
   const [fetching, setFetching] = useState(true);
   const [savedKeyPreview, setSavedKeyPreview] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  const [customUrl, setCustomUrl] = useState(() => localStorage.getItem("contentforge_custom_supabase_url") || "");
+  const [customKey, setCustomKey] = useState(() => localStorage.getItem("contentforge_custom_supabase_anon_key") || "");
+  const [syncStatus, setSyncStatus] = useState<"default" | "custom_connected" | "custom_error" | "testing">("default");
+
+  useEffect(() => {
+    async function checkConnection() {
+      const hasCustom = localStorage.getItem("contentforge_custom_supabase_url") && localStorage.getItem("contentforge_custom_supabase_anon_key");
+      if (!hasCustom) {
+        setSyncStatus("default");
+        return;
+      }
+      setSyncStatus("testing");
+      try {
+        const { error } = await supabase.auth.getSession();
+        if (error) {
+          setSyncStatus("custom_error");
+        } else {
+          setSyncStatus("custom_connected");
+        }
+      } catch (e) {
+        setSyncStatus("custom_error");
+      }
+    }
+    checkConnection();
+  }, []);
+
+  const handleSaveCustomSupabase = () => {
+    if (!customUrl.trim() || !customKey.trim()) {
+      toast.error("Please enter both Supabase URL and Anon Key");
+      return;
+    }
+    localStorage.setItem("contentforge_custom_supabase_url", customUrl.trim());
+    localStorage.setItem("contentforge_custom_supabase_anon_key", customKey.trim());
+    toast.success("Custom Supabase credentials saved! Refreshing page to connect…");
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
+  };
+
+  const handleClearCustomSupabase = () => {
+    localStorage.removeItem("contentforge_custom_supabase_url");
+    localStorage.removeItem("contentforge_custom_supabase_anon_key");
+    setCustomUrl("");
+    setCustomKey("");
+    toast.success("Reset to default Supabase project! Refreshing page to connect…");
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
+  };
 
   // Use uncontrolled input via ref to keep the raw key out of the React DevTools state tree
   const keyInputRef = useRef<HTMLInputElement>(null);
@@ -109,7 +160,8 @@ export function ApiKeySettings() {
   }
 
   return (
-    <div className="pf-card" style={{ marginTop: 14 }}>
+    <>
+      <div className="pf-card" style={{ marginTop: 14 }}>
       <h2 className="pf-section-h" style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Key size={18} style={{ color: "#c8f09a" }} />
         <span>User API Key Fallback</span>
@@ -373,5 +425,104 @@ export function ApiKeySettings() {
         </div>
       </form>
     </div>
+
+      <div className="pf-card" style={{ marginTop: 24 }}>
+        <h2 className="pf-section-h" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ShieldCheck size={18} style={{ color: "#c8f09a" }} />
+            <span>Custom Supabase Sync</span>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {syncStatus === "default" && (
+              <span style={{ fontSize: 10, padding: "2px 8px", background: "rgba(255,255,255,0.06)", color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: 99 }}>
+                Default Project
+              </span>
+            )}
+            {syncStatus === "testing" && (
+              <span style={{ fontSize: 10, padding: "2px 8px", background: "rgba(255,255,255,0.03)", color: "var(--text2)", border: "1px solid var(--border2)", borderRadius: 99 }}>
+                Connecting…
+              </span>
+            )}
+            {syncStatus === "custom_connected" && (
+              <span style={{ fontSize: 10, padding: "2px 8px", background: "rgba(200,240,154,0.12)", color: "var(--accent)", border: "1px solid rgba(200,240,154,0.2)", borderRadius: 99 }}>
+                🟢 Connected to Custom DB
+              </span>
+            )}
+            {syncStatus === "custom_error" && (
+              <span style={{ fontSize: 10, padding: "2px 8px", background: "rgba(240,154,154,0.12)", color: "var(--err)", border: "1px solid rgba(240,154,154,0.2)", borderRadius: 99 }}>
+                🔴 Connection Failed
+              </span>
+            )}
+          </div>
+        </h2>
+
+        <div className="pf-section-sub" style={{ marginBottom: 16 }}>
+          Sync your saved calendars and personas to your own private Supabase instance instead of the default project. Requires a page refresh to apply.
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <label className="pf-label" htmlFor="supabase-url">
+              Supabase Project URL
+            </label>
+            <input
+              id="supabase-url"
+              type="text"
+              className="pf-input"
+              value={customUrl}
+              onChange={e => setCustomUrl(e.target.value)}
+              placeholder="https://your-project.supabase.co"
+              style={{ marginBottom: 0 }}
+            />
+          </div>
+
+          <div>
+            <label className="pf-label" htmlFor="supabase-key">
+              Supabase Anon Key
+            </label>
+            <input
+              id="supabase-key"
+              type="password"
+              className="pf-input"
+              value={customKey}
+              onChange={e => setCustomKey(e.target.value)}
+              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              style={{ marginBottom: 0 }}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+            <button
+              type="button"
+              className="pf-btn"
+              onClick={handleSaveCustomSupabase}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <Save size={14} />
+              <span>Save sync credentials</span>
+            </button>
+            {(customUrl || customKey) && (
+              <button
+                type="button"
+                className="pf-btn ghost"
+                onClick={handleClearCustomSupabase}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "rgba(240, 154, 154, 0.08)",
+                  border: "1px solid rgba(240, 154, 154, 0.2)",
+                  color: "#f09a9a",
+                  cursor: "pointer",
+                }}
+              >
+                <Trash2 size={13} />
+                <span>Reset to default</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

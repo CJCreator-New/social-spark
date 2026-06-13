@@ -6,6 +6,9 @@ import { useCalendarQuery, useProfileQuery, useProfileUpdateMutation, useSchedul
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
 import { BufferScheduler } from "@/components/BufferScheduler";
+import { HashtagChipEditor } from "@/components/HashtagChipEditor";
+import { PersonaCompare } from "@/components/PersonaCompare";
+import { WeekBalanceScore } from "@/components/WeekBalanceScore";
 
 
 import {
@@ -22,7 +25,7 @@ import { insightFor } from "@/lib/postInsights";
 import PostInsights from "@/components/PostInsights";
 import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
 import { TopicGapBadge } from "@/components/TopicGapBadge";
-import { PerformanceFocusMetric, calculatePerformanceScore, getWeakestPerformanceMetric, getRegenerationGuidance } from "@/lib/postPerformanceScore";
+import { PerformanceFocusMetric, calculatePerformanceScore, getWeakestPerformanceMetric, getRegenerationGuidance, getEngagementPrediction, ENGAGEMENT_BADGE } from "@/lib/postPerformanceScore";
 import { buildBrandMemoryPrompt } from "@/lib/brandMemory";
 import { createSeedFromPost, storeSeed } from "@/lib/seedFromPost";
 import { isEnabled } from "@/lib/featureFlags";
@@ -253,7 +256,7 @@ function wordCount(s: string): number {
 function hasEmoji(text: string): boolean {
   return /\p{Emoji}/u.test(text);
 }
-type TweakKind = "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting" | "enhance";
+type TweakKind = "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting" | "enhance" | string;
 
 function calculateScore(scores: Record<string, number>): number {
   const keys = Object.keys(scores);
@@ -268,6 +271,13 @@ function aspectRatioForPlatform(platform?: string): string {
   if (normalized === "twitter") return "16:9";
   if (normalized === "facebook") return "1.91:1";
   return "1.91:1";
+}
+
+function cssAspectRatioForPlatform(platform?: string): string {
+  const ratio = aspectRatioForPlatform(platform);
+  if (ratio === "4:5") return "4 / 5";
+  if (ratio === "16:9") return "16 / 9";
+  return "1.91 / 1";
 }
 
 function readingStats(text: string) {
@@ -322,6 +332,18 @@ export default function CalendarDetail() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Post | null>(null);
   const [saving, setSaving] = useState(false);
+  
+  // Feature 5: Post Field History / Versioning
+  const [fieldHistory, setFieldHistory] = useState<Record<number, Record<string, string[]>>>({});
+
+  // Feature 2: Inline Image URL Paste
+  const [pasteImageOpenDay, setPasteImageOpenDay] = useState<number | null>(null);
+  const [pasteImageUrl, setPasteImageUrl] = useState("");
+
+  // Feature 6: Tone Slider
+  const [toneLevel, setToneLevel] = useState<Record<number, number>>({});
+  const toneDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [regenerating, setRegenerating] = useState(false);
   const [formPayload, setFormPayload] = useState<FormPayload>({});
   const [platform, setPlatform] = useState<string>("");
@@ -654,6 +676,28 @@ export default function CalendarDetail() {
   async function saveEdit() {
     if (!draft || !id) return;
     setSaving(true);
+
+    // Feature 5: Track edit history per field before saving
+    const currentPost = posts[active];
+    const day = currentPost.day;
+    const newHistory = { ...fieldHistory };
+    if (!newHistory[day]) newHistory[day] = {};
+
+    const fieldsToTrack = ["title", "hook", "body", "cta", "hashtags", "rationale", "image_prompt"] as const;
+    let changed = false;
+    fieldsToTrack.forEach(f => {
+      const oldVal = currentPost[f] || "";
+      const newVal = draft[f] || "";
+      if (oldVal !== newVal) {
+        if (!newHistory[day][f]) newHistory[day][f] = [];
+        newHistory[day][f].push(String(oldVal));
+        changed = true;
+      }
+    });
+    if (changed) {
+      setFieldHistory(newHistory);
+    }
+
     const updated = posts.map((p, i) => i === active ? draft : p);
     try {
       await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
@@ -666,6 +710,47 @@ export default function CalendarDetail() {
     setEditing(false);
     setDraft(null);
     toast.success("Post updated");
+  }
+
+  const undoField = useCallback((field: string) => {
+    if (!draft) return;
+    const day = draft.day;
+    const stack = fieldHistory[day]?.[field];
+    if (!stack || stack.length === 0) return;
+    const nextStack = [...stack];
+    const poppedValue = nextStack.pop()!;
+    
+    setDraft(prev => prev ? { ...prev, [field]: poppedValue } : null);
+    
+    setFieldHistory(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [field]: nextStack
+      }
+    }));
+    toast.success(`Restored last version of ${field} ✓`);
+  }, [draft, fieldHistory]);
+
+  async function applyImageToPost(day: number, imageUrl: string) {
+    const updated = posts.map(p => {
+      if (p.day === day) {
+        return {
+          ...p,
+          image_url: imageUrl || undefined,
+        };
+      }
+      return p;
+    });
+    setPosts(updated);
+    if (id) {
+      try {
+        await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
+        toast.success(imageUrl ? "Image URL applied ✓" : "Image removed ✓");
+      } catch (e) {
+        toast.error("Failed to save updated visual to cloud");
+      }
+    }
   }
 
   async function selectHookVariant(day: number, variant: string) {
@@ -800,6 +885,11 @@ export default function CalendarDetail() {
       setRegenerating(false);
     }
   }
+
+  const handleToneShift = useCallback((level: number) => {
+    const toneLabel = level === 1 ? "very-formal" : level === 2 ? "formal" : level === 4 ? "casual" : "very-casual";
+    void regenerateDay(`tone-${toneLabel}` as any);
+  }, [regenerateDay]);
 
   async function repurposeTo(targetPlatform: string) {
     const log = createScopedLogger('CalendarDetail-Repurpose');
@@ -1560,28 +1650,58 @@ export default function CalendarDetail() {
         </div>
 
         {posts.length > 1 && (
-          <div className="cd-strip" role="tablist" aria-label="Days of the week">
-            {posts.map((post, i) => {
-              const st = statusByDay[post.day];
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  role="tab"
-                  aria-selected={i === active}
-                  disabled={editing}
-                  className={`cd-tab ${i === active ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
-                  onClick={() => { if (!editing) setActive(i); }}
-                  title={st ? `Status: ${st}` : "Not scheduled"}
-                >
-                  {st && <span className={`cd-tab-status ${st}`} aria-hidden="true" style={{ background: st === "published" ? "#c8f09a" : st === "approved" ? "#9ab5f0" : st === "failed" ? "#f09a9a" : "#9a9aae" }} />}
-                  <div className="cd-tab-dow">{post.dow}</div>
-                  <div className="cd-tab-n">{i + 1}</div>
-                  <div className="cd-tab-date">{shortDateLabel(dateForDow(weekStartDate, post.dow)).split(" · ")[1]}</div>
-                </button>
-              );
-            })}
-          </div>
+          <>
+            <WeekBalanceScore posts={posts} />
+            <div className="cd-strip" role="tablist" aria-label="Days of the week" style={{ height: "auto", minHeight: "68px" }}>
+              {posts.map((post, i) => {
+                const st = statusByDay[post.day];
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === active}
+                    disabled={editing}
+                    className={`cd-tab ${i === active ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
+                    onClick={() => { if (!editing) setActive(i); }}
+                    title={st ? `Status: ${st}` : "Not scheduled"}
+                    style={{ paddingBottom: 6 }}
+                  >
+                    {st && <span className={`cd-tab-status ${st}`} aria-hidden="true" style={{ background: st === "published" ? "#c8f09a" : st === "approved" ? "#9ab5f0" : st === "failed" ? "#f09a9a" : "#9a9aae" }} />}
+                    <div className="cd-tab-dow">{post.dow}</div>
+                    <div className="cd-tab-n">{i + 1}</div>
+                    <div className="cd-tab-date">{shortDateLabel(dateForDow(weekStartDate, post.dow)).split(" · ")[1]}</div>
+                    {/* Engagement prediction badge */}
+                    {(() => {
+                      const engagementLevel = getEngagementPrediction(post, platform);
+                      const badge = ENGAGEMENT_BADGE[engagementLevel];
+                      return (
+                        <div
+                          title={`Predicted engagement: ${engagementLevel}`}
+                          style={{
+                            marginTop: 4,
+                            fontSize: 9,
+                            fontWeight: 600,
+                            letterSpacing: ".04em",
+                            color: badge.color,
+                            background: badge.bg,
+                            borderRadius: 99,
+                            padding: "1px 4px",
+                            lineHeight: 1.4,
+                            display: "inline-block",
+                            transition: "opacity .2s",
+                            opacity: i === active ? 1 : 0.7,
+                          }}
+                        >
+                          {badge.emoji} {engagementLevel}
+                        </div>
+                      );
+                    })()}
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
 
         <div className="cd-export-row" aria-label="Export options">
@@ -1710,6 +1830,39 @@ export default function CalendarDetail() {
                   </select>
                 )}
               </div>
+
+              {/* ── Tone Slider (Feature 6) ─────────────────────────────────── */}
+              <div style={{ marginTop: 14, padding: "12px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--text2)", fontWeight: 500 }}>Tone</span>
+                  <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 500 }}>
+                    {(toneLevel[p.day] ?? 3) === 1 ? "Very Formal" : (toneLevel[p.day] ?? 3) === 2 ? "Formal" : (toneLevel[p.day] ?? 3) === 3 ? "Balanced" : (toneLevel[p.day] ?? 3) === 4 ? "Casual" : "Very Casual"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: "var(--text3)" }}>Formal</span>
+                  <input
+                    type="range" min="1" max="5" step="1"
+                    disabled={regenerating}
+                    value={toneLevel[p.day] ?? 3}
+                    onChange={e => {
+                      const v = Number(e.target.value);
+                      setToneLevel(prev => ({ ...prev, [p.day]: v }));
+                      if (toneDebounce.current) clearTimeout(toneDebounce.current);
+                      toneDebounce.current = setTimeout(() => {
+                        if (v !== 3) {
+                          const toneLabel = v === 1 ? "very-formal" : v === 2 ? "formal" : v === 4 ? "casual" : "very-casual";
+                          void regenerateDay(`tone-${toneLabel}` as any);
+                        }
+                      }, 700);
+                    }}
+                    style={{ flex: 1, accentColor: "var(--accent)", cursor: regenerating ? "not-allowed" : "pointer" }}
+                  />
+                  <span style={{ fontSize: 10, color: "var(--text3)" }}>Casual</span>
+                </div>
+                <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 5, fontStyle: "italic" }}>Adjusts register only — content and structure stay the same</div>
+              </div>
+
               <div className="cd-blabel"><span>Hashtags</span><span className="cd-blabel-count">click a tag to lock, ban, or replace</span></div>
               <div className="cd-tags-row">
                 {(() => {
@@ -1766,8 +1919,28 @@ export default function CalendarDetail() {
               <div className="cd-blabel"><span>Cinematic image prompt</span></div>
               <div className="cd-body" style={{ whiteSpace: "pre-wrap" }}>{p.image_prompt || "No image prompt generated yet."}</div>
               {p.image_url && (
-                <div className="cd-image-preview">
-                  <img src={p.image_url} alt={`Generated visual for day ${p.day}`} />
+                <div 
+                  className="cd-image-preview" 
+                  style={{ 
+                    aspectRatio: cssAspectRatioForPlatform(platform),
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    overflow: "hidden",
+                    borderRadius: 10,
+                    border: "1px solid var(--border)",
+                    backgroundColor: "rgba(0,0,0,0.2)"
+                  }}
+                >
+                  <img 
+                    src={p.image_url} 
+                    alt={`Generated visual for day ${p.day}`} 
+                    style={{ 
+                      width: "100%", 
+                      height: "100%", 
+                      objectFit: "cover" 
+                    }} 
+                  />
                 </div>
               )}
               <div className="cd-actions" style={{ marginTop: 10 }}>
@@ -1779,18 +1952,105 @@ export default function CalendarDetail() {
                 >
                   {imageGeneratingDay === p.day ? "Generating visual..." : p.image_url ? "Regenerate visual" : "Generate visual"}
                 </button>
+                <button
+                  type="button"
+                  className="cd-btn"
+                  onClick={() => {
+                    setPasteImageOpenDay(pasteImageOpenDay === p.day ? null : p.day);
+                    setPasteImageUrl(p.image_url || "");
+                  }}
+                  title="Paste your own image URL"
+                >
+                  🔗 Paste URL
+                </button>
                 {p.image_url && (
-                  <button
-                    className="cd-btn"
-                    onClick={async () => {
-                      const ok = await writeToClipboard(p.image_url || "");
-                      if (ok) toast.success("Image URL copied");
-                    }}
-                  >
-                    Copy image URL
-                  </button>
+                  <>
+                    <button
+                      className="cd-btn"
+                      onClick={async () => {
+                        const ok = await writeToClipboard(p.image_url || "");
+                        if (ok) toast.success("Image URL copied");
+                      }}
+                    >
+                      Copy image URL
+                    </button>
+                    <button
+                      className="cd-btn"
+                      style={{ borderColor: "rgba(240,154,154,0.3)", color: "#f09a9a" }}
+                      onClick={() => {
+                        if (confirm("Are you sure you want to remove this visual?")) {
+                          applyImageToPost(p.day, "");
+                        }
+                      }}
+                    >
+                      Remove visual
+                    </button>
+                  </>
                 )}
               </div>
+
+              {/* ── Collapsible Image URL Paste (Feature 2) ────────────────── */}
+              {pasteImageOpenDay === p.day && (
+                <div style={{ marginTop: 10, padding: "12px 14px", background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(200,240,154,0.2)", borderRadius: 10 }}>
+                  <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--text2)", fontWeight: 500, marginBottom: 8 }}>Paste Your Own Image URL</div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      type="url"
+                      value={pasteImageUrl}
+                      onChange={e => setPasteImageUrl(e.target.value)}
+                      placeholder="https://your-image-url.com/image.jpg"
+                      style={{
+                        flex: 1, background: "var(--bg)", border: "1px solid var(--border2)",
+                        borderRadius: 6, padding: "7px 10px", fontSize: 12, color: "var(--text)",
+                        fontFamily: "var(--font-body)", outline: "none",
+                      }}
+                      onKeyDown={async e => {
+                        if (e.key === "Enter" && pasteImageUrl.startsWith("http")) {
+                          await applyImageToPost(p.day, pasteImageUrl);
+                          setPasteImageOpenDay(null);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="cd-btn cd-btn-p"
+                      style={{ padding: "5px 12px", fontSize: 11 }}
+                      disabled={!pasteImageUrl.startsWith("http")}
+                      onClick={async () => {
+                        if (pasteImageUrl.startsWith("http")) {
+                          await applyImageToPost(p.day, pasteImageUrl);
+                          setPasteImageOpenDay(null);
+                        }
+                      }}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  {pasteImageUrl.startsWith("http") && (
+                    <div 
+                      style={{ 
+                        marginTop: 10, 
+                        borderRadius: 8, 
+                        overflow: "hidden", 
+                        border: "1px solid var(--border)",
+                        aspectRatio: cssAspectRatioForPlatform(platform),
+                        backgroundColor: "rgba(0,0,0,0.2)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}
+                    >
+                      <img
+                        src={pasteImageUrl}
+                        alt="Preview"
+                        style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }}
+                        onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                    </div>
+                  )}
+                  <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 6, fontStyle: "italic" }}>Paste a direct image URL (JPG, PNG, WebP). Press Enter or click Apply.</div>
+                </div>
+              )}
               <div className="cd-actions">
                 {(() => {
                   const f = formatForPlatform(p, platform);
@@ -1956,20 +2216,36 @@ export default function CalendarDetail() {
                 </select>
               </div>
 
-              <div className="cd-blabel"><span>Topic</span></div>
+              <div className="cd-blabel">
+                <span>Topic</span>
+                {fieldHistory[draft.day]?.["topic"]?.length > 0 && (
+                  <button type="button" onClick={() => undoField("topic")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                )}
+              </div>
               <input className="cd-edit-input" style={{ fontFamily: "var(--font-body)", fontSize: 13 }} value={draft.topic} onChange={e => setDraft({ ...draft, topic: e.target.value })} />
 
-              <div className="cd-blabel"><span>Format</span></div>
+              <div className="cd-blabel">
+                <span>Format</span>
+                {fieldHistory[draft.day]?.["format"]?.length > 0 && (
+                  <button type="button" onClick={() => undoField("format")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                )}
+              </div>
               <input className="cd-edit-input" style={{ fontFamily: "var(--font-body)", fontSize: 13 }} value={draft.format} onChange={e => setDraft({ ...draft, format: e.target.value })} />
 
               <div className="cd-blabel">
                 <span>Title</span>
+                {fieldHistory[draft.day]?.["title"]?.length > 0 && (
+                  <button type="button" onClick={() => undoField("title")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                )}
                 <span className="cd-blabel-count">{titleChars} chars</span>
               </div>
               <input className="cd-edit-input" value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} />
 
               <div className="cd-blabel">
                 <span>Hook</span>
+                {fieldHistory[draft.day]?.["hook"]?.length > 0 && (
+                  <button type="button" onClick={() => undoField("hook")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                )}
                 <span className="cd-blabel-count">{hookWords} words</span>
               </div>
               <textarea
@@ -1982,6 +2258,9 @@ export default function CalendarDetail() {
 
               <div className="cd-blabel">
                 <span>Post body</span>
+                {fieldHistory[draft.day]?.["body"]?.length > 0 && (
+                  <button type="button" onClick={() => undoField("body")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                )}
                 <span className="cd-blabel-count">{bodyWords} words · {targetHint}</span>
               </div>
               <textarea
@@ -2010,6 +2289,9 @@ export default function CalendarDetail() {
 
               <div className="cd-blabel">
                 <span>CTA</span>
+                {fieldHistory[draft.day]?.["cta"]?.length > 0 && (
+                  <button type="button" onClick={() => undoField("cta")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                )}
                 <span className="cd-blabel-count">{ctaChars} chars</span>
               </div>
               <textarea
@@ -2020,13 +2302,28 @@ export default function CalendarDetail() {
                 onSelect={e => rememberInlineSelection("cta", e.currentTarget)}
               />
 
-              <div className="cd-blabel"><span>Hashtags</span></div>
-              <textarea className="cd-edit-area" rows={2} value={draft.hashtags} onChange={e => setDraft({ ...draft, hashtags: e.target.value })} />
+              <div className="cd-blabel">
+                <span>Hashtags</span>
+                {fieldHistory[draft.day]?.["hashtags"]?.length > 0 && (
+                  <button type="button" onClick={() => undoField("hashtags")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                )}
+              </div>
+              <HashtagChipEditor hashtags={draft.hashtags} platform={platform} onChange={newTags => setDraft({ ...draft, hashtags: newTags })} />
 
-              <div className="cd-blabel"><span>Why this works (rationale)</span></div>
+              <div className="cd-blabel">
+                <span>Why this works (rationale)</span>
+                {fieldHistory[draft.day]?.["rationale"]?.length > 0 && (
+                  <button type="button" onClick={() => undoField("rationale")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                )}
+              </div>
               <textarea className="cd-edit-area" rows={3} value={draft.rationale} onChange={e => setDraft({ ...draft, rationale: e.target.value })} />
 
-              <div className="cd-blabel"><span>Cinematic image prompt</span></div>
+              <div className="cd-blabel">
+                <span>Cinematic image prompt</span>
+                {fieldHistory[draft.day]?.["image_prompt"]?.length > 0 && (
+                  <button type="button" onClick={() => undoField("image_prompt")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                )}
+              </div>
               <textarea className="cd-edit-area" rows={8} value={draft.image_prompt || ""} onChange={e => setDraft({ ...draft, image_prompt: e.target.value })} />
 
               <div className="cd-actions">

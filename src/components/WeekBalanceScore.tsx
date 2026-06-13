@@ -8,6 +8,7 @@ interface WeekBalanceScoreProps {
 interface BalanceWarning {
   type: "consecutive_format" | "repeated_topic" | "poor_distribution" | "all_same_format";
   message: string;
+  suggestion?: string;
 }
 
 interface BalanceResult {
@@ -28,10 +29,18 @@ function computeWeekBalance(posts: Post[]): BalanceResult {
   const formats = posts.map(p => (p.format || "").toLowerCase());
   const uniqueFormats = new Set(formats);
   if (uniqueFormats.size === 1 && posts.length >= 3) {
-    warnings.push({ type: "all_same_format", message: `All ${posts.length} posts use the same format (${formats[0]}). Mix in lists, stories, or tips for variety.` });
+    warnings.push({
+      type: "all_same_format",
+      message: `All ${posts.length} posts use the same format (${posts[0].format || formats[0]}). Mix in lists, stories, or tips for variety.`,
+      suggestion: "💡 Try changing one of the posts to a 'Case Study' or 'How-to Guide' to add format variety."
+    });
     deductions += 25;
   } else if (uniqueFormats.size <= 2 && posts.length >= 5) {
-    warnings.push({ type: "all_same_format", message: "Low format variety — try mixing opinion posts, how-tos, and list formats." });
+    warnings.push({
+      type: "all_same_format",
+      message: "Low format variety — try mixing opinion posts, how-tos, and list formats.",
+      suggestion: "💡 Introduce a 'Behind-the-scenes' or 'Myth-busting' format for one of the days."
+    });
     deductions += 12;
   }
 
@@ -42,7 +51,11 @@ function computeWeekBalance(posts: Post[]): BalanceResult {
     else cur = 1;
   }
   if (maxConsec >= 3) {
-    warnings.push({ type: "consecutive_format", message: `${maxConsec} consecutive posts share the same format. Stagger different styles.` });
+    warnings.push({
+      type: "consecutive_format",
+      message: `${maxConsec} consecutive posts share the same format. Stagger different styles.`,
+      suggestion: "💡 Alternate between text-heavy narratives and punchy list breakdowns to keep readers engaged."
+    });
     deductions += maxConsec >= 4 ? 20 : 10;
   }
 
@@ -53,7 +66,11 @@ function computeWeekBalance(posts: Post[]): BalanceResult {
   const repeated = Object.entries(topicCounts).filter(([, c]) => c > 1);
   if (repeated.length > 0) {
     const repeatedNames = repeated.map(([t]) => t).join(", ");
-    warnings.push({ type: "repeated_topic", message: `Repeated topics: "${repeatedNames}". Each day should ideally cover a distinct angle.` });
+    warnings.push({
+      type: "repeated_topic",
+      message: `Repeated topics: "${repeatedNames}". Each day should ideally cover a distinct angle.`,
+      suggestion: `💡 Focus on different sub-niches. For example, instead of repeating "${repeated[0]?.[0]}", cover a case study or specific execution tools for it.`
+    });
     deductions += repeated.reduce((acc, [, c]) => acc + (c - 1) * 8, 0);
   }
 
@@ -61,7 +78,11 @@ function computeWeekBalance(posts: Post[]): BalanceResult {
   const ctas = posts.map(p => (p.cta || "").toLowerCase().slice(0, 30));
   const uniqueCtas = new Set(ctas);
   if (uniqueCtas.size <= 1 && posts.length >= 3) {
-    warnings.push({ type: "poor_distribution", message: "CTAs look similar across posts — vary your calls-to-action for better engagement spread." });
+    warnings.push({
+      type: "poor_distribution",
+      message: "CTAs look similar across posts — vary your calls-to-action for better engagement spread.",
+      suggestion: "💡 Use 'Ask a question' to boost comments on one day, and 'Link to resource' to drive clicks on another."
+    });
     deductions += 10;
   }
 
@@ -123,7 +144,7 @@ export const WeekBalanceScore: React.FC<WeekBalanceScoreProps> = ({ posts }) => 
         </div>
       </div>
       {expanded && balance.warnings.length > 0 && (
-        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }} onClick={(e) => e.stopPropagation()}>
           {balance.warnings.map((w, i) => (
             <div
               key={i}
@@ -133,7 +154,12 @@ export const WeekBalanceScore: React.FC<WeekBalanceScoreProps> = ({ posts }) => 
                 border: "1px solid var(--border)", lineHeight: 1.5,
               }}
             >
-              ⚠️ {w.message}
+              <div>⚠️ {w.message}</div>
+              {w.suggestion && (
+                <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px dashed rgba(255,255,255,0.08)", color: "var(--accent)" }}>
+                  {w.suggestion}
+                </div>
+              )}
             </div>
           ))}
         </div>

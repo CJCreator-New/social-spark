@@ -2,13 +2,23 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const getSupabaseConfig = () => {
+  if (typeof window !== "undefined") {
+    const customUrl = localStorage.getItem("contentforge_custom_supabase_url");
+    const customKey = localStorage.getItem("contentforge_custom_supabase_anon_key");
+    if (customUrl && customKey) {
+      return { url: customUrl, key: customKey };
+    }
+  }
+  return {
+    url: import.meta.env.VITE_SUPABASE_URL || "",
+    key: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "",
+  };
+};
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
+const config = getSupabaseConfig();
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(config.url, config.key, {
   auth: {
     storage: localStorage,
     persistSession: true,

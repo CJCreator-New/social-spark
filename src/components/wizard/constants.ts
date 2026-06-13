@@ -35,6 +35,7 @@ export interface WizardForm {
   style: string;
   goals: string[];
   topics: string[];
+  postType: string;
   format: string;
   cta: string;
   copyStyle: string;
@@ -110,6 +111,14 @@ export const PLATFORM_OPTIONS = [
   { id: "Blog", label: "Blog / SEO", hint: "Long-form articles" },
 ];
 
+export const POST_TYPE_OPTIONS = [
+  { id: "text", label: "Text post", hint: "Standard feed post" },
+  { id: "carousel", label: "Carousel", hint: "Slide-by-slide script" },
+  { id: "thread", label: "Thread", hint: "Numbered thread" },
+  { id: "poll", label: "Poll", hint: "Question + 4 options" },
+  { id: "newsletter", label: "Newsletter", hint: "Email section" },
+];
+
 export const AUDIENCE_PRESETS: Record<string, string[]> = {
   tech: ["Developers & engineers", "Product managers", "CTOs & tech leads", "Tech founders", "Non-technical stakeholders", "Design professionals", "Data scientists", "DevRel professionals"],
   health: ["Fitness enthusiasts", "Healthcare professionals", "Wellness coaches", "Patients & caregivers", "Nutritionists", "Health founders", "General public", "Corporate wellness teams"],
@@ -179,6 +188,7 @@ export const INITIAL_FORM: WizardForm = {
   style: "",
   goals: ["Awareness", "Engagement"],
   topics: [],
+  postType: "text",
   format: "Balanced mix",
   cta: "Share & repost bait",
   copyStyle: "Keep plain text (recommended)",

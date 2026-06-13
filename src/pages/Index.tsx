@@ -55,6 +55,7 @@ import {
   AUDIENCE_PRESETS,
   VOICE_OPTIONS,
   STYLE_OPTIONS,
+  POST_TYPE_OPTIONS,
   FORMAT_OPTIONS,
   CTA_OPTIONS,
   COPY_STYLE_OPTIONS,
@@ -1153,6 +1154,7 @@ const Index = () => {
         voice: form.voice,
         style: form.style,
         goals: form.goals,
+        postType: form.postType,
         format: form.format,
         cta: form.cta,
         length: form.length,
@@ -1298,7 +1300,7 @@ const Index = () => {
 
   async function regenerateDay(
     idx: number,
-    tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting" | "enhance",
+    tweak?: "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting" | "enhance" | string,
     focusMetric?: PerformanceFocusMetric,
     guidance?: string
   ) {
@@ -1336,6 +1338,7 @@ const Index = () => {
             voice: form.voice,
             style: form.style,
             goals: form.goals,
+            postType: form.postType,
             format: form.format,
             cta: form.cta,
             length: form.length,
@@ -2306,6 +2309,26 @@ const Index = () => {
                   </div>
                 </div>
               )}
+
+              {/* NEW: Post Type grid */}
+              <div className="csect">
+                <div className="flabel" id="cf-posttype-label">Post type</div>
+                <div className="plat-grid" role="radiogroup" aria-labelledby="cf-posttype-label" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
+                  {POST_TYPE_OPTIONS.map(pt => (
+                    <button
+                      key={pt.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.postType === pt.id}
+                      className={`plat-card ${form.postType === pt.id ? "on" : ""}`}
+                      onClick={() => upd("postType", pt.id)}
+                    >
+                      <div className="plat-name">{pt.label}</div>
+                      <div className="plat-hint">{pt.hint}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* COLLAPSIBLE ADVANCED FORMATTING & KEYWORDS PANEL */}
               <div className="accordion-panel">

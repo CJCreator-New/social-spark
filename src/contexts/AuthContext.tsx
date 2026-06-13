@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { getE2EAuthFlag, E2E_USER_EMAIL, E2E_USER_ID } from "@/lib/e2eFixtures";
@@ -16,6 +17,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const e2eEnabled = import.meta.env.DEV && window.localStorage.getItem(getE2EAuthFlag()) === "true";
@@ -45,7 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Set up listener FIRST
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "PASSWORD_RECOVERY") {
+        navigate("/reset-password", { replace: true });
+      }
       setSession(s);
       setUser(s?.user ?? null);
       setLoading(false);
@@ -57,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const signOut = async () => {
     if (import.meta.env.DEV && window.localStorage.getItem(getE2EAuthFlag()) === "true") {

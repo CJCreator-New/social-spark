@@ -14,6 +14,7 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({ industry, plat
   const staticUpdated = getTrendingTopicsLastUpdated();
 
   const [customTrends, setCustomTrends] = useState<any[] | null>(null);
+  const [reviewingTopic, setReviewingTopic] = useState<any | null>(null);
   const generateTrendsMutation = useGenerateTrendsMutation();
 
   const loadAiTrending = async () => {
@@ -75,7 +76,7 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({ industry, plat
           <button
             key={i}
             className="insp-topic"
-            onClick={() => onTopicClick(t.topic)}
+            onClick={() => setReviewingTopic(t)}
             title={`${t.posts} posts this week`}
           >
             <div className="insp-topic-main">
@@ -93,6 +94,82 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({ industry, plat
       <div className="insp-hint">
         ✨ Click any topic to add it to your week. Mix trending topics for maximum reach.
       </div>
+
+      {reviewingTopic && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.75)",
+          backdropFilter: "blur(4px)",
+          zIndex: 1100,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 20
+        }}>
+          <div style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 12,
+            padding: 20,
+            maxWidth: 400,
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
+            color: "var(--text)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", fontWeight: 600 }}>
+                Trending Topic Review
+              </span>
+              {reviewingTopic.trending && <span style={{ fontSize: 12 }}>🔥 Live Trend</span>}
+            </div>
+
+            <div>
+              <h4 style={{ margin: "2px 0 4px 0", fontSize: 18, fontWeight: 500, color: "var(--text)" }}>
+                {reviewingTopic.topic}
+              </h4>
+              <div style={{ fontSize: 11, color: "var(--text3)" }}>
+                Category: <span style={{ color: "var(--text2)" }}>{reviewingTopic.category}</span>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 12, color: "var(--text2)", lineHeight: 1.5, display: "flex", flexDirection: "column", gap: 10 }}>
+              <div>
+                <strong>Weekly Volume:</strong> {(reviewingTopic.posts / 100).toFixed(0)}k posts this week
+              </div>
+              <div style={{ padding: 12, background: "rgba(255, 255, 255, 0.02)", borderRadius: 8, border: "1px solid var(--border)", fontSize: 11, color: "var(--text2)" }}>
+                💡 This topic is currently seeing a surge in engagement on {platform || "your selected platform"} among professionals in the {industry} space. Adding this topic will optimize your posts for current feed algorithms.
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+              <button
+                type="button"
+                className="cpbtn"
+                onClick={() => setReviewingTopic(null)}
+                style={{ fontSize: 11, padding: "5px 12px" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="cpbtn done"
+                onClick={() => {
+                  onTopicClick(reviewingTopic.topic);
+                  setReviewingTopic(null);
+                  toast.success(`Added "${reviewingTopic.topic}" to selection ✓`);
+                }}
+                style={{ fontSize: 11, padding: "5px 12px" }}
+              >
+                Confirm & Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
