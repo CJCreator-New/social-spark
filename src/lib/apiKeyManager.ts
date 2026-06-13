@@ -50,26 +50,22 @@ export async function saveUserApiKey(apiKey: string, provider: 'openai' | 'anthr
     return;
   }
 
-  try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/encrypt-api-key`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ apiKey, provider }),
-    });
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/encrypt-api-key`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ apiKey, provider }),
+  });
 
-    if (!res.ok) {
-      if (res.status === 404) {
-        throw new Error("Edge function 'encrypt-api-key' not found (404)");
-      }
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data?.error || `Failed to save API key (${res.status})`);
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error("Edge function 'encrypt-api-key' not found (404)");
     }
-  } catch (err) {
-    throw err;
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.error || `Failed to save API key (${res.status})`);
   }
 }
 
@@ -213,30 +209,26 @@ export async function setUseOwnKey(enabled: boolean, keyMode: 'fallback' | 'alwa
     return;
   }
 
-  try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/encrypt-api-key`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        action: "toggle",
-        useOwnKey: enabled,
-        keyMode,
-      }),
-    });
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/encrypt-api-key`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      action: "toggle",
+      useOwnKey: enabled,
+      keyMode,
+    }),
+  });
 
-    if (!res.ok) {
-      if (res.status === 404) {
-        throw new Error("Edge function 'encrypt-api-key' not found (404) for toggle");
-      }
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data?.error || `Failed to update settings (${res.status})`);
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error("Edge function 'encrypt-api-key' not found (404) for toggle");
     }
-  } catch (err) {
-    throw err;
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.error || `Failed to update settings (${res.status})`);
   }
 }
 
@@ -259,24 +251,20 @@ export async function deleteUserApiKey(): Promise<void> {
     return;
   }
 
-  try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-api-key`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${token}`,
-      },
-    });
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-api-key`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-    if (!res.ok) {
-      if (res.status === 404) {
-        throw new Error("Edge function 'delete-api-key' not found (404)");
-      }
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data?.error || `Failed to delete API key (${res.status})`);
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error("Edge function 'delete-api-key' not found (404)");
     }
-  } catch (err) {
-    throw err;
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.error || `Failed to delete API key (${res.status})`);
   }
 }
