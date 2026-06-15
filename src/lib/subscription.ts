@@ -47,25 +47,52 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return FREE_STATUS;
 
+  const settings = (supabase.from as unknown as (t: string) => ReturnType<typeof supabase.from>)("user_settings");
+
+  type Row = { tier?: string; plan_period_end?: string | null; generation_count?: number; quota_limit?: number } | null;
+
   try {
-    const { data, error } = await (supabase.from as unknown as (t: string) => ReturnType<typeof supabase.from>)("user_settings")
+    const { data, error } = await settings
       .select("tier, plan_period_end, generation_count, quota_limit")
       .maybeSingle();
     if (error) throw error;
-    const row = data as unknown as {
-      tier?: string;
-      plan_period_end?: string | null;
-      generation_count?: number;
-      quota_limit?: number;
-    } | null;
+    const row = data as unknown as Row;
     if (!row) return FREE_STATUS;
 
     const tier = (row.tier === "starter" || row.tier === "pro") ? row.tier : "free";
     return computeStatus(tier, row.plan_period_end ?? null, row.generation_count ?? 0, row.quota_limit ?? 10);
   } catch (err) {
+    // Schema may predate the tier migration (PostgREST 404 on unknown columns).
+    // Degrade gracefully: read only the always-present quota columns and treat
+    // the user as Free. This keeps the app working if the frontend is deployed
+    // ahead of the 20260616 migration.
+    if (isMissingColumnError(err)) {
+      try {
+        const { data } = await settings
+          .select("generation_count, quota_limit")
+          .maybeSingle();
+        const row = data as unknown as Row;
+        return computeStatus("free", null, row?.generation_count ?? 0, row?.quota_limit ?? 10);
+      } catch {
+        return FREE_STATUS;
+      }
+    }
     console.warn("getSubscriptionStatus failed:", err);
     return FREE_STATUS;
   }
+}
+
+/** Detects a PostgREST "column does not exist" / 404-style error. */
+function isMissingColumnError(err: unknown): boolean {
+  const e = err as { code?: string; status?: number; message?: string } | null;
+  if (!e) return false;
+  // 42703 = undefined_column; PGRST204/PGRST116 cover schema-cache misses.
+  return (
+    e.code === "42703" ||
+    e.code === "PGRST204" ||
+    e.status === 404 ||
+    (typeof e.message === "string" && /column .* does not exist|tier|plan_period_end/i.test(e.message))
+  );
 }
 
 function computeStatus(tier: Tier, planPeriodEnd: string | null, used: number, limit: number): SubscriptionStatus {
