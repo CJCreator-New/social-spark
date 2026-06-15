@@ -1277,10 +1277,10 @@ const Index = () => {
       const reason = (ac.signal as AbortSignal & { reason?: unknown }).reason;
       if (!aborted) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes("free generations")) {
+        if (msg.includes("generations") && (msg.includes("Upgrade") || msg.includes("Add your own API key"))) {
           toast.warning(msg, {
             duration: 8000,
-            action: { label: "Add API key", onClick: () => navigate("/profile") },
+            action: { label: "See plans", onClick: () => navigate("/profile?tab=plan") },
           });
         }
         localFallback(msg);
@@ -1372,7 +1372,15 @@ const Index = () => {
               okCount++;
             }
           } catch (e) {
-            // ignore per-item failures
+            const msg = e instanceof Error ? e.message : String(e);
+            if (msg.includes("generations") && (msg.includes("Upgrade") || msg.includes("Add your own API key"))) {
+              toast.warning(msg, {
+                duration: 8000,
+                action: { label: "See plans", onClick: () => navigate("/profile?tab=plan") },
+              });
+              break;
+            }
+            // ignore other per-item failures
           }
         }
         setSavedId(null);
@@ -1486,7 +1494,15 @@ const Index = () => {
               okCount++;
             }
           } catch (e) {
-            // ignore per-item failures
+            const msg = e instanceof Error ? e.message : String(e);
+            if (msg.includes("generations") && (msg.includes("Upgrade") || msg.includes("Add your own API key"))) {
+              toast.warning(msg, {
+                duration: 8000,
+                action: { label: "See plans", onClick: () => navigate("/profile?tab=plan") },
+              });
+              break;
+            }
+            // ignore other per-item failures
           }
         }
         setSavedId(null);

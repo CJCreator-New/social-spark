@@ -527,6 +527,18 @@ function rejectFreeTierByok(
   return null;
 }
 
+/**
+ * Message shown when a user has exhausted their generation quota. Tailored by
+ * effective tier: free users are pointed at upgrading (BYOK is paid-only), while
+ * starter/pro users are pointed at adding their own key or renewing their plan.
+ */
+function quotaExceededMessage(tier: EffectiveTier): string {
+  if (tier === "free") {
+    return "You've used all your free generations. Upgrade to Starter or Pro for more — Starter also unlocks adding your own API key for unlimited generations.";
+  }
+  return "You've used your plan's generations for this period. Add your own API key (Settings > API Keys, 'Always use my key') to keep generating, or renew your plan for a fresh quota.";
+}
+
 async function incrementGenerationCount(userId: string): Promise<void> {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");

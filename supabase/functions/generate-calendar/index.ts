@@ -29,6 +29,7 @@ import {
   checkQuota,
   incrementGenerationCount,
   rejectFreeTierByok,
+  quotaExceededMessage,
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
@@ -78,7 +79,7 @@ Deno.serve(async (req: Request) => {
     if (usingSharedKey && !quota.allowed) {
       return jsonResponse({
         error: "QUOTA_EXCEEDED",
-        message: "You've used your free generations for now — more are coming soon! Add your own API key (Settings > API Keys, 'Always use my key') to keep generating in the meantime.",
+        message: quotaExceededMessage(quota.tier),
         quota: { used: quota.used, limit: quota.limit },
       }, 402);
     }

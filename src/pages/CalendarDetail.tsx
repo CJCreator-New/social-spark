@@ -496,7 +496,10 @@ export default function CalendarDetail() {
         });
         const data = await res.json().catch(() => ({}));
         if (res.status === 402 || data?.error === "QUOTA_EXCEEDED" || data?.error === "UPGRADE_REQUIRED") {
-          toast.error(data?.message || "You've reached your generation limit. Upgrade to continue.");
+          toast.error(data?.message || "You've reached your generation limit. Upgrade to continue.", {
+            duration: 8000,
+            action: { label: "See plans", onClick: () => navigate("/profile?tab=plan") },
+          });
           return;
         }
         if (res.ok && data?.post) next[i] = data.post;
