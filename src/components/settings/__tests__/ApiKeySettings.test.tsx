@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -10,12 +11,14 @@ const mockSaveUserApiKey = vi.fn();
 const mockGetUserApiKey = vi.fn();
 const mockSetUseOwnKey = vi.fn();
 const mockDeleteUserApiKey = vi.fn();
+const mockGetQuotaStatus = vi.fn();
 
 vi.mock("@/lib/apiKeyManager", () => ({
   saveUserApiKey: (...args: unknown[]) => mockSaveUserApiKey(...args),
   getUserApiKey: (...args: unknown[]) => mockGetUserApiKey(...args),
   setUseOwnKey: (...args: unknown[]) => mockSetUseOwnKey(...args),
   deleteUserApiKey: (...args: unknown[]) => mockDeleteUserApiKey(...args),
+  getQuotaStatus: (...args: unknown[]) => mockGetQuotaStatus(...args),
 }));
 
 // Mock sonner toast
@@ -24,6 +27,18 @@ vi.mock("sonner", () => ({
     success: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+// Mock useSubscription — default to an entitled user so the key form renders.
+const mockUseSubscription = vi.fn(() => ({ canUseOwnKey: true, loading: false }));
+vi.mock("@/hooks/useSubscription", () => ({
+  useSubscription: () => mockUseSubscription(),
+}));
+
+// Mock react-router-dom Link (component is rendered outside a Router here).
+vi.mock("react-router-dom", () => ({
+  Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) =>
+    React.createElement("a", { href: to, ...props }, children),
 }));
 
 type ResolvedKeyState = { apiKey: string | null; provider: string | null; useOwnKey: boolean };
@@ -53,6 +68,9 @@ beforeEach(() => {
   mockSaveUserApiKey.mockResolvedValue(undefined);
   mockSetUseOwnKey.mockResolvedValue(undefined);
   mockDeleteUserApiKey.mockResolvedValue(undefined);
+  mockGetQuotaStatus.mockResolvedValue({ used: 0, limit: 10, useOwnKey: false, keyMode: "fallback" });
+  // Default: entitled user so the key form renders.
+  mockUseSubscription.mockReturnValue({ canUseOwnKey: true, loading: false });
 });
 
 // ---------------------------------------------------------------------------
@@ -97,6 +115,22 @@ describe("ApiKeySettings — initial render", () => {
   it("privacy notice is present in the DOM without any interaction", async () => {
     await renderAndWait();
     expect(screen.getByText(/encrypted with AES-256/i)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 1b. Starter gate (free tier cannot use BYOK)
+// ---------------------------------------------------------------------------
+describe("ApiKeySettings — Starter gate", () => {
+  it("free-tier user sees an upgrade CTA instead of the key form", async () => {
+    mockUseSubscription.mockReturnValue({ canUseOwnKey: false, loading: false });
+    await renderAndWait();
+
+    // Form input is hidden behind the gate
+    expect(screen.queryByLabelText("API Key")).not.toBeInTheDocument();
+    // Upgrade CTA is shown
+    expect(screen.getByText(/paid feature/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /view plans/i })).toBeInTheDocument();
   });
 });
 

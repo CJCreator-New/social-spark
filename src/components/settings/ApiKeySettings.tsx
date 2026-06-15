@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { saveUserApiKey, getUserApiKey, setUseOwnKey, deleteUserApiKey, getQuotaStatus } from "@/lib/apiKeyManager";
 import { toast } from "sonner";
-import { Eye, EyeOff, Save, Key, CheckCircle2, AlertCircle, Loader2, Trash2, ShieldCheck, Info } from "lucide-react";
+import { Eye, EyeOff, Save, Key, CheckCircle2, AlertCircle, Loader2, Trash2, ShieldCheck, Info, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSubscription } from "@/hooks/useSubscription";
 
 export function ApiKeySettings() {
+  const { canUseOwnKey, loading: subLoading } = useSubscription();
   const [provider, setProvider] = useState<'openai' | 'anthropic' | 'openrouter'>("openai");
   const [showKey, setShowKey] = useState(false);
   const [useOwnKey, setUseOwnKeyVal] = useState(false);
@@ -216,6 +219,25 @@ export function ApiKeySettings() {
         Configure your own AI API key to be used as a fallback if the platform-level generation is rate-limited or unavailable.
       </div>
 
+      {!subLoading && !canUseOwnKey ? (
+        <div
+          role="note"
+          className="pf-notice"
+          style={{ flexDirection: "column", alignItems: "flex-start", gap: 10, borderColor: "rgba(200,240,154,0.2)" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#edeae3", fontWeight: 600 }}>
+            <Lock size={14} style={{ color: "#c8f09a" }} />
+            <span>Using your own API key is a paid feature</span>
+          </div>
+          <span style={{ color: "#9a9aae" }}>
+            Upgrade to <strong style={{ color: "#c8f09a" }}>Starter</strong> (or Pro) to securely store and use your own
+            OpenAI, Anthropic, or OpenRouter key for content generation.
+          </span>
+          <Link to="/profile?tab=plan" className="pf-btn" style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
+            <span>View plans</span>
+          </Link>
+        </div>
+      ) : (
       <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {statusMsg && (
           <div
@@ -460,6 +482,7 @@ export function ApiKeySettings() {
           )}
         </div>
       </form>
+      )}
     </div>
 
       <div className="pf-card" style={{ marginTop: 24 }}>
