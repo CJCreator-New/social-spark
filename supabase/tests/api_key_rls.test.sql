@@ -5,7 +5,7 @@
 
 BEGIN;
 
-SELECT plan(7);
+SELECT plan(11);
 
 -- ---------------------------------------------------------------------------
 -- Test 1: User cannot read another user's user_settings row
@@ -113,7 +113,79 @@ SELECT ok(
   'Test 7: admin_user_key_status view exists'
 );
 
+-- ---------------------------------------------------------------------------
+-- Test 8: payments table is excluded from supabase_realtime publication
+-- ---------------------------------------------------------------------------
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND tablename = 'payments'
+  ),
+  'Test 8: payments excluded from supabase_realtime publication'
+);
+
+-- ---------------------------------------------------------------------------
+-- Test 9: User cannot read another user's payments row (RLS)
+-- ---------------------------------------------------------------------------
+INSERT INTO payments (user_id, razorpay_order_id, amount, currency, status, tier_granted, period_end)
+VALUES ('a0000000-0000-0000-0000-000000000001', 'order_test_rls_9', 49900, 'INR', 'paid', 'pro', now() + interval '30 days')
+ON CONFLICT (razorpay_order_id) DO NOTHING;
+
+SET LOCAL request.jwt.claim.sub TO 'b0000000-0000-0000-0000-000000000002';
+SET LOCAL role TO authenticated;
+
+SELECT is(
+  (SELECT COUNT(*)::bigint FROM payments
+   WHERE user_id = 'a0000000-0000-0000-0000-000000000001'),
+  0::bigint,
+  'Test 9: User B cannot read User A payments via RLS'
+);
+
+RESET role;
+
+-- ---------------------------------------------------------------------------
+-- Test 10: Authenticated role cannot INSERT into payments directly (RLS)
+-- ---------------------------------------------------------------------------
+SET LOCAL request.jwt.claim.sub TO 'a0000000-0000-0000-0000-000000000001';
+SET LOCAL role TO authenticated;
+
+SELECT throws_ok(
+  $$INSERT INTO payments (user_id, razorpay_order_id, amount, status)
+    VALUES ('a0000000-0000-0000-0000-000000000001', 'order_client_insert', 49900, 'paid')$$,
+  '42501',
+  NULL,
+  'Test 10: Authenticated role cannot insert payments directly (RLS)'
+);
+
+RESET role;
+
+-- ---------------------------------------------------------------------------
+-- Test 11: grant_tier_from_payment is idempotent on razorpay_order_id
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_period TIMESTAMPTZ := now() + interval '30 days';
+BEGIN
+  PERFORM grant_tier_from_payment(
+    'a0000000-0000-0000-0000-000000000001', 'pro', 300, v_period,
+    'order_idempotent_11', 'pay_idempotent_11', 49900, 'INR'
+  );
+  -- Second call with same order id must not create a second payments row.
+  PERFORM grant_tier_from_payment(
+    'a0000000-0000-0000-0000-000000000001', 'pro', 300, v_period,
+    'order_idempotent_11', 'pay_idempotent_11', 49900, 'INR'
+  );
+END $$;
+
+SELECT is(
+  (SELECT COUNT(*)::bigint FROM payments WHERE razorpay_order_id = 'order_idempotent_11'),
+  1::bigint,
+  'Test 11: grant_tier_from_payment does not double-insert for the same order'
+);
+
 -- Cleanup test data
+DELETE FROM payments WHERE user_id = 'a0000000-0000-0000-0000-000000000001';
 DELETE FROM user_settings WHERE user_id = 'a0000000-0000-0000-0000-000000000001';
 
 SELECT * FROM finish();
