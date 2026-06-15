@@ -197,7 +197,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (usingSharedKey) {
-      incrementGenerationCount(userId);
+      await incrementGenerationCount(userId);
     }
 
     const parseResult = parseAIResponse(aiRes.data || {}, "return_calendar");

@@ -453,9 +453,17 @@ export async function checkQuota(userId: string): Promise<{ allowed: boolean; us
   const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SUPABASE_URL || !SUPABASE_KEY) return DEFAULT;
 
+  // userId comes from a decoded JWT `sub`; ensure it is a real UUID before
+  // interpolating into the PostgREST query URL.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(userId)) {
+    console.warn("checkQuota: userId is not a valid UUID, returning default quota");
+    return DEFAULT;
+  }
+
   try {
     const res = await fetch(
-      `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/user_settings?user_id=eq.${userId}&select=generation_count,quota_limit,use_own_key,key_mode`,
+      `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/user_settings?user_id=eq.${encodeURIComponent(userId)}&select=generation_count,quota_limit,use_own_key,key_mode`,
       {
         headers: {
           apikey: SUPABASE_KEY,
