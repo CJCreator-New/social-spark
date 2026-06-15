@@ -21,6 +21,9 @@ import {
   buildUserMessage,
   getUserIdFromToken,
   errorResponse,
+  checkQuota,
+  incrementGenerationCount,
+  rejectFreeTierByok,
 } from "../_shared/promptHelpers.ts";
 
 interface ExistingPost {
@@ -92,6 +95,22 @@ Deno.serve(async (req: Request) => {
         { error: "Rate limit exceeded. Please wait a moment before trying again." },
         429
       );
+    }
+
+    // Quota: a regenerate counts as one generation (same gate as generate-*).
+    const quota = await checkQuota(userId);
+
+    // Free users cannot use their own API key (paid capability).
+    const byokRejection = rejectFreeTierByok(payload, quota.tier);
+    if (byokRejection) return byokRejection;
+
+    const usingSharedKey = !payload.userApiKey && !(quota.useOwnKey && quota.keyMode === "always");
+    if (usingSharedKey && !quota.allowed) {
+      return jsonResponse({
+        error: "QUOTA_EXCEEDED",
+        message: "You've used your free generations for now — more are coming soon! Add your own API key (Settings > API Keys, 'Always use my key') to keep generating in the meantime.",
+        quota: { used: quota.used, limit: quota.limit },
+      }, 402);
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -209,6 +228,11 @@ CRITIQUE & REWRITE GUIDANCE:
     );
     if (aiRes.status !== 200) {
       return jsonResponse({ error: aiRes.error }, aiRes.status);
+    }
+
+    // A successful regenerate counts as one generation against the quota.
+    if (usingSharedKey) {
+      await incrementGenerationCount(userId);
     }
 
     const parseResult = parseAIResponse(aiRes.data || {}, "return_post");

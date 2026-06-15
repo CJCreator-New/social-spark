@@ -495,6 +495,10 @@ export default function CalendarDetail() {
           }),
         });
         const data = await res.json().catch(() => ({}));
+        if (res.status === 402 || data?.error === "QUOTA_EXCEEDED" || data?.error === "UPGRADE_REQUIRED") {
+          toast.error(data?.message || "You've reached your generation limit. Upgrade to continue.");
+          return;
+        }
         if (res.ok && data?.post) next[i] = data.post;
       }
       const newTitle = `${title} — ${targetPlatform}`;

@@ -9,6 +9,8 @@ import { normalizeTag, displayTag, parsePolicyList } from "@/lib/hashtagPolicy";
 import { listTimezones, browserTimezone, tzLabel } from "@/lib/timezones";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import { ApiKeySettings } from "@/components/settings/ApiKeySettings";
+import { PlanSettings } from "@/components/settings/PlanSettings";
+import { TierBadge } from "@/components/TierBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { LayoutTemplate } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -88,9 +90,9 @@ export default function Profile() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = (searchParams.get("tab") as 'profile' | 'brand' | 'api-keys') || 'profile';
+  const activeTab = (searchParams.get("tab") as 'profile' | 'brand' | 'api-keys' | 'plan') || 'profile';
 
-  const setActiveTab = (tab: 'profile' | 'brand' | 'api-keys') => {
+  const setActiveTab = (tab: 'profile' | 'brand' | 'api-keys' | 'plan') => {
     setSearchParams({ tab });
   };
 
@@ -350,10 +352,13 @@ export default function Profile() {
   return (
     <>
       <WorkspacePage size="narrow">
-        <h1 className="pf-title">Your profile</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <h1 className="pf-title" style={{ margin: 0 }}>Your profile</h1>
+          <TierBadge />
+        </div>
         <div className="pf-sub">Update how you appear inside ContentForge and set brand defaults to pre-fill the wizard.</div>
 
-        {activeTab !== 'api-keys' && (
+        {activeTab !== 'api-keys' && activeTab !== 'plan' && (
           <div className="pf-summary">
             <div className="pf-summary-card">
               <div className="pf-summary-label">Defaults set</div>
@@ -377,6 +382,7 @@ export default function Profile() {
           {([
             { id: 'profile' as const, label: 'Account Info' },
             { id: 'brand' as const, label: 'Brand Defaults' },
+            { id: 'plan' as const, label: 'Plan & Billing' },
             { id: 'api-keys' as const, label: 'API Keys' },
           ]).map(tab => (
             <button
@@ -730,6 +736,10 @@ export default function Profile() {
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'plan' && !profileLoading && (
+          <PlanSettings />
         )}
 
         {activeTab === 'api-keys' && !profileLoading && (
