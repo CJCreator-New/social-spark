@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { checkRateLimit, corsHeaders } from "../_shared/promptHelpers.ts";
+import { computePeriodEnd, getPlan, isPaidPlan } from "../_shared/plans.ts";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -59,8 +60,10 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const razorpayKeyId = Deno.env.get("RAZORPAY_KEY_ID");
     const razorpayKeySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
-    if (!supabaseUrl || !supabaseAnonKey || !razorpayKeySecret) {
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey || !razorpayKeyId || !razorpayKeySecret) {
       console.error("verify-payment: missing required environment configuration");
       return jsonResponse({ error: "Payment is not configured." }, 500);
     }
@@ -107,10 +110,70 @@ Deno.serve(async (req) => {
       payment_id: paymentId,
     });
 
-    // NOTE: This endpoint only proves the payment is authentic. Persisting the
-    // payment and granting entitlements is handled separately (subscription
-    // Phase 1/3), so no DB writes occur here.
-    return jsonResponse({ verified: true });
+    // ── Fetch the order from Razorpay to re-derive plan + amount server-side ──
+    // We trust the ORDER (created server-side with our notes), never the client.
+    const basicAuth = btoa(`${razorpayKeyId}:${razorpayKeySecret}`);
+    const orderRes = await fetch(`https://api.razorpay.com/v1/orders/${encodeURIComponent(orderId)}`, {
+      headers: { Authorization: `Basic ${basicAuth}` },
+    });
+    if (!orderRes.ok) {
+      const errText = await orderRes.text().catch(() => "");
+      console.error("verify-payment: failed to fetch order", orderRes.status, errText);
+      return jsonResponse({ verified: false, error: "Could not confirm the order." }, 502);
+    }
+    const order = await orderRes.json() as {
+      amount: number;
+      status: string;
+      notes?: { user_id?: string; plan?: string };
+    };
+
+    const planId = order.notes?.plan;
+    if (!isPaidPlan(planId)) {
+      console.error("verify-payment: order has no valid plan in notes", { order_id: orderId });
+      return jsonResponse({ verified: false, error: "Order is not associated with a plan." }, 400);
+    }
+    const plan = getPlan(planId);
+
+    // Integrity: the order must belong to THIS user and the charged amount must
+    // match the server-side plan price exactly. Defends against tampering.
+    if (order.notes?.user_id && order.notes.user_id !== user.id) {
+      console.warn("verify-payment: order user mismatch", { order_id: orderId, user_id: user.id });
+      return jsonResponse({ verified: false, error: "Order does not belong to this account." }, 403);
+    }
+    if (order.amount !== plan.amount) {
+      console.error("verify-payment: amount mismatch", {
+        order_id: orderId, order_amount: order.amount, expected: plan.amount,
+      });
+      return jsonResponse({ verified: false, error: "Payment amount mismatch." }, 400);
+    }
+
+    // ── Grant the tier (idempotent on order_id) via service role ─────────────
+    const periodEnd = computePeriodEnd();
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: grantData, error: grantError } = await adminClient.rpc("grant_tier_from_payment", {
+      p_user_id: user.id,
+      p_tier: plan.tier,
+      p_quota_limit: plan.quotaLimit,
+      p_period_end: periodEnd,
+      p_order_id: orderId,
+      p_payment_id: paymentId,
+      p_amount: plan.amount,
+      p_currency: plan.currency,
+    });
+
+    if (grantError) {
+      console.error("verify-payment: grant_tier_from_payment failed:", grantError?.code || grantError?.message);
+      return jsonResponse({ verified: true, granted: false, error: "Payment verified but access could not be granted. Contact support." }, 500);
+    }
+
+    const granted = Array.isArray(grantData) ? grantData[0] : grantData;
+
+    return jsonResponse({
+      verified: true,
+      granted: true,
+      tier: granted?.tier ?? plan.tier,
+      period_end: granted?.period_end ?? periodEnd,
+    });
   } catch (e) {
     console.error("verify-payment handler error:", e);
     return jsonResponse({ error: "An unexpected error occurred." }, 500);

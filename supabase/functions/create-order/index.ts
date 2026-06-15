@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { checkRateLimit, corsHeaders } from "../_shared/promptHelpers.ts";
+import { getPlan, isPaidPlan } from "../_shared/plans.ts";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -58,19 +59,22 @@ Deno.serve(async (req) => {
     }
 
     // ── Validate input ──────────────────────────────────────────────────────
+    // The client picks a PLAN; the server derives the amount. The client never
+    // dictates price (prevents "pay ₹1 for Pro" tampering).
     const body = await req.json().catch(() => ({}));
-    const amount = Number(body.amount);
-    const currency = typeof body.currency === "string" && body.currency.trim() ? body.currency.trim() : "INR";
-    const receipt = typeof body.receipt === "string" && body.receipt.trim()
-      ? body.receipt.trim().slice(0, 40)
-      : `rcpt_${user.id.slice(0, 8)}_${Date.now()}`;
+    const planId = String(body.plan || "").trim();
 
-    if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount < MIN_AMOUNT_PAISE) {
-      return jsonResponse(
-        { error: `Invalid amount. Must be an integer of at least ${MIN_AMOUNT_PAISE} paise.` },
-        400,
-      );
+    if (!isPaidPlan(planId)) {
+      return jsonResponse({ error: "Invalid plan. Must be 'starter' or 'pro'." }, 400);
     }
+    const plan = getPlan(planId);
+
+    if (plan.amount < MIN_AMOUNT_PAISE) {
+      console.error("create-order: plan amount below Razorpay minimum", planId, plan.amount);
+      return jsonResponse({ error: "Payment is not configured." }, 500);
+    }
+
+    const receipt = `rcpt_${user.id.slice(0, 8)}_${Date.now()}`;
 
     // ── Create the Razorpay order via REST (Basic auth: key_id:key_secret) ──
     const basicAuth = btoa(`${razorpayKeyId}:${razorpayKeySecret}`);
@@ -81,10 +85,12 @@ Deno.serve(async (req) => {
         Authorization: `Basic ${basicAuth}`,
       },
       body: JSON.stringify({
-        amount,
-        currency,
+        amount: plan.amount,
+        currency: plan.currency,
         receipt,
-        notes: { user_id: user.id },
+        // Record the intended buyer + plan on the order itself so verify-payment
+        // can re-derive entitlement without trusting client input.
+        notes: { user_id: user.id, plan: plan.tier },
       }),
     });
 
@@ -101,6 +107,8 @@ Deno.serve(async (req) => {
       order_id: order.id,
       amount: order.amount,
       currency: order.currency,
+      plan: plan.tier,
+      label: plan.label,
     });
   } catch (e) {
     console.error("create-order handler error:", e);

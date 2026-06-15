@@ -76,11 +76,11 @@ function edgeHeaders(token: string): Record<string, string> {
   };
 }
 
+export type PaidPlan = "starter" | "pro";
+
 export interface CheckoutParams {
-  /** Amount in paise (minimum 100). e.g. ₹499 → 49900 */
-  amount: number;
-  currency?: string;
-  receipt?: string;
+  /** Which plan to purchase. The server derives the price — the client never sends an amount. */
+  plan: PaidPlan;
   /** Branding shown in the modal */
   name?: string;
   description?: string;
@@ -88,7 +88,7 @@ export interface CheckoutParams {
 }
 
 export type CheckoutResult =
-  | { status: "success" }
+  | { status: "success"; tier: PaidPlan; periodEnd: string | null }
   | { status: "dismissed" }
   | { status: "failed"; error: string };
 
@@ -99,8 +99,8 @@ export type CheckoutResult =
  * creation failed) reject.
  */
 export async function startRazorpayCheckout(params: CheckoutParams): Promise<CheckoutResult> {
-  if (params.amount < 100 || !Number.isInteger(params.amount)) {
-    throw new Error("Amount must be an integer of at least 100 paise.");
+  if (params.plan !== "starter" && params.plan !== "pro") {
+    throw new Error("Invalid plan.");
   }
 
   const keyId = (import.meta.env.VITE_RAZORPAY_KEY_ID as string) || "";
@@ -120,21 +120,17 @@ export async function startRazorpayCheckout(params: CheckoutParams): Promise<Che
     throw new Error("Could not load the payment gateway. Check your connection and try again.");
   }
 
-  // 1) Create the order server-side
+  // 1) Create the order server-side (server derives amount from the plan)
   const orderRes = await fetch(`${SUPABASE_URL}/functions/v1/create-order`, {
     method: "POST",
     headers: edgeHeaders(token),
-    body: JSON.stringify({
-      amount: params.amount,
-      currency: params.currency || "INR",
-      receipt: params.receipt,
-    }),
+    body: JSON.stringify({ plan: params.plan }),
   });
   if (!orderRes.ok) {
     const data = await orderRes.json().catch(() => ({}));
     throw new Error(data?.error || `Failed to create order (${orderRes.status})`);
   }
-  const order = await orderRes.json() as { order_id: string; amount: number; currency: string };
+  const order = await orderRes.json() as { order_id: string; amount: number; currency: string; label?: string };
 
   // 2) Open the Razorpay modal and await the user outcome
   return new Promise<CheckoutResult>((resolve, reject) => {
@@ -144,7 +140,7 @@ export async function startRazorpayCheckout(params: CheckoutParams): Promise<Che
       currency: order.currency,
       order_id: order.order_id,
       name: params.name || "Social Spark",
-      description: params.description,
+      description: params.description || order.label,
       prefill: params.prefill,
       theme: { color: "#c8f09a" },
       handler: async (response: RazorpaySuccessResponse) => {
@@ -160,8 +156,12 @@ export async function startRazorpayCheckout(params: CheckoutParams): Promise<Che
             }),
           });
           const verifyData = await verifyRes.json().catch(() => ({}));
-          if (verifyRes.ok && verifyData?.verified) {
-            resolve({ status: "success" });
+          if (verifyRes.ok && verifyData?.verified && verifyData?.granted) {
+            resolve({
+              status: "success",
+              tier: (verifyData.tier as PaidPlan) ?? params.plan,
+              periodEnd: verifyData.period_end ?? null,
+            });
           } else {
             resolve({ status: "failed", error: verifyData?.error || "Payment verification failed." });
           }

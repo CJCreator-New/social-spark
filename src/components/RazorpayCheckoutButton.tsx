@@ -1,27 +1,23 @@
 import React, { useState } from "react";
 import { toast } from "sonner";
 import { Loader2, CreditCard } from "lucide-react";
-import { startRazorpayCheckout, type CheckoutParams } from "@/lib/razorpayCheckout";
+import { startRazorpayCheckout, type CheckoutParams, type PaidPlan } from "@/lib/razorpayCheckout";
 
 interface RazorpayCheckoutButtonProps {
-  /** Amount in paise (minimum 100). e.g. ₹499 → 49900 */
-  amount: number;
-  currency?: string;
-  receipt?: string;
+  /** Which plan to purchase. Server derives the price. */
+  plan: PaidPlan;
   name?: string;
   description?: string;
   prefill?: CheckoutParams["prefill"];
   label?: string;
   className?: string;
-  onSuccess?: () => void;
+  onSuccess?: (tier: PaidPlan, periodEnd: string | null) => void;
   onDismiss?: () => void;
   onFailure?: (error: string) => void;
 }
 
 export function RazorpayCheckoutButton({
-  amount,
-  currency = "INR",
-  receipt,
+  plan,
   name,
   description,
   prefill,
@@ -36,10 +32,10 @@ export function RazorpayCheckoutButton({
   async function handleClick() {
     setLoading(true);
     try {
-      const result = await startRazorpayCheckout({ amount, currency, receipt, name, description, prefill });
+      const result = await startRazorpayCheckout({ plan, name, description, prefill });
       if (result.status === "success") {
         toast.success("Payment successful!");
-        onSuccess?.();
+        onSuccess?.(result.tier, result.periodEnd);
       } else if (result.status === "dismissed") {
         toast.info("Payment cancelled.");
         onDismiss?.();
