@@ -36,6 +36,18 @@ interface AuditLogRow {
   created_at: string;
 }
 
+interface PaymentRow {
+  id: string;
+  user_id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  tier_granted: string | null;
+  period_end: string | null;
+  created_at: string;
+  is_comp: boolean;
+}
+
 const AdminCharts = lazy(() => import("./admin/AdminCharts"));
 
 
@@ -50,6 +62,10 @@ export function AdminDashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [apiKeyStatuses, setApiKeyStatuses] = useState<ApiKeyStatusRow[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogRow[]>([]);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [compUserId, setCompUserId] = useState("");
+  const [compTier, setCompTier] = useState<"starter" | "pro" | "free">("starter");
+  const [compBusy, setCompBusy] = useState(false);
 
   // Fetch stats on mount and periodically
   useEffect(() => {
@@ -95,6 +111,21 @@ export function AdminDashboard() {
     };
     loadApiKeyData();
 
+    // Fetch payments ledger (admin RLS allows reading all)
+    const loadPayments = async () => {
+      try {
+        const { data: rows } = await supabase
+          .from('admin_payments' as any)
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (rows) setPayments(rows as unknown as PaymentRow[]);
+      } catch (err) {
+        console.error('Failed to load payments:', err);
+      }
+    };
+    loadPayments();
+
     // Refresh every 30 seconds
     const interval = setInterval(loadStats, 30000);
     return () => clearInterval(interval);
@@ -103,6 +134,36 @@ export function AdminDashboard() {
   const handleRefresh = async () => {
     telemetry.sendEvent('admin_dashboard_refresh_clicked');
     window.location.reload();
+  };
+
+  const handleCompGrant = async () => {
+    const target = compUserId.trim();
+    if (!target) return;
+    setCompBusy(true);
+    try {
+      // Quota mirrors the server plan catalogue: starter 1000, pro 300.
+      const quota = compTier === 'pro' ? 300 : compTier === 'starter' ? 1000 : 10;
+      const { error } = await supabase.rpc('admin_grant_tier' as any, {
+        p_target_user: target,
+        p_tier: compTier,
+        p_quota_limit: quota,
+        p_days: 30,
+      });
+      if (error) throw error;
+      // Refresh the payments list to reflect the new comp row.
+      const { data: rows } = await supabase
+        .from('admin_payments' as any)
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (rows) setPayments(rows as unknown as PaymentRow[]);
+      setCompUserId('');
+    } catch (err) {
+      console.error('Comp grant failed:', err);
+      setError(err instanceof Error ? err.message : 'Comp grant failed');
+    } finally {
+      setCompBusy(false);
+    }
   };
 
   if (loading) {
@@ -364,6 +425,77 @@ export function AdminDashboard() {
           <p className="text-sm">
             ✓ Active users (today): <strong>{stats.overview.activeUsersToday}</strong>
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Payments & Subscriptions Section */}
+      <Card className="border-l-4 border-l-lime-500">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Payments &amp; Subscriptions
+          </CardTitle>
+          <CardDescription>
+            Paid &amp; comped tier grants (last 100). Use the form to comp a tier to a beta user without payment.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Comp grant form */}
+          <div className="flex flex-wrap items-end gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-wide text-slate-500" htmlFor="comp-user">User ID (UUID)</label>
+              <input
+                id="comp-user"
+                value={compUserId}
+                onChange={(e) => setCompUserId(e.target.value)}
+                placeholder="a0000000-0000-…"
+                className="w-72 rounded-md border border-white/10 bg-slate-900 px-2 py-1 text-xs font-mono text-slate-200"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-wide text-slate-500" htmlFor="comp-tier">Tier</label>
+              <select
+                id="comp-tier"
+                value={compTier}
+                onChange={(e) => setCompTier(e.target.value as 'starter' | 'pro' | 'free')}
+                className="rounded-md border border-white/10 bg-slate-900 px-2 py-1 text-xs text-slate-200"
+              >
+                <option value="starter">Starter (30d)</option>
+                <option value="pro">Pro (30d)</option>
+                <option value="free">Free (revoke)</option>
+              </select>
+            </div>
+            <Button size="sm" onClick={handleCompGrant} disabled={compBusy || !compUserId.trim()}>
+              {compBusy ? 'Granting…' : 'Comp grant'}
+            </Button>
+          </div>
+
+          {payments.length === 0 ? (
+            <p className="text-sm text-gray-500">No payments yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {payments.map((p) => (
+                <div key={p.id} className="flex items-center justify-between flex-wrap gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-3 text-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-slate-400">{p.user_id.slice(0, 8)}…</span>
+                    {p.tier_granted && (
+                      <Badge variant="outline" className="text-lime-400 border-lime-400/40 text-[10px] capitalize">{p.tier_granted}</Badge>
+                    )}
+                    {p.is_comp ? (
+                      <Badge variant="outline" className="text-sky-400 border-sky-400/40 text-[10px]">Comp</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px]">₹{(p.amount / 100).toFixed(0)}</Badge>
+                    )}
+                    <Badge variant="outline" className={`text-[10px] ${p.status === 'paid' ? 'text-lime-400 border-lime-400/40' : 'text-slate-500'}`}>{p.status}</Badge>
+                  </div>
+                  <div className="flex items-center gap-3 text-slate-600">
+                    {p.period_end && <span>until {new Date(p.period_end).toLocaleDateString()}</span>}
+                    <span>{new Date(p.created_at).toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

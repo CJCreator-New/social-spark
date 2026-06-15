@@ -5,7 +5,7 @@
 
 BEGIN;
 
-SELECT plan(11);
+SELECT plan(12);
 
 -- ---------------------------------------------------------------------------
 -- Test 1: User cannot read another user's user_settings row
@@ -183,6 +183,21 @@ SELECT is(
   1::bigint,
   'Test 11: grant_tier_from_payment does not double-insert for the same order'
 );
+
+-- ---------------------------------------------------------------------------
+-- Test 12: admin_grant_tier rejects non-admin callers
+-- ---------------------------------------------------------------------------
+SET LOCAL request.jwt.claim.sub TO 'b0000000-0000-0000-0000-000000000002';
+SET LOCAL role TO authenticated;
+
+SELECT throws_ok(
+  $$SELECT admin_grant_tier('a0000000-0000-0000-0000-000000000001', 'pro', 300, 30)$$,
+  'P0001',
+  'Not authorized',
+  'Test 12: non-admin cannot comp-grant a tier'
+);
+
+RESET role;
 
 -- Cleanup test data
 DELETE FROM payments WHERE user_id = 'a0000000-0000-0000-0000-000000000001';
