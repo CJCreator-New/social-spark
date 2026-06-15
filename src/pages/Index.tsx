@@ -27,6 +27,7 @@ import { createSeedFromPost, storeSeed, readAndClearSeed } from "@/lib/seedFromP
 import { isEnabled } from "@/lib/featureFlags";
 import { buildBrandMemoryPrompt, generateWithFallback } from "@/lib/brandMemory";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
+import { WelcomeBanner } from "@/components/WelcomeBanner";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { FontStyle, applyStyle } from "@/lib/unicodeFonts";
 import { useWizardStore } from "@/stores/useWizardStore";
@@ -1882,6 +1883,9 @@ const Index = () => {
             <h1 className="brand-title">Content<em>Forge</em></h1>
             <div className="brand-sub">Generate a full week of platform-native posts for any niche — tailored to your voice, audience, and goals.</div>
           </div>
+
+          {/* FIRST-RUN WELCOME (new free users, step 1 only) */}
+          {step === 1 && <WelcomeBanner />}
 
           {/* CONDENSED WIZARD STATUS SUMMARY */}
           {step < 4 && (
