@@ -5,7 +5,6 @@
 // amount; it sends a `plan` id and the server derives amount + quota + tier.
 // This prevents "pay ₹1, get Pro" tampering.
 //
-// ⚠️ PLACEHOLDER PRICES — confirm B1/B2 (Starter/Pro ₹ + quotas) before go-live.
 // amount is in PAISE (₹1 = 100 paise).
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -26,17 +25,17 @@ export const PLAN_CATALOG: Record<PaidPlan, PlanConfig> = {
   // Starter: unlocks BYOK (user pays their own AI costs). Soft generation cap.
   starter: {
     tier: "starter",
-    amount: 19900, // ₹199 — PLACEHOLDER
+    amount: 19900, // ₹199
     currency: "INR",
-    quotaLimit: 1000, // soft cap (B3 default) — PLACEHOLDER
+    quotaLimit: 1000, // BYOK soft cap
     label: "Social Spark Starter",
   },
   // Pro: high platform quota + premium features.
   pro: {
     tier: "pro",
-    amount: 49900, // ₹499 — PLACEHOLDER
+    amount: 49900, // ₹499
     currency: "INR",
-    quotaLimit: 300, // monthly platform generations — PLACEHOLDER
+    quotaLimit: 300, // monthly platform generations
     label: "Social Spark Pro",
   },
 };

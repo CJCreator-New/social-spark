@@ -447,8 +447,10 @@ export async function checkRateLimit(userId: string, endpoint: string, config: R
 
 // ─── GENERATION QUOTA (PILOT) ──────────────────────────────────────────────
 
-export async function checkQuota(userId: string): Promise<{ allowed: boolean; used: number; limit: number; useOwnKey: boolean; keyMode: string }> {
-  const DEFAULT = { allowed: true, used: 0, limit: 10, useOwnKey: false, keyMode: "fallback" };
+export type EffectiveTier = "free" | "starter" | "pro";
+
+export async function checkQuota(userId: string): Promise<{ allowed: boolean; used: number; limit: number; useOwnKey: boolean; keyMode: string; tier: EffectiveTier }> {
+  const DEFAULT = { allowed: true, used: 0, limit: 10, useOwnKey: false, keyMode: "fallback", tier: "free" as EffectiveTier };
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SUPABASE_URL || !SUPABASE_KEY) return DEFAULT;
@@ -463,7 +465,7 @@ export async function checkQuota(userId: string): Promise<{ allowed: boolean; us
 
   try {
     const res = await fetch(
-      `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/user_settings?user_id=eq.${encodeURIComponent(userId)}&select=generation_count,quota_limit,use_own_key,key_mode`,
+      `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/user_settings?user_id=eq.${encodeURIComponent(userId)}&select=generation_count,quota_limit,use_own_key,key_mode,tier,plan_period_end`,
       {
         headers: {
           apikey: SUPABASE_KEY,
@@ -480,13 +482,39 @@ export async function checkQuota(userId: string): Promise<{ allowed: boolean; us
     const limit = row.quota_limit ?? 10;
     const useOwnKey = !!row.use_own_key;
     const keyMode = row.key_mode || "fallback";
+
+    // Effective tier: a paid tier whose window has lapsed is treated as free.
+    const storedTier = (row.tier === "starter" || row.tier === "pro") ? row.tier : "free";
+    const periodEnd = row.plan_period_end ? Date.parse(row.plan_period_end) : NaN;
+    const windowActive = Number.isFinite(periodEnd) && periodEnd > Date.now();
+    const tier: EffectiveTier = storedTier === "free" ? "free" : (windowActive ? storedTier : "free");
+
     const allowed = (useOwnKey && keyMode === "always") || used < limit;
 
-    return { allowed, used, limit, useOwnKey, keyMode };
+    return { allowed, used, limit, useOwnKey, keyMode, tier };
   } catch (e) {
     console.warn("checkQuota failed, allowing request", e);
     return DEFAULT;
   }
+}
+
+/**
+ * Free users cannot bring their own API key (BYOK is a paid Starter/Pro
+ * capability). Returns a 402 response when a free-tier request carries a user
+ * key, otherwise null. Enforced server-side so the gate can't be bypassed by
+ * crafting a request body. `tier` should be the EFFECTIVE tier from checkQuota.
+ */
+export function rejectFreeTierByok(
+  payload: { userApiKey?: string },
+  tier: EffectiveTier,
+): Response | null {
+  if (payload.userApiKey && tier === "free") {
+    return jsonResponse({
+      error: "UPGRADE_REQUIRED",
+      message: "Using your own API key requires a Starter or Pro plan. Upgrade in Settings to continue.",
+    }, 402);
+  }
+  return null;
 }
 
 export async function incrementGenerationCount(userId: string): Promise<void> {

@@ -28,6 +28,7 @@ import {
   errorResponse,
   checkQuota,
   incrementGenerationCount,
+  rejectFreeTierByok,
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
@@ -68,6 +69,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const quota = await checkQuota(userId);
+
+    // Free users cannot use their own API key (paid capability).
+    const byokRejection = rejectFreeTierByok(payload, quota.tier);
+    if (byokRejection) return byokRejection;
+
     const usingSharedKey = !payload.userApiKey && !(quota.useOwnKey && quota.keyMode === "always");
     if (usingSharedKey && !quota.allowed) {
       return jsonResponse({
