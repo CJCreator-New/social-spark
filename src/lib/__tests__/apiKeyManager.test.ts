@@ -267,7 +267,7 @@ describe("getUserApiKey", () => {
   it("returns null values when not authenticated (no session)", async () => {
     mockGetSession.mockResolvedValue(NO_SESSION);
     const result = await getUserApiKey();
-    expect(result).toEqual({ apiKey: null, provider: null, useOwnKey: false, keyMode: 'fallback' });
+    expect(result).toEqual({ apiKey: null, hasKey: false, provider: null, useOwnKey: false, keyMode: 'fallback' });
   });
 
   it("returns null apiKey when no user_settings row exists", async () => {
@@ -277,15 +277,16 @@ describe("getUserApiKey", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ apiKey: null, provider: null }),
+      json: () => Promise.resolve({ hasKey: false, provider: null, last4: null }),
     } as Response);
 
     const result = await getUserApiKey();
     expect(result.apiKey).toBeNull();
+    expect(result.hasKey).toBe(false);
     expect(result.useOwnKey).toBe(false);
   });
 
-  it("returns apiKey, provider, useOwnKey=true on happy path", async () => {
+  it("returns hasKey, provider, useOwnKey=true, last4 on happy path", async () => {
     mockGetSession.mockResolvedValue(VALID_SESSION);
     mockMaybySingle.mockResolvedValue({ data: { use_own_key: true }, error: null });
 
@@ -293,11 +294,13 @@ describe("getUserApiKey", () => {
       ok: true,
       status: 200,
       json: () =>
-        Promise.resolve({ apiKey: "sk-decrypted-key-abc123", provider: "openai" }),
+        Promise.resolve({ hasKey: true, provider: "openai", last4: "abc123" }),
     } as Response);
 
     const result = await getUserApiKey();
-    expect(result.apiKey).toBe("sk-decrypted-key-abc123");
+    expect(result.apiKey).toBeNull(); // SECURE: No raw key returned
+    expect(result.hasKey).toBe(true);
+    expect(result.last4).toBe("abc123");
     expect(result.provider).toBe("openai");
     expect(result.useOwnKey).toBe(true);
   });
@@ -317,13 +320,14 @@ describe("getUserApiKey", () => {
     const result = await getUserApiKey();
     expect(result).toEqual({
       apiKey: null,
+      hasKey: false,
       provider: null,
       useOwnKey: false,
       keyMode: 'fallback',
     });
   });
 
-  it("returns null apiKey when use_own_key is false even if key exists", async () => {
+  it("returns hasKey: true when key exists in DB but useOwnKey is false", async () => {
     mockGetSession.mockResolvedValue(VALID_SESSION);
     mockMaybySingle.mockResolvedValue({ data: { use_own_key: false }, error: null });
 
@@ -331,14 +335,14 @@ describe("getUserApiKey", () => {
       ok: true,
       status: 200,
       json: () =>
-        Promise.resolve({ apiKey: "sk-some-key-abc123", provider: "openai" }),
+        Promise.resolve({ hasKey: true, provider: "openai", last4: "abc123" }),
     } as Response);
 
     const result = await getUserApiKey();
     // Key comes back from decrypt but useOwnKey is false
     expect(result.useOwnKey).toBe(false);
-    // apiKey still returned (caller decides whether to use it based on useOwnKey)
-    expect(result.apiKey).toBe("sk-some-key-abc123");
+    expect(result.hasKey).toBe(true);
+    expect(result.apiKey).toBeNull();
   });
 });
 
@@ -470,9 +474,11 @@ describe("localStorage Fallback", () => {
       const retrieved = await getUserApiKey();
       expect(retrieved).toEqual({
         apiKey: VALID_OPENAI_KEY,
+        hasKey: true,
         provider: "openai",
         useOwnKey: true,
         keyMode: "always",
+        last4: "aaaa",
       });
 
       // Delete
@@ -514,6 +520,7 @@ describe("localStorage Fallback", () => {
       const retrieved = await getUserApiKey();
       expect(retrieved).toEqual({
         apiKey: null,
+        hasKey: false,
         provider: null,
         useOwnKey: false,
         keyMode: "fallback",
@@ -551,6 +558,7 @@ describe("localStorage Fallback", () => {
       const retrieved = await getUserApiKey();
       expect(retrieved).toEqual({
         apiKey: null,
+        hasKey: false,
         provider: null,
         useOwnKey: false,
         keyMode: "fallback",

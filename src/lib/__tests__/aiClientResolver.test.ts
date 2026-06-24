@@ -55,6 +55,7 @@ describe("resolveAiClient", () => {
 
     mockGetUserApiKey.mockResolvedValue({
       apiKey: "sk-user-key-" + "a".repeat(24),
+      hasKey: true,
       provider: "openai",
       useOwnKey: true,
     });
@@ -72,6 +73,7 @@ describe("resolveAiClient", () => {
 
     mockGetUserApiKey.mockResolvedValue({
       apiKey: "sk-ant-user-key-" + "a".repeat(32),
+      hasKey: true,
       provider: "anthropic",
       useOwnKey: true,
     });
@@ -90,6 +92,7 @@ describe("resolveAiClient", () => {
 
     mockGetUserApiKey.mockResolvedValue({
       apiKey: null,
+      hasKey: false,
       provider: null,
       useOwnKey: false,
     });
@@ -102,6 +105,7 @@ describe("resolveAiClient", () => {
 
     mockGetUserApiKey.mockResolvedValue({
       apiKey: null,
+      hasKey: false,
       provider: null,
       useOwnKey: false,
     });
@@ -114,6 +118,7 @@ describe("resolveAiClient", () => {
 
     mockGetUserApiKey.mockResolvedValue({
       apiKey: "sk-user-key-abc123abc123abc123abc123abc123",
+      hasKey: true,
       provider: "openai",
       useOwnKey: false, // toggle disabled
     });
@@ -126,6 +131,7 @@ describe("resolveAiClient", () => {
 
     mockGetUserApiKey.mockResolvedValue({
       apiKey: null,
+      hasKey: false,
       provider: "openai",
       useOwnKey: true, // toggle on, but no key saved
     });
@@ -142,6 +148,7 @@ describe("resolveAiClient", () => {
 
     mockGetUserApiKey.mockResolvedValue({
       apiKey: null,
+      hasKey: false,
       provider: null,
       useOwnKey: false,
     });
@@ -168,6 +175,7 @@ describe("resolveAiClient", () => {
 
     mockGetUserApiKey.mockResolvedValue({
       apiKey: "sk-or-user-fallback-" + "a".repeat(32),
+      hasKey: true,
       provider: "openrouter",
       useOwnKey: true,
     });

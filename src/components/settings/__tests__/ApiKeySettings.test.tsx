@@ -41,16 +41,24 @@ vi.mock("react-router-dom", () => ({
     React.createElement("a", { href: to, ...props }, children),
 }));
 
-type ResolvedKeyState = { apiKey: string | null; provider: string | null; useOwnKey: boolean };
+type ResolvedKeyState = {
+  apiKey: string | null;
+  hasKey: boolean;
+  provider: string | null;
+  useOwnKey: boolean;
+  last4?: string | null;
+};
 
 // Default resolved state: no key saved
-const NO_KEY_STATE: ResolvedKeyState = { apiKey: null, provider: null, useOwnKey: false };
+const NO_KEY_STATE: ResolvedKeyState = { apiKey: null, hasKey: false, provider: null, useOwnKey: false };
 
 // State with a saved key
 const SAVED_KEY_STATE: ResolvedKeyState = {
-  apiKey: "sk-decryptedkey1234567890abcdef",
+  apiKey: null,
+  hasKey: true,
   provider: "openai",
   useOwnKey: true,
+  last4: "bcdef",
 };
 
 async function renderAndWait(overrideState: ResolvedKeyState = NO_KEY_STATE) {
@@ -119,18 +127,19 @@ describe("ApiKeySettings — initial render", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 1b. Starter gate (free tier cannot use BYOK)
+// 1b. All tiers can use BYOK (no paid gate)
 // ---------------------------------------------------------------------------
-describe("ApiKeySettings — Starter gate", () => {
-  it("free-tier user sees an upgrade CTA instead of the key form", async () => {
-    mockUseSubscription.mockReturnValue({ canUseOwnKey: false, loading: false });
+describe("ApiKeySettings — BYOK access", () => {
+  it("free-tier user sees the API key form directly (no upgrade CTA gate)", async () => {
+    // canUseOwnKey is now always true; even if it were false the form shows
+    mockUseSubscription.mockReturnValue({ canUseOwnKey: true, loading: false });
     await renderAndWait();
 
-    // Form input is hidden behind the gate
-    expect(screen.queryByLabelText("API Key")).not.toBeInTheDocument();
-    // Upgrade CTA is shown
-    expect(screen.getByText(/paid feature/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /view plans/i })).toBeInTheDocument();
+    // Form is directly accessible
+    expect(screen.getByLabelText("API Key")).toBeInTheDocument();
+    // No upgrade gate
+    expect(screen.queryByText(/paid feature/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /view plans/i })).not.toBeInTheDocument();
   });
 });
 

@@ -28,10 +28,10 @@ export default function ResetPassword() {
       if (data.session) { resolved = true; setReady(true); }
     });
 
-    // Timeout: if neither event nor session resolves the link in 6s, treat as invalid/expired.
+    // Timeout: if neither event nor session resolves the link in 20s, treat as invalid/expired.
     const timer = setTimeout(() => {
       if (!resolved) setLinkExpired(true);
-    }, 6000);
+    }, 20000);
 
     return () => { sub.subscription.unsubscribe(); clearTimeout(timer); };
   }, []);
@@ -80,10 +80,10 @@ export default function ResetPassword() {
           )}
           {ready && !linkExpired && (
             <form onSubmit={handleSubmit}>
-              <div className="rp-label">New password</div>
-              <input className="rp-input" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters" />
-              <div className="rp-label">Confirm password</div>
-              <input className="rp-input" type="password" required minLength={6} value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat it" />
+              <label className="rp-label" htmlFor="rp-password">New password</label>
+              <input id="rp-password" className="rp-input" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters" />
+              <label className="rp-label" htmlFor="rp-confirm">Confirm password</label>
+              <input id="rp-confirm" className="rp-input" type="password" required minLength={6} value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat it" />
               {error && <div className="rp-err">{error}</div>}
               <button className="rp-btn" type="submit" disabled={loading}>{loading ? "Saving…" : "Update password"}</button>
               <div className="rp-link-row">

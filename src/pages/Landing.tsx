@@ -515,9 +515,9 @@ export default function Landing() {
           <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
             <p>© {new Date().getFullYear()} ContentForge · Built for serious content teams</p>
             <div className="flex gap-6">
-              <a href="#" className="hover:text-slate-400 transition-colors">Privacy</a>
-              <a href="#" className="hover:text-slate-400 transition-colors">Terms</a>
-              <a href="#" className="hover:text-slate-400 transition-colors">Docs</a>
+              <a href="/privacy" className="hover:text-slate-400 transition-colors">Privacy</a>
+              <a href="/terms" className="hover:text-slate-400 transition-colors">Terms</a>
+              <a href="/docs" className="hover:text-slate-400 transition-colors">Docs</a>
             </div>
           </div>
         </footer>

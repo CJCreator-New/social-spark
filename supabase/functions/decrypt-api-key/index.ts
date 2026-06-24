@@ -1,4 +1,7 @@
+// deno-lint-ignore-file
+// @ts-ignore - Deno ESM import resolved at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+declare const Deno: { env: { get(key: string): string | undefined }; serve(handler: (req: Request) => Response | Promise<Response>): void; openKv(): Promise<any> };
 import { checkRateLimit, corsHeaders } from "../_shared/promptHelpers.ts";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -14,7 +17,7 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -78,8 +81,9 @@ Deno.serve(async (req) => {
     });
 
     return jsonResponse({
-      apiKey: resultRow.decrypted_key,
+      hasKey: !!resultRow.decrypted_key,
       provider: resultRow.api_provider,
+      last4: resultRow.decrypted_key ? resultRow.decrypted_key.slice(-4) : null,
     });
   } catch (e) {
     console.error("decrypt-api-key handler error:", e);

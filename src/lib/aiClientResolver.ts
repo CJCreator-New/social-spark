@@ -19,18 +19,18 @@ export async function resolveAiClient(
   const userKeyInfo = await getUserApiKey();
 
   // If the user has configured "always use my key", bypass the platform entirely
-  if (userKeyInfo.useOwnKey && userKeyInfo.keyMode === 'always' && userKeyInfo.apiKey && userKeyInfo.provider) {
+  if (userKeyInfo.useOwnKey && userKeyInfo.keyMode === 'always' && userKeyInfo.hasKey && userKeyInfo.provider) {
     return {
-      apiKey: userKeyInfo.apiKey,
+      apiKey: userKeyInfo.apiKey || "USER_KEY_STORED_SERVERSIDE",
       provider: userKeyInfo.provider,
       source: "user",
     };
   }
 
   // Fallback to user-supplied key (only when useOwnKey is enabled and key exists)
-  if (userKeyInfo.useOwnKey && userKeyInfo.apiKey && userKeyInfo.provider) {
+  if (userKeyInfo.useOwnKey && userKeyInfo.hasKey && userKeyInfo.provider) {
     return {
-      apiKey: userKeyInfo.apiKey,
+      apiKey: userKeyInfo.apiKey || "USER_KEY_STORED_SERVERSIDE",
       provider: userKeyInfo.provider,
       source: "user",
     };

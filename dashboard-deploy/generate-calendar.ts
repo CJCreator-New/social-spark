@@ -387,6 +387,7 @@ async function getTrendingTopics(
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!SUPABASE_URL || !SERVICE_KEY) return [];
 
+    // @ts-ignore - Deno ESM import resolved at runtime
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -458,7 +459,7 @@ async function checkRateLimit(userId: string, endpoint: string, config: RateLimi
 type EffectiveTier = "free" | "starter" | "pro";
 
 async function checkQuota(userId: string): Promise<{ allowed: boolean; used: number; limit: number; useOwnKey: boolean; keyMode: string; tier: EffectiveTier }> {
-  const DEFAULT = { allowed: true, used: 0, limit: 10, useOwnKey: false, keyMode: "fallback", tier: "free" as EffectiveTier };
+  const DEFAULT = { allowed: true, used: 0, limit: 50, useOwnKey: false, keyMode: "fallback", tier: "free" as EffectiveTier };
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SUPABASE_URL || !SUPABASE_KEY) return DEFAULT;
@@ -487,7 +488,7 @@ async function checkQuota(userId: string): Promise<{ allowed: boolean; used: num
     if (!row) return DEFAULT;
 
     const used = row.generation_count ?? 0;
-    const limit = row.quota_limit ?? 10;
+    const limit = row.quota_limit ?? 50;
     const useOwnKey = !!row.use_own_key;
     const keyMode = row.key_mode || "fallback";
 
@@ -507,34 +508,30 @@ async function checkQuota(userId: string): Promise<{ allowed: boolean; used: num
 }
 
 /**
- * Free users cannot bring their own API key (BYOK is a paid Starter/Pro
- * capability). Returns a 402 response when a free-tier request carries a user
- * key, otherwise null. Enforced server-side so the gate can't be bypassed by
- * crafting a request body. `tier` should be the EFFECTIVE tier from checkQuota.
+ * BYOK is now available to all tiers — this function is retained as a no-op
+ * so existing callers don't need to be updated immediately.
+ * @deprecated Remove call sites; BYOK is no longer gated behind a paid tier.
  */
 function rejectFreeTierByok(
-  payload: { userApiKey?: string },
-  tier: EffectiveTier,
+  _useOwnKey: boolean,
+  _tier: EffectiveTier,
 ): Response | null {
-  if (payload.userApiKey && tier === "free") {
-    return jsonResponse({
-      error: "UPGRADE_REQUIRED",
-      message: "Using your own API key requires a Starter or Pro plan. Upgrade in Settings to continue.",
-    }, 402);
-  }
   return null;
 }
 
 /**
- * Message shown when a user has exhausted their generation quota. Tailored by
- * effective tier: free users are pointed at upgrading (BYOK is paid-only), while
- * starter/pro users are pointed at adding their own key or renewing their plan.
+ * Message shown when a user has exhausted their monthly platform generation
+ * quota. Points free users at upgrading for more platform credits; all users
+ * can use BYOK (Settings > API Keys, 'Always use my key') to bypass the quota.
  */
 function quotaExceededMessage(tier: EffectiveTier): string {
   if (tier === "free") {
-    return "You've used all your free generations. Upgrade to Starter or Pro for more — Starter also unlocks adding your own API key for unlimited generations.";
+    return "You've used your 50 free platform generations this month. Upgrade for more platform credits, or add your own API key (Settings → API Keys) to keep generating at no platform cost.";
   }
-  return "You've used your plan's generations for this period. Add your own API key (Settings > API Keys, 'Always use my key') to keep generating, or renew your plan for a fresh quota.";
+  if (tier === "starter") {
+    return "You've used your 100 Starter generations this month. Add your own API key (Settings → API Keys, 'Always use my key') to keep generating, or upgrade to Pro for 500 monthly generations.";
+  }
+  return "You've used your 500 Pro generations this month. Add your own API key (Settings → API Keys, 'Always use my key') to keep generating without limits.";
 }
 
 async function incrementGenerationCount(userId: string): Promise<void> {
@@ -1456,8 +1453,41 @@ async function callAIGatewayOnce(
     max_tokens?: number;
   } = {}
 ): Promise<GatewayResult> {
+  let userApiKey = opts.userApiKey;
+  let userApiProvider = opts.userApiProvider;
+
+  if ((!userApiKey || userApiKey === "USER_KEY_STORED_SERVERSIDE") && opts.userToken) {
+    try {
+      const supabaseUrl = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_URL") : null;
+      const supabaseAnonKey = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_ANON_KEY") : null;
+      if (supabaseUrl && supabaseAnonKey) {
+        // @ts-ignore: Deno dynamic import
+        const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+        const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+          global: {
+            headers: {
+              Authorization: `Bearer ${opts.userToken}`,
+            },
+          },
+        });
+        const { data, error } = await userClient.rpc("get_decrypted_api_key");
+        if (error) {
+          console.error("get_decrypted_api_key RPC failed server-side:", error.message || error);
+        } else {
+          const row = Array.isArray(data) ? data[0] : data;
+          if (row && row.decrypted_key) {
+            userApiKey = row.decrypted_key;
+            userApiProvider = row.api_provider;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to decrypt user API key server-side:", err);
+    }
+  }
+
   // If userApiKey is provided, route through callAI helper
-  if (opts.userApiKey && opts.userApiProvider) {
+  if (userApiKey && userApiProvider) {
     // Asynchronously log the fallback usage to the audit log
     const supabaseUrl = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_URL") : null;
     const supabaseServiceKey = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") : null;
@@ -1478,7 +1508,7 @@ async function callAIGatewayOnce(
                 const { error: logErr } = await adminClient.from("api_key_audit_log").insert({
                   user_id: userId,
                   action: "used",
-                  provider: opts.userApiProvider,
+                  provider: userApiProvider,
                   source: "user",
                   ip_address: opts.userIp || null,
                 });
@@ -1497,8 +1527,8 @@ async function callAIGatewayOnce(
       }
     }
 
-    return callAI(messages, tool, opts.userApiKey, {
-      provider: opts.userApiProvider as any,
+    return callAI(messages, tool, userApiKey, {
+      provider: userApiProvider as any,
       quality: opts.quality,
       model: opts.model,
       temperature: opts.temperature,
@@ -1703,10 +1733,11 @@ function normalizePost(
     });
     if (missing.length > 0) {
       console.warn(`Post generation missing required words: ${missing.join(", ")}`);
-      const selfCheck = p.self_check && typeof p.self_check === "object"
+      const selfCheckBase = p.self_check && typeof p.self_check === "object"
         ? { ...p.self_check as Record<string, unknown> }
-        : { forbidden_violations: [], checks_passed: true, notes: "" };
-      const violations = (Array.isArray(selfCheck.forbidden_violations) ? [...selfCheck.forbidden_violations] : []) as string[];
+        : { forbidden_violations: [] as string[], checks_passed: true, notes: "" };
+      const selfCheck = selfCheckBase as Record<string, unknown> & { forbidden_violations: string[]; checks_passed: boolean };
+      const violations: string[] = Array.isArray(selfCheck.forbidden_violations) ? [...selfCheck.forbidden_violations as string[]] : [];
       missing.forEach(w => violations.push(`Missing required word: "${w}"`));
       selfCheck.forbidden_violations = violations;
       selfCheck.checks_passed = false;
@@ -1785,10 +1816,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const quota = await checkQuota(userId);
-
-    // Free users cannot use their own API key (paid capability).
-    const byokRejection = rejectFreeTierByok(payload, quota.tier);
-    if (byokRejection) return byokRejection;
 
     const usingSharedKey = !payload.userApiKey && !(quota.useOwnKey && quota.keyMode === "always");
     if (usingSharedKey && !quota.allowed) {

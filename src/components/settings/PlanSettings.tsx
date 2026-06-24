@@ -1,4 +1,4 @@
-import { CheckCircle2, Sparkles, Zap, Crown } from "lucide-react";
+import { CheckCircle2, Sparkles, Zap, Crown, AlertCircle } from "lucide-react";
 import { RazorpayCheckoutButton } from "@/components/RazorpayCheckoutButton";
 import { useSubscription } from "@/hooks/useSubscription";
 import { daysRemaining, type Tier } from "@/lib/subscription";
@@ -23,7 +23,7 @@ const PLANS: Array<{
     price: "₹0",
     cadence: "",
     icon: Sparkles,
-    features: ["10 generations", "Platform AI", "Calendar + single posts"],
+    features: ["50 platform generations / month", "BYOK (use your own API key)", "Calendar + single posts"],
     purchasable: false,
   },
   {
@@ -32,7 +32,7 @@ const PLANS: Array<{
     price: "₹199",
     cadence: "/ 30 days",
     icon: Zap,
-    features: ["Use your own API key (BYOK)", "Up to 1,000 generations", "You control AI costs"],
+    features: ["100 platform generations / month", "BYOK — you control AI costs", "Priority support"],
     purchasable: true,
   },
   {
@@ -41,7 +41,7 @@ const PLANS: Array<{
     price: "₹499",
     cadence: "/ 30 days",
     icon: Crown,
-    features: ["300 platform generations / mo", "Premium features", "BYOK supported"],
+    features: ["500 platform generations / month", "BYOK for unlimited generations", "Premium features"],
     purchasable: true,
   },
 ];
@@ -58,12 +58,33 @@ export function PlanSettings() {
         <span>Plan &amp; Billing</span>
       </h2>
 
+      {status.active && remaining !== null && remaining <= 3 && (
+        <div
+          role="alert"
+          className="pf-notice"
+          style={{
+            marginBottom: 16,
+            borderColor: "rgba(240, 154, 154, 0.2)",
+            background: "rgba(240, 154, 154, 0.04)",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <AlertCircle size={16} style={{ color: "#f09a9a", flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: "#edeae3" }}>
+            Your subscription will expire in <strong style={{ color: "#f09a9a" }}>{remaining} day{remaining === 1 ? "" : "s"}</strong>.
+            Renew now to prevent any service interruption.
+          </span>
+        </div>
+      )}
+
       {/* Current plan + expiry */}
       <div className="pf-section-sub" style={{ marginBottom: 16 }}>
         {loading ? (
           "Loading your plan…"
         ) : current === "free" ? (
-          "You're on the Free plan. Upgrade to use your own API key or get more generations."
+          "You're on the Free plan. Upgrade to get more monthly platform generations."
         ) : (
           <>
             You're on <strong style={{ color: "#c8f09a", textTransform: "capitalize" }}>{current}</strong>

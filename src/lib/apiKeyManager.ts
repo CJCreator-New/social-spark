@@ -9,12 +9,12 @@ import { getE2EAuthFlag } from "@/lib/e2eFixtures";
  */
 export function validateApiKeyFormat(key: string, provider: 'openai' | 'anthropic' | 'openrouter'): boolean {
   const patterns = {
-    // OpenAI: sk- followed by alphanumeric and hyphens, min 20 total chars (covers sk-proj-... variants)
-    openai: /^sk-[a-zA-Z0-9-]{20,}$/,
-    // Anthropic: sk-ant- followed by alphanumeric and hyphens, min 32 chars after prefix
-    anthropic: /^sk-ant-[a-zA-Z0-9-]{32,}$/,
-    // OpenRouter: sk-or- followed by alphanumeric and hyphens, min 32 chars after prefix
-    openrouter: /^sk-or-[a-zA-Z0-9-]{32,}$/,
+    // OpenAI: sk- followed by alphanumeric, hyphens, and underscores, min 20 total chars (covers sk-proj-... variants)
+    openai: /^sk-[a-zA-Z0-9_-]{20,}$/,
+    // Anthropic: sk-ant- followed by alphanumeric, hyphens, and underscores, min 20 chars after prefix
+    anthropic: /^sk-ant-[a-zA-Z0-9_-]{20,}$/,
+    // OpenRouter: sk-or- followed by alphanumeric, hyphens, and underscores, min 20 chars after prefix
+    openrouter: /^sk-or-[a-zA-Z0-9_-]{20,}$/,
   };
   return patterns[provider]?.test(key) ?? false;
 }
@@ -71,13 +71,15 @@ export async function saveUserApiKey(apiKey: string, provider: 'openai' | 'anthr
 
 export async function getUserApiKey(): Promise<{
   apiKey: string | null;
+  hasKey: boolean;
   provider: 'openai' | 'anthropic' | 'openrouter' | null;
   useOwnKey: boolean;
   keyMode: 'fallback' | 'always';
+  last4?: string | null;
 }> {
   const token = await getAccessToken();
   if (!token) {
-    return { apiKey: null, provider: null, useOwnKey: false, keyMode: 'fallback' };
+    return { apiKey: null, hasKey: false, provider: null, useOwnKey: false, keyMode: 'fallback' };
   }
 
   const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
@@ -91,13 +93,15 @@ export async function getUserApiKey(): Promise<{
     const keyMode = (localStorage.getItem("social_spark_key_mode") === "always" ? "always" : "fallback") as 'fallback' | 'always';
     return {
       apiKey,
+      hasKey: !!apiKey,
       provider,
       useOwnKey: apiKey ? useOwnKey : false,
       keyMode,
+      last4: apiKey ? apiKey.slice(-4) : null,
     };
   }
 
-  // Call the Edge Function to decrypt the key
+  // Call the Edge Function to decrypt the key (which now returns metadata only)
   const decPromise = fetch(`${SUPABASE_URL}/functions/v1/decrypt-api-key`, {
     method: "POST",
     headers: {
@@ -113,7 +117,7 @@ export async function getUserApiKey(): Promise<{
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.error || `Failed to retrieve API key (${res.status})`);
     }
-    return res.json() as Promise<{ apiKey: string | null; provider: 'openai' | 'anthropic' | 'openrouter' | null }>;
+    return res.json() as Promise<{ hasKey: boolean; provider: 'openai' | 'anthropic' | 'openrouter' | null; last4?: string | null }>;
   });
 
   // Query the user_settings table for use_own_key and key_mode
@@ -134,18 +138,20 @@ export async function getUserApiKey(): Promise<{
 
   try {
     const [decrypted, settings] = await Promise.all([decPromise, settingsPromise]);
-    const hasKey = !!decrypted.apiKey;
 
     return {
-      apiKey: decrypted.apiKey,
+      apiKey: null, // SECURITY: raw plaintext key is never returned to frontend
+      hasKey: decrypted.hasKey,
       provider: decrypted.provider,
-      useOwnKey: hasKey ? settings.useOwnKey : false,
+      useOwnKey: decrypted.hasKey ? settings.useOwnKey : false,
       keyMode: settings.keyMode,
+      last4: decrypted.last4,
     };
   } catch (err) {
     console.error("getUserApiKey failed:", err);
     return {
       apiKey: null,
+      hasKey: false,
       provider: null,
       useOwnKey: false,
       keyMode: 'fallback',
@@ -182,7 +188,7 @@ export async function getQuotaStatus(): Promise<{
     const row = data as unknown as { generation_count?: number; quota_limit?: number; use_own_key?: boolean; key_mode?: string } | null;
     return {
       used: row?.generation_count ?? 0,
-      limit: row?.quota_limit ?? 10,
+      limit: row?.quota_limit ?? 50,
       useOwnKey: row?.use_own_key || false,
       keyMode: (row?.key_mode === 'always' ? 'always' : 'fallback'),
     };

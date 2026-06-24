@@ -28,8 +28,8 @@ export const FREE_STATUS: SubscriptionStatus = {
   planPeriodEnd: null,
   active: false,
   used: 0,
-  limit: 10,
-  canUseOwnKey: false,
+  limit: 50,
+  canUseOwnKey: true,
 };
 
 function isMockEnv(): boolean {
@@ -41,7 +41,7 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
   if (isMockEnv()) {
     const tier = (localStorage.getItem("social_spark_tier") as Tier) || "free";
     const periodEnd = localStorage.getItem("social_spark_plan_period_end");
-    return computeStatus(tier, periodEnd, Number(localStorage.getItem("social_spark_generation_count") || "0"), 10);
+    return computeStatus(tier, periodEnd, Number(localStorage.getItem("social_spark_generation_count") || "0"), 50);
   }
 
   const { data: { session } } = await supabase.auth.getSession();
@@ -60,7 +60,7 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
     if (!row) return FREE_STATUS;
 
     const tier = (row.tier === "starter" || row.tier === "pro") ? row.tier : "free";
-    return computeStatus(tier, row.plan_period_end ?? null, row.generation_count ?? 0, row.quota_limit ?? 10);
+    return computeStatus(tier, row.plan_period_end ?? null, row.generation_count ?? 0, row.quota_limit ?? 50);
   } catch (err) {
     // Schema may predate the tier migration (PostgREST 404 on unknown columns).
     // Degrade gracefully: read only the always-present quota columns and treat
@@ -72,7 +72,7 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
           .select("generation_count, quota_limit")
           .maybeSingle();
         const row = data as unknown as Row;
-        return computeStatus("free", null, row?.generation_count ?? 0, row?.quota_limit ?? 10);
+        return computeStatus("free", null, row?.generation_count ?? 0, row?.quota_limit ?? 50);
       } catch {
         return FREE_STATUS;
       }
@@ -106,7 +106,7 @@ function computeStatus(tier: Tier, planPeriodEnd: string | null, used: number, l
     active,
     used,
     limit,
-    canUseOwnKey: effectiveTier === "starter" || effectiveTier === "pro",
+    canUseOwnKey: true, // BYOK is available to all tiers
   };
 }
 

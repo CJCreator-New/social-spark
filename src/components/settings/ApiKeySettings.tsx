@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+
 import { saveUserApiKey, getUserApiKey, setUseOwnKey, deleteUserApiKey, getQuotaStatus } from "@/lib/apiKeyManager";
 import { toast } from "sonner";
-import { Eye, EyeOff, Save, Key, CheckCircle2, AlertCircle, Loader2, Trash2, ShieldCheck, Info, Lock } from "lucide-react";
+import { Eye, EyeOff, Save, Key, CheckCircle2, AlertCircle, Loader2, Trash2, ShieldCheck, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useSubscription } from "@/hooks/useSubscription";
 
 export function ApiKeySettings() {
-  const { canUseOwnKey, loading: subLoading } = useSubscription();
   const [provider, setProvider] = useState<'openai' | 'anthropic' | 'openrouter'>("openai");
   const [showKey, setShowKey] = useState(false);
   const [useOwnKey, setUseOwnKeyVal] = useState(false);
@@ -81,10 +79,8 @@ export function ApiKeySettings() {
         if (data.provider) setProvider(data.provider);
         setUseOwnKeyVal(data.useOwnKey);
         if (data.keyMode) setKeyMode(data.keyMode);
-        if (data.apiKey) {
-          // Mask the key: show only last 4 chars, e.g. ••••••••xQ3Z
-          const last4 = data.apiKey.slice(-4);
-          setSavedKeyPreview(`••••••••${last4}`);
+        if (data.hasKey && data.last4) {
+          setSavedKeyPreview(`••••••••${data.last4}`);
         }
       } catch (err) {
         console.error("Failed to load user API key settings:", err);
@@ -110,6 +106,13 @@ export function ApiKeySettings() {
     try {
       const rawKey = keyInputRef.current?.value?.trim() ?? "";
       const isNewKey = rawKey && !rawKey.startsWith("••••");
+      const hasSavedKey = !!savedKeyPreview;
+
+      if (useOwnKey && !isNewKey && !hasSavedKey) {
+        toast.error("Please enter an API key to enable custom API key fallback.");
+        setLoading(false);
+        return;
+      }
 
       if (isNewKey) {
         await saveUserApiKey(rawKey, provider);
@@ -190,7 +193,7 @@ export function ApiKeySettings() {
       {quota && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9a9aae", marginBottom: 4 }}>
-            <span>Free generations used</span>
+            <span>Monthly platform generations used</span>
             <span>{Math.min(quota.used, quota.limit)} / {quota.limit}</span>
           </div>
           <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
@@ -207,8 +210,8 @@ export function ApiKeySettings() {
             <div role="alert" className="pf-notice" style={{ marginTop: 10, borderColor: "rgba(240, 154, 154, 0.2)" }}>
               <AlertCircle size={14} style={{ color: "#f09a9a", flexShrink: 0, marginTop: 1 }} />
               <span>
-                You've used your free generations for now — more are coming soon! Add your own API key below and
-                enable "Always use my key" to keep generating in the meantime.
+                You've used your platform generations for this month. Upgrade for more credits, or add your
+                own API key below and enable "Always use my key" to keep generating at no platform cost.
               </span>
             </div>
           )}
@@ -219,25 +222,6 @@ export function ApiKeySettings() {
         Configure your own AI API key to be used as a fallback if the platform-level generation is rate-limited or unavailable.
       </div>
 
-      {!subLoading && !canUseOwnKey ? (
-        <div
-          role="note"
-          className="pf-notice"
-          style={{ flexDirection: "column", alignItems: "flex-start", gap: 10, borderColor: "rgba(200,240,154,0.2)" }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#edeae3", fontWeight: 600 }}>
-            <Lock size={14} style={{ color: "#c8f09a" }} />
-            <span>Using your own API key is a paid feature</span>
-          </div>
-          <span style={{ color: "#9a9aae" }}>
-            Upgrade to <strong style={{ color: "#c8f09a" }}>Starter</strong> (or Pro) to securely store and use your own
-            OpenAI, Anthropic, or OpenRouter key for content generation.
-          </span>
-          <Link to="/profile?tab=plan" className="pf-btn" style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
-            <span>View plans</span>
-          </Link>
-        </div>
-      ) : (
       <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {statusMsg && (
           <div
@@ -482,7 +466,6 @@ export function ApiKeySettings() {
           )}
         </div>
       </form>
-      )}
     </div>
 
       <div className="pf-card" style={{ marginTop: 24 }}>

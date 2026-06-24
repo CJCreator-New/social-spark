@@ -22,20 +22,20 @@ export interface PlanConfig {
 }
 
 export const PLAN_CATALOG: Record<PaidPlan, PlanConfig> = {
-  // Starter: unlocks BYOK (user pays their own AI costs). Soft generation cap.
+  // Starter: 100 monthly platform generations + BYOK available to all tiers.
   starter: {
     tier: "starter",
     amount: 19900, // ₹199
     currency: "INR",
-    quotaLimit: 1000, // BYOK soft cap
+    quotaLimit: 100, // monthly platform generations
     label: "Social Spark Starter",
   },
-  // Pro: high platform quota + premium features.
+  // Pro: 500 monthly platform generations + premium features.
   pro: {
     tier: "pro",
     amount: 49900, // ₹499
     currency: "INR",
-    quotaLimit: 300, // monthly platform generations
+    quotaLimit: 500, // monthly platform generations
     label: "Social Spark Pro",
   },
 };

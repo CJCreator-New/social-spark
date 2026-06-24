@@ -18,6 +18,9 @@ const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const Landing = lazyWithRetry(() => import("./pages/Landing"));
+const Privacy = lazyWithRetry(() => import("./pages/Privacy"));
+const Terms = lazyWithRetry(() => import("./pages/Terms"));
+const Docs = lazyWithRetry(() => import("./pages/Docs"));
 
 function E2ECrashRoute(): JSX.Element {
   throw new Error("Test error");
@@ -61,6 +64,9 @@ const App = () => {
                   <Route path="/auth" element={<Suspense fallback={<RouteFallback title="Sign In" />}><Auth /></Suspense>} />
                   <Route path="/reset-password" element={<Suspense fallback={<RouteFallback title="Reset Password" />}><ResetPassword /></Suspense>} />
                   <Route path="/" element={<Suspense fallback={<RouteFallback title="ContentForge" />}><Landing /></Suspense>} />
+                  <Route path="/privacy" element={<Suspense fallback={<RouteFallback title="Privacy Policy" />}><Privacy /></Suspense>} />
+                  <Route path="/terms" element={<Suspense fallback={<RouteFallback title="Terms of Service" />}><Terms /></Suspense>} />
+                  <Route path="/docs" element={<Suspense fallback={<RouteFallback title="Docs" />}><Docs /></Suspense>} />
                   <Route path="/__e2e/crash" element={<E2ECrashRoute />} />
                   <Route
                     element={

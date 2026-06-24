@@ -153,8 +153,8 @@ export default function AuthPage() {
             {tab === "forgot" ? (
               <form onSubmit={handleForgot}>
                 <div className="auth-field">
-                  <div className="auth-label">Email</div>
-                  <input className="auth-input" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" />
+                  <label className="auth-label" htmlFor="forgot-email">Email</label>
+                  <input id="forgot-email" className="auth-input" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" />
                 </div>
                 {error && <div className="auth-err" role="alert" aria-live="assertive">{error}</div>}
                 {info && <div className="auth-ok" role="status" aria-live="polite">{info}</div>}
@@ -180,17 +180,17 @@ export default function AuthPage() {
               >
                 {tab === "signup" && (
                   <div className="auth-field">
-                    <div className="auth-label">Display name</div>
-                    <input className="auth-input" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" />
+                    <label className="auth-label" htmlFor="auth-name">Display name</label>
+                    <input id="auth-name" className="auth-input" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" />
                   </div>
                 )}
                 <div className="auth-field">
-                  <div className="auth-label">Email</div>
-                  <input className="auth-input" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" />
+                  <label className="auth-label" htmlFor="auth-email">Email</label>
+                  <input id="auth-email" className="auth-input" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" />
                 </div>
                 <div className="auth-field">
-                  <div className="auth-label">Password</div>
-                  <input className="auth-input" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters" aria-describedby={tab === "signup" ? "pw-strength" : undefined} />
+                  <label className="auth-label" htmlFor="auth-password">Password</label>
+                  <input id="auth-password" className="auth-input" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters" aria-describedby={tab === "signup" ? "pw-strength" : undefined} />
                   {tab === "signup" && password.length > 0 && (
                     <div id="pw-strength" style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ display: "flex", gap: 3 }}>
@@ -231,6 +231,13 @@ export default function AuthPage() {
                 </button>
                 {tab === "signin" && (
                   <button type="button" className="auth-forgot" onClick={() => switchTab("forgot")}>Forgot password?</button>
+                )}
+                {tab === "signup" && (
+                  <p className="auth-inline-note" style={{ marginTop: 10, fontSize: 11 }}>
+                    By creating an account, you agree to our{" "}
+                    <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a> and{" "}
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+                  </p>
                 )}
               </form>
             )}

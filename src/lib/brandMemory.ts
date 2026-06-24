@@ -58,6 +58,27 @@ export interface AiGenerationRequestBody {
   userApiProvider?: string | null;
 }
 
+/**
+ * Errors that indicate a client/validation/quota problem — these should surface
+ * directly to the user and NOT trigger the user-key fallback path.
+ * Fallback should only happen for infrastructure failures (network, 5xx, 429).
+ */
+const NON_FALLBACK_ERRORS = [
+  "Missing core idea",
+  "Missing core idea or topics",
+  "Sign in required",
+  "Unauthorized",
+  "QUOTA_EXCEEDED",
+  "UPGRADE_REQUIRED",
+  "Rate limit exceeded",
+  "Request body too large",
+  "Invalid request",
+];
+
+function isNonFallbackError(message: string): boolean {
+  return NON_FALLBACK_ERRORS.some((prefix) => message.startsWith(prefix) || message.includes(prefix));
+}
+
 export async function generateWithFallback<T = unknown>(
   endpoint: string,
   body: AiGenerationRequestBody,
@@ -80,14 +101,15 @@ export async function generateWithFallback<T = unknown>(
     ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
   };
 
-  // Resolve user key settings upfront (needed to check key_mode)
+  // Resolve user key settings upfront (needed to check key_mode).
+  // Swallow any network errors here — key lookup failure is not fatal at this stage.
   const userKeyInfo = await resolveAiClient(false).catch(() => null);
 
   // If user has configured "always use my key", inject immediately and skip platform
   if (userKeyInfo && userKeyInfo.source === "user") {
     const alwaysBody = {
       ...body,
-      userApiKey: userKeyInfo.apiKey,
+      userApiKey: userKeyInfo.apiKey === "USER_KEY_STORED_SERVERSIDE" ? undefined : userKeyInfo.apiKey,
       userApiProvider: userKeyInfo.provider,
     };
     const res = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
@@ -114,6 +136,12 @@ export async function generateWithFallback<T = unknown>(
       signal: abortSignal,
     });
 
+    // 4xx client errors (validation, auth, quota) — surface directly, do NOT fall back
+    if (!res.ok && res.status >= 400 && res.status < 500) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.error || `Request failed (${res.status})`);
+    }
+
     if (!res.ok && (res.status === 429 || res.status >= 500)) {
       throw new Error(`Platform failed with status ${res.status}`);
     }
@@ -121,6 +149,10 @@ export async function generateWithFallback<T = unknown>(
     const data = await res.json();
     if (data?.error === "QUOTA_EXCEEDED" || data?.error === "UPGRADE_REQUIRED") {
       throw new Error(data.message || data.error);
+    }
+    // Treat validation/auth errors returned in a 200 body as non-fallback errors
+    if (data?.error && isNonFallbackError(String(data.error))) {
+      throw new Error(data.error);
     }
     if (data?.error) {
       throw new Error(data.error);
@@ -133,9 +165,16 @@ export async function generateWithFallback<T = unknown>(
       throw err;
     }
 
-    console.warn(`Platform AI call failed (${err instanceof Error ? err.message : String(err)}). Attempting fallback key...`);
+    const errMessage = err instanceof Error ? err.message : String(err);
 
-    // Platform failed — try user key as fallback
+    // Validation/auth/quota errors must surface directly — no point trying a different key
+    if (isNonFallbackError(errMessage)) {
+      throw err;
+    }
+
+    console.warn(`Platform AI call failed (${errMessage}). Attempting fallback key...`);
+
+    // Platform failed — try user key as fallback (infrastructure failure only)
     let fallbackClient: Awaited<ReturnType<typeof resolveAiClient>>;
     try {
       fallbackClient = await resolveAiClient(false);
@@ -146,7 +185,7 @@ export async function generateWithFallback<T = unknown>(
 
     const fallbackBody = {
       ...body,
-      userApiKey: fallbackClient.apiKey,
+      userApiKey: fallbackClient.apiKey === "USER_KEY_STORED_SERVERSIDE" ? undefined : fallbackClient.apiKey,
       userApiProvider: fallbackClient.provider,
     };
 
