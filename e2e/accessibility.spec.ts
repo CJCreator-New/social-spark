@@ -5,6 +5,7 @@ import { getE2EAuthFlag, E2E_CALENDAR } from "../src/lib/e2eFixtures";
 async function enableE2EAuth(page: Page) {
   await page.addInitScript((flag) => {
     window.localStorage.setItem(flag, "true");
+    window.localStorage.setItem("social_spark_onboarding_completed", "true");
   }, getE2EAuthFlag());
 }
 

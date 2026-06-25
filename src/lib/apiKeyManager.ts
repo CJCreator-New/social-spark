@@ -69,6 +69,58 @@ export async function saveUserApiKey(apiKey: string, provider: 'openai' | 'anthr
   }
 }
 
+/**
+ * Live-validates an API key by asking the server to make a minimal real call
+ * to the provider. The raw key is sent to our own edge function only (over
+ * HTTPS) and is never stored on this path. Returns whether the key works and,
+ * when it doesn't, a human-readable reason to show the user.
+ */
+export async function validateUserApiKey(
+  apiKey: string,
+  provider: 'openai' | 'anthropic' | 'openrouter'
+): Promise<{ valid: boolean; reason?: string }> {
+  // Cheap client-side format gate first — avoids a network round-trip for
+  // obviously malformed keys.
+  if (!validateApiKeyFormat(apiKey, provider)) {
+    return { valid: false, reason: "INVALID_KEY_FORMAT" };
+  }
+
+  const token = await getAccessToken();
+  if (!token) {
+    throw new Error("User session not found");
+  }
+
+  const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+  const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
+
+  // In a mock Supabase environment there is no provider to call — treat a
+  // well-formed key as valid so local/E2E flows aren't blocked.
+  if (!SUPABASE_URL || SUPABASE_URL.includes("mock.supabase.co")) {
+    return { valid: true };
+  }
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/encrypt-api-key`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action: "validate", apiKey, provider }),
+  });
+
+  const data = await res.json().catch(() => ({} as { valid?: boolean; reason?: string }));
+
+  if (res.status === 429) {
+    return { valid: false, reason: "Too many checks. Please wait a moment and try again." };
+  }
+  if (!res.ok && typeof data?.valid !== "boolean") {
+    return { valid: false, reason: data?.reason || `Validation failed (${res.status})` };
+  }
+
+  return { valid: Boolean(data?.valid), reason: data?.reason };
+}
+
 export async function getUserApiKey(): Promise<{
   apiKey: string | null;
   hasKey: boolean;

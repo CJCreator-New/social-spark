@@ -14,6 +14,7 @@ import { TierBadge } from "@/components/TierBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { LayoutTemplate } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Helmet } from "react-helmet-async";
 import "@/styles/pages.css";
 
 
@@ -57,7 +58,7 @@ function TemplatesList() {
     }
   }
 
-  if (loading) return <div style={{ color: '#7a7a8e' }}>Loading templates…</div>;
+  if (loading) return <div style={{ color: '#78716c', fontSize: 13 }}>Loading templates…</div>;
   if (templates.length === 0) return (
     <EmptyState
       icon={LayoutTemplate}
@@ -71,10 +72,10 @@ function TemplatesList() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
       {templates.map(t => (
-        <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, border: '1px solid rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
+        <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, border: '1px solid #e7e5e4', padding: '10px 12px', borderRadius: 10, background: '#ffffff' }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600 }}>{t.name}</div>
-            <div style={{ fontSize: 12, color: '#7a7a8e' }}>{t.description || ''} · {new Date(t.created_at).toLocaleString()}</div>
+            <div style={{ fontWeight: 600, color: '#1c1917', fontSize: 13 }}>{t.name}</div>
+            <div style={{ fontSize: 11, color: '#78716c', marginTop: 2 }}>{t.description || ''} · {new Date(t.created_at).toLocaleString()}</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="pf-add-btn" onClick={() => handleLoad(t)}>Load</button>
@@ -348,37 +349,45 @@ export default function Profile() {
     await handleSave();
     setSavedOnce(true);
   };
+  const tabLabels = {
+    profile: "Account Info",
+    brand: "Brand Defaults",
+    plan: "Plan & Billing",
+    "api-keys": "API Keys",
+  };
+  const pageTitle = `${tabLabels[activeTab] || "Profile"} — Your Profile — ContentForge`;
 
   return (
     <>
+      <Helmet>
+        <title>{pageTitle}</title>
+      </Helmet>
       <WorkspacePage size="narrow">
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <h1 className="pf-title" style={{ margin: 0 }}>Your profile</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
+          <h1 className="pf-title" style={{ margin: 0, color: '#1c1917' }}>Profile &amp; Brand</h1>
           <TierBadge />
         </div>
-        <div className="pf-sub">Update how you appear inside ContentForge and set brand defaults to pre-fill the wizard.</div>
+        <div className="pf-sub" style={{ color: '#57534e' }}>Update how you appear inside ContentForge and set brand defaults to pre-fill the wizard.</div>
 
-        {activeTab !== 'api-keys' && activeTab !== 'plan' && (
-          <div className="pf-summary">
-            <div className="pf-summary-card">
-              <div className="pf-summary-label">Defaults set</div>
-              <div className="pf-summary-value">{activeDefaults}</div>
-              <div className="pf-summary-sub">Profile fields that will pre-fill the next calendar.</div>
-            </div>
-            <div className="pf-summary-card">
-              <div className="pf-summary-label">Audiences</div>
-              <div className="pf-summary-value">{defaultAudiences.length}</div>
-              <div className="pf-summary-sub">Reusable audience presets.</div>
-            </div>
-            <div className="pf-summary-card">
-              <div className="pf-summary-label">Hashtag rules</div>
-              <div className="pf-summary-value">{bannedHashtags.length + requiredHashtags.length}</div>
-              <div className="pf-summary-sub">Guardrails applied across generations.</div>
-            </div>
+        <div className="pf-summary">
+          <div className="pf-summary-card">
+            <div className="pf-summary-label">Defaults set</div>
+            <div className="pf-summary-value">{activeDefaults}</div>
+            <div className="pf-summary-sub">Profile fields that will pre-fill the next calendar.</div>
           </div>
-        )}
+          <div className="pf-summary-card">
+            <div className="pf-summary-label">Audiences</div>
+            <div className="pf-summary-value">{defaultAudiences.length}</div>
+            <div className="pf-summary-sub">Reusable audience presets.</div>
+          </div>
+          <div className="pf-summary-card">
+            <div className="pf-summary-label">Hashtag rules</div>
+            <div className="pf-summary-value">{bannedHashtags.length + requiredHashtags.length}</div>
+            <div className="pf-summary-sub">Guardrails applied across generations.</div>
+          </div>
+        </div>
 
-        <div role="tablist" aria-label="Profile sections" style={{ display: 'flex', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 20, paddingBottom: 0 }}>
+        <div role="tablist" aria-label="Profile sections" style={{ display: 'flex', gap: 4, borderBottom: '1.5px solid #e7e5e4', marginBottom: 24, paddingBottom: 0 }}>
           {([
             { id: 'profile' as const, label: 'Account Info' },
             { id: 'brand' as const, label: 'Brand Defaults' },
@@ -391,26 +400,6 @@ export default function Profile() {
               aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
               className="pf-tab-btn"
-              style={{
-                background: 'none',
-                border: 'none',
-                borderBottom: activeTab === tab.id ? '2px solid #c8f09a' : '2px solid transparent',
-                color: activeTab === tab.id ? '#c8f09a' : '#7c8294',
-                padding: '10px 16px 8px',
-                cursor: 'pointer',
-                fontWeight: activeTab === tab.id ? 600 : 400,
-                fontSize: 13,
-                fontFamily: 'var(--font-body)',
-                marginBottom: -1,
-                transition: 'all 0.15s',
-                outline: 'none',
-                borderRadius: '4px 4px 0 0',
-                letterSpacing: '0.01em',
-              }}
-              onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 0 0 2px rgba(200,240,154,0.5)'; }}
-              onBlur={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
-              onMouseEnter={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.color = '#edeae3'; }}
-              onMouseLeave={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.color = '#7c8294'; }}
             >
               {tab.label}
             </button>
@@ -420,12 +409,12 @@ export default function Profile() {
         {activeTab === 'profile' && (
           <div className="pf-card">
             {profileLoading ? (
-              <div style={{ color: "#7a7a8e", fontSize: 13 }}>Loading…</div>
+              <div style={{ color: "#78716c", fontSize: 13 }}>Loading…</div>
             ) : (
               <>
                 <div className="pf-row">
                   {avatarUrl
-                    ? <img className="pf-avatar" src={avatarUrl} alt="Your avatar" />
+                    ? <img className="pf-avatar" src={avatarUrl} alt="Your avatar" style={{ objectFit: 'cover' }} />
                     : <div className="pf-avatar" aria-hidden="true">{initial}</div>}
                   <div>
                     <label className="pf-uplabel">
@@ -456,7 +445,7 @@ export default function Profile() {
                     {saving ? "Saving…" : "Save changes"}
                   </button>
                   {savedOnce && !saving && (
-                    <span style={{ fontSize: 11, color: '#c8f09a', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 11, color: '#15803d', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 5.5L4.5 8L9.5 3"/></svg>
                       Saved
                     </span>
@@ -545,7 +534,7 @@ export default function Profile() {
               <div className="pf-tagrow" aria-hidden>
                 {brandExamples.length === 0 ? <div className="pf-tagrow-empty">No examples saved</div> : brandExamples.map((b, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                    <div style={{ flex: 1, fontSize: 13, color: '#c8f09a' }}>{b}</div>
+                    <div style={{ flex: 1, fontSize: 13, color: '#57534e' }}>{b}</div>
                     <button className="pf-add-btn" onClick={() => setBrandExamples(prev => prev.filter((_, idx) => idx !== i))}>Remove</button>
                   </div>
                 ))}
@@ -568,9 +557,9 @@ export default function Profile() {
                 {forbiddenPhrases.length === 0
                   ? <span className="pf-tagrow-empty">No forbidden phrases locked</span>
                   : forbiddenPhrases.map(p => (
-                    <span key={p} className="pf-tag" role="listitem" style={{ background: "rgba(240,154,154,0.1)", borderColor: "rgba(240,154,154,0.3)", color: "#f09a9a" }}>
+                    <span key={p} className="pf-tag" role="listitem" style={{ background: "#fee2e2", borderColor: "#fca5a5", color: "#b91c1c" }}>
                       "{p}"
-                      <button className="pf-tag-x" onClick={() => setForbiddenPhrases(prev => prev.filter(x => x !== p))} aria-label={`Remove ${p}`} style={{ color: "rgba(240,154,154,0.6)" }}>×</button>
+                      <button className="pf-tag-x" onClick={() => setForbiddenPhrases(prev => prev.filter(x => x !== p))} aria-label={`Remove ${p}`} style={{ color: "rgba(185,28,28,0.5)" }}>×</button>
                     </span>
                   ))}
               </div>
@@ -671,9 +660,9 @@ export default function Profile() {
                     <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pf-tagrow-empty">No banned tags yet</motion.span>
                   ) : (
                     bannedHashtags.map(t => (
-                      <motion.span layout initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ type: "spring", stiffness: 500, damping: 25 }} key={t} className="pf-tag" role="listitem" style={{ background: "rgba(240,154,154,0.1)", borderColor: "rgba(240,154,154,0.3)", color: "#f09a9a" }}>
+                      <motion.span layout initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ type: "spring", stiffness: 500, damping: 25 }} key={t} className="pf-tag" role="listitem" style={{ background: "#fee2e2", borderColor: "#fca5a5", color: "#b91c1c" }}>
                         {displayTag(t)}
-                        <button className="pf-tag-x" onClick={() => removeTag("ban", t)} aria-label={`Remove ${displayTag(t)}`} style={{ color: "rgba(240,154,154,0.6)" }}>×</button>
+                        <button className="pf-tag-x" onClick={() => removeTag("ban", t)} aria-label={`Remove ${displayTag(t)}`} style={{ color: "rgba(185,28,28,0.5)" }}>×</button>
                       </motion.span>
                     ))
                   )}
@@ -722,7 +711,7 @@ export default function Profile() {
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <button className="pf-btn" onClick={wrappedHandleSave} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
                 {savedOnce && !saving && (
-                  <span style={{ fontSize: 11, color: '#c8f09a', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 11, color: '#15803d', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 5.5L4.5 8L9.5 3"/></svg>
                     Saved
                   </span>

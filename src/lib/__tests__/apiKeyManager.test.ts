@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   validateApiKeyFormat,
   saveUserApiKey,
+  validateUserApiKey,
   getUserApiKey,
   deleteUserApiKey,
   setUseOwnKey,
@@ -567,5 +568,94 @@ describe("localStorage Fallback", () => {
       // Delete should throw network error
       await expect(deleteUserApiKey()).rejects.toThrow("Failed to fetch");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateUserApiKey
+// ---------------------------------------------------------------------------
+describe("validateUserApiKey", () => {
+  const VALID_KEY = "sk-" + "a".repeat(32);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetSession.mockResolvedValue(VALID_SESSION);
+    vi.stubEnv("VITE_SUPABASE_URL", "https://real-project.supabase.co");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("returns INVALID_KEY_FORMAT reason without any network call for a malformed key", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const result = await validateUserApiKey("bad-key", "openai");
+    expect(result).toEqual({ valid: false, reason: "INVALID_KEY_FORMAT" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("throws 'User session not found' when not authenticated", async () => {
+    mockGetSession.mockResolvedValue(NO_SESSION);
+    await expect(validateUserApiKey(VALID_KEY, "openai")).rejects.toThrow("User session not found");
+  });
+
+  it("posts action='validate' with key + provider to the encrypt-api-key function", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ valid: true }),
+    } as Response);
+
+    await validateUserApiKey(VALID_KEY, "openai");
+
+    const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/functions/v1/encrypt-api-key");
+    const body = JSON.parse(opts.body as string);
+    expect(body.action).toBe("validate");
+    expect(body.apiKey).toBe(VALID_KEY);
+    expect(body.provider).toBe("openai");
+  });
+
+  it("returns valid:true when the server confirms the key works", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ valid: true }),
+    } as Response);
+
+    const result = await validateUserApiKey(VALID_KEY, "openai");
+    expect(result.valid).toBe(true);
+  });
+
+  it("returns valid:false with the server's reason when the provider rejects the key", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ valid: false, reason: "Key was rejected (invalid or revoked)." }),
+    } as Response);
+
+    const result = await validateUserApiKey(VALID_KEY, "openai");
+    expect(result).toEqual({ valid: false, reason: "Key was rejected (invalid or revoked)." });
+  });
+
+  it("surfaces a rate-limit message on HTTP 429", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: () => Promise.resolve({}),
+    } as Response);
+
+    const result = await validateUserApiKey(VALID_KEY, "openai");
+    expect(result.valid).toBe(false);
+    expect(result.reason).toMatch(/too many checks/i);
+  });
+
+  it("treats a mock Supabase environment as valid without a network call", async () => {
+    vi.stubEnv("VITE_SUPABASE_URL", "https://mock.supabase.co");
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const result = await validateUserApiKey(VALID_KEY, "openai");
+    expect(result).toEqual({ valid: true });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

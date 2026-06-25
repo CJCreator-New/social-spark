@@ -1,7 +1,10 @@
 import React from "react";
 import { Post } from "./constants";
 import { motion } from "framer-motion";
-import { getEngagementPrediction, ENGAGEMENT_BADGE } from "@/lib/postPerformanceScore";
+import { getEngagementPrediction } from "@/lib/postPerformanceScore";
+import { useWizardStore } from "@/stores/useWizardStore";
+import { parseLocalDate } from "@/lib/calendarSchedule";
+import { Zap } from "lucide-react";
 
 interface WeekStripProps {
   posts: Post[];
@@ -15,6 +18,7 @@ interface WeekStripProps {
   handleDragOver: (e: React.DragEvent<HTMLElement>) => void;
   handleDrop: (e: React.DragEvent<HTMLElement>, target: number) => number | null;
   platform?: string;
+  weekStartDate?: Date;
 }
 
 export const WeekStrip = React.memo(function WeekStrip({
@@ -29,12 +33,24 @@ export const WeekStrip = React.memo(function WeekStrip({
   handleDragOver,
   handleDrop,
   platform = "",
+  weekStartDate,
 }: WeekStripProps) {
+  const formWeekStart = useWizardStore((state) => state.form.weekStart);
+  const start = weekStartDate || parseLocalDate(formWeekStart) || new Date();
+
   return (
     <div className="week-strip" role="tablist" aria-label="Days of the week">
       {posts.map((post, i) => {
         const engagementLevel = getEngagementPrediction(post, platform);
-        const badge = ENGAGEMENT_BADGE[engagementLevel];
+        const dayDate = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+        const dayOfWeekName = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dayDate.getDay()];
+
+        const badgeStyle = engagementLevel === "High"
+          ? { color: "#15803d", background: "#dcfce7" }
+          : engagementLevel === "Low"
+          ? { color: "#b91c1c", background: "#fee2e2" }
+          : { color: "#a16207", background: "#fef9c3" };
+
         return (
           <motion.button
             key={i}
@@ -59,29 +75,33 @@ export const WeekStrip = React.memo(function WeekStrip({
               }
             }}
             onDragEnd={() => setDraggedIndex(null)}
-            title={`Day ${i + 1} · ${post.dow} · Engagement: ${engagementLevel}. Drag to reorder.`}
+            title={`Day ${i + 1} · ${dayOfWeekName} · Engagement: ${engagementLevel}. Drag to reorder.`}
           >
-            <div className="dtab-dow">{post.dow}</div>
+            <div className="dtab-dow">{dayOfWeekName}</div>
             <div className="dtab-n tabular-nums">{i + 1}</div>
-            {/* Engagement prediction badge */}
+            {/* AI engagement prediction badge */}
             <div
-              title={`Predicted engagement: ${engagementLevel}`}
+              title={`AI predicted engagement: ${engagementLevel}`}
               style={{
-                marginTop: 3,
+                marginTop: 4,
                 fontSize: 8,
-                fontWeight: 600,
+                fontWeight: 700,
                 letterSpacing: ".04em",
-                color: badge.color,
-                background: badge.bg,
-                borderRadius: 99,
+                color: badgeStyle.color,
+                background: badgeStyle.background,
+                borderRadius: 4,
                 padding: "1px 4px",
                 lineHeight: 1.6,
-                display: "inline-block",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 2,
                 transition: "opacity .2s",
-                opacity: i === activeDay ? 1 : 0.7,
+                opacity: i === activeDay ? 1 : 0.72,
+                textTransform: "uppercase",
               }}
             >
-              {badge.emoji} {engagementLevel}
+              <Zap size={7} style={{ flexShrink: 0 }} />
+              {engagementLevel}
             </div>
           </motion.button>
         );

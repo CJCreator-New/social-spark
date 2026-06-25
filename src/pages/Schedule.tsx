@@ -253,10 +253,6 @@ export default function Schedule() {
       <WorkspacePage size="wide">
         <div className="sc-head">
           <h1 className="sc-title">My <em>schedule</em></h1>
-          <div style={{ display: "flex", gap: 12 }}>
-            <Link to="/my-calendars" className="sc-back">My calendars</Link>
-            <Link to="/app" className="sc-back">← New calendar</Link>
-          </div>
         </div>
 
         <div className="sc-summary" aria-label="Schedule summary">
@@ -307,6 +303,11 @@ export default function Schedule() {
             <div className="sc-empty-title">Nothing in the <em>queue</em> yet</div>
             <p className="sc-empty-sub">Open a calendar and click <strong style={{ color: "#c8f09a" }}>Schedule week</strong> to populate this view with draft and publish actions.</p>
             <Link to="/app" className="sc-empty-cta">Create a calendar</Link>
+            <div style={{ marginTop: 12 }}>
+              <Link to="/my-calendars" className="text-xs text-slate-500 hover:text-[#c8f09a] transition-colors underline">
+                Or schedule an existing calendar →
+              </Link>
+            </div>
           </div>
         ) : grouped ? (
           [...grouped.entries()].map(([date, list]) => (

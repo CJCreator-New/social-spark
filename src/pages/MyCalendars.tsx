@@ -103,6 +103,14 @@ export default function MyCalendars() {
   const totalPosts = useMemo(() => items.reduce((count, item) => count + (Array.isArray(item.posts) ? item.posts.length : 0), 0), [items]);
   const visibleCount = filteredItems.length;
 
+  const visibleSubtitle = useMemo(() => {
+    const hasSearch = debouncedSearch.trim().length > 0;
+    if (favOnly && hasSearch) return "Starred matching search";
+    if (hasSearch) return "Matching search query";
+    if (favOnly) return "Starred items only";
+    return "All saved calendars";
+  }, [favOnly, debouncedSearch]);
+
   const toggleFavorite = useCallback(async (it: SavedCalendar) => {
     const next = !it.is_favorite;
     try {
@@ -298,17 +306,29 @@ export default function MyCalendars() {
         <div className="mc-summary" aria-label="Calendar summary">
           <div className="mc-summary-card">
             <div className="mc-summary-label">Visible calendars</div>
-            <div className="mc-summary-value">{visibleCount || items.length}</div>
-            <div className="mc-summary-sub">{favOnly ? "Starred items only" : "All saved calendars"}</div>
+            {isLoading ? (
+              <div className="animate-pulse bg-slate-700 h-8 w-16 rounded my-1"></div>
+            ) : (
+              <div className="mc-summary-value tabular-nums">{visibleCount}</div>
+            )}
+            <div className="mc-summary-sub">{visibleSubtitle}</div>
           </div>
           <div className="mc-summary-card">
             <div className="mc-summary-label">Starred</div>
-            <div className="mc-summary-value">{favoriteCount}</div>
+            {isLoading ? (
+              <div className="animate-pulse bg-slate-700 h-8 w-16 rounded my-1"></div>
+            ) : (
+              <div className="mc-summary-value tabular-nums">{favoriteCount}</div>
+            )}
             <div className="mc-summary-sub">Quick access to the calendars you reuse most.</div>
           </div>
           <div className="mc-summary-card">
             <div className="mc-summary-label">Posts stored</div>
-            <div className="mc-summary-value">{totalPosts}</div>
+            {isLoading ? (
+              <div className="animate-pulse bg-slate-700 h-8 w-16 rounded my-1"></div>
+            ) : (
+              <div className="mc-summary-value tabular-nums">{totalPosts}</div>
+            )}
             <div className="mc-summary-sub">Across all saved calendars in this account.</div>
           </div>
         </div>

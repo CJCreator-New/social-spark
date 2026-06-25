@@ -1,59 +1,106 @@
 :root {
-  /* Colors */
-  --color-bg: #06080e;
-  --color-surface: #0c0e17;
-  --color-primary: #c8f09a;
-  --color-accent: #c8f09a;
-  --color-text: #edeae3;
-  --color-muted: #7c8294;
+  /* ── Brand Colors ── */
+  --color-primary:     #c2410c;   /* warm orange */
+  --color-primary-hover: #9a3412;
+  --color-primary-light: #fef3c7;
+  --color-primary-xlight: #ffedd5;
 
-  /* Spacing (8px baseline) */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 16px;
-  --space-4: 24px;
-  --space-5: 32px;
+  /* ── Surface / Background ── */
+  --color-bg:          #faf8f4;   /* warm off-white page background */
+  --color-surface:     #ffffff;   /* card surfaces */
+  --color-surface-2:   #f5f0e8;   /* secondary panels */
+  --color-surface-3:   #ebe6de;   /* tertiary / hover */
 
-  /* Typography */
-  --font-sans: 'Manrope', sans-serif;
-  --text-base: 16px;
-  --text-lg: 18px;
-  --text-xl: 20px;
-  --text-2xl: 28px;
+  /* ── Text ── */
+  --color-text:        #1c1917;   /* primary text */
+  --color-text-2:      #57534e;   /* secondary text */
+  --color-text-3:      #78716c;   /* tertiary / muted text */
+  --color-text-4:      #a8a29e;   /* disabled text */
+  --color-body:        #292524;   /* long-form body copy */
 
-  /* Concentric Border Radii (outerRadius = innerRadius + padding) */
-  --radius-xs: 4px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  /* ── Borders ── */
+  --color-border:      #e7e5e4;
+  --color-border-2:    #d6d3d1;
+
+  /* ── Status ── */
+  --color-success:     #22c55e;
+  --color-success-bg:  #dcfce7;
+  --color-success-dk:  #15803d;
+  --color-warning:     #f59e0b;
+  --color-warning-bg:  #fef9c3;
+  --color-warning-dk:  #b45309;
+  --color-error:       #ef4444;
+  --color-error-bg:    #fee2e2;
+  --color-error-dk:    #b91c1c;
+
+  /* ── Accent fallback (avoid using directly — prefer --color-primary) ── */
+  --color-accent:      #c2410c;
+
+  /* ── Typography ── */
+  --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Lora', Georgia, serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+
+  --text-xs:   11px;
+  --text-sm:   13px;
+  --text-base: 15px;
+  --text-lg:   18px;
+  --text-xl:   22px;
+  --text-2xl:  28px;
+  --text-3xl:  32px;
+
+  /* ── Spacing (8px baseline) ── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  28px;
+  --space-8:  32px;
+  --space-10: 40px;
+
+  /* ── Border Radius ── */
+  --radius-xs:  4px;
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  24px;
   --radius-2xl: 32px;
+  --radius-pill: 9999px;
 
-  /* Elevation */
-  --shadow-1: 0 1px 2px rgba(15,23,42,0.04), 0 1px 3px rgba(15,23,42,0.06);
-  --shadow-2: 0 4px 12px rgba(15,23,42,0.08);
+  /* ── Shadows (warm neutral) ── */
+  --shadow-card:   0 10px 30px rgba(120, 113, 108, 0.06), 0 1px 3px rgba(120, 113, 108, 0.02);
+  --shadow-card-hover: 0 12px 30px rgba(120, 113, 108, 0.10);
+  --shadow-stat:   0 4px 20px rgba(120, 113, 108, 0.04);
+  --shadow-btn:    0 4px 12px rgba(194, 65, 12, 0.15);
+  --shadow-btn-hover: 0 6px 16px rgba(194, 65, 12, 0.25);
+  --shadow-sm:     0 2px 8px rgba(120, 113, 108, 0.04);
+  --shadow-day-active: 0 4px 12px rgba(194, 65, 12, 0.08);
+  --shadow-toast:  0 4px 12px rgba(0, 0, 0, 0.15);
 
-  /* Semantic Shadows (dark-theme) */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.28), 0 1px 2px rgba(0,0,0,0.36);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.36), 0 2px 6px rgba(0,0,0,0.28);
-  --shadow-lg: 0 16px 48px rgba(0,0,0,0.48), 0 6px 18px rgba(0,0,0,0.36);
+  /* ── Elevation (light-theme neutral) ── */
+  --shadow-1: 0 1px 2px rgba(120, 113, 108, 0.04), 0 1px 3px rgba(120, 113, 108, 0.06);
+  --shadow-2: 0 4px 12px rgba(120, 113, 108, 0.08);
 
-  /* Z-index Scale */
-  --z-base: 1;
+  /* ── Z-index Scale ── */
+  --z-base:     1;
   --z-dropdown: 100;
-  --z-sticky: 200;
-  --z-modal: 1000;
-  --z-toast: 2000;
+  --z-sticky:   200;
+  --z-modal:    1000;
+  --z-toast:    2000;
 
-  /* Transition Easings */
+  /* ── Transitions ── */
   --ease-standard:   cubic-bezier(0.4, 0, 0.2, 1);
   --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
   --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  --transition-base: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: all 0.15s ease;
 }
 
-/* Utility tokens */
+/* Layout utility */
 .container {
   max-width: 1100px;
   margin: 0 auto;
-  padding: var(--space-3);
+  padding: var(--space-4);
 }

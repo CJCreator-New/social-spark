@@ -187,12 +187,15 @@ export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
 
   for (const p of posts) {
     const time = postTimes[String(p.day)] || suggestedTimeForDay(p.day, platform);
-    const localStart = postDateTime(weekStart, p.dow, time);
+    const dayOffset = (p.day && typeof p.day === "number") ? p.day - 1 : 0;
+    const localStart = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayOffset);
+    const { hours, minutes } = parseTime(time);
+    localStart.setHours(hours, minutes, 0, 0);
 
     let dtStart: string;
     let dtEnd: string;
     if (useTz && timezone) {
-      const slotDate = toDateInputValue(dateForDow(weekStart, p.dow));
+      const slotDate = toDateInputValue(localStart);
       const startUtc = new Date(zonedToUtcIso(slotDate, time, timezone));
       const endUtc = new Date(startUtc.getTime() + durationMin * 60 * 1000);
       dtStart = `DTSTART:${toIcsUtcStamp(startUtc)}`;

@@ -12,6 +12,7 @@ const mockGetUserApiKey = vi.fn();
 const mockSetUseOwnKey = vi.fn();
 const mockDeleteUserApiKey = vi.fn();
 const mockGetQuotaStatus = vi.fn();
+const mockValidateUserApiKey = vi.fn();
 
 vi.mock("@/lib/apiKeyManager", () => ({
   saveUserApiKey: (...args: unknown[]) => mockSaveUserApiKey(...args),
@@ -19,6 +20,7 @@ vi.mock("@/lib/apiKeyManager", () => ({
   setUseOwnKey: (...args: unknown[]) => mockSetUseOwnKey(...args),
   deleteUserApiKey: (...args: unknown[]) => mockDeleteUserApiKey(...args),
   getQuotaStatus: (...args: unknown[]) => mockGetQuotaStatus(...args),
+  validateUserApiKey: (...args: unknown[]) => mockValidateUserApiKey(...args),
 }));
 
 // Mock sonner toast
@@ -77,6 +79,8 @@ beforeEach(() => {
   mockSetUseOwnKey.mockResolvedValue(undefined);
   mockDeleteUserApiKey.mockResolvedValue(undefined);
   mockGetQuotaStatus.mockResolvedValue({ used: 0, limit: 10, useOwnKey: false, keyMode: "fallback" });
+  // Default: a freshly entered key passes the live validation gate before save.
+  mockValidateUserApiKey.mockResolvedValue({ valid: true });
   // Default: entitled user so the key form renders.
   mockUseSubscription.mockReturnValue({ canUseOwnKey: true, loading: false });
 });
@@ -269,6 +273,67 @@ describe("ApiKeySettings — save button behavior", () => {
       const alertEl = screen.getByRole("alert");
       expect(alertEl).toHaveTextContent(/invalid key format for openai/i);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3b. Live key validation ("Test key")
+// ---------------------------------------------------------------------------
+describe("ApiKeySettings — live key validation", () => {
+  it("Test key calls validateUserApiKey with the entered key + provider", async () => {
+    await renderAndWait();
+    const input = screen.getByLabelText("API Key") as HTMLInputElement;
+    const key = "sk-" + "a".repeat(32);
+    fireEvent.change(input, { target: { value: key } });
+
+    fireEvent.click(screen.getByRole("button", { name: /test key/i }));
+
+    await waitFor(() => {
+      expect(mockValidateUserApiKey).toHaveBeenCalledWith(key, "openai");
+    });
+  });
+
+  it("shows a success indicator when the key verifies", async () => {
+    mockValidateUserApiKey.mockResolvedValue({ valid: true });
+    await renderAndWait();
+    const input = screen.getByLabelText("API Key") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "sk-" + "a".repeat(32) } });
+
+    fireEvent.click(screen.getByRole("button", { name: /test key/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/key verified/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows the failure reason when the key is rejected", async () => {
+    mockValidateUserApiKey.mockResolvedValue({ valid: false, reason: "Key was rejected (invalid or revoked)." });
+    await renderAndWait();
+    const input = screen.getByLabelText("API Key") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "sk-" + "a".repeat(32) } });
+
+    fireEvent.click(screen.getByRole("button", { name: /test key/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/key was rejected/i)).toBeInTheDocument();
+    });
+  });
+
+  it("does NOT save when the new key fails validation", async () => {
+    mockValidateUserApiKey.mockResolvedValue({ valid: false, reason: "Key was rejected (invalid or revoked)." });
+    await renderAndWait();
+    const input = screen.getByLabelText("API Key") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "sk-" + "a".repeat(32) } });
+
+    const form = screen.getByRole("button", { name: /save api configuration/i }).closest("form")!;
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      // Both the inline result and the status box surface the reason — assert at least one does.
+      const alerts = screen.getAllByRole("alert");
+      expect(alerts.some((el) => /key was rejected/i.test(el.textContent || ""))).toBe(true);
+    });
+    expect(mockSaveUserApiKey).not.toHaveBeenCalled();
   });
 });
 

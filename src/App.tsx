@@ -53,7 +53,7 @@ const App = () => {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider attribute="class" forcedTheme="dark" enableSystem={false}>
+      <ThemeProvider attribute="class" forcedTheme="light" enableSystem={false}>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <Toaster />

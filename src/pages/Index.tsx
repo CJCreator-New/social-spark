@@ -31,7 +31,9 @@ import { WelcomeBanner } from "@/components/WelcomeBanner";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { FontStyle, applyStyle } from "@/lib/unicodeFonts";
 import { useWizardStore } from "@/stores/useWizardStore";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { Helmet } from "react-helmet-async";
+import { OnboardingTour } from "@/components/OnboardingTour";
 
 // Lazy load components to optimize bundle size
 const DraftRecoveryDialog = lazy(() => import("@/components/DraftRecoveryDialog").then(m => ({ default: m.DraftRecoveryDialog })));
@@ -415,16 +417,17 @@ function calculateScore(scores: Record<string, number>): number {
 
 const screenVariants = {
   hidden: { opacity: 0, y: 15 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { 
-      type: "spring", 
-      stiffness: 100, 
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      stiffness: 100,
       damping: 18,
       staggerChildren: 0.05
-    } 
-  }
+    }
+  },
+  exit: { opacity: 0, y: -10, transition: { duration: 0.18, ease: "easeIn" } },
 } as const;
 
 const Index = () => {
@@ -482,6 +485,10 @@ const Index = () => {
   const [showPerformance, setShowPerformance] = useState(false);
   const [brandMemory, setBrandMemory] = useState<BrandMemory | null>(null);
   const [generationMeta, setGenerationMeta] = useState<{ inferredTopics?: boolean } | null>(null);
+  const [showValidation, setShowValidation] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showFloatingButton, setShowFloatingButton] = useState(false);
+  const blockAutosaveRef = useRef(true);
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const generatingRef = useRef(false);
@@ -609,6 +616,30 @@ const Index = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [step, canUndo, canRedo, undoChange, redoChange]);
+
+  useEffect(() => {
+    const completed = localStorage.getItem("social_spark_onboarding_completed") === "true";
+    if (!completed) {
+      setShowOnboarding(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
+
+  useEffect(() => {
+    if (step !== 2) {
+      setShowFloatingButton(false);
+      return;
+    }
+    const handleScroll = () => {
+      setShowFloatingButton(window.scrollY > 300);
+    };
+    window.addEventListener("scroll", handleScroll);
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [step]);
 
   const scrollToField = (field: "industry" | "coreIdea" | "topics") => {
     const refMap = { industry: industryRef, coreIdea: coreIdeaRef, topics: topicsRef };
@@ -778,8 +809,12 @@ const Index = () => {
             }
             return;
           }
-          setRecoveryDraft(newestDraft.data);
-          setShowRecoveryDialog(true);
+          const prompted = sessionStorage.getItem("ss_recovery_prompted") === "true";
+          if (!prompted) {
+            setRecoveryDraft(newestDraft.data);
+            setShowRecoveryDialog(true);
+            sessionStorage.setItem("ss_recovery_prompted", "true");
+          }
           if (user && localDraft && localDraft.savedAt >= (serverDraft?.savedAt || 0)) {
             void writeServerDraft(user.id, localDraft.data).catch((error) => {
               console.warn("Failed to sync local draft to server", error);
@@ -818,7 +853,7 @@ const Index = () => {
 
   // Persist the active wizard snapshot, with a short debounce, so reloads can recover progress.
   useEffect(() => {
-    if (!draftReady.current || !wizardDraftKey || recoveryDraft) return;
+    if (!draftReady.current || !wizardDraftKey || recoveryDraft || blockAutosaveRef.current) return;
     if (draftSaveTimer.current) {
       window.clearTimeout(draftSaveTimer.current);
     }
@@ -929,12 +964,8 @@ const Index = () => {
 
   const restoreDraft = () => {
     if (!recoveryDraft) return;
-    setForm({ ...recoveryDraft.form });
-    setStep(recoveryDraft.posts.length > 0 ? 4 : recoveryDraft.step);
-    setExtraTopics([...recoveryDraft.extraTopics]);
+    loadSnapshot(recoveryDraft);
     setPostsWithHistory([...recoveryDraft.posts]);
-    setActiveDay(recoveryDraft.activeDay);
-    setPostTimes({ ...recoveryDraft.postTimes });
     setSavedId(null);
     setSampleMode(false);
     setError("");
@@ -942,22 +973,29 @@ const Index = () => {
     setGenStep(0);
     setRecoveryDraft(null);
     setShowRecoveryDialog(false);
+    hydrated.current = true;
+    blockAutosaveRef.current = false;
   };
 
   const discardDraft = () => {
     clearDraft();
     setRecoveryDraft(null);
     setShowRecoveryDialog(false);
+    toast.success("Draft discarded. Start fresh below.");
   };
 
   const upd = useCallback(<K extends keyof typeof form>(k: K, v: (typeof form)[K]) => {
+    blockAutosaveRef.current = false;
     setForm(f => ({ ...f, [k]: v }));
     setError("");
   }, []);
-  const toggleChip = (k: "goals", v: string) =>
+  const toggleChip = (k: "goals", v: string) => {
+    blockAutosaveRef.current = false;
     setForm(f => ({ ...f, [k]: f[k].includes(v) ? f[k].filter(x => x !== v) : [...f[k], v] }));
+  };
 
   const setIndustry = (id: string) => {
+    blockAutosaveRef.current = false;
     setForm(f => ({ ...f, industry: id, topics: [], audiences: [] }));
     setExtraTopics([]);
     setError("");
@@ -970,6 +1008,7 @@ const Index = () => {
   function addCustomTopic() {
     const v = customTopic.trim();
     if (!v || topicPool.includes(v)) return;
+    blockAutosaveRef.current = false;
     setExtraTopics(p => [...p, v]);
     setForm(f => ({ ...f, topics: [...f.topics, v] }));
     setError("");
@@ -978,13 +1017,22 @@ const Index = () => {
 
   function validate(s: number) {
     if (s === 1) {
-      if (!form.industry) { setError("Please select your industry / niche."); scrollToField("industry"); return false; }
-      if (!form.coreIdea.trim()) { setError("Please describe your core idea."); scrollToField("coreIdea"); return false; }
+      if (!form.industry) {
+        setShowValidation(true);
+        setError("Please select your industry / niche.");
+        scrollToField("industry");
+        return false;
+      }
+      if (!form.coreIdea.trim()) {
+        setShowValidation(true);
+        setError("Please describe your core idea.");
+        scrollToField("coreIdea");
+        return false;
+      }
     }
     if (s === 2) {
       if (form.mode === "day") {
         if (!form.targetDate) { setError("Please pick a date for your post."); return false; }
-        // Topics are optional: if none selected, the generator will infer sensible angles from the core idea.
       }
     }
     setError(""); return true;
@@ -1827,8 +1875,26 @@ const Index = () => {
     }
   };
 
+  const stepTitles: Record<number, string> = {
+    1: "Niche & Idea",
+    2: "Topics & Date",
+    3: "Generating Posts",
+    4: "Review & Customize",
+  };
+  const pageTitle = `Create Calendar (${stepTitles[step] || "Step " + step}) — ContentForge`;
+
   return (
     <WorkspacePage size="xwide" className="cf-app">
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content="Use the AI-guided setup wizard to generate high-engagement social media content calendars tailored to your specific brand, niche, and target audience." />
+      </Helmet>
+      {showOnboarding && (
+        <OnboardingTour
+          onSeeExample={loadSample}
+          onClose={() => setShowOnboarding(false)}
+        />
+      )}
       {isE2EModeActive && (
         <div style={{
           background: "rgba(240, 212, 154, 0.1)",
@@ -1937,36 +2003,59 @@ const Index = () => {
 
           {/* STEPPER */}
           <div className="stepper" role="list" aria-label="Wizard steps">
-            {STEP_LABELS.map((s, i) => (
-              <React.Fragment key={s}>
-                <div
-                  className={`snode ${i + 1 === step ? "on" : ""}`}
-                  role="listitem"
-                  tabIndex={i + 1 < step ? 0 : -1}
-                  aria-current={i + 1 === step ? "step" : undefined}
-                  aria-label={`Step ${i + 1}: ${s}${i + 1 < step ? " (completed)" : i + 1 === step ? " (current)" : " (upcoming)"}`}
-                  onClick={() => i + 1 < step && setStep(i + 1)}
-                  onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && i + 1 < step) setStep(i + 1); }}
-                  style={{ cursor: i + 1 < step ? "pointer" : "default" }}
-                >
-                  <div className={`sdot ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>
-                    {i + 1 < step ? <Check /> : i + 1}
+            {STEP_LABELS.map((s, i) => {
+              const targetStep = i + 1;
+              const isStepClickable = (tStep: number) => {
+                if (tStep === step) return false;
+                if (tStep < step) return true;
+                if (posts.length > 0) return true;
+                if (tStep === 2 && form.industry && form.coreIdea.trim()) return true;
+                return false;
+              };
+              const isClickable = isStepClickable(targetStep);
+              const stepTooltips = {
+                1: "Industry: Select your niche and describe your core idea",
+                2: "Topics: Pick up to 7 topics for this week",
+                3: "Generate: Review the generator settings and write your content",
+                4: "Calendar: Review, edit, and export your weekly posts",
+              };
+              const tooltip = stepTooltips[targetStep as keyof typeof stepTooltips];
+              return (
+                <React.Fragment key={s}>
+                  <div
+                    className={`snode ${targetStep === step ? "on" : ""} ${isClickable ? "clickable" : ""}`}
+                    role="listitem"
+                    tabIndex={isClickable ? 0 : -1}
+                    aria-current={targetStep === step ? "step" : undefined}
+                    aria-label={`Step ${targetStep}: ${s}${targetStep < step ? " (completed)" : targetStep === step ? " (current)" : " (upcoming)"}`}
+                    onClick={() => { if (isClickable) setStep(targetStep); }}
+                    onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && isClickable) setStep(targetStep); }}
+                    style={{ cursor: isClickable ? "pointer" : "default" }}
+                    title={tooltip}
+                  >
+                    <div className={`sdot ${targetStep === step ? "active" : ""} ${targetStep < step ? "done" : ""}`}>
+                      {targetStep < step ? <Check /> : targetStep}
+                    </div>
+                    <div className={`slabel ${targetStep === step ? "active" : ""} ${targetStep < step ? "done" : ""}`}>{s}</div>
                   </div>
-                  <div className={`slabel ${i + 1 === step ? "active" : ""} ${i + 1 < step ? "done" : ""}`}>{s}</div>
-                </div>
-                {i < STEP_LABELS.length - 1 && (
-                  <div key={`line-${i}`} className={`sline ${i + 1 < step ? "done" : ""}`} aria-hidden="true" />
-                )}
-              </React.Fragment>
-            ))}
+                  {i < STEP_LABELS.length - 1 && (
+                    <div key={`line-${i}`} className={`sline ${targetStep < step ? "done" : ""}`} aria-hidden="true" />
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
 
+          <AnimatePresence mode="wait">
+
           {/* ── STEP 1 ── */}
-          <motion.div 
-            className={`screen ${step === 1 ? "active" : ""}`}
+          {step === 1 && <motion.div
+            key="step-1"
+            className="screen active"
             variants={screenVariants}
             initial="hidden"
-            animate={step === 1 ? "visible" : "hidden"}
+            animate="visible"
+            exit="exit"
           >
             {recentCalendars.length > 0 && (
               <div className="recent-strip">
@@ -2005,7 +2094,7 @@ const Index = () => {
               </button>
             </div>
             <div className="card" ref={industryRef}>
-              <div className="sh">What's your <span>industry / niche?</span></div>
+              <div className="sh">What's your <span>industry / niche? <span style={{ color: "var(--err)" }}>*</span></span></div>
               <div className="ind-grid" role="radiogroup" aria-label="Industry or niche">
                 {INDUSTRIES.map(ind => (
                   <button
@@ -2021,6 +2110,11 @@ const Index = () => {
                   </button>
                 ))}
               </div>
+              {showValidation && !form.industry && (
+                <div style={{ color: "var(--err)", fontSize: "12px", marginTop: "10px", fontWeight: 400 }}>
+                  Please select your industry / niche.
+                </div>
+              )}
             </div>
 
             <div className="card">
@@ -2047,7 +2141,7 @@ const Index = () => {
 
               <div className="csect" ref={coreIdeaRef}>
                 <div className="flabel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>Core idea / angle</span>
+                  <span>Core idea / angle <span style={{ color: "var(--err)" }}>*</span></span>
                   <span style={{ fontSize: 10, color: form.coreIdea.length > 220 ? "#f0d49a" : form.coreIdea.length > 280 ? "#f09a9a" : "var(--text3)", fontWeight: 400, letterSpacing: 0, textTransform: "none" }}>
                     {form.coreIdea.length}/300
                   </span>
@@ -2055,11 +2149,17 @@ const Index = () => {
                 <textarea
                   rows={3}
                   maxLength={300}
+                  className={showValidation && !form.coreIdea.trim() ? "invalid" : ""}
                   placeholder="What's the big idea or angle behind your content? e.g. 'helping early-stage SaaS founders ship better products faster'…"
                   value={form.coreIdea}
                   onChange={e => upd("coreIdea", e.target.value)}
                   aria-describedby="coreIdea-hint"
                 />
+                {showValidation && !form.coreIdea.trim() && (
+                  <div style={{ color: "var(--err)", fontSize: "12px", marginTop: "5px", fontWeight: 400 }}>
+                    Please describe your core idea.
+                  </div>
+                )}
                 <div id="coreIdea-hint" className="time-hint" style={{ marginTop: 5 }}>
                   This is the north star for all generated content — be specific for better results.
                 </div>
@@ -2074,11 +2174,18 @@ const Index = () => {
                 onClick={() => setShowAdvancedBrand(!showAdvancedBrand)}
                 aria-expanded={showAdvancedBrand}
               >
-                <span className="accordion-trigger-title">
-                  ✨ Tailor Voice & Brand Settings
-                  {(!showAdvancedBrand && (form.voice || form.style || form.audiences.length > 0)) ? <span className="accordion-active-tag">Active</span> : <span className="accordion-opt-tag">Optional</span>}
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <span className="accordion-trigger-title" style={{ padding: 0 }}>
+                    ✨ Tailor Voice & Brand Settings
+                    {(!showAdvancedBrand && (form.voice || form.style || form.audiences.length > 0)) ? <span className="accordion-active-tag">Active</span> : <span className="accordion-opt-tag">Optional</span>}
+                  </span>
+                  <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 300 }}>
+                    {showAdvancedBrand ? "Configure language, target audience, voice, style, and rules" : "Expand to configure language, target audience, voice, style, and rules…"}
+                  </span>
+                </div>
+                <span className="accordion-icon" style={{ fontSize: 16, fontWeight: 300 }}>
+                  {showAdvancedBrand ? "−" : "+"}
                 </span>
-                <span className={`accordion-icon ${showAdvancedBrand ? 'open' : ''}`}>▼</span>
               </button>
               
               <div className={`accordion-content ${showAdvancedBrand ? 'open' : ''}`}>
@@ -2107,7 +2214,16 @@ const Index = () => {
                       />
                       {!form.industry && (
                         <div className="gated-lock-msg">
-                          <span>🔒 Target audience settings are locked. Select an industry above to configure.</span>
+                          <span>
+                            🔒 Target audience settings are locked.{" "}
+                            <button
+                              type="button"
+                              onClick={() => scrollToField("industry")}
+                              style={{ textDecoration: "underline", background: "none", border: "none", padding: 0, color: "var(--accent)", cursor: "pointer", font: "inherit" }}
+                            >
+                              Select industry ↑
+                            </button>
+                          </span>
                         </div>
                       )}
                     </div>
@@ -2154,7 +2270,7 @@ const Index = () => {
                       Save your brand setup once and reuse it on future generations. Brand memory is private and saved locally to this workspace.
                     </div>
                     <div className="bactions" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
-                      <button type="button" className="cpbtn" onClick={saveBrandMemoryFromForm}>Save brand memory</button>
+                      <button type="button" className="cpbtn" onClick={saveBrandMemoryFromForm}>Local Brand Memory (this browser only)</button>
                       <button type="button" className="cpbtn" onClick={applyBrandMemoryToForm} disabled={!brandMemory}>Apply saved memory</button>
                       <button type="button" className="cpbtn" onClick={clearBrandMemorySaved} disabled={!brandMemory}>Clear saved memory</button>
                       {/* Feature: Cloud Persona Sync */}
@@ -2178,7 +2294,7 @@ const Index = () => {
                           }}
                           disabled={profileUpdateMutation.isPending}
                         >
-                          {profileUpdateMutation.isPending ? "Syncing…" : "☁️ Save as persona"}
+                          {profileUpdateMutation.isPending ? "Syncing…" : "☁️ Profile Sync (saved to account)"}
                         </button>
                       )}
                     </div>
@@ -2201,7 +2317,16 @@ const Index = () => {
                       </div>
                       {!form.industry && (
                         <div className="gated-lock-msg">
-                          <span>🔒 Goal configuration is locked. Select an industry in Step 1 first.</span>
+                          <span>
+                            🔒 Goal configuration is locked.{" "}
+                            <button
+                              type="button"
+                              onClick={() => scrollToField("industry")}
+                              style={{ textDecoration: "underline", background: "none", border: "none", padding: 0, color: "var(--accent)", cursor: "pointer", font: "inherit" }}
+                            >
+                              Select industry ↑
+                            </button>
+                          </span>
                         </div>
                       )}
                     </div>
@@ -2219,22 +2344,21 @@ const Index = () => {
               )}
               <button
                 className="btn btn-p"
-                onClick={() => { if (validate(1)) { setError(""); setStep(2); } }}
-                disabled={!form.industry || !form.coreIdea.trim()}
-                aria-disabled={!form.industry || !form.coreIdea.trim()}
-                title={!form.industry ? "Select an industry first" : !form.coreIdea.trim() ? "Add a core idea to continue" : ""}
+                onClick={() => { if (validate(1)) { setError(""); setShowValidation(false); setStep(2); } }}
               >
                 Next step →
               </button>
             </div>
-          </motion.div>
+          </motion.div>}
 
           {/* ── STEP 2 ── */}
-          <motion.div 
-            className={`screen ${step === 2 ? "active" : ""}`}
+          {step === 2 && <motion.div
+            key="step-2"
+            className="screen active"
             variants={screenVariants}
             initial="hidden"
-            animate={step === 2 ? "visible" : "hidden"}
+            animate="visible"
+            exit="exit"
           >
             <div className="card">
               <div className="sh">Pick your <span>{form.mode === "day" ? "single-day topic" : "weekly topics"}</span></div>
@@ -2297,7 +2421,16 @@ const Index = () => {
                   />
                   {!form.industry && (
                     <div className="gated-lock-msg">
-                      <span>🔒 Topic selection is locked. Select an industry in Step 1 to load relevant topic presets.</span>
+                      <span>
+                        🔒 Topic selection is locked.{" "}
+                        <button
+                          type="button"
+                          onClick={() => scrollToField("industry")}
+                          style={{ textDecoration: "underline", background: "none", border: "none", padding: 0, color: "var(--accent)", cursor: "pointer", font: "inherit" }}
+                        >
+                          Select industry ↑
+                        </button>
+                      </span>
                     </div>
                   )}
                 </div>
@@ -2331,7 +2464,16 @@ const Index = () => {
                   <div className="inspiration-bank-gated">
                     <div className="flabel">Inspiration Bank</div>
                     <div className="gated-lock-msg">
-                      <span>🔒 Inspiration Bank is locked. Select an industry in Step 1 to load trending topics.</span>
+                      <span>
+                        🔒 Inspiration Bank is locked.{" "}
+                        <button
+                          type="button"
+                          onClick={() => scrollToField("industry")}
+                          style={{ textDecoration: "underline", background: "none", border: "none", padding: 0, color: "var(--accent)", cursor: "pointer", font: "inherit" }}
+                        >
+                          Select industry ↑
+                        </button>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -2520,14 +2662,14 @@ const Index = () => {
                     const payload = { user_id: user.id, name: name.trim(), description: '', config: form as unknown as Json };
                     const { error } = await supabase.from('templates').insert(payload).select();
                     if (error) throw error;
-                    toast.success('Template saved');
+                    toast.success(`Template "${name}" saved to your account! Template loading will be available in the next release.`);
                   } catch (e) {
                     toast.error((e instanceof Error && e.message) || 'Failed to save template');
                   }
                 }}>Save as template</button>
               </div>
             </div>
-          </motion.div>
+          </motion.div>}
 
           {showSubtopicConfirm && (
             <Modal onClose={() => setShowSubtopicConfirm(false)} className="modal-content">
@@ -2551,11 +2693,13 @@ const Index = () => {
           )}
 
           {/* ── STEP 3 ── */}
-          <motion.div
-            className={`screen ${step === 3 ? "active" : ""}`}
+          {step === 3 && <motion.div
+            key="step-3"
+            className="screen active"
             variants={screenVariants}
             initial="hidden"
-            animate={step === 3 ? "visible" : "hidden"}
+            animate="visible"
+            exit="exit"
           >
             <div className="gen-wrap">
               {/* Pulsing structural skeleton loader */}
@@ -2612,14 +2756,16 @@ const Index = () => {
                 Cancel and try again
               </button>
             </div>
-          </motion.div>
+          </motion.div>}
 
           {/* ── STEP 4 ── */}
-          <motion.div
-            className={`screen ${step === 4 ? "active" : ""}`}
+          {step === 4 && <motion.div
+            key="step-4"
+            className="screen active"
             variants={screenVariants}
             initial="hidden"
-            animate={step === 4 ? "visible" : "hidden"}
+            animate="visible"
+            exit="exit"
           >
             {posts.length === 0 && step === 4 && (
               <div className="gen-wrap" style={{ minHeight: 320 }}>
@@ -2697,7 +2843,9 @@ const Index = () => {
                 />
               </Suspense>
             )}
-          </motion.div>
+          </motion.div>}
+
+          </AnimatePresence>
         </div>
 
         {/* Batch Edit Modal */}
@@ -2743,7 +2891,7 @@ const Index = () => {
           </div>
         )}
 
-        {(step === 1 || step === 2) && (
+        {step === 2 && showFloatingButton && (
           <button
             className="btn btn-p"
             style={{ position: "fixed", right: 24, bottom: 28, zIndex: 950, padding: "12px 18px", borderRadius: 12 }}

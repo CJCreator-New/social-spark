@@ -2,7 +2,7 @@
 // @ts-ignore - Deno ESM import resolved at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 declare const Deno: { env: { get(key: string): string | undefined }; serve(handler: (req: Request) => Response | Promise<Response>): void; openKv(): Promise<any> };
-import { checkRateLimit, corsHeaders } from "../_shared/promptHelpers.ts";
+import { checkRateLimit, corsHeaders, callAI, getProviderModel } from "../_shared/promptHelpers.ts";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -63,6 +63,56 @@ Deno.serve(async (req: Request) => {
     const action = String(body.action || "").trim();
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    if (action === "validate") {
+      // Live key check: make a minimal real call to the provider so the user
+      // knows the key works BEFORE we store it. The key is never persisted on
+      // this path and is never returned to the client.
+      const candidateKey = String(body.apiKey || "").trim();
+      const candidateProvider = String(body.provider || "").trim();
+
+      if (!candidateKey) {
+        return jsonResponse({ valid: false, reason: "Missing API key." }, 400);
+      }
+      if (!["openai", "anthropic", "openrouter"].includes(candidateProvider)) {
+        return jsonResponse({ valid: false, reason: "Invalid provider." }, 400);
+      }
+
+      const provider = candidateProvider as "openai" | "anthropic" | "openrouter";
+      const pingRes = await callAI(
+        [{ role: "user", content: "ping" }],
+        null,
+        candidateKey,
+        {
+          provider,
+          // Cheapest model per provider; a 1-token reply is enough to prove auth.
+          model: getProviderModel(provider, "draft"),
+          temperature: 0,
+          max_tokens: 1,
+        }
+      );
+
+      if (pingRes.status === 200) {
+        return jsonResponse({ valid: true });
+      }
+
+      // Map common upstream statuses to actionable reasons. We deliberately do
+      // not forward the raw provider error body (may contain noise/PII).
+      let reason = "The provider rejected this key.";
+      if (pingRes.status === 401 || pingRes.status === 403) {
+        reason = "Key was rejected (invalid or revoked). Double-check you copied it correctly.";
+      } else if (pingRes.status === 429) {
+        reason = "Key is valid but currently rate-limited. Try again in a moment.";
+      } else if (pingRes.status === 402) {
+        reason = "Key is valid but the provider account has no remaining credits.";
+      } else if (pingRes.status >= 500) {
+        reason = "Couldn't reach the provider right now. Please try again.";
+      } else if (pingRes.status === 404) {
+        reason = "The test model isn't available for this key. The key may still work for generation.";
+      }
+
+      return jsonResponse({ valid: false, status: pingRes.status, reason });
+    }
 
     if (action === "toggle") {
       const useOwnKey = body.useOwnKey;

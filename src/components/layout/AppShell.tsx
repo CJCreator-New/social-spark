@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCalendarQuery } from "@/hooks/useAppQueries";
 import { cn } from "@/lib/utils";
 import { Sparkles, CalendarDays, Clock, UserCircle, LogOut } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -17,13 +18,12 @@ export function AppShell({ children }: AppShellProps) {
   const isCalendarDetail = location.pathname.startsWith("/calendar/") && !!routeCalendarId;
   const { data: calendarData } = useCalendarQuery(isCalendarDetail ? routeCalendarId : undefined);
   const [isOpen, setIsOpen] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
 
   const menuItems = [
     { label: "New calendar", path: "/app", icon: Sparkles },
     { label: "My calendars", path: "/my-calendars", icon: CalendarDays },
     { label: "Schedule", path: "/schedule", icon: Clock },
-    { label: "Profile & Brand", path: "/profile", icon: UserCircle },
+    { label: "Profile", path: "/profile", icon: UserCircle },
   ];
 
   // Close mobile sidebar on route change
@@ -31,211 +31,138 @@ export function AppShell({ children }: AppShellProps) {
     setIsOpen(false);
   }, [location.pathname]);
 
-  // Handle outside click to close mobile sidebar
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [isOpen]);
-
-  // Escape key closes mobile sidebar, and focus trap while open
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const FOCUSABLE_SELECTOR =
-      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsOpen(false);
-        return;
-      }
-
-      if (e.key !== "Tab") return;
-
-      const container = sidebarRef.current;
-      if (!container) return;
-
-      const focusable = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-        (el) => el.offsetParent !== null
-      );
-      if (focusable.length === 0) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
-
-      if (e.shiftKey) {
-        if (active === first || !container.contains(active)) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (active === last || !container.contains(active)) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-
-    // Focus first focusable element in sidebar on open
-    const container = sidebarRef.current;
-    if (container) {
-      const focusable = container.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-      focusable?.focus();
-    }
-
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
-
   const handleSignOut = async () => {
     await signOut();
     navigate("/auth");
   };
 
-  const activeItem = menuItems.find(item => location.pathname === item.path) || menuItems[0];
+  const activeItem = menuItems.find(item => location.pathname === item.path || (item.path === "/my-calendars" && location.pathname.startsWith("/calendar/"))) || menuItems[0];
   const breadcrumbLabel = isCalendarDetail
     ? (calendarData?.title || (calendarData ? "Untitled calendar" : "Loading…"))
     : activeItem.label;
   const initial = (user?.email || "?").charAt(0).toUpperCase();
 
   return (
-    <div className="relative min-h-screen bg-background text-foreground flex overflow-x-hidden w-full">
-      {/* Background decoration elements */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[radial-gradient(circle_at_center,rgba(200,240,154,0.08)_0%,transparent_70%)] pointer-events-none -z-10" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[radial-gradient(circle_at_center,rgba(154,200,240,0.06)_0%,transparent_70%)] pointer-events-none -z-10" />
+    <div className="relative min-h-screen flex flex-col w-full overflow-x-hidden" style={{ backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}>
 
-      {/* MOBILE HEADER */}
-      <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-card/60 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-4 z-40">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#c8f09a] to-[#a0e86b] flex items-center justify-center text-background font-bold text-sm">
-            CF
-          </div>
-          <span className="font-display text-lg tracking-tight">
-            Content<em>Forge</em>
+      {/* TOP NAVBAR (sticky, warm white) */}
+      <header className="sticky top-0 z-40 w-full border-b px-6 md:px-8 h-16 flex items-center justify-between" style={{ backgroundColor: "#ffffff", borderColor: "#e7e5e4", boxShadow: "0 2px 10px rgba(120,113,108,0.03)" }}>
+        {/* Left: Brand */}
+        <Link to="/app" className="flex items-center gap-2 font-bold text-lg hover:opacity-90 transition-opacity" style={{ fontFamily: "var(--font-display)", color: "#c2410c", textDecoration: "none" }}>
+          <Sparkles className="w-5 h-5" style={{ color: "#c2410c" }} />
+          <span>ContentForge</span>
+        </Link>
+
+        {/* Center: Navigation Links (Desktop) */}
+        <nav className="hidden md:flex items-center gap-6" aria-label="Main Navigation">
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.path || (item.path === "/my-calendars" && location.pathname.startsWith("/calendar/"));
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className="relative py-2 px-1"
+                style={{
+                  fontSize: 13,
+                  fontWeight: isActive ? 600 : 500,
+                  color: isActive ? "#c2410c" : "#57534e",
+                  textDecoration: "none",
+                  transition: "color 0.15s",
+                }}
+              >
+                {item.label}
+                {isActive && (
+                  <motion.div
+                    layoutId="activeTabIndicator"
+                    className="absolute left-0 right-0"
+                    style={{ bottom: -17, height: 2, backgroundColor: "#c2410c", borderRadius: 9999 }}
+                  />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Right: User Avatar & Actions */}
+        <div className="flex items-center gap-3">
+          <span className="hidden sm:inline text-xs font-medium truncate max-w-[140px]" style={{ color: "#78716c" }}>
+            {user?.email || "Creator"}
           </span>
+          <div className="w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs border" style={{ backgroundColor: "#fef3c7", color: "#c2410c", borderColor: "#c2410c", borderWidth: 1.5 }}>
+            {initial}
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-1.5 rounded-full text-xs transition-all"
+            style={{ padding: "6px 12px", color: "#57534e", background: "none", border: "none", cursor: "pointer" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#c2410c"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(194,65,12,0.05)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#57534e"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent"; }}
+            title="Sign out"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Sign out</span>
+          </button>
+
+          {/* Mobile hamburger */}
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="md:hidden p-1.5 transition-colors"
+            style={{ color: "#57534e", background: "none", border: "none", cursor: "pointer" }}
+            aria-label="Toggle menu"
+          >
+            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              {isOpen ? <path d="M18 6L6 18M6 6l12 12" /> : <path d="M4 6h16M4 12h16M4 18h16" />}
+            </svg>
+          </button>
         </div>
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-2 text-slate-400 hover:text-white transition-colors"
-          aria-label="Toggle Navigation Menu"
-        >
-          <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            {isOpen ? <path d="M18 6L6 18M6 6l12 12" /> : <path d="M4 6h16M4 12h16M4 18h16" />}
-          </svg>
-        </button>
       </header>
 
-      {/* MOBILE BACKDROP */}
+      {/* Mobile Drawer menu (warm) */}
       {isOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
-          onClick={() => setIsOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* SIDEBAR */}
-      <aside
-        ref={sidebarRef}
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-card/45 backdrop-blur-2xl border-r border-white/5 flex flex-col justify-between p-6 transition-transform duration-300 ease-out md:translate-x-0 md:static md:h-screen md:flex-shrink-0",
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        <div className="flex flex-col gap-8">
-          {/* Logo Deck */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#c8f09a] to-[#a0e86b] flex items-center justify-center text-background font-bold text-base shadow-lg shadow-[#c8f09a]/15">
-              CF
-            </div>
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#c8f09a]">
-                AI Studio
-              </div>
-              <div className="font-display text-xl leading-tight">
-                Content<em>Forge</em>
-              </div>
-            </div>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="flex flex-col gap-1.5" aria-label="Main Navigation">
+        <div className="md:hidden fixed inset-x-0 top-16 z-30 flex flex-col p-6 border-b" style={{ backgroundColor: "#ffffff", borderColor: "#e7e5e4" }}>
+          <nav className="flex flex-col gap-3">
             {menuItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              const isActive = location.pathname === item.path || (item.path === "/my-calendars" && location.pathname.startsWith("/calendar/"));
               return (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={cn(
-                    "flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm transition-all duration-200 relative overflow-hidden group",
-                    isActive
-                      ? "text-[#c8f09a] bg-accent/10 font-semibold border border-white/5"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]"
-                  )}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all"
+                  style={{
+                    color: isActive ? "#c2410c" : "#57534e",
+                    backgroundColor: isActive ? "rgba(194,65,12,0.05)" : "transparent",
+                    fontWeight: isActive ? 600 : 500,
+                    textDecoration: "none",
+                  }}
+                  onClick={() => setIsOpen(false)}
                 >
-                  {/* Subtle hover glow effect */}
-                  <item.icon className="w-[18px] h-[18px] z-10" aria-hidden="true" />
-                  <span className="z-10">{item.label}</span>
-                  {isActive && (
-                    <div className="absolute left-0 top-3 bottom-3 w-1 bg-[#c8f09a] rounded-full" />
-                  )}
+                  <item.icon className="w-4 h-4" />
+                  <span>{item.label}</span>
                 </Link>
               );
             })}
           </nav>
         </div>
+      )}
 
-        {/* User Card & Sign Out */}
-        <div className="flex flex-col gap-4 border-t border-white/5 pt-4">
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-9 h-9 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-slate-300 font-semibold text-sm">
-              {initial}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs text-slate-500 truncate">Logged in as</div>
-              <div className="text-sm font-medium text-slate-300 truncate" title={user?.email || ""}>
-                {user?.email || "Workspace User"}
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-xs text-slate-500 hover:text-red-400 hover:bg-red-500/[0.05] transition-all duration-200 w-full text-left"
-          >
-            <LogOut className="w-4 h-4" aria-hidden="true" />
-            <span>Sign out</span>
-          </button>
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 w-full max-w-[1100px] mx-auto px-4 md:px-8 py-8 flex flex-col" style={{ paddingBottom: 80 }}>
+        {/* Breadcrumb */}
+        <div className="mb-6 flex items-center gap-2 text-xs" style={{ color: "#78716c" }}>
+          {isCalendarDetail ? (
+            <Link to="/my-calendars" style={{ color: "#78716c", textDecoration: "none", transition: "color 0.15s" }} onMouseEnter={e => (e.currentTarget.style.color = "#c2410c")} onMouseLeave={e => (e.currentTarget.style.color = "#78716c")}>My calendars</Link>
+          ) : (
+            <span>Workspace</span>
+          )}
+          <span>/</span>
+          <span style={{ color: "#1c1917", fontWeight: 500 }}>{breadcrumbLabel}</span>
         </div>
-      </aside>
 
-      {/* MAIN CONTENT CONTAINER */}
-      <div className="flex-1 flex flex-col min-w-0 md:h-screen md:overflow-y-auto overflow-x-hidden">
-        {/* Subtle breadcrumb/topbar header on desktop */}
-        <header className="hidden md:flex items-center justify-between h-16 px-8 border-b border-white/5 backdrop-blur-xl bg-background/20 sticky top-0 z-30">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            {isCalendarDetail ? (
-              <Link to="/my-calendars" className="hover:text-slate-300 transition-colors">My calendars</Link>
-            ) : (
-              <span>Workspace</span>
-            )}
-            <span>/</span>
-            <span className="text-slate-300 font-medium">{breadcrumbLabel}</span>
-          </div>
-        </header>
-
-        {/* Real route pages */}
-        <div className="flex-1 pt-20 pb-12 px-4 md:pt-6 md:px-8">
+        {/* Inner page content */}
+        <div className="w-full flex-1">
           {children}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

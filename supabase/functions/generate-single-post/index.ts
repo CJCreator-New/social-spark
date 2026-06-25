@@ -165,6 +165,12 @@ Deno.serve(async (req: Request) => {
       }
     );
     if (aiRes.status !== 200) {
+      if (aiRes.status === 503) {
+        return jsonResponse({
+          error: "PLATFORM_UNAVAILABLE",
+          message: "Our AI providers are temporarily overloaded. Please try again in a moment, or add your own API key in Profile → API Keys to generate without platform limits.",
+        }, 503);
+      }
       return jsonResponse({ error: aiRes.error }, aiRes.status);
     }
 

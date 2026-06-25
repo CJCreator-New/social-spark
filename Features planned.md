@@ -1,5 +1,21 @@
 # ContentForge v4 — Complete Feature List
 
+> **38 total features** · 24 live · 9 planned · 9 AI-powered · 5 export options
+
+---
+
+## Status key
+
+| Badge | Meaning |
+|-------|---------|
+| ✅ Live | Built and working in the current artifact |
+| 🔵 Planned | Designed, not yet built |
+| 🤖 AI-powered | Makes a direct call to the API |
+| 🎨 UX | Editing or interface feature |
+| 📤 Export | Outputs content outside the app |
+
+---
+
 ## 1. Content generation
 
 *9 features*
@@ -34,7 +50,7 @@ Add topics not in the preset library by typing and pressing Enter or clicking Ad
 ### Markdown-formatted AI output ✅ 🤖
 The AI prompt explicitly instructs the model to use `**bold**` for key terms and numbers, `*italic*` for nuance, `## headers` for sections (sparingly), and `→` for bullet lists inside the JSON string values. Rendered as real styled HTML in the card.
 
-### Trending topic suggestions ✅ 🤖
+### Trending topic suggestions 🔵 🤖
 Pull live trending topics per industry via web search, surfaced as chip suggestions in the topic picker. User reviews and confirms before adding to the selection.
 
 ---
@@ -93,7 +109,7 @@ One-click links open the tool in a new tab so the user can paste the prompt imme
 - [Adobe Firefly](https://firefly.adobe.com)
 - [Leonardo.ai](https://leonardo.ai)
 
-### Inline image preview ✅
+### Inline image preview 🔵
 After generating an image externally, paste the URL back into ContentForge to preview it inline alongside the post card. Stored with the session on save.
 
 ---
@@ -124,7 +140,7 @@ Each day cell in the calendar grid shows "Best day" or "Off-peak" in a small col
 ### Format spread visibility ✅
 The calendar grid shows each post's format type (Storytelling, Opinion, List, etc.) as a small label on the day cell. Lets you spot a monotone week — e.g. five consecutive Opinion posts — before copying.
 
-### Week balance score ✅
+### Week balance score 🔵
 A visual indicator that scores the week's format mix, topic variety, and posting cadence. Flags imbalances such as three consecutive opinion posts, repeated topics, or poor day distribution. Shown as a coloured bar above the calendar.
 
 ### Engagement prediction badge 🔵 🤖
@@ -157,7 +173,7 @@ Spreadsheet-ready CSV with one row per post. Columns:
 
 Designed to import directly into Buffer, Hootsuite, Notion databases, or Airtable.
 
-### Direct Buffer / Hootsuite scheduling ✅ 📤
+### Direct Buffer / Hootsuite scheduling 🔵 📤
 Connect Buffer or Hootsuite via API key entered in settings. Push all posts to the scheduling queue in one click — platform, date, best-time slot, and image prompt pre-filled from the generated data.
 
 ---
@@ -177,7 +193,7 @@ Save a full session to `localStorage` including posts, image prompts, image styl
 ### Session and persona delete ✅
 Delete individual sessions or personas with a single click. The list updates immediately without page reload.
 
-### Cloud sync across devices ✅
+### Cloud sync across devices 🔵
 Optional Supabase-backed persistence so sessions and personas sync across browsers and devices. Requires a Supabase project URL and anon key entered in a settings panel.
 
 ### Multi-persona quick switch 🔵 🤖
@@ -218,21 +234,15 @@ Track edit history per post field. Undo any field to a previous version without 
 
 | Category | Live | Planned | Total |
 |----------|------|---------|-------|
-| Content generation | 9 | 0 | 9 |
+| Content generation | 8 | 1 | 9 |
 | Editing and refinement | 4 | 2 | 6 |
-| Image prompt generation | 5 | 0 | 5 |
-| Performance and strategy | 4 | 1 | 5 |
-| Copy and export | 6 | 0 | 6 |
-| Personas and sessions | 4 | 1 | 5 |
+| Image prompt generation | 4 | 1 | 5 |
+| Performance and strategy | 3 | 2 | 5 |
+| Copy and export | 5 | 1 | 6 |
+| Personas and sessions | 3 | 2 | 5 |
 | UX and platform | 3 | 1 | 4 |
-| **Total** | **35** | **5** | **40** |
+| **Total** | **30** | **10** | **40** |
 
 ---
 
-## Todo List (Remaining Features)
-
-- [x] **Hashtag editor**: Edit, add, or remove individual hashtags per post without touching the body. Includes volume guidance per platform.
-- [x] **Tone slider per post**: A formal/casual slider that triggers a targeted rewrite of the post body at the selected tone level.
-- [x] **Engagement prediction badge**: Rates each post's predicted engagement level (High, Medium, or Low) based on topic, format, platform, and day of week.
-- [x] **Multi-persona quick switch**: Run the same week's topics through two different personas and view both sets of posts in a side-by-side comparison before choosing which to copy.
-- [x] **Post history and versioning**: Track edit history per post field. Undo any field to a previous version without affecting the rest of the post.
+*Generated for ContentForge v4 · Built with Claude Sonnet · June 2026*

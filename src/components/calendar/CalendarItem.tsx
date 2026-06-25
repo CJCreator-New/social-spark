@@ -1,7 +1,8 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import type { SavedCalendar } from "@/pages/MyCalendars";
 import { motion } from "framer-motion";
+import { Star, MoreVertical } from "lucide-react";
 
 interface CalendarItemProps {
   it: SavedCalendar;
@@ -18,14 +19,15 @@ interface CalendarItemProps {
   toggleFavorite: (it: SavedCalendar) => void;
 }
 
-function platformColorStyle(platform?: string | null): React.CSSProperties {
-  if (!platform) return { background: "rgba(124, 130, 148, 0.1)", color: "#7c8294", borderColor: "rgba(124, 130, 148, 0.2)" };
+function platformBadgeStyle(platform?: string | null): React.CSSProperties {
+  if (!platform) return { background: "#f5f5f4", color: "#78716c", border: "1px solid #e7e5e4" };
   const p = platform.toLowerCase();
-  if (p.includes("linkedin")) return { background: "rgba(10, 102, 194, 0.1)", color: "#70b5f9", borderColor: "rgba(10, 102, 194, 0.3)" };
-  if (p.includes("twitter") || p.includes("x")) return { background: "rgba(255, 255, 255, 0.05)", color: "#edeae3", borderColor: "rgba(255, 255, 255, 0.1)" };
-  if (p.includes("instagram")) return { background: "rgba(225, 48, 108, 0.1)", color: "#ff7da4", borderColor: "rgba(225, 48, 108, 0.3)" };
-  if (p.includes("facebook")) return { background: "rgba(24, 119, 242, 0.1)", color: "#6ca8ff", borderColor: "rgba(24, 119, 242, 0.3)" };
-  return { background: "rgba(124, 130, 148, 0.1)", color: "#7c8294", borderColor: "rgba(124, 130, 148, 0.2)" };
+  if (p.includes("linkedin"))  return { background: "#dbeafe", color: "#1d4ed8", border: "1px solid #bfdbfe" };
+  if (p.includes("twitter") || p.includes("x")) return { background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd" };
+  if (p.includes("instagram")) return { background: "#fce7f3", color: "#be185d", border: "1px solid #fbcfe8" };
+  if (p.includes("facebook"))  return { background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" };
+  if (p.includes("newsletter") || p.includes("blog")) return { background: "#fef3c7", color: "#d97706", border: "1px solid #fde68a" };
+  return { background: "#f5f5f4", color: "#78716c", border: "1px solid #e7e5e4" };
 }
 
 export const CalendarItem = React.memo(function CalendarItem({
@@ -42,126 +44,199 @@ export const CalendarItem = React.memo(function CalendarItem({
   setPendingDelete,
   toggleFavorite,
 }: CalendarItemProps) {
+  const navigate = useNavigate();
   const isRenaming = renamingId === it.id;
   const postCount = Array.isArray(it.posts) ? it.posts.length : 0;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [menuOpen]);
 
   return (
     <motion.div
-      className="glass-card p-5 flex flex-col justify-between min-h-[190px] border border-white/5 relative overflow-hidden group transition-all duration-300 hover:border-white/10 hover:shadow-lg"
+      className="relative flex flex-col justify-between overflow-hidden group cursor-pointer"
       style={{
-        background: "linear-gradient(145deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.005) 100%)",
+        backgroundColor: "#ffffff",
+        borderRadius: 16,
+        padding: 24,
+        minHeight: 200,
+        boxShadow: "0 4px 20px rgba(120,113,108,0.04)",
+        border: "1px solid #e7e5e4",
+        transition: "box-shadow 0.2s ease, border-color 0.2s ease",
       }}
-      whileHover={{ y: -4 }}
+      onClick={() => { if (!isRenaming) navigate(`/calendar/${it.id}`); }}
+      whileHover={{ y: -4, boxShadow: "0 12px 30px rgba(120,113,108,0.08)" } as never}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
     >
       <div>
-        {/* Card Header row */}
-        <div className="flex justify-between items-start gap-4 mb-4">
+        {/* Card Header */}
+        <div className="flex justify-between items-start gap-3 mb-3">
           <span
-            className="px-2.5 py-1 rounded-md text-[10px] font-semibold tracking-wider uppercase border"
-            style={platformColorStyle(it.platform)}
+            className="text-[10px] font-semibold tracking-wider uppercase rounded-md"
+            style={{ padding: "3px 8px", ...platformBadgeStyle(it.platform) }}
           >
             {it.platform || "Generic"}
           </span>
 
-          <button
-            type="button"
-            className={`text-base p-1 transition-colors ${
-              it.is_favorite ? "text-[#c8f09a]" : "text-slate-600 hover:text-slate-400"
-            }`}
-            onClick={() => toggleFavorite(it)}
-            aria-pressed={!!it.is_favorite}
-            aria-label={it.is_favorite ? "Unstar" : "Star"}
-          >
-            {it.is_favorite ? "★" : "☆"}
-          </button>
+          <div className="flex items-center gap-1" ref={menuRef}>
+            {/* Star toggle with Lucide icon */}
+            <button
+              type="button"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 4,
+                display: "flex",
+                alignItems: "center",
+                color: it.is_favorite ? "#f59e0b" : "#a8a29e",
+                transition: "color 0.15s",
+              }}
+              onClick={(e) => { e.stopPropagation(); toggleFavorite(it); }}
+              aria-pressed={!!it.is_favorite}
+              aria-label={it.is_favorite ? "Unstar" : "Star"}
+            >
+              <Star
+                size={15}
+                style={{ fill: it.is_favorite ? "#f59e0b" : "none", strokeWidth: 1.5 }}
+              />
+            </button>
+
+            {/* Actions menu */}
+            <button
+              type="button"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 4,
+                display: "flex",
+                alignItems: "center",
+                color: "#a8a29e",
+                transition: "color 0.15s",
+              }}
+              onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
+              aria-label="Calendar actions"
+              aria-expanded={menuOpen}
+            >
+              <MoreVertical size={15} />
+            </button>
+
+            {menuOpen && (
+              <div
+                className="absolute right-0 top-full mt-1 z-30"
+                style={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e7e5e4",
+                  borderRadius: 8,
+                  boxShadow: "0 8px 24px rgba(120,113,108,0.10)",
+                  minWidth: 120,
+                  overflow: "hidden",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {[
+                  { label: "Rename", action: () => { setMenuOpen(false); startRename(it); }, color: "#57534e" },
+                  { label: duplicatingId === it.id ? "Copying…" : "Duplicate", action: () => { setMenuOpen(false); duplicate(it); }, color: "#57534e" },
+                  { label: "Delete", action: () => { setMenuOpen(false); setPendingDelete(it); }, color: "#ef4444" },
+                ].map(({ label, action, color }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "8px 14px",
+                      fontSize: 12,
+                      color,
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      display: "block",
+                      transition: "background 0.12s",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#faf8f4")}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+                    onClick={(e) => { e.stopPropagation(); action(); }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Title / Input */}
+        {/* Title / rename input */}
         {isRenaming ? (
           <input
-            className="w-full bg-[#07080d] border border-white/10 rounded-lg px-3 py-2 text-sm text-[#edeae3] outline-none focus:border-[#c8f09a]/30 mb-3"
+            className="w-full rounded-lg px-3 py-2 text-sm outline-none mb-3"
+            style={{
+              backgroundColor: "#faf8f4",
+              border: "1.5px solid #c2410c",
+              color: "#1c1917",
+              fontFamily: "inherit",
+            }}
             autoFocus
             value={renameValue}
             disabled={renameSaving}
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => setRenameValue(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                saveRename();
-              }
-              if (e.key === "Escape") {
-                e.preventDefault();
-                setRenamingId(null);
-              }
+              e.stopPropagation();
+              if (e.key === "Enter") { e.preventDefault(); saveRename(); }
+              if (e.key === "Escape") { e.preventDefault(); setRenamingId(null); }
             }}
             onBlur={saveRename}
           />
         ) : (
-          <Link to={`/calendar/${it.id}`} className="block group-hover:text-[#c8f09a] transition-colors mb-3">
-            <h2 className="font-display text-base font-normal leading-snug truncate">
-              {it.title}
-            </h2>
-          </Link>
+          <h2
+            className="text-base font-semibold leading-snug truncate mb-2"
+            style={{
+              fontFamily: "var(--font-display, 'Lora', Georgia, serif)",
+              color: "#1c1917",
+              transition: "color 0.15s",
+            }}
+            title={it.title}
+          >
+            {it.title}
+          </h2>
         )}
 
-        {/* Core Idea preview */}
+        {/* Core idea excerpt */}
         {it.core_idea && (
-          <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-4">
+          <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: "#57534e" }}>
             {it.core_idea}
           </p>
         )}
       </div>
 
-      {/* Card Footer info / actions */}
-      <div className="border-t border-white/5 pt-4 mt-auto">
-        <div className="flex justify-between items-center text-[11px] text-slate-500">
-          <div className="flex gap-2.5">
-            <span>{postCount} posts</span>
-            {it.industry_label && (
-              <>
-                <span>•</span>
-                <span className="truncate max-w-[100px]">{it.industry_label}</span>
-              </>
-            )}
-          </div>
-          <span>{new Date(it.created_at).toLocaleDateString()}</span>
-        </div>
-
-        {/* Action button deck */}
-        <div className="flex justify-end gap-3 mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          {isRenaming ? (
-            <button
-              className="text-[11px] font-semibold text-slate-400 hover:text-slate-200"
-              onClick={() => setRenamingId(null)}
-              disabled={renameSaving}
-            >
-              Cancel
-            </button>
-          ) : (
+      {/* Card footer */}
+      <div className="flex justify-between items-center mt-4 pt-3" style={{ borderTop: "1px solid #f5f5f4" }}>
+        <div className="flex gap-2 text-[11px]" style={{ color: "#78716c" }}>
+          <span>{postCount} posts</span>
+          {it.industry_label && (
             <>
-              <button
-                className="text-[11px] font-semibold text-slate-400 hover:text-[#c8f09a] transition-colors"
-                onClick={() => startRename(it)}
-              >
-                Rename
-              </button>
-              <button
-                className="text-[11px] font-semibold text-slate-400 hover:text-[#c8f09a] transition-colors"
-                onClick={() => duplicate(it)}
-                disabled={duplicatingId === it.id}
-              >
-                {duplicatingId === it.id ? "Copying…" : "Duplicate"}
-              </button>
-              <button
-                className="text-[11px] font-semibold text-slate-500 hover:text-red-400 transition-colors"
-                onClick={() => setPendingDelete(it)}
-              >
-                Delete
-              </button>
+              <span>·</span>
+              <span className="truncate max-w-[110px]">{it.industry_label}</span>
             </>
           )}
         </div>
+        <span className="text-[11px]" style={{ color: "#78716c" }}>
+          {new Date(it.created_at).toLocaleDateString()}
+        </span>
       </div>
     </motion.div>
   );

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 
-import { saveUserApiKey, getUserApiKey, setUseOwnKey, deleteUserApiKey, getQuotaStatus } from "@/lib/apiKeyManager";
+import { saveUserApiKey, getUserApiKey, setUseOwnKey, deleteUserApiKey, getQuotaStatus, validateUserApiKey } from "@/lib/apiKeyManager";
 import { toast } from "sonner";
-import { Eye, EyeOff, Save, Key, CheckCircle2, AlertCircle, Loader2, Trash2, ShieldCheck, Info } from "lucide-react";
+import { Eye, EyeOff, Save, Key, CheckCircle2, AlertCircle, Loader2, Trash2, ShieldCheck, Info, BadgeCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export function ApiKeySettings() {
@@ -11,6 +11,8 @@ export function ApiKeySettings() {
   const [useOwnKey, setUseOwnKeyVal] = useState(false);
   const [keyMode, setKeyMode] = useState<'fallback' | 'always'>('fallback');
   const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ valid: boolean; reason?: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -98,6 +100,42 @@ export function ApiKeySettings() {
     loadSettings();
   }, []);
 
+  // Turns a validation reason into something friendly to show the user.
+  function validationMessage(reason?: string): string {
+    if (reason === "INVALID_KEY_FORMAT") {
+      return `Invalid key format for ${provider}. Please check your API key and try again.`;
+    }
+    return reason || "This key could not be verified.";
+  }
+
+  // Live "Test key" — verifies the entered key against the provider without saving it.
+  async function handleTest() {
+    const rawKey = keyInputRef.current?.value?.trim() ?? "";
+    if (!rawKey || rawKey.startsWith("••••")) {
+      toast.error("Enter an API key to test.");
+      return;
+    }
+
+    setTesting(true);
+    setTestResult(null);
+    setStatusMsg(null);
+    try {
+      const result = await validateUserApiKey(rawKey, provider);
+      setTestResult(result);
+      if (result.valid) {
+        toast.success("API key verified — it works!");
+      } else {
+        toast.error("API key check failed.");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Validation failed";
+      setTestResult({ valid: false, reason: msg });
+      toast.error("Couldn't verify the key. Please try again.");
+    } finally {
+      setTesting(false);
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -115,9 +153,20 @@ export function ApiKeySettings() {
       }
 
       if (isNewKey) {
+        // Verify the key against the provider before storing it, so we never
+        // persist a dud that would silently fail at generation time.
+        const check = await validateUserApiKey(rawKey, provider);
+        if (!check.valid) {
+          setTestResult(check);
+          setStatusMsg({ text: validationMessage(check.reason), type: "error" });
+          toast.error(check.reason === "INVALID_KEY_FORMAT" ? "Invalid API key format" : "API key check failed");
+          setLoading(false);
+          return;
+        }
         await saveUserApiKey(rawKey, provider);
         const last4 = rawKey.slice(-4);
         setSavedKeyPreview(`••••••••${last4}`);
+        setTestResult(null);
       }
 
       await setUseOwnKey(useOwnKey, keyMode);
@@ -166,8 +215,8 @@ export function ApiKeySettings() {
 
   if (fetching) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#7a7a8e", fontSize: 13, padding: "20px 0" }}>
-        <Loader2 className="animate-spin" size={16} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#78716c", fontSize: 13, padding: "20px 0" }}>
+        <Loader2 className="animate-spin" size={16} style={{ color: "#c2410c" }} />
         <span>Loading API key configurations...</span>
       </div>
     );
@@ -177,13 +226,13 @@ export function ApiKeySettings() {
     <>
       <div className="pf-card" style={{ marginTop: 14 }}>
       <h2 className="pf-section-h" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Key size={18} style={{ color: "#c8f09a" }} />
+        <Key size={18} style={{ color: "#c2410c" }} />
         <span>User API Key Fallback</span>
       </h2>
 
       {/* Inline Privacy Notice */}
       <div role="note" className="pf-notice">
-        <ShieldCheck size={14} style={{ color: "#c8f09a", flexShrink: 0, marginTop: 1 }} />
+        <ShieldCheck size={14} style={{ color: "#c2410c", flexShrink: 0, marginTop: 1 }} />
         <span>
           Your API key is encrypted with AES-256 and stored securely. It is never logged, shared, or used for
           any purpose other than generating content on your behalf. You can delete it at any time.
@@ -196,19 +245,19 @@ export function ApiKeySettings() {
             <span>Monthly platform generations used</span>
             <span>{Math.min(quota.used, quota.limit)} / {quota.limit}</span>
           </div>
-          <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+          <div style={{ height: 6, borderRadius: 99, background: "#e7e5e4", overflow: "hidden" }}>
             <div
               style={{
                 height: "100%",
                 width: `${Math.min(100, (quota.used / quota.limit) * 100)}%`,
-                background: quota.used >= quota.limit ? "#f09a9a" : "#c8f09a",
+                background: quota.used >= quota.limit ? "#ef4444" : "#22c55e",
                 transition: "width 0.3s ease",
               }}
             />
           </div>
           {quota.used >= quota.limit && !(useOwnKey && keyMode === 'always') && (
-            <div role="alert" className="pf-notice" style={{ marginTop: 10, borderColor: "rgba(240, 154, 154, 0.2)" }}>
-              <AlertCircle size={14} style={{ color: "#f09a9a", flexShrink: 0, marginTop: 1 }} />
+            <div role="alert" className="pf-notice" style={{ marginTop: 10, borderColor: "rgba(239,68,68,0.2)", background: "#fee2e2" }}>
+              <AlertCircle size={14} style={{ color: "#b91c1c", flexShrink: 0, marginTop: 1 }} />
               <span>
                 You've used your platform generations for this month. Upgrade for more credits, or add your
                 own API key below and enable "Always use my key" to keep generating at no platform cost.
@@ -233,9 +282,9 @@ export function ApiKeySettings() {
               padding: "10px 14px",
               borderRadius: "8px",
               fontSize: "12px",
-              background: statusMsg.type === "error" ? "rgba(240, 154, 154, 0.08)" : "rgba(200, 240, 154, 0.08)",
-              border: statusMsg.type === "error" ? "1px solid rgba(240, 154, 154, 0.2)" : "1px solid rgba(200, 240, 154, 0.2)",
-              color: statusMsg.type === "error" ? "#f09a9a" : "#c8f09a",
+              background: statusMsg.type === "error" ? "#fee2e2" : "#dcfce7",
+              border: statusMsg.type === "error" ? "1px solid #fca5a5" : "1px solid #86efac",
+              color: statusMsg.type === "error" ? "#b91c1c" : "#15803d",
             }}
           >
             {statusMsg.type === "error" ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
@@ -254,8 +303,9 @@ export function ApiKeySettings() {
             onChange={(e) => {
               const val = e.target.value as 'openai' | 'anthropic' | 'openrouter';
               setProvider(val);
-              // Clear input when switching provider
+              // Clear input and any stale test result when switching provider
               if (keyInputRef.current) keyInputRef.current.value = "";
+              setTestResult(null);
             }}
             style={{ marginBottom: 0 }}
           >
@@ -284,6 +334,8 @@ export function ApiKeySettings() {
               spellCheck={false}
               autoCorrect="off"
               autoCapitalize="off"
+              // Clear any stale verification result once the key is edited
+              onInput={() => testResult && setTestResult(null)}
             />
             <button
               type="button"
@@ -294,7 +346,7 @@ export function ApiKeySettings() {
                 right: "12px",
                 background: "none",
                 border: "none",
-                color: "#7a7a8e",
+                color: "#78716c",
                 cursor: "pointer",
                 padding: 0,
                 display: "flex",
@@ -305,25 +357,54 @@ export function ApiKeySettings() {
             </button>
           </div>
           {savedKeyPreview && (
-            <div style={{ fontSize: "11px", color: "#6a6a82", marginTop: "4px" }}>
+            <div style={{ fontSize: "11px", color: "#78716c", marginTop: "4px" }}>
               Currently configured key ends in <span className="font-mono">{savedKeyPreview.slice(-4)}</span>
             </div>
           )}
           {provider === "openai" && (
-            <div style={{ fontSize: "11px", color: "#6a6a82", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: "11px", color: "#78716c", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
               <Info size={11} /> Format: <code>sk-...</code> (32+ characters)
             </div>
           )}
           {provider === "anthropic" && (
-            <div style={{ fontSize: "11px", color: "#6a6a82", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: "11px", color: "#78716c", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
               <Info size={11} /> Format: <code>sk-ant-...</code>
             </div>
           )}
           {provider === "openrouter" && (
-            <div style={{ fontSize: "11px", color: "#6a6a82", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: "11px", color: "#78716c", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
               <Info size={11} /> Format: <code>sk-or-...</code>
             </div>
           )}
+
+          {/* Live key validation */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={handleTest}
+              disabled={testing}
+              className="pf-btn ghost"
+              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "6px 12px" }}
+            >
+              {testing ? <Loader2 className="animate-spin" size={13} /> : <BadgeCheck size={13} />}
+              <span>{testing ? "Testing…" : "Test key"}</span>
+            </button>
+            {testResult && (
+              <span
+                role={testResult.valid ? "status" : "alert"}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 12,
+                  color: testResult.valid ? "#15803d" : "#b91c1c",
+                }}
+              >
+                {testResult.valid ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                <span>{testResult.valid ? "Key verified — it works!" : validationMessage(testResult.reason)}</span>
+              </span>
+            )}
+          </div>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "6px 0" }}>
@@ -335,7 +416,7 @@ export function ApiKeySettings() {
             style={{
               width: "16px",
               height: "16px",
-              accentColor: "#c8f09a",
+              accentColor: "#c2410c",
               cursor: "pointer",
             }}
           />
@@ -343,7 +424,7 @@ export function ApiKeySettings() {
             htmlFor="use-own-key"
             style={{
               fontSize: "13px",
-              color: "#edeae3",
+              color: "#1c1917",
               cursor: "pointer",
               userSelect: "none",
             }}
@@ -372,7 +453,7 @@ export function ApiKeySettings() {
                 <option value="always">Always — use my key for all content generation</option>
               </select>
             </div>
-            <div style={{ fontSize: "11px", color: "#6a6a82", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: "11px", color: "#78716c", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
               <Info size={11} />
               {keyMode === "always"
                 ? "Your key will be used directly. Platform credits are not consumed."
@@ -403,9 +484,9 @@ export function ApiKeySettings() {
                 fontSize: "13px",
                 padding: "8px 14px",
                 borderRadius: "8px",
-                background: "rgba(240, 154, 154, 0.08)",
-                border: "1px solid rgba(240, 154, 154, 0.2)",
-                color: "#f09a9a",
+                background: "#fee2e2",
+                border: "1px solid #fca5a5",
+                color: "#b91c1c",
                 cursor: "pointer",
               }}
             >
@@ -422,10 +503,10 @@ export function ApiKeySettings() {
                 gap: 10,
                 padding: "10px 14px",
                 borderRadius: "8px",
-                background: "rgba(240, 154, 154, 0.08)",
-                border: "1px solid rgba(240, 154, 154, 0.2)",
+                background: "#fee2e2",
+                border: "1px solid #fca5a5",
                 fontSize: "12px",
-                color: "#f09a9a",
+                color: "#b91c1c",
               }}
             >
               <AlertCircle size={13} />
@@ -435,8 +516,8 @@ export function ApiKeySettings() {
                 onClick={handleDelete}
                 disabled={deleting}
                 style={{
-                  background: "#f09a9a",
-                  color: "#0a0a14",
+                  background: "#ef4444",
+                  color: "#ffffff",
                   border: "none",
                   borderRadius: "6px",
                   padding: "4px 10px",
@@ -452,8 +533,8 @@ export function ApiKeySettings() {
                 onClick={() => setConfirmDelete(false)}
                 style={{
                   background: "transparent",
-                  color: "#7a7a8e",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "#78716c",
+                  border: "1px solid #d6d3d1",
                   borderRadius: "6px",
                   padding: "4px 10px",
                   fontSize: "11px",
@@ -471,28 +552,28 @@ export function ApiKeySettings() {
       <div className="pf-card" style={{ marginTop: 24 }}>
         <h2 className="pf-section-h" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <ShieldCheck size={18} style={{ color: "#c8f09a" }} />
+            <ShieldCheck size={18} style={{ color: "#c2410c" }} />
             <span>Custom Supabase Sync</span>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             {syncStatus === "default" && (
-              <span style={{ fontSize: 10, padding: "2px 8px", background: "rgba(255,255,255,0.06)", color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: 99 }}>
+              <span style={{ fontSize: 10, padding: "2px 8px", background: "#f5f5f4", color: "#78716c", border: "1px solid #e7e5e4", borderRadius: 99 }}>
                 Default Project
               </span>
             )}
             {syncStatus === "testing" && (
-              <span style={{ fontSize: 10, padding: "2px 8px", background: "rgba(255,255,255,0.03)", color: "var(--text2)", border: "1px solid var(--border2)", borderRadius: 99 }}>
+              <span style={{ fontSize: 10, padding: "2px 8px", background: "#fef9c3", color: "#a16207", border: "1px solid #fde68a", borderRadius: 99 }}>
                 Connecting…
               </span>
             )}
             {syncStatus === "custom_connected" && (
-              <span style={{ fontSize: 10, padding: "2px 8px", background: "rgba(200,240,154,0.12)", color: "var(--accent)", border: "1px solid rgba(200,240,154,0.2)", borderRadius: 99 }}>
-                🟢 Connected to Custom DB
+              <span style={{ fontSize: 10, padding: "2px 8px", background: "#dcfce7", color: "#15803d", border: "1px solid #86efac", borderRadius: 99, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                Connected to Custom DB
               </span>
             )}
             {syncStatus === "custom_error" && (
-              <span style={{ fontSize: 10, padding: "2px 8px", background: "rgba(240,154,154,0.12)", color: "var(--err)", border: "1px solid rgba(240,154,154,0.2)", borderRadius: 99 }}>
-                🔴 Connection Failed
+              <span style={{ fontSize: 10, padding: "2px 8px", background: "#fee2e2", color: "#b91c1c", border: "1px solid #fca5a5", borderRadius: 99, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                Connection Failed
               </span>
             )}
           </div>
@@ -552,9 +633,9 @@ export function ApiKeySettings() {
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
-                  background: "rgba(240, 154, 154, 0.08)",
-                  border: "1px solid rgba(240, 154, 154, 0.2)",
-                  color: "#f09a9a",
+                  background: "#fee2e2",
+                  border: "1px solid #fca5a5",
+                  color: "#b91c1c",
                   cursor: "pointer",
                 }}
               >

@@ -73,6 +73,9 @@ const NON_FALLBACK_ERRORS = [
   "Rate limit exceeded",
   "Request body too large",
   "Invalid request",
+  "AI is not configured",        // server-side platform key missing
+  "PLATFORM_UNAVAILABLE",        // entire provider waterfall exhausted — surface directly
+  "All platform AI providers",   // same error, string-prefix match
 ];
 
 function isNonFallbackError(message: string): boolean {

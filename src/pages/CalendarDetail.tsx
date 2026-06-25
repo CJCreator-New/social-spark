@@ -40,6 +40,8 @@ import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Database, Json } from "@/integrations/supabase/types";
 import type { Post } from "@/components/wizard/constants";
+import { AnimatePresence, motion } from "framer-motion";
+import { Helmet } from "react-helmet-async";
 
 type SavedCalendarInsert = Database["public"]["Tables"]["saved_calendars"]["Insert"];
 
@@ -245,6 +247,10 @@ const css = `
   .cd-hero-title { font-size:26px; max-width:none; }
   .cd-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .cd-editor-meter { grid-template-columns:1fr; }
+}
+.cd-tz-input::placeholder {
+  color: #7a7a8e !important;
+  font-style: italic !important;
 }
 `;
 
@@ -1353,8 +1359,8 @@ export default function CalendarDetail() {
     try {
       const ws = parseLocalDate(weekStart) || nextMonday();
       const tz = timezone || profileTimezone || browserTimezone();
-      const rows = posts.map(post => {
-        const d = dateForDow(ws, post.dow);
+      const rows = posts.map((post, idx) => {
+        const d = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + idx);
         const dateStr = toDateInputValue(d);
         const time = postTimes[String(post.day)] || suggestedTimeForDay(post.day, platform);
         const f = formatForPlatform(post, platform);
@@ -1390,6 +1396,16 @@ export default function CalendarDetail() {
   const weekStartDate = useMemo(() => parseLocalDate(weekStart) || nextMonday(), [weekStart]);
 
   const p = posts[active] ?? EMPTY_POST;
+
+  const activeDate = useMemo(() => {
+    if (!p) return null;
+    return new Date(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate() + (p.day - 1));
+  }, [weekStartDate, p]);
+
+  const activeDowName = useMemo(() => {
+    if (!activeDate) return "—";
+    return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][activeDate.getDay()];
+  }, [activeDate]);
   const bodyWords = useMemo(() => wordCount(draft?.body || ""), [draft?.body]);
   const hookWords = useMemo(() => wordCount(draft?.hook || ""), [draft?.hook]);
   const titleChars = (draft?.title || "").length;
@@ -1438,6 +1454,9 @@ export default function CalendarDetail() {
 
   return (
     <>
+      <Helmet>
+        <title>{title ? `${title} — ContentForge` : "Content Calendar — ContentForge"}</title>
+      </Helmet>
       <style>{css}</style>
       {isE2EModeActive && (
         <div style={{
@@ -1523,8 +1542,8 @@ export default function CalendarDetail() {
           <div className="cd-hero-side">
             <div className="cd-hero-card">
               <span>Active day</span>
-              <strong>Day {p?.day ?? 0} · {p?.dow ?? "—"}</strong>
-              <small>{p ? shortDateLabel(dateForDow(weekStartDate, p.dow)) : "No active post"}</small>
+              <strong>Day {p?.day ?? 0} · {activeDowName}</strong>
+              <small>{activeDate ? shortDateLabel(activeDate) : "No active post"}</small>
             </div>
             <div className="cd-hero-card">
               <span>Workflow</span>
@@ -1662,6 +1681,8 @@ export default function CalendarDetail() {
             <div className="cd-strip" role="tablist" aria-label="Days of the week" style={{ height: "auto", minHeight: "68px" }}>
               {posts.map((post, i) => {
                 const st = statusByDay[post.day];
+                const dayDate = new Date(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate() + i);
+                const dayOfWeekName = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dayDate.getDay()];
                 return (
                   <button
                     key={i}
@@ -1675,9 +1696,9 @@ export default function CalendarDetail() {
                     style={{ paddingBottom: 6 }}
                   >
                     {st && <span className={`cd-tab-status ${st}`} aria-hidden="true" style={{ background: st === "published" ? "#c8f09a" : st === "approved" ? "#9ab5f0" : st === "failed" ? "#f09a9a" : "#9a9aae" }} />}
-                    <div className="cd-tab-dow">{post.dow}</div>
+                    <div className="cd-tab-dow">{dayOfWeekName}</div>
                     <div className="cd-tab-n">{i + 1}</div>
-                    <div className="cd-tab-date">{shortDateLabel(dateForDow(weekStartDate, post.dow)).split(" · ")[1]}</div>
+                    <div className="cd-tab-date">{shortDateLabel(dayDate).split(" · ")[1]}</div>
                     {/* Engagement prediction badge */}
                     {(() => {
                       const engagementLevel = getEngagementPrediction(post, platform);
@@ -1770,11 +1791,19 @@ export default function CalendarDetail() {
             )}
           </div>
 
-        {p && !editing && (
-          <div className="cd-card">
+        <AnimatePresence mode="wait">
+          {p && !editing && (
+            <motion.div
+              key="view"
+              className="cd-card"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+            >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                  <span className="cd-date-pill">{shortDateLabel(dateForDow(weekStartDate, p.dow))}</span>
+                  <span className="cd-date-pill">{activeDate ? shortDateLabel(activeDate) : ""}</span>
                   <span className="ptag pt-topic" style={{ fontSize: 11 }}>{p.topic}</span>
                   <TopicGapBadge
                     topic={p.topic}
@@ -2078,13 +2107,18 @@ export default function CalendarDetail() {
                         const ins = insightFor(p, platform);
                         const tagCls = ins.hashtagState === "sweet" ? "good" : ins.hashtagState === "na" ? "" : ins.hashtagState === "dense" ? "bad" : "warn";
                         const healthCls = ins.health === "good" ? "good" : ins.health === "warn" ? "warn" : "bad";
-                        const healthLabel = ins.health === "good" ? "✓ ready" : ins.health === "warn" ? "⚠ review" : "✕ fix";
+                        const healthLabel = ins.health === "good" ? "✓ ready" : ins.health === "warn" ? "⚠ review" : "✕ Fix hashtags";
+                        const healthTooltip = ins.health === "good"
+                          ? "Post length and hashtag density are within recommended ranges."
+                          : ins.health === "warn"
+                            ? "Warning: Post has suboptimal length or hashtag density."
+                            : "Hashtag density exceeds recommended limit or contains banned hashtags. Please edit to fix.";
                         return (
                           <>
                             <span className={`cd-chip ${tagCls}`} title={`Hashtag density for ${niceLabel}`}>
                               # {ins.hashtagLabel}
                             </span>
-                            <span className={`cd-chip ${healthCls}`} title="Overall health (length + hashtags)">
+                            <span className={`cd-chip ${healthCls}`} title={healthTooltip}>
                               {healthLabel}
                             </span>
                             {p.variant_scores && p.chosen_index !== undefined && p.variant_scores[p.chosen_index] && (() => {
@@ -2135,9 +2169,9 @@ export default function CalendarDetail() {
                   className="cd-btn"
                   onClick={() => setFeedbackOpen(true)}
                   disabled={regenerating}
-                  title="Regenerate and send feedback"
+                  title="Provide custom formatting notes or adjustment instructions for this day's rewrite"
                 >
-                  📝 Regenerate + feedback
+                  📝 Regenerate with notes
                 </button>
                 <div className="cd-tweak-wrap" ref={repurposeRef}>
                   <button
@@ -2197,11 +2231,18 @@ export default function CalendarDetail() {
                   )}
                 </div>
               </div>
-            </div>
-        )}
+            </motion.div>
+          )}
 
-        {p && editing && draft && (
-          <div className="cd-card">
+          {p && editing && draft && (
+            <motion.div
+              key="edit"
+              className="cd-card"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+            >
               <div className="cd-blabel"><span>Day · Day-of-week</span></div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                 <input
@@ -2337,8 +2378,9 @@ export default function CalendarDetail() {
                 <button className="cd-btn cd-btn-p" onClick={saveEdit} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
                 <button className="cd-btn" onClick={cancelEdit} disabled={saving}>Cancel</button>
               </div>
-            </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </WorkspacePage>
       {scheduleOpen && (
         <div className="cd-modal-bg" onClick={() => !scheduling && setScheduleOpen(false)}>
@@ -2348,8 +2390,8 @@ export default function CalendarDetail() {
               Queues all 7 posts to your schedule using the times below. Existing scheduled
               entries for this calendar will be replaced. Adjust times in the per-day cards if needed.
             </p>
-            {posts.map(post => {
-              const d = dateForDow(weekStartDate, post.dow);
+            {posts.map((post, idx) => {
+              const d = new Date(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate() + idx);
               return (
                 <div key={post.day} className="cd-modal-row">
                   <span className="cd-modal-day">{shortDateLabel(d)}</span>

@@ -27,6 +27,84 @@ const VALID_DOW = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
 
 const ENRICHMENT_MODEL = "google/gemini-2.5-flash-lite";
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  PLATFORM PROVIDER WATERFALL
+//  Ordered list of platform-level AI providers tried in sequence.
+//  The waterfall skips any entry whose secret key is not configured.
+//  Set secondary keys in Supabase: PLATFORM_OPENROUTER_KEY, PLATFORM_OPENAI_KEY,
+//  PLATFORM_ANTHROPIC_KEY. Only LOVABLE_API_KEY is required.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ProviderEntry {
+  name: string;
+  envKey: string;
+  provider: "openai" | "anthropic" | "openrouter" | "lovable";
+  endpoint?: string;   // only used for lovable (custom gateway URL)
+  model: (quality: string) => string;
+}
+
+const PLATFORM_PROVIDER_CHAIN: ProviderEntry[] = [
+  {
+    name: "lovable-gateway",
+    envKey: "LOVABLE_API_KEY",
+    provider: "lovable",
+    endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
+    model: (q) => q === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash",
+  },
+  {
+    name: "openrouter",
+    envKey: "PLATFORM_OPENROUTER_KEY",
+    provider: "openrouter",
+    model: (q) => q === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash",
+  },
+  {
+    name: "openai",
+    envKey: "PLATFORM_OPENAI_KEY",
+    provider: "openai",
+    model: (q) => q === "polished" ? "gpt-4o" : "gpt-4o-mini",
+  },
+  {
+    name: "anthropic",
+    envKey: "PLATFORM_ANTHROPIC_KEY",
+    provider: "anthropic",
+    model: (q) => q === "polished" ? "claude-3-5-sonnet-latest" : "claude-3-5-haiku-latest",
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  CIRCUIT BREAKER  (in-memory, per Deno isolate)
+//  Opens after CIRCUIT_THRESHOLD consecutive failures; resets after CIRCUIT_RESET_MS.
+//  A half-open probe is allowed once the cooldown expires.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CIRCUIT_THRESHOLD = 3;
+const CIRCUIT_RESET_MS  = 60_000; // 60 seconds
+
+const _circuitState = new Map<string, { failures: number; openUntil: number }>();
+
+function isCircuitOpen(name: string): boolean {
+  const s = _circuitState.get(name);
+  if (!s) return false;
+  if (s.openUntil > Date.now()) return true;
+  // cooldown expired → half-open: delete state, allow one probe
+  _circuitState.delete(name);
+  return false;
+}
+
+function recordProviderSuccess(name: string): void {
+  _circuitState.delete(name);
+}
+
+function recordProviderFailure(name: string): void {
+  const s = _circuitState.get(name) ?? { failures: 0, openUntil: 0 };
+  s.failures++;
+  if (s.failures >= CIRCUIT_THRESHOLD) {
+    s.openUntil = Date.now() + CIRCUIT_RESET_MS;
+    console.warn(`[circuit-breaker] ${name} tripped after ${s.failures} failures — cooling ${CIRCUIT_RESET_MS / 1000}s`);
+  }
+  _circuitState.set(name, s);
+}
+
 function getUserIdFromToken(token?: string | null): string {
   if (!token) return "anonymous";
   try {
@@ -476,7 +554,7 @@ async function checkQuota(userId: string): Promise<{ allowed: boolean; used: num
 
   try {
     const res = await fetch(
-      `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/user_settings?user_id=eq.${encodeURIComponent(userId)}&select=generation_count,quota_limit,use_own_key,key_mode,tier,plan_period_end`,
+      `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/user_settings?user_id=eq.${encodeURIComponent(userId)}&select=generation_count,quota_limit,quota_period_start,use_own_key,key_mode,tier,plan_period_end`,
       {
         headers: {
           apikey: SUPABASE_KEY,
@@ -489,10 +567,21 @@ async function checkQuota(userId: string): Promise<{ allowed: boolean; used: num
     const row = Array.isArray(rows) ? rows[0] : null;
     if (!row) return DEFAULT;
 
-    const used = row.generation_count ?? 0;
-    const limit = row.quota_limit ?? 50;
     const useOwnKey = !!row.use_own_key;
     const keyMode = row.key_mode || "fallback";
+
+    // ── Monthly quota window ──────────────────────────────────────────────
+    // quota_period_start tracks which calendar month the current count belongs to.
+    // If it is from a previous month, treat the effective count as 0 (reset).
+    // The actual DB reset happens atomically inside increment_generation_count().
+    const periodStart = row.quota_period_start ? new Date(row.quota_period_start) : new Date(0);
+    const nowMonthStart = new Date();
+    nowMonthStart.setUTCDate(1);
+    nowMonthStart.setUTCHours(0, 0, 0, 0);
+    const effectiveCount = periodStart < nowMonthStart ? 0 : (row.generation_count ?? 0);
+
+    const used  = effectiveCount;
+    const limit = row.quota_limit ?? 50;
 
     // Effective tier: a paid tier whose window has lapsed is treated as free.
     const storedTier = (row.tier === "starter" || row.tier === "pro") ? row.tier : "free";
@@ -1122,7 +1211,7 @@ async function callAI(
   tool: Record<string, unknown> | null,
   apiKey: string,
   opts: {
-    provider: "openai" | "anthropic" | "openrouter";
+    provider: "openai" | "anthropic" | "openrouter" | "lovable";
     quality?: string;
     model?: string;
     temperature?: number;
@@ -1141,8 +1230,11 @@ async function callAI(
     return callOpenAiCompatibleDirect("https://openrouter.ai/api/v1/chat/completions", messages, tool, apiKey, model, temperature, opts.max_tokens);
   } else if (provider === "anthropic") {
     return callAnthropicDirect(messages, tool, apiKey, model, temperature, opts.max_tokens);
+  } else if (provider === "lovable") {
+    // Lovable AI Gateway speaks the OpenAI-compatible wire protocol
+    return callOpenAiCompatibleDirect("https://ai.gateway.lovable.dev/v1/chat/completions", messages, tool, apiKey, model, temperature, opts.max_tokens);
   }
-  
+
   return { status: 400, error: `Unsupported API provider: ${provider}` };
 }
 
@@ -1425,7 +1517,8 @@ async function callAIGateway(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     lastResult = await callAIGatewayOnce(messages, tool, apiKey, opts);
 
-    const isRetryable = lastResult.status >= 500 || lastResult.error === "AI request timeout";
+    // 503 = entire waterfall exhausted — no point retrying at this level
+    const isRetryable = (lastResult.status >= 500 && lastResult.status !== 503) || lastResult.error === "AI request timeout";
     if (!isRetryable || attempt === maxRetries) {
       return lastResult;
     }
@@ -1441,7 +1534,7 @@ async function callAIGateway(
 async function callAIGatewayOnce(
   messages: Array<{ role: string; content: string }>,
   tool: Record<string, unknown>,
-  apiKey: string,
+  _apiKey: string,   // kept for signature compat — waterfall reads keys from Deno.env directly
   opts: {
     timeoutMs?: number;
     model?: string;
@@ -1539,70 +1632,55 @@ async function callAIGatewayOnce(
     });
   }
 
-  // Fallback to standard Lovable AI Gateway
-  const timeoutMs = opts.timeoutMs ?? 90000;
-  const model = opts.model || "google/gemini-2.5-flash";
-  const temperature = typeof opts.temperature === "number" ? opts.temperature : 0.8;
-  const top_p = typeof opts.top_p === "number" ? opts.top_p : 1.0;
+  // ── Platform Provider Waterfall ──────────────────────────────────────────
+  // Try each configured platform provider in priority order until one succeeds.
+  // Circuit-broken providers are skipped for CIRCUIT_RESET_MS after CIRCUIT_THRESHOLD failures.
+  // 429/402/5xx/timeout → continue to next provider.
+  // Hard 4xx (400/401/403) → request is malformed; stop immediately.
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    const functionName = ((tool as { function?: { name?: unknown } }).function?.name || "") as string;
+  const quality = opts.quality || "draft";
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        tools: tool && Object.keys(tool).length > 0 ? [tool] : undefined,
-        tool_choice: tool && Object.keys(tool).length > 0 ? { type: "function", function: { name: functionName } } : undefined,
-        temperature,
-        top_p,
-        max_tokens: opts.max_tokens,
-      }),
-      signal: controller.signal,
+  for (const entry of PLATFORM_PROVIDER_CHAIN) {
+    const providerKey = (typeof Deno !== "undefined" ? Deno.env.get(entry.envKey) : undefined);
+    if (!providerKey) continue;              // secret not configured → skip
+
+    if (isCircuitOpen(entry.name)) {
+      console.info(`[waterfall] ${entry.name} circuit open — skipping`);
+      continue;
+    }
+
+    const providerModel = opts.model || entry.model(quality);
+    console.info(`[waterfall] trying ${entry.name} (model: ${providerModel})`);
+
+    const result = await callAI(messages, tool, providerKey, {
+      provider: entry.provider,
+      model: providerModel,
+      temperature: opts.temperature,
+      timeoutMs: opts.timeoutMs,
+      max_tokens: opts.max_tokens,
     });
 
-    clearTimeout(timeoutId);
-
-    if (res.status === 429) {
-      return {
-        status: 429,
-        error: "Rate limit hit. Please wait a moment and try again.",
-      };
+    if (result.status === 200) {
+      recordProviderSuccess(entry.name);
+      console.info(`[waterfall] ${entry.name} succeeded`);
+      return result;
     }
 
-    if (res.status === 402) {
-      return {
-        status: 402,
-        error: "AI credits exhausted. Please add credits in Settings → Workspace → Usage.",
-      };
-    }
+    recordProviderFailure(entry.name);
+    console.warn(`[waterfall] ${entry.name} returned ${result.status}: ${result.error}`);
 
-    if (!res.ok) {
-      const text = await res.text();
-      console.error(`AI gateway error ${res.status}:`, text);
-      return {
-        status: res.status || 500,
-        error: `AI error: ${res.status}`,
-      };
+    // Hard 4xx (not 429/402) = request is malformed; retrying other providers won't help
+    if (result.status >= 400 && result.status < 500
+        && result.status !== 429 && result.status !== 402) {
+      console.error(`[waterfall] hard client error ${result.status} — aborting waterfall`);
+      return result;
     }
-
-    const data = await res.json();
-    return { status: 200, data };
-  } catch (e) {
-    if (e instanceof Error && e.name === "AbortError") {
-      console.error("AI request timeout");
-      return { status: 500, error: "AI request timeout" };
-    }
-    console.error("AI gateway call failed:", e instanceof Error ? e.stack : e);
-    return { status: 500, error: "An unexpected error occurred." };
+    // 5xx / 429 / 402 / timeout → try next provider in chain
   }
+
+  // All configured providers exhausted
+  console.error("[waterfall] all platform providers failed or unconfigured");
+  return { status: 503, error: "All platform AI providers are currently unavailable." };
 }
 
 /**
@@ -1828,6 +1906,56 @@ Deno.serve(async (req: Request) => {
     const action = String(body.action || "").trim();
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    if (action === "validate") {
+      // Live key check: make a minimal real call to the provider so the user
+      // knows the key works BEFORE we store it. The key is never persisted on
+      // this path and is never returned to the client.
+      const candidateKey = String(body.apiKey || "").trim();
+      const candidateProvider = String(body.provider || "").trim();
+
+      if (!candidateKey) {
+        return jsonResponse({ valid: false, reason: "Missing API key." }, 400);
+      }
+      if (!["openai", "anthropic", "openrouter"].includes(candidateProvider)) {
+        return jsonResponse({ valid: false, reason: "Invalid provider." }, 400);
+      }
+
+      const provider = candidateProvider as "openai" | "anthropic" | "openrouter";
+      const pingRes = await callAI(
+        [{ role: "user", content: "ping" }],
+        null,
+        candidateKey,
+        {
+          provider,
+          // Cheapest model per provider; a 1-token reply is enough to prove auth.
+          model: getProviderModel(provider, "draft"),
+          temperature: 0,
+          max_tokens: 1,
+        }
+      );
+
+      if (pingRes.status === 200) {
+        return jsonResponse({ valid: true });
+      }
+
+      // Map common upstream statuses to actionable reasons. We deliberately do
+      // not forward the raw provider error body (may contain noise/PII).
+      let reason = "The provider rejected this key.";
+      if (pingRes.status === 401 || pingRes.status === 403) {
+        reason = "Key was rejected (invalid or revoked). Double-check you copied it correctly.";
+      } else if (pingRes.status === 429) {
+        reason = "Key is valid but currently rate-limited. Try again in a moment.";
+      } else if (pingRes.status === 402) {
+        reason = "Key is valid but the provider account has no remaining credits.";
+      } else if (pingRes.status >= 500) {
+        reason = "Couldn't reach the provider right now. Please try again.";
+      } else if (pingRes.status === 404) {
+        reason = "The test model isn't available for this key. The key may still work for generation.";
+      }
+
+      return jsonResponse({ valid: false, status: pingRes.status, reason });
+    }
 
     if (action === "toggle") {
       const useOwnKey = body.useOwnKey;

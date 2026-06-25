@@ -201,7 +201,7 @@ export default function AuthPage() {
                               "h-[3px] w-8 rounded-full transition-colors duration-200",
                               password.length >= [6, 10, 14][i]
                                 ? (password.length >= 14 ? "bg-primary" : password.length >= 10 ? "bg-yellow-400" : "bg-destructive")
-                                : "bg-white/[0.08]"
+                                : "bg-border"
                             )}
                           />
                         ))}
@@ -249,10 +249,10 @@ export default function AuthPage() {
             </button>
             {import.meta.env.DEV && (
               <div style={{ marginTop: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0", color: "#7c8294", fontSize: 11 }}>
-                  <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0", color: "#78716c", fontSize: 11 }}>
+                  <div style={{ flex: 1, height: 1, background: "#e7e5e4" }} />
                   <span>Developer Sandbox</span>
-                  <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+                  <div style={{ flex: 1, height: 1, background: "#e7e5e4" }} />
                 </div>
                 <button
                   onClick={() => {
@@ -265,14 +265,14 @@ export default function AuthPage() {
                     width: "100%",
                     minHeight: 44,
                     padding: 12,
-                    borderRadius: 14,
+                    borderRadius: 10,
                     fontSize: 13,
-                    fontWeight: 700,
+                    fontWeight: 600,
                     fontFamily: "var(--font-body)",
                     cursor: "pointer",
-                    background: "rgba(200,240,154,0.05)",
-                    border: "1px dashed rgba(200,240,154,0.3)",
-                    color: "#c8f09a",
+                    background: "rgba(194,65,12,0.04)",
+                    border: "1px dashed rgba(194,65,12,0.25)",
+                    color: "#c2410c",
                     transition: "all .15s",
                     display: "flex",
                     alignItems: "center",
@@ -281,7 +281,7 @@ export default function AuthPage() {
                   }}
                   type="button"
                 >
-                  💡 Enter Sandbox Mode (Bypass Auth)
+                  Enter Sandbox Mode (Bypass Auth)
                 </button>
               </div>
             )}

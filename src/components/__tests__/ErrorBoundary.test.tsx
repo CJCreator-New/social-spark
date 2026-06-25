@@ -58,18 +58,18 @@ describe("ErrorBoundary", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders 'Go to API Keys' button for AI_UNAVAILABLE error", () => {
+  it("renders 'Try Again' and 'Add API Key' buttons for AI_UNAVAILABLE error", () => {
     render(
       <ErrorBoundary>
         <ThrowingChild error={new Error("AI_UNAVAILABLE")} />
       </ErrorBoundary>
     );
 
-    const btn = screen.getByRole("button", { name: /go to api keys/i });
-    expect(btn).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add api key/i })).toBeInTheDocument();
   });
 
-  it("'Go to API Keys' button navigates to /profile?tab=api-keys", () => {
+  it("'Add API Key' button navigates to /profile?tab=api-keys", () => {
     // Redefine window.location to allow spying/mocking of assign in jsdom
     const originalLocation = window.location;
     delete (window as any).location;
@@ -81,7 +81,7 @@ describe("ErrorBoundary", () => {
       </ErrorBoundary>
     );
 
-    const btn = screen.getByRole("button", { name: /go to api keys/i });
+    const btn = screen.getByRole("button", { name: /add api key/i });
     fireEvent.click(btn);
 
     expect(window.location.assign).toHaveBeenCalledWith("/profile?tab=api-keys");
