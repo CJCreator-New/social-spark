@@ -45,6 +45,15 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="relative min-h-screen flex flex-col w-full overflow-x-hidden" style={{ backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}>
 
+      {/* Skip-to-content link — visible on focus only, for keyboard users */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-semibold focus:no-underline"
+        style={{ backgroundColor: "#c2410c", color: "#ffffff", boxShadow: "0 4px 12px rgba(194,65,12,0.3)" }}
+      >
+        Skip to main content
+      </a>
+
       {/* TOP NAVBAR (sticky, warm white) */}
       <header className="sticky top-0 z-40 w-full border-b px-6 md:px-8 h-16 flex items-center justify-between" style={{ backgroundColor: "#ffffff", borderColor: "#e7e5e4", boxShadow: "0 2px 10px rgba(120,113,108,0.03)" }}>
         {/* Left: Brand */}
@@ -103,12 +112,14 @@ export function AppShell({ children }: AppShellProps) {
             <span className="hidden sm:inline">Sign out</span>
           </button>
 
-          {/* Mobile hamburger */}
+          {/* Mobile hamburger — hidden from both view AND accessibility tree on md+ screens */}
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="md:hidden p-1.5 transition-colors"
             style={{ color: "#57534e", background: "none", border: "none", cursor: "pointer" }}
-            aria-label="Toggle menu"
+            aria-label="Toggle navigation menu"
+            aria-expanded={isOpen}
+            aria-controls="mobile-nav-drawer"
           >
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               {isOpen ? <path d="M18 6L6 18M6 6l12 12" /> : <path d="M4 6h16M4 12h16M4 18h16" />}
@@ -119,7 +130,7 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Mobile Drawer menu (warm) */}
       {isOpen && (
-        <div className="md:hidden fixed inset-x-0 top-16 z-30 flex flex-col p-6 border-b" style={{ backgroundColor: "#ffffff", borderColor: "#e7e5e4" }}>
+        <div id="mobile-nav-drawer" className="md:hidden fixed inset-x-0 top-16 z-30 flex flex-col p-6 border-b" style={{ backgroundColor: "#ffffff", borderColor: "#e7e5e4" }} role="navigation" aria-label="Mobile navigation">
           <nav className="flex flex-col gap-3">
             {menuItems.map((item) => {
               const isActive = location.pathname === item.path || (item.path === "/my-calendars" && location.pathname.startsWith("/calendar/"));
@@ -146,7 +157,7 @@ export function AppShell({ children }: AppShellProps) {
       )}
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 w-full max-w-[1100px] mx-auto px-4 md:px-8 py-8 flex flex-col" style={{ paddingBottom: 80 }}>
+      <main id="main-content" className="flex-1 w-full max-w-[1100px] mx-auto px-4 md:px-8 py-8 flex flex-col" style={{ paddingBottom: 80 }}>
         {/* Breadcrumb */}
         <div className="mb-6 flex items-center gap-2 text-xs" style={{ color: "#78716c" }}>
           {isCalendarDetail ? (

@@ -2397,6 +2397,7 @@ const Index = () => {
                   <input
                     type="date"
                     className="date-input"
+                    aria-label="Date for this post"
                     value={form.targetDate}
                     onChange={e => upd("targetDate", e.target.value)}
                   />
@@ -2437,6 +2438,7 @@ const Index = () => {
                 {form.industry && (
                   <div className="add-row">
                     <input type="text" className="ti" placeholder="+ add a custom topic, press Enter or click Add"
+                      aria-label="Add custom topic"
                       value={customTopic}
                       onChange={e => setCustomTopic(e.target.value)}
                       onKeyDown={e => e.key === "Enter" && addCustomTopic()} />
@@ -2565,6 +2567,7 @@ const Index = () => {
                         <input
                           type="text"
                           className="ti"
+                          aria-label="Never say — banned words (comma-separated)"
                           placeholder="e.g. game-changer, synergy, leverage"
                           value={form.bannedWords.join(", ")}
                           onChange={e => upd("bannedWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
@@ -2575,6 +2578,7 @@ const Index = () => {
                         <input
                           type="text"
                           className="ti"
+                          aria-label="Must mention — required words (comma-separated)"
                           placeholder="e.g. our product name, RAG, India"
                           value={form.requiredWords.join(", ")}
                           onChange={e => upd("requiredWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
@@ -2593,6 +2597,7 @@ const Index = () => {
                   <input
                     type="date"
                     className="date-input"
+                    aria-label="Week starting date"
                     value={form.weekStart}
                     onChange={e => upd("weekStart", e.target.value)}
                   />
@@ -2611,7 +2616,7 @@ const Index = () => {
                     </span>
                   )}
                 </div>
-                <textarea rows={2} maxLength={500} placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
+                <textarea rows={2} maxLength={500} aria-label="Extra context (optional)" placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
               </div>
             </div>
 
@@ -2879,13 +2884,33 @@ const Index = () => {
           />
         )}
 
-        {/* Keyboard Shortcuts Help (visible on Step 4) */}
+        {/* Keyboard Shortcuts Help — dismissible tooltip, doesn't overlap content */}
         {step === 4 && (
-          <div style={{ position: "fixed", bottom: 16, left: 16, fontSize: 10, color: "var(--text3)", zIndex: 999, maxWidth: 200 }}>
-            <div style={{ opacity: 0.7 }}>
-              <strong>Quick shortcuts:</strong><br/>
-              Ctrl+Z = Undo | Ctrl+Y = Redo<br/>
-              Ctrl+Shift+E = Batch edit<br/>
+          <div style={{ position: "fixed", bottom: 16, left: 16, zIndex: 999 }} className="group">
+            <button
+              aria-label="Show keyboard shortcuts"
+              style={{
+                width: 28, height: 28, borderRadius: "50%",
+                background: "rgba(120,113,108,0.12)", border: "1px solid rgba(120,113,108,0.2)",
+                color: "#78716c", fontSize: 12, fontWeight: 700,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              ?
+            </button>
+            <div
+              role="tooltip"
+              style={{
+                display: "none", position: "absolute", bottom: 36, left: 0,
+                background: "#1c1917", color: "#faf8f4", borderRadius: 8, padding: "10px 14px",
+                fontSize: 11, lineHeight: 1.6, whiteSpace: "nowrap",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+              }}
+              className="group-hover:!block group-focus-within:!block"
+            >
+              <strong style={{ display: "block", marginBottom: 4 }}>Quick shortcuts</strong>
+              Ctrl+Z — Undo &nbsp;|&nbsp; Ctrl+Y — Redo<br/>
+              Ctrl+Shift+E — Batch edit<br/>
               Drag days to reorder
             </div>
           </div>

@@ -428,8 +428,8 @@ export default function Profile() {
                 <label className="pf-label" htmlFor="pf-name">Display name</label>
                 <input id="pf-name" className="pf-input" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your name" />
 
-                <label className="pf-label" htmlFor="pf-email">Email</label>
-                <input id="pf-email" className="pf-input" value={user?.email || ""} disabled />
+                <label className="pf-label" htmlFor="pf-email">Email <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: '#a8a29e', fontSize: 10 }}>(cannot be changed here)</span></label>
+                <input id="pf-email" className="pf-input" value={user?.email || ""} readOnly aria-readonly="true" style={{ cursor: 'default', opacity: 0.7 }} />
 
                 <label className="pf-label" htmlFor="pf-tz">Default timezone</label>
                 <select id="pf-tz" className="pf-select" value={defaultTimezone} onChange={e => setDefaultTimezone(e.target.value)}>

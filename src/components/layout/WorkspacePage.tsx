@@ -17,15 +17,16 @@ interface WorkspacePageProps {
 }
 
 export function WorkspacePage({ children, size = "medium", className }: WorkspacePageProps) {
+  // Intentionally a <div> — AppShell already renders the <main> landmark.
+  // Adding a second <main> here would create nested mains, violating HTML5 spec.
   return (
-    <main className={cn("page-shell", className)}>
-      <h1 className="sr-only">Social Spark workspace</h1>
+    <div className={cn("page-shell", className)}>
       <div
         className="relative z-10 mx-auto w-full px-4 py-[52px] sm:px-6"
         style={{ maxWidth: MAX_WIDTHS[size], paddingBottom: "100px" }}
       >
         {children}
       </div>
-    </main>
+    </div>
   );
 }
