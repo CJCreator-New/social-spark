@@ -142,13 +142,13 @@ export default function HeroCanvas() {
           // Fresnel Rim Glow
           float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 3.0);
           
-          // Premium luxury gradient colors (refined violet to cyan-teal)
-          vec3 colorViolet = vec3(0.55, 0.18, 0.98); // violet
-          vec3 colorTeal = vec3(0.08, 0.82, 0.76);   // cyan-teal
-          
+          // Warm editorial colors (burnt orange to warm amber)
+          vec3 colorOrange = vec3(0.76, 0.26, 0.05); // burnt orange #c2410c
+          vec3 colorAmber  = vec3(0.95, 0.73, 0.40); // warm amber
+
           // Mix colors based on position-based noise value
           float mixValue = (vNoise + 1.0) * 0.5;
-          vec3 baseColor = mix(colorViolet, colorTeal, mixValue);
+          vec3 baseColor = mix(colorOrange, colorAmber, mixValue);
           
           // Emissive rim glow lighting
           vec3 finalColor = baseColor * (0.5 + fresnel * 2.0) + vec3(fresnel * 0.9);
@@ -256,7 +256,7 @@ export default function HeroCanvas() {
     <div 
       ref={containerRef} 
       className="w-full h-full min-h-[450px] relative pointer-events-none"
-      style={{ mixBlendMode: "screen" }}
+      style={{ mixBlendMode: "multiply", opacity: 0.4 }}
     />
   );
 }

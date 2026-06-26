@@ -19,6 +19,7 @@ import {
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { CalendarItem } from "@/components/calendar/CalendarItem";
 import type { Json } from "@/integrations/supabase/types";
+import { CalendarPlus, Search, Star } from "lucide-react";
 import "@/styles/pages.css";
 
 export interface SavedCalendar {
@@ -349,7 +350,7 @@ export default function MyCalendars() {
               onClick={() => setFavOnly((f) => !f)}
               aria-pressed={favOnly}
             >
-              {favOnly ? "★ Starred only" : "☆ Starred only"}
+              <Star size={14} fill={favOnly ? "currentColor" : "none"} aria-hidden="true" /> Starred only
             </button>
             <select
               className="mc-sort"
@@ -370,7 +371,7 @@ export default function MyCalendars() {
         ) : items.length === 0 ? (
           <div className="mc-empty" style={{ padding: "72px 24px" }}>
             <div className="mc-empty-illus" aria-hidden="true">
-              ✦
+              <CalendarPlus size={34} strokeWidth={1.6} />
             </div>
             <h2 className="mc-empty-title">
               No <em>calendars</em> yet
@@ -384,7 +385,7 @@ export default function MyCalendars() {
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="mc-empty">
-            <div className="mc-empty-illus" aria-hidden="true">⌕</div>
+            <div className="mc-empty-illus" aria-hidden="true"><Search size={34} strokeWidth={1.6} /></div>
             <div className="mc-empty-title">No <em>matches</em></div>
             <p className="mc-empty-sub">Try a different search term or switch off the starred-only filter to see more calendars.</p>
           </div>

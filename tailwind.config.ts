@@ -16,7 +16,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
-        display: ['Lora', 'Georgia', 'serif'],
+        display: ['Lora', 'Fraunces', 'Georgia', 'serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       colors: {
@@ -68,6 +68,17 @@ export default {
           instagram: "hsl(var(--instagram))",
           linkedin: "hsl(var(--linkedin))",
           twitter: "hsl(var(--twitter))",
+        },
+        design: {
+          bg: "var(--color-bg)",
+          surface: "var(--color-surface)",
+          "surface-muted": "var(--color-surface-muted)",
+          primary: "var(--color-primary)",
+          "primary-hover": "var(--color-primary-hover)",
+          text: "var(--color-text)",
+          "text-secondary": "var(--color-text-secondary)",
+          "text-muted": "var(--color-text-muted)",
+          border: "var(--color-border)",
         },
       },
       borderRadius: {

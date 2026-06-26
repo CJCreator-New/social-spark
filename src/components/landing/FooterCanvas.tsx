@@ -40,21 +40,21 @@ export default function FooterCanvas() {
     scene.add(dirLight);
 
     // Point lights for colored luxury reflections
-    const pLight1 = new THREE.PointLight(0xc8f09a, 6.0, 8); // Primary lime glow
+    const pLight1 = new THREE.PointLight(0xc2410c, 6.0, 8); // Warm burnt orange glow
     pLight1.position.set(-2, 2, 1);
     scene.add(pLight1);
 
-    const pLight2 = new THREE.PointLight(0x00f0ff, 4.0, 8); // Secondary cyan glow
+    const pLight2 = new THREE.PointLight(0xf59e0b, 4.0, 8); // Warm amber glow
     pLight2.position.set(2, -2, 1);
     scene.add(pLight2);
 
-    // 5. Geometry & Premium Metal Material
+    // 5. Geometry & Warm Metal Material
     const geometry = new THREE.TorusKnotGeometry(0.8, 0.26, 150, 20);
 
     const material = new THREE.MeshStandardMaterial({
-      color: 0x111218,
-      metalness: 0.95,
-      roughness: 0.12,
+      color: 0x7c2d12,
+      metalness: 0.92,
+      roughness: 0.18,
       flatShading: false,
     });
 

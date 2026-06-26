@@ -18,11 +18,12 @@ interface SelectFieldProps {
 }
 
 export function SelectField({ label, options, value, onChange, placeholder, hint }: SelectFieldProps) {
+  const selectId = React.useId();
   return (
     <div>
-      <div className="flabel">{label}{hint && <span className="fhint">{hint}</span>}</div>
+      <label className="flabel" htmlFor={selectId}>{label}{hint && <span className="fhint">{hint}</span>}</label>
       <div className="swrap">
-        <select className="sel" aria-label={label || "Select option"} value={value} onChange={e => onChange(e.target.value)}>
+        <select id={selectId} className="sel" value={value} onChange={e => onChange(e.target.value)}>
           {placeholder !== null && <option value="">{placeholder || "Select…"}</option>}
           {options.map(o => {
             const val = typeof o === "string" ? o : o.value;

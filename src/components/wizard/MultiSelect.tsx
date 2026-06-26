@@ -46,19 +46,35 @@ export function MultiSelect({ label, options, value, onChange, placeholder, max 
     <div>
       <div className="flabel">{label}{hint && <span className="fhint">{hint}</span>}</div>
       <div className="mswrap" ref={ref}>
-        <div className={`msbox ${open ? "open" : ""} ${disabled ? "disabled" : ""}`} onClick={() => !disabled && setOpen(o => !o)}>
+        <button
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          disabled={disabled}
+          className={`msbox ${open ? "open" : ""} ${disabled ? "disabled" : ""} focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus:outline-none`}
+          onClick={() => !disabled && setOpen(o => !o)}
+          style={{ textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}
+        >
           {value.length === 0
             ? <span className="ms-ph">{placeholder || "Select…"}</span>
             : value.map(v => (
               <span key={v} className="ms-tag" title={v}>
                 <span className="ms-tag-text">{v}</span>
-                <span className="ms-x" onClick={e => { e.stopPropagation(); toggle(v); }}>×</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${v}`}
+                  className="ms-x"
+                  onClick={e => { e.stopPropagation(); toggle(v); }}
+                  style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }}
+                >
+                  ×
+                </button>
               </span>
             ))}
           <span className="ms-caret"><Caret /></span>
-        </div>
+        </button>
         {open && !disabled && (
-          <div className="ms-drop">
+          <div className="ms-drop" role="listbox" aria-multiselectable="true">
             {options.map(o => {
               const isDisabledOption = disabledOptions.includes(o);
               if (isDisabledOption) {
@@ -68,11 +84,20 @@ export function MultiSelect({ label, options, value, onChange, placeholder, max 
                   </div>
                 );
               }
+              const isSelected = value.includes(o);
               return (
-                <div key={o} className={`ms-opt ${value.includes(o) ? "sel" : ""}`} onClick={() => toggle(o)}>
+                <button
+                  key={o}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  className={`ms-opt ${isSelected ? "sel" : ""} focus:bg-[rgba(255,255,255,0.05)] focus:outline-none`}
+                  onClick={() => toggle(o)}
+                  style={{ textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', background: 'none', color: 'inherit', font: 'inherit' }}
+                >
                   {o}
-                  <span className="ms-chk">{value.includes(o) && <Check />}</span>
-                </div>
+                  <span className="ms-chk">{isSelected && <Check />}</span>
+                </button>
               );
             })}
           </div>

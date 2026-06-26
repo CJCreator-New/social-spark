@@ -20,3 +20,19 @@ This repository contains **Social Spark**, a React + TypeScript + Supabase + Zus
 - **Loading & Recovery states**: Design pages to handle loading, empty, error, and recovery states (such as draft restoration on application reload).
 - **No bold/italic tags in post copy**: Enforce rules that prevent the LLM from outputting markdown formatting (`**` or `*`) inside the post text copy.
 - **Verify with tests**: Always run tests using `npm run test:run` and verify that the test suite passes cleanly before marking tasks as complete.
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as local markdown files under `.scratch/` in this repo (no external tracker). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default label vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout — one `CONTEXT.md` at the repo root and `docs/adr/` for architectural decisions. See `docs/agents/domain.md`.

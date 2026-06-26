@@ -180,17 +180,15 @@ export function AdminDashboard() {
   }
 
   return (
-    <div className="relative w-full overflow-hidden bg-slate-950 text-slate-100">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(132,204,22,0.12),transparent_32%),radial-gradient(circle_at_top_right,rgba(56,189,248,0.08),transparent_28%)]" />
-      <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-lime-400/10 blur-3xl" />
-      <div className="absolute right-0 top-32 h-96 w-96 rounded-full bg-cyan-400/10 blur-3xl" />
+    <div className="relative w-full overflow-hidden bg-[#faf8f4] text-stone-900">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(194,65,12,0.035),transparent_28%)]" />
       <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-8 px-6 py-8">
       {/* Header */}
       <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-2xl shadow-black/20">
-          <p className="text-[10px] uppercase tracking-[0.28em] text-lime-300">System dashboard</p>
-          <h1 className="mt-3 font-serif text-3xl font-normal text-white md:text-4xl">Monitor the studio without losing the story.</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">Track how the product is behaving, spot error spikes, and read the platform mix at a glance.</p>
+        <div className="rounded-2xl bg-white p-6 shadow-[0_10px_30px_rgba(120,113,108,0.06),0_1px_3px_rgba(120,113,108,0.02)]">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-[#c2410c]">System dashboard</p>
+          <h1 className="mt-3 font-display text-3xl font-bold text-stone-900 md:text-4xl">Monitor the studio without losing the story.</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-500">Track how the product is behaving, spot error spikes, and read the platform mix at a glance.</p>
           <div className="mt-5 flex flex-wrap gap-2">
             <Badge variant="outline">Auto-refresh 30s</Badge>
             <Badge variant="outline">Telemetry on</Badge>
@@ -199,12 +197,12 @@ export function AdminDashboard() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-2xl shadow-black/20">
+        <div className="rounded-2xl bg-white p-6 shadow-[0_10px_30px_rgba(120,113,108,0.06),0_1px_3px_rgba(120,113,108,0.02)]">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.28em] text-slate-400">Last updated</p>
-              <p className="mt-2 font-serif text-2xl font-normal text-white">{lastUpdated.toLocaleTimeString()}</p>
-              <p className="mt-2 text-sm leading-6 text-slate-400">Auto-refreshes every 30 seconds.</p>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-stone-500">Last updated</p>
+              <p className="mt-2 font-display text-2xl font-bold text-stone-900">{lastUpdated.toLocaleTimeString()}</p>
+              <p className="mt-2 text-sm leading-6 text-stone-500">Auto-refreshes every 30 seconds.</p>
             </div>
             <Button size="sm" onClick={handleRefresh}>
               Refresh
@@ -402,7 +400,7 @@ export function AdminDashboard() {
       </Card>
 
       {/* Summary Section */}
-      <Card className="border-l-4 border-l-blue-500">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Zap className="h-4 w-4" />
@@ -429,7 +427,7 @@ export function AdminDashboard() {
       </Card>
 
       {/* Payments & Subscriptions Section */}
-      <Card className="border-l-4 border-l-lime-500">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Zap className="h-4 w-4" />
@@ -441,7 +439,7 @@ export function AdminDashboard() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Comp grant form */}
-          <div className="flex flex-wrap items-end gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+          <div className="flex flex-wrap items-end gap-2 rounded-xl border border-stone-200 bg-[#faf8f4] p-3">
             <div className="flex flex-col gap-1">
               <label className="text-[10px] uppercase tracking-wide text-slate-500" htmlFor="comp-user">User ID (UUID)</label>
               <input
@@ -449,7 +447,7 @@ export function AdminDashboard() {
                 value={compUserId}
                 onChange={(e) => setCompUserId(e.target.value)}
                 placeholder="a0000000-0000-…"
-                className="w-72 rounded-md border border-white/10 bg-slate-900 px-2 py-1 text-xs font-mono text-slate-200"
+                className="w-72 rounded-md border border-stone-200 bg-white px-2 py-1 text-xs font-mono text-stone-700"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -458,7 +456,7 @@ export function AdminDashboard() {
                 id="comp-tier"
                 value={compTier}
                 onChange={(e) => setCompTier(e.target.value as 'starter' | 'pro' | 'free')}
-                className="rounded-md border border-white/10 bg-slate-900 px-2 py-1 text-xs text-slate-200"
+                className="rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-700"
               >
                 <option value="starter">Starter (30d)</option>
                 <option value="pro">Pro (30d)</option>
@@ -475,7 +473,7 @@ export function AdminDashboard() {
           ) : (
             <div className="space-y-2">
               {payments.map((p) => (
-                <div key={p.id} className="flex items-center justify-between flex-wrap gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-3 text-xs">
+                <div key={p.id} className="flex items-center justify-between flex-wrap gap-2 rounded-xl border border-stone-200 bg-[#faf8f4] p-3 text-xs">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-slate-400">{p.user_id.slice(0, 8)}…</span>
                     {p.tier_granted && (
@@ -500,7 +498,7 @@ export function AdminDashboard() {
       </Card>
 
       {/* User Fallback API Keys Section */}
-      <Card className="border-l-4 border-l-lime-500">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Key className="h-4 w-4" />
@@ -518,7 +516,7 @@ export function AdminDashboard() {
               {apiKeyStatuses.slice(0, 20).map((row) => {
                 const userLogs = auditLogs.filter(l => l.user_id === row.user_id).slice(0, 5);
                 return (
-                  <div key={row.user_id} className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-2">
+                  <div key={row.user_id} className="rounded-xl border border-stone-200 bg-[#faf8f4] p-3 space-y-2">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-xs text-slate-400">{row.user_id.slice(0, 8)}…</span>
@@ -585,10 +583,10 @@ interface StatCardProps {
 
 function StatCard({ icon, title, value, change, status }: StatCardProps) {
   const statusColors = {
-    good: 'text-green-600 bg-green-50 border-green-200',
-    warning: 'text-yellow-600 bg-yellow-50 border-yellow-200',
-    error: 'text-red-600 bg-red-50 border-red-200',
-    default: 'text-gray-600 bg-gray-50 border-gray-200',
+    good: 'text-green-700 bg-green-50 border-green-100',
+    warning: 'text-amber-700 bg-amber-50 border-amber-100',
+    error: 'text-red-700 bg-red-50 border-red-100',
+    default: 'text-stone-600 bg-[#faf8f4] border-stone-200',
   };
 
   const borderColor = status ? statusColors[status] : statusColors.default;
@@ -617,7 +615,7 @@ interface MetricRowProps {
 }
 
 function MetricRow({ label, value, benchmark, status }: MetricRowProps) {
-  const textColor = status === 'good' ? 'text-green-600' : 'text-yellow-600';
+  const textColor = status === 'good' ? 'text-green-700' : 'text-amber-700';
 
   return (
     <div className="flex items-center justify-between">

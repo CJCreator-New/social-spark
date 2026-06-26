@@ -1029,10 +1029,9 @@ const Index = () => {
         scrollToField("coreIdea");
         return false;
       }
-    }
-    if (s === 2) {
-      if (form.mode === "day") {
-        if (!form.targetDate) { setError("Please pick a date for your post."); return false; }
+      if (form.mode === "day" && !form.targetDate) {
+        setError("Please pick a date for your post.");
+        return false;
       }
     }
     setError(""); return true;
@@ -2140,13 +2139,14 @@ const Index = () => {
               </div>
 
               <div className="csect" ref={coreIdeaRef}>
-                <div className="flabel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <label className="flabel" htmlFor="cf-core-idea" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                   <span>Core idea / angle <span style={{ color: "var(--err)" }}>*</span></span>
                   <span style={{ fontSize: 10, color: form.coreIdea.length > 220 ? "#f0d49a" : form.coreIdea.length > 280 ? "#f09a9a" : "var(--text3)", fontWeight: 400, letterSpacing: 0, textTransform: "none" }}>
                     {form.coreIdea.length}/300
                   </span>
-                </div>
+                </label>
                 <textarea
+                  id="cf-core-idea"
                   rows={3}
                   maxLength={300}
                   className={showValidation && !form.coreIdea.trim() ? "invalid" : ""}
@@ -2166,13 +2166,75 @@ const Index = () => {
               </div>
             </div>
 
+            <div className="card">
+              <div className="sh">Your <span>frequency & schedule</span></div>
+
+              <div className="csect">
+                <div className="flabel" id="cf-mode-label">Generation mode</div>
+                <div className="plat-grid" role="radiogroup" aria-labelledby="cf-mode-label" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={form.mode === "week"}
+                    className={`plat-card ${form.mode === "week" ? "on" : ""} focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus:outline-none`}
+                    onClick={() => setForm(f => ({ ...f, mode: "week", topics: f.topics.slice(0, 7) }))}
+                  >
+                    <div className="plat-name">Full week</div>
+                    <div className="plat-hint">7 posts, Mon → Sun</div>
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={form.mode === "day"}
+                    className={`plat-card ${form.mode === "day" ? "on" : ""} focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus:outline-none`}
+                    onClick={() => setForm(f => ({ ...f, mode: "day", topics: f.topics.slice(0, 1) }))}
+                  >
+                    <div className="plat-name">Single day</div>
+                    <div className="plat-hint">Just 1 post for a chosen date</div>
+                  </button>
+                </div>
+              </div>
+
+              {form.mode === "day" ? (
+                <div className="csect">
+                  <label className="flabel" htmlFor="cf-target-date">Date for this post</label>
+                  <input
+                    type="date"
+                    id="cf-target-date"
+                    className="date-input focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus:outline-none"
+                    value={form.targetDate}
+                    onChange={e => upd("targetDate", e.target.value)}
+                  />
+                  <div className="time-hint" style={{ marginTop: 6 }}>
+                    Your post will be written for <strong style={{ color: "rgba(200,240,154,.85)" }}>{shortDateLabel(parseLocalDate(form.targetDate) || nextMonday())}</strong>.
+                  </div>
+                </div>
+              ) : (
+                <div className="csect">
+                  <label className="flabel" htmlFor="cf-week-start">Week starting <span className="fhint">(used for dates + .ics export)</span></label>
+                  <input
+                    type="date"
+                    id="cf-week-start"
+                    className="date-input focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus:outline-none"
+                    value={form.weekStart}
+                    onChange={e => upd("weekStart", e.target.value)}
+                  />
+                  <div className="time-hint" style={{ marginTop: 6 }}>
+                    Day 1 will be <strong style={{ color: "rgba(200,240,154,.85)" }}>{shortDateLabel(weekStartDate)}</strong>. Each post gets a day-specific default time — you can adjust per post on the next screen.
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* COLLAPSIBLE TAILOR BRAND AND VOICE PANEL */}
             <div className="accordion-panel">
               <button
                 type="button"
+                id="advanced-brand-button"
                 className="accordion-trigger"
                 onClick={() => setShowAdvancedBrand(!showAdvancedBrand)}
                 aria-expanded={showAdvancedBrand}
+                aria-controls="advanced-brand-content"
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   <span className="accordion-trigger-title" style={{ padding: 0 }}>
@@ -2188,7 +2250,7 @@ const Index = () => {
                 </span>
               </button>
               
-              <div className={`accordion-content ${showAdvancedBrand ? 'open' : ''}`}>
+              <div id="advanced-brand-content" className={`accordion-content ${showAdvancedBrand ? 'open' : ''}`} role="region" aria-labelledby="advanced-brand-button">
                 <div className="accordion-content-inner">
                   <div className="csect">
                     <SelectField
@@ -2363,50 +2425,6 @@ const Index = () => {
             <div className="card">
               <div className="sh">Pick your <span>{form.mode === "day" ? "single-day topic" : "weekly topics"}</span></div>
 
-              {/* NEW: mode toggle */}
-              <div className="csect">
-                <div className="flabel">Generation mode</div>
-                <div className="plat-grid" role="radiogroup" aria-label="Generation mode" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={form.mode === "week"}
-                    className={`plat-card ${form.mode === "week" ? "on" : ""}`}
-                    onClick={() => setForm(f => ({ ...f, mode: "week", topics: f.topics.slice(0, 7) }))}
-                  >
-                    <div className="plat-name">Full week</div>
-                    <div className="plat-hint">7 posts, Mon → Sun</div>
-                  </button>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={form.mode === "day"}
-                    className={`plat-card ${form.mode === "day" ? "on" : ""}`}
-                    onClick={() => setForm(f => ({ ...f, mode: "day", topics: f.topics.slice(0, 1) }))}
-                  >
-                    <div className="plat-name">Single day</div>
-                    <div className="plat-hint">Just 1 post for a chosen date</div>
-                  </button>
-                </div>
-              </div>
-
-              {/* NEW: date picker (single-day mode only) */}
-              {form.mode === "day" && (
-                <div className="csect">
-                  <div className="flabel">Date for this post</div>
-                  <input
-                    type="date"
-                    className="date-input"
-                    aria-label="Date for this post"
-                    value={form.targetDate}
-                    onChange={e => upd("targetDate", e.target.value)}
-                  />
-                  <div className="time-hint" style={{ marginTop: 6 }}>
-                    Your post will be written for <strong style={{ color: "rgba(200,240,154,.85)" }}>{shortDateLabel(parseLocalDate(form.targetDate) || nextMonday())}</strong>.
-                  </div>
-                </div>
-              )}
-
               <div className="csect" ref={topicsRef}>
                 <div className={`form-group-gated ${!form.industry ? 'gated' : ''}`}>
                   <MultiSelect
@@ -2505,9 +2523,11 @@ const Index = () => {
               <div className="accordion-panel">
                 <button
                   type="button"
+                  id="advanced-format-button"
                   className="accordion-trigger"
                   onClick={() => setShowAdvancedFormat(!showAdvancedFormat)}
                   aria-expanded={showAdvancedFormat}
+                  aria-controls="advanced-format-content"
                 >
                   <span className="accordion-trigger-title">
                     ⚙️ Advanced Formatting & Keywords
@@ -2516,7 +2536,7 @@ const Index = () => {
                   <span className={`accordion-icon ${showAdvancedFormat ? 'open' : ''}`}>▼</span>
                 </button>
 
-                <div className={`accordion-content ${showAdvancedFormat ? 'open' : ''}`}>
+                <div id="advanced-format-content" className={`accordion-content ${showAdvancedFormat ? 'open' : ''}`} role="region" aria-labelledby="advanced-format-button">
                   <div className="accordion-content-inner">
                     <div className="g2" style={{ marginBottom: 16 }}>
                       <SelectField label="Format mix" options={FORMAT_OPTIONS} value={form.format} onChange={v => upd("format", v)} />
@@ -2563,22 +2583,22 @@ const Index = () => {
 
                     <div className="g2">
                       <div>
-                        <div className="flabel">Never say <span className="fhint">(comma-separated, hard ban)</span></div>
+                        <label className="flabel" htmlFor="cf-banned-words">Never say <span className="fhint">(comma-separated, hard ban)</span></label>
                         <input
+                          id="cf-banned-words"
                           type="text"
                           className="ti"
-                          aria-label="Never say — banned words (comma-separated)"
                           placeholder="e.g. game-changer, synergy, leverage"
                           value={form.bannedWords.join(", ")}
                           onChange={e => upd("bannedWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
                         />
                       </div>
                       <div>
-                        <div className="flabel">Must mention <span className="fhint">(comma-separated, weave in)</span></div>
+                        <label className="flabel" htmlFor="cf-required-words">Must mention <span className="fhint">(comma-separated, weave in)</span></label>
                         <input
+                          id="cf-required-words"
                           type="text"
                           className="ti"
-                          aria-label="Must mention — required words (comma-separated)"
                           placeholder="e.g. our product name, RAG, India"
                           value={form.requiredWords.join(", ")}
                           onChange={e => upd("requiredWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
@@ -2589,34 +2609,18 @@ const Index = () => {
                 </div>
               </div>
 
-              <div className="divider" />
 
-              {form.mode === "week" && (
-                <div className="csect">
-                  <div className="flabel">Week starting <span className="fhint">(used for dates + .ics export)</span></div>
-                  <input
-                    type="date"
-                    className="date-input"
-                    aria-label="Week starting date"
-                    value={form.weekStart}
-                    onChange={e => upd("weekStart", e.target.value)}
-                  />
-                  <div className="time-hint" style={{ marginTop: 6 }}>
-                    Day 1 will be <strong style={{ color: "rgba(200,240,154,.85)" }}>{shortDateLabel(weekStartDate)}</strong>. Each post gets a day-specific default time — you can adjust per post on the next screen.
-                  </div>
-                </div>
-              )}
               
               <div className="csect">
-                <div className="flabel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <label className="flabel" htmlFor="cf-extra-context" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                   <span>Extra context <span className="fhint">(optional)</span></span>
                   {form.extra.length > 0 && (
                     <span style={{ fontSize: 10, color: form.extra.length > 450 ? "#f0d49a" : "var(--text3)", fontWeight: 400, letterSpacing: 0, textTransform: "none" }}>
                       {form.extra.length}/500
                     </span>
                   )}
-                </div>
-                <textarea rows={2} maxLength={500} aria-label="Extra context (optional)" placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
+                </label>
+                <textarea id="cf-extra-context" rows={2} maxLength={500} placeholder="e.g. reference specific tools, frameworks, local market context, personal story hooks…" value={form.extra} onChange={e => upd("extra", e.target.value)} />
               </div>
             </div>
 
@@ -2739,11 +2743,11 @@ const Index = () => {
               </div>
 
               <div className="gen-title">{form.mode === "day" ? "Writing your post" : "Writing your week"}</div>
-              <div className="gen-msg">{genMsg}</div>
+              <div className="gen-msg" aria-live="polite">{genMsg}</div>
               <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4, fontStyle: "italic" }}>
                 {form.mode === "day" ? "Usually takes 10–20 seconds" : "Usually takes 30–60 seconds"} — keep this tab open
               </div>
-              <div className="prog-track" style={{ marginBottom: 20 }}>
+              <div className="prog-track" style={{ marginBottom: 20 }} role="progressbar" aria-valuenow={Math.round(((genStep + 1) / GEN_LABELS.length) * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Content generation progress">
                 <div className="prog-indet" />
               </div>
               <div className="gen-checklist" style={{ margin: "0 auto" }}>

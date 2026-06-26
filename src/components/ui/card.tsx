@@ -1,7 +1,7 @@
 import * as React from 'react';
 
 export const Card = ({ children, className = '', ...rest }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={`rounded-xl border border-white/[0.06] bg-white/[0.02] p-6 shadow-xl shadow-black/15 backdrop-blur-md transition-all duration-300 ${className}`} {...rest}>
+  <div className={`rounded-2xl border border-stone-200 bg-white p-6 shadow-[0_10px_30px_rgba(120,113,108,0.06),0_1px_3px_rgba(120,113,108,0.02)] transition-all duration-300 ${className}`} {...rest}>
     {children}
   </div>
 );
@@ -13,13 +13,13 @@ export const CardHeader = ({ children, className = '', ...rest }: React.HTMLAttr
 );
 
 export const CardTitle = ({ children, className = '', ...rest }: React.HTMLAttributes<HTMLHeadingElement>) => (
-  <h3 className={`text-lg font-semibold ${className}`} {...rest}>
+  <h3 className={`font-display text-lg font-semibold text-stone-900 ${className}`} {...rest}>
     {children}
   </h3>
 );
 
 export const CardDescription = ({ children, className = '', ...rest }: React.HTMLAttributes<HTMLParagraphElement>) => (
-  <p className={`text-sm text-slate-400 ${className}`} {...rest}>
+  <p className={`text-sm text-stone-500 ${className}`} {...rest}>
     {children}
   </p>
 );

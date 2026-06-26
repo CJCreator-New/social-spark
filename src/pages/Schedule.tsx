@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarClock, CheckCircle2, Clipboard, ExternalLink, MoreHorizontal, RotateCcw, XCircle } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clipboard, ExternalLink, MoreHorizontal, RotateCcw, Timer, XCircle } from "lucide-react";
 import { writeToClipboard, niceLabelFor } from "@/lib/platformCopy";
 import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
 import { downloadScheduleCsv } from "@/lib/exportSchedule";
@@ -299,7 +299,7 @@ export default function Schedule() {
           <ScheduleSkeleton rows={5} />
         ) : rows.length === 0 ? (
           <div className="sc-empty">
-            <div className="sc-empty-illus" aria-hidden="true">⌛</div>
+            <div className="sc-empty-illus" aria-hidden="true"><Timer size={34} strokeWidth={1.6} /></div>
             <div className="sc-empty-title">Nothing in the <em>queue</em> yet</div>
             <p className="sc-empty-sub">Open a calendar and click <strong style={{ color: "#c8f09a" }}>Schedule week</strong> to populate this view with draft and publish actions.</p>
             <Link to="/app" className="sc-empty-cta">Create a calendar</Link>
