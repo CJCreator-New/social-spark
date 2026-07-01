@@ -14,6 +14,102 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string | null
+          id: string
+          notes: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      api_key_audit_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          ip_address: unknown
+          provider: string | null
+          source: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          provider?: string | null
+          source?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          provider?: string | null
+          source?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          period_end: string | null
+          razorpay_order_id: string
+          razorpay_payment_id: string | null
+          status: string
+          tier_granted: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          period_end?: string | null
+          razorpay_order_id: string
+          razorpay_payment_id?: string | null
+          status?: string
+          tier_granted?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          period_end?: string | null
+          razorpay_order_id?: string
+          razorpay_payment_id?: string | null
+          status?: string
+          tier_granted?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -250,6 +346,51 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          api_key_enc: string | null
+          api_provider: string
+          created_at: string
+          generation_count: number
+          id: string
+          key_mode: string
+          plan_period_end: string | null
+          quota_limit: number
+          tier: string
+          updated_at: string
+          use_own_key: boolean
+          user_id: string
+        }
+        Insert: {
+          api_key_enc?: string | null
+          api_provider?: string
+          created_at?: string
+          generation_count?: number
+          id?: string
+          key_mode?: string
+          plan_period_end?: string | null
+          quota_limit?: number
+          tier?: string
+          updated_at?: string
+          use_own_key?: boolean
+          user_id: string
+        }
+        Update: {
+          api_key_enc?: string | null
+          api_provider?: string
+          created_at?: string
+          generation_count?: number
+          id?: string
+          key_mode?: string
+          plan_period_end?: string | null
+          quota_limit?: number
+          tier?: string
+          updated_at?: string
+          use_own_key?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       wizard_drafts: {
         Row: {
           created_at: string
@@ -276,15 +417,100 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      admin_payments: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          currency: string | null
+          id: string | null
+          is_comp: boolean | null
+          period_end: string | null
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          status: string | null
+          tier_granted: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string | null
+          is_comp?: never
+          period_end?: string | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          status?: string | null
+          tier_granted?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string | null
+          is_comp?: never
+          period_end?: string | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          status?: string | null
+          tier_granted?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      admin_grant_tier: {
+        Args: {
+          p_days?: number
+          p_quota_limit: number
+          p_target_user: string
+          p_tier: string
+        }
+        Returns: {
+          period_end: string
+          tier: string
+        }[]
+      }
+      get_decrypted_api_key: {
+        Args: never
+        Returns: {
+          api_provider: string
+          decrypted_key: string
+        }[]
+      }
+      grant_tier_from_payment: {
+        Args: {
+          p_amount: number
+          p_currency?: string
+          p_order_id: string
+          p_payment_id: string
+          p_period_end: string
+          p_quota_limit: number
+          p_tier: string
+          p_user_id: string
+        }
+        Returns: {
+          period_end: string
+          tier: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_generation_count: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
+      is_admin: { Args: never; Returns: boolean }
+      upsert_encrypted_api_key: {
+        Args: { p_api_key: string; p_api_provider: string }
+        Returns: undefined
       }
     }
     Enums: {
