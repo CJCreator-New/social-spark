@@ -1070,8 +1070,11 @@ function clampMaxTokensForProvider(provider: string, model: string, maxTokens?: 
   if (typeof maxTokens !== "number") return undefined;
 
   const normalizedModel = model.toLowerCase();
+  // Gemini (via Lovable gateway or OpenRouter) reliably serves tool-calling
+  // completions up to ~8k output tokens; higher requests intermittently return
+  // upstream 400s with 0 output tokens generated. Cap to a safe ceiling.
   if ((provider === "lovable" || provider === "openrouter") && normalizedModel.includes("gemini")) {
-    return Math.min(maxTokens, 8192);
+    return Math.min(maxTokens, 8000);
   }
 
   return maxTokens;
