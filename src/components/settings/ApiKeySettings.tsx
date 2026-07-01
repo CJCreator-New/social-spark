@@ -18,7 +18,9 @@ export function ApiKeySettings() {
   const [fetching, setFetching] = useState(true);
   const [savedKeyPreview, setSavedKeyPreview] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
-  const [quota, setQuota] = useState<{ used: number; limit: number } | null>(null);
+  const [quota, setQuota] = useState<{ used: number; limit: number; planPeriodEnd: string | null } | null>(null);
+  const [keyFieldState, setKeyFieldState] = useState<"empty" | "masked" | "filled">("empty");
+  const [settingsError, setSettingsError] = useState(false);
 
   const [customUrl, setCustomUrl] = useState(() => localStorage.getItem("contentforge_custom_supabase_url") || "");
   const [customKey, setCustomKey] = useState(() => localStorage.getItem("contentforge_custom_supabase_anon_key") || "");
@@ -81,8 +83,11 @@ export function ApiKeySettings() {
         if (data.provider) setProvider(data.provider);
         setUseOwnKeyVal(data.useOwnKey);
         if (data.keyMode) setKeyMode(data.keyMode);
+        setSettingsError(Boolean(data.settingsError));
         if (data.hasKey && data.last4) {
-          setSavedKeyPreview(`••••••••${data.last4}`);
+          const maskedValue = `••••••••${data.last4}`;
+          setSavedKeyPreview(maskedValue);
+          setKeyFieldState("empty");
         }
       } catch (err) {
         console.error("Failed to load user API key settings:", err);
@@ -92,7 +97,7 @@ export function ApiKeySettings() {
 
       try {
         const q = await getQuotaStatus();
-        setQuota({ used: q.used, limit: q.limit });
+        setQuota({ used: q.used, limit: q.limit, planPeriodEnd: q.planPeriodEnd });
       } catch (err) {
         console.error("Failed to load quota status:", err);
       }
@@ -166,6 +171,7 @@ export function ApiKeySettings() {
         await saveUserApiKey(rawKey, provider);
         const last4 = rawKey.slice(-4);
         setSavedKeyPreview(`••••••••${last4}`);
+        setKeyFieldState("empty");
         setTestResult(null);
       }
 
@@ -201,6 +207,7 @@ export function ApiKeySettings() {
       await deleteUserApiKey();
       setSavedKeyPreview(null);
       setUseOwnKeyVal(false);
+      setKeyFieldState("empty");
       setConfirmDelete(false);
       if (keyInputRef.current) keyInputRef.current.value = "";
       setStatusMsg({ text: "API key removed successfully.", type: "success" });
@@ -241,7 +248,7 @@ export function ApiKeySettings() {
 
       {quota && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9a9aae", marginBottom: 4 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9a9aae", marginBottom: 4, gap: 8, flexWrap: "wrap" }}>
             <span>Monthly platform generations used</span>
             <span>{Math.min(quota.used, quota.limit)} / {quota.limit}</span>
           </div>
@@ -254,6 +261,16 @@ export function ApiKeySettings() {
                 transition: "width 0.3s ease",
               }}
             />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, color: "#78716c" }}>
+              Resets {quota.planPeriodEnd ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(quota.planPeriodEnd)) : "next month"}
+            </span>
+            {settingsError && (
+              <span style={{ fontSize: 10, padding: "2px 8px", background: "#fef3c7", color: "#a16207", border: "1px solid #fcd34d", borderRadius: 99 }}>
+                Settings row unavailable
+              </span>
+            )}
           </div>
           {quota.used >= quota.limit && !(useOwnKey && keyMode === 'always') && (
             <div role="alert" className="pf-notice" style={{ marginTop: 10, borderColor: "rgba(239,68,68,0.2)", background: "#fee2e2" }}>
@@ -305,6 +322,7 @@ export function ApiKeySettings() {
               setProvider(val);
               // Clear input and any stale test result when switching provider
               if (keyInputRef.current) keyInputRef.current.value = "";
+              setKeyFieldState("empty");
               setTestResult(null);
             }}
             style={{ marginBottom: 0 }}
@@ -335,7 +353,11 @@ export function ApiKeySettings() {
               autoCorrect="off"
               autoCapitalize="off"
               // Clear any stale verification result once the key is edited
-              onInput={() => testResult && setTestResult(null)}
+              onChange={() => {
+                const value = keyInputRef.current?.value?.trim() ?? "";
+                setKeyFieldState(!value ? "empty" : value.startsWith("••••") ? "masked" : "filled");
+                if (testResult) setTestResult(null);
+              }}
             />
             <button
               type="button"
@@ -382,7 +404,7 @@ export function ApiKeySettings() {
             <button
               type="button"
               onClick={handleTest}
-              disabled={testing}
+              disabled={testing || keyFieldState !== "filled"}
               className="pf-btn ghost"
               style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "6px 12px" }}
             >
@@ -391,7 +413,7 @@ export function ApiKeySettings() {
             </button>
             {testResult && (
               <span
-                role={testResult.valid ? "status" : "alert"}
+                role="status"
                 style={{
                   display: "flex",
                   alignItems: "center",

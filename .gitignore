@@ -27,8 +27,5 @@ blob-report/
 *.sln
 *.sw?
  
-# Local env files
-.env
-
 # Agent skills
 .agents/

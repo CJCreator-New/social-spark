@@ -49,10 +49,11 @@ type ResolvedKeyState = {
   provider: string | null;
   useOwnKey: boolean;
   last4?: string | null;
+  settingsError?: boolean;
 };
 
 // Default resolved state: no key saved
-const NO_KEY_STATE: ResolvedKeyState = { apiKey: null, hasKey: false, provider: null, useOwnKey: false };
+const NO_KEY_STATE: ResolvedKeyState = { apiKey: null, hasKey: false, provider: null, useOwnKey: false, settingsError: false };
 
 // State with a saved key
 const SAVED_KEY_STATE: ResolvedKeyState = {
@@ -148,6 +149,21 @@ describe("ApiKeySettings — BYOK access", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 1c. Settings row warning
+// ---------------------------------------------------------------------------
+describe("ApiKeySettings — settings row warning", () => {
+  it("shows a badge when the user_settings row cannot be read", async () => {
+    mockGetUserApiKey.mockResolvedValue({ ...NO_KEY_STATE, settingsError: true });
+    mockGetQuotaStatus.mockResolvedValue({ used: 0, limit: 10, useOwnKey: false, keyMode: "fallback", planPeriodEnd: new Date().toISOString() });
+    render(<ApiKeySettings />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/settings row unavailable/i)).toBeInTheDocument();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 2. Show/Hide toggle
 // ---------------------------------------------------------------------------
 describe("ApiKeySettings — show/hide toggle", () => {
@@ -181,6 +197,12 @@ describe("ApiKeySettings — save button behavior", () => {
     // The save button is type=submit and not disabled when no loading state
     const saveBtn = screen.getByRole("button", { name: /save api configuration/i });
     expect(saveBtn).not.toBeDisabled();
+  });
+
+  it("Test key stays disabled until a non-masked key is entered", async () => {
+    await renderAndWait(SAVED_KEY_STATE);
+    const testBtn = screen.getByRole("button", { name: /test key/i });
+    expect(testBtn).toBeDisabled();
   });
 
   it("calls saveUserApiKey with correct key and provider arguments", async () => {

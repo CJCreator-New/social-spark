@@ -2,6 +2,28 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
+export const SUPABASE_NOT_CONFIGURED_ERROR = new Error(
+  'SUPABASE_NOT_CONFIGURED: VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY is missing.'
+);
+
+function createMissingSupabaseProxy(): ReturnType<typeof createClient<Database>> {
+  const throwMissingConfig = () => {
+    throw SUPABASE_NOT_CONFIGURED_ERROR;
+  };
+
+  const callableProxy = new Proxy(throwMissingConfig, {
+    apply: () => throwMissingConfig(),
+    construct: () => throwMissingConfig(),
+    get: () => callableProxy,
+  });
+
+  return new Proxy({}, {
+    get: () => callableProxy,
+    apply: () => throwMissingConfig(),
+    construct: () => throwMissingConfig(),
+  }) as unknown as ReturnType<typeof createClient<Database>>;
+}
+
 const getSupabaseConfig = () => {
   if (typeof window !== "undefined") {
     const customUrl = localStorage.getItem("contentforge_custom_supabase_url");
@@ -18,10 +40,12 @@ const getSupabaseConfig = () => {
 
 const config = getSupabaseConfig();
 
-export const supabase = createClient<Database>(config.url, config.key, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-  }
-});
+export const supabase = config.url && config.key
+  ? createClient<Database>(config.url, config.key, {
+      auth: {
+        storage: localStorage,
+        persistSession: true,
+        autoRefreshToken: true,
+      }
+    })
+  : createMissingSupabaseProxy();

@@ -1058,6 +1058,14 @@ export function getProviderModel(provider: string, quality: string): string {
   return quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
 }
 
+export function shouldUseUserKeyOnly(keyMode?: string | null): boolean {
+  return String(keyMode || "fallback").trim() === "always";
+}
+
+export function shouldFallbackToUserKey(status: number): boolean {
+  return status === 429 || status === 402 || status === 503;
+}
+
 async function callOpenAiCompatibleDirect(
   url: string,
   messages: Array<{ role: string; content: string }>,
@@ -1540,8 +1548,10 @@ async function callAIGatewayOnce(
 ): Promise<GatewayResult> {
   let userApiKey = opts.userApiKey;
   let userApiProvider = opts.userApiProvider;
+  let userUseOwnKey = Boolean(userApiKey && userApiProvider);
+  let userKeyMode: "fallback" | "always" = "fallback";
 
-  if ((!userApiKey || userApiKey === "USER_KEY_STORED_SERVERSIDE") && opts.userToken) {
+  if (opts.userToken) {
     try {
       const supabaseUrl = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_URL") : null;
       const supabaseAnonKey = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_ANON_KEY") : null;
@@ -1563,6 +1573,8 @@ async function callAIGatewayOnce(
           if (row && row.decrypted_key) {
             userApiKey = row.decrypted_key;
             userApiProvider = row.api_provider;
+            userUseOwnKey = row.use_own_key ?? userUseOwnKey;
+            userKeyMode = row.key_mode === "always" ? "always" : "fallback";
           }
         }
       }
@@ -1571,8 +1583,13 @@ async function callAIGatewayOnce(
     }
   }
 
-  // If userApiKey is provided, route through callAI helper
-  if (userApiKey && userApiProvider) {
+  const canUseUserKey = Boolean(userUseOwnKey && userApiKey && userApiProvider);
+
+  if (shouldUseUserKeyOnly(userKeyMode)) {
+    if (!canUseUserKey) {
+      return { status: 402, error: "User API key is required in always mode." };
+    }
+
     // Asynchronously log the fallback usage to the audit log
     const supabaseUrl = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_URL") : null;
     const supabaseServiceKey = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") : null;
@@ -1668,9 +1685,22 @@ async function callAIGatewayOnce(
     // 5xx / 429 / 402 / timeout → try next provider in chain
   }
 
+  const platformResult = { status: 503, error: "All platform AI providers are currently unavailable." };
+
+  if (shouldFallbackToUserKey(platformResult.status) && canUseUserKey) {
+    return callAI(messages, tool, userApiKey as string, {
+      provider: userApiProvider as any,
+      quality: opts.quality,
+      model: opts.model,
+      temperature: opts.temperature,
+      timeoutMs: opts.timeoutMs,
+      max_tokens: opts.max_tokens,
+    });
+  }
+
   // All configured providers exhausted
   console.error("[waterfall] all platform providers failed or unconfigured");
-  return { status: 503, error: "All platform AI providers are currently unavailable." };
+  return platformResult;
 }
 
 /**

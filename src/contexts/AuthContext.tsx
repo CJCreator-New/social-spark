@@ -17,7 +17,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [bootError, setBootError] = useState<Error | null>(null);
   const navigate = useNavigate();
+
+  if (bootError) {
+    throw bootError;
+  }
 
   useEffect(() => {
     const e2eEnabled = import.meta.env.DEV && window.localStorage.getItem(getE2EAuthFlag()) === "true";
@@ -46,22 +51,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Set up listener FIRST
-    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      if (event === "PASSWORD_RECOVERY") {
-        navigate("/reset-password", { replace: true });
-      }
-      setSession(s);
-      setUser(s?.user ?? null);
+    let active = true;
+    let unsubscribe = () => {};
+
+    const convertAuthError = (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      return new Error(message.includes("SUPABASE_NOT_CONFIGURED") ? message : `AUTH_SESSION_ERROR: ${message}`);
+    };
+
+    try {
+      const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+        if (!active) return;
+        if (event === "PASSWORD_RECOVERY") {
+          navigate("/reset-password", { replace: true });
+        }
+        setSession(s);
+        setUser(s?.user ?? null);
+        setLoading(false);
+      });
+      unsubscribe = () => sub.subscription.unsubscribe();
+    } catch (error) {
       setLoading(false);
-    });
-    // THEN check existing session
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      setLoading(false);
-    });
-    return () => sub.subscription.unsubscribe();
+      setBootError(convertAuthError(error));
+      return;
+    }
+
+    supabase.auth.getSession()
+      .then(({ data: { session: s } }) => {
+        if (!active) return;
+        setSession(s);
+        setUser(s?.user ?? null);
+        setLoading(false);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setLoading(false);
+        setBootError(convertAuthError(error));
+      });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [navigate]);
 
   const signOut = async () => {

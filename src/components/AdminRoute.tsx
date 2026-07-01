@@ -1,13 +1,28 @@
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { RouteFallback } from "@/components/layout/RouteFallback";
 
 export function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAdmin, loading } = useIsAdmin();
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      setTimedOut(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setTimedOut(true), 8000);
+    return () => window.clearTimeout(timeout);
+  }, [loading]);
+
   if (loading) {
+    if (timedOut) {
+      return <RouteFallback title="Permission check timed out" ariaLabel="Permission check timed out" />;
+    }
     return (
-      <div style={{ minHeight: "100vh", background: "#07080d", display: "flex", alignItems: "center", justifyContent: "center", color: "#7a7a8e", fontFamily: "var(--font-body)", fontSize: 13 }}>
-        Checking permissions…
-      </div>
+      <RouteFallback title="Checking permissions" ariaLabel="Checking admin permissions" />
     );
   }
   if (!isAdmin) return <Navigate to="/app" replace />;

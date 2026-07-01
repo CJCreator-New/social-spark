@@ -118,7 +118,7 @@ export async function validateUserApiKey(
     return { valid: false, reason: data?.reason || `Validation failed (${res.status})` };
   }
 
-  return { valid: Boolean(data?.valid), reason: data?.reason };
+  return { valid: Boolean(data?.valid ?? data?.success), reason: data?.reason };
 }
 
 export async function getUserApiKey(): Promise<{
@@ -128,10 +128,11 @@ export async function getUserApiKey(): Promise<{
   useOwnKey: boolean;
   keyMode: 'fallback' | 'always';
   last4?: string | null;
+  settingsError?: boolean;
 }> {
   const token = await getAccessToken();
   if (!token) {
-    return { apiKey: null, hasKey: false, provider: null, useOwnKey: false, keyMode: 'fallback' };
+    return { apiKey: null, hasKey: false, provider: null, useOwnKey: false, keyMode: 'fallback', settingsError: false };
   }
 
   const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
@@ -150,6 +151,7 @@ export async function getUserApiKey(): Promise<{
       useOwnKey: apiKey ? useOwnKey : false,
       keyMode,
       last4: apiKey ? apiKey.slice(-4) : null,
+      settingsError: false,
     };
   }
 
@@ -182,10 +184,11 @@ export async function getUserApiKey(): Promise<{
       return {
         useOwnKey: row?.use_own_key || false,
         keyMode: (row?.key_mode === 'always' ? 'always' : 'fallback') as 'fallback' | 'always',
+        settingsError: false,
       };
-    }).catch((err: unknown) => {
-      console.warn("Failed to query user_settings table.", err);
-      return { useOwnKey: false, keyMode: 'fallback' as const };
+    }, (err: unknown) => {
+      console.warn("USER_SETTINGS_SCHEMA_ERROR: Failed to query user_settings table.", err);
+      return { useOwnKey: false, keyMode: 'fallback' as const, settingsError: true };
     });
 
   try {
@@ -198,6 +201,7 @@ export async function getUserApiKey(): Promise<{
       useOwnKey: decrypted.hasKey ? settings.useOwnKey : false,
       keyMode: settings.keyMode,
       last4: decrypted.last4,
+      settingsError: settings.settingsError,
     };
   } catch (err) {
     console.error("getUserApiKey failed:", err);
@@ -207,6 +211,7 @@ export async function getUserApiKey(): Promise<{
       provider: null,
       useOwnKey: false,
       keyMode: 'fallback',
+      settingsError: true,
     };
   }
 }
@@ -216,8 +221,9 @@ export async function getQuotaStatus(): Promise<{
   limit: number;
   useOwnKey: boolean;
   keyMode: 'fallback' | 'always';
+  planPeriodEnd: string | null;
 }> {
-  const DEFAULT = { used: 0, limit: 10, useOwnKey: false, keyMode: 'fallback' as const };
+  const DEFAULT = { used: 0, limit: 10, useOwnKey: false, keyMode: 'fallback' as const, planPeriodEnd: null as string | null };
 
   const token = await getAccessToken();
   if (!token) return DEFAULT;
@@ -229,20 +235,23 @@ export async function getQuotaStatus(): Promise<{
     const used = Number(localStorage.getItem("social_spark_generation_count") || "0");
     const useOwnKey = localStorage.getItem("social_spark_use_own_key") === "true";
     const keyMode = (localStorage.getItem("social_spark_key_mode") === "always" ? "always" : "fallback") as 'fallback' | 'always';
-    return { used, limit: 10, useOwnKey, keyMode };
+    const now = new Date();
+    const firstOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+    return { used, limit: 10, useOwnKey, keyMode, planPeriodEnd: firstOfNextMonth };
   }
 
   try {
     const { data, error } = await (supabase.from as unknown as (table: string) => ReturnType<typeof supabase.from>)("user_settings")
-      .select("generation_count, quota_limit, use_own_key, key_mode")
+      .select("generation_count, quota_limit, use_own_key, key_mode, plan_period_end")
       .maybeSingle();
     if (error) throw error;
-    const row = data as unknown as { generation_count?: number; quota_limit?: number; use_own_key?: boolean; key_mode?: string } | null;
+    const row = data as unknown as { generation_count?: number; quota_limit?: number; use_own_key?: boolean; key_mode?: string; plan_period_end?: string | null } | null;
     return {
       used: row?.generation_count ?? 0,
       limit: row?.quota_limit ?? 50,
       useOwnKey: row?.use_own_key || false,
       keyMode: (row?.key_mode === 'always' ? 'always' : 'fallback'),
+      planPeriodEnd: row?.plan_period_end ?? null,
     };
   } catch (err) {
     console.warn("getQuotaStatus failed:", err);

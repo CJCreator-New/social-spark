@@ -64,6 +64,7 @@ Deno.serve(async (req) => {
       .update({
         api_key_enc: null,
         use_own_key: false,
+        key_mode: "fallback",
         updated_at: new Date().toISOString()
       })
       .eq("user_id", user.id);

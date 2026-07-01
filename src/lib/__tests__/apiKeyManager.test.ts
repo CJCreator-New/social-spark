@@ -268,7 +268,7 @@ describe("getUserApiKey", () => {
   it("returns null values when not authenticated (no session)", async () => {
     mockGetSession.mockResolvedValue(NO_SESSION);
     const result = await getUserApiKey();
-    expect(result).toEqual({ apiKey: null, hasKey: false, provider: null, useOwnKey: false, keyMode: 'fallback' });
+    expect(result).toEqual({ apiKey: null, hasKey: false, provider: null, useOwnKey: false, keyMode: 'fallback', settingsError: false });
   });
 
   it("returns null apiKey when no user_settings row exists", async () => {
@@ -304,6 +304,7 @@ describe("getUserApiKey", () => {
     expect(result.last4).toBe("abc123");
     expect(result.provider).toBe("openai");
     expect(result.useOwnKey).toBe(true);
+    expect(result.settingsError).toBe(false);
   });
 
   it("returns null (does not throw) when decrypt Edge Function fails", async () => {
@@ -325,6 +326,7 @@ describe("getUserApiKey", () => {
       provider: null,
       useOwnKey: false,
       keyMode: 'fallback',
+      settingsError: true,
     });
   });
 
@@ -344,6 +346,21 @@ describe("getUserApiKey", () => {
     expect(result.useOwnKey).toBe(false);
     expect(result.hasKey).toBe(true);
     expect(result.apiKey).toBeNull();
+  });
+
+  it("surfaces a settings schema warning when the settings row cannot be read", async () => {
+    mockGetSession.mockResolvedValue(VALID_SESSION);
+    mockMaybySingle.mockResolvedValue({ data: null, error: new Error("column use_own_key does not exist") });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ hasKey: true, provider: "openai", last4: "abc123" }),
+    } as Response);
+
+    const result = await getUserApiKey();
+    expect(result.settingsError).toBe(true);
+    expect(result.useOwnKey).toBe(false);
   });
 });
 
@@ -480,6 +497,7 @@ describe("localStorage Fallback", () => {
         useOwnKey: true,
         keyMode: "always",
         last4: "aaaa",
+        settingsError: false,
       });
 
       // Delete
@@ -525,6 +543,7 @@ describe("localStorage Fallback", () => {
         provider: null,
         useOwnKey: false,
         keyMode: "fallback",
+        settingsError: true,
       });
 
       // Delete should throw error
@@ -563,6 +582,7 @@ describe("localStorage Fallback", () => {
         provider: null,
         useOwnKey: false,
         keyMode: "fallback",
+        settingsError: true,
       });
 
       // Delete should throw network error

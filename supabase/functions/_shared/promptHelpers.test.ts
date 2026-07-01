@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload, buildSystemMessage, buildUserMessage } from "./promptHelpers.ts";
+import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload, buildSystemMessage, buildUserMessage, shouldFallbackToUserKey, shouldUseUserKeyOnly } from "./promptHelpers.ts";
 
 describe("promptHelpers engagement guidance", () => {
   it("adds a core-idea framework that locks the output to one angle", () => {
@@ -186,6 +186,20 @@ describe("promptHelpers engagement guidance", () => {
       expect(result.self_check.checks_passed).toBe(false);
       expect(result.self_check.forbidden_violations).toContain('Missing required word: "scaleup"');
       expect(result.self_check.forbidden_violations).toContain('Missing required word: "retention"');
+    });
+  });
+
+  describe("BYOK routing helpers", () => {
+    it("uses own key only when mode is always", () => {
+      expect(shouldUseUserKeyOnly("always")).toBe(true);
+      expect(shouldUseUserKeyOnly("fallback")).toBe(false);
+    });
+
+    it("falls back to the own key only for platform-unavailable statuses", () => {
+      expect(shouldFallbackToUserKey(429)).toBe(true);
+      expect(shouldFallbackToUserKey(402)).toBe(true);
+      expect(shouldFallbackToUserKey(503)).toBe(true);
+      expect(shouldFallbackToUserKey(500)).toBe(false);
     });
   });
 

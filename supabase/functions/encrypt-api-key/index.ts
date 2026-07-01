@@ -79,16 +79,20 @@ Deno.serve(async (req: Request) => {
       }
 
       const provider = candidateProvider as "openai" | "anthropic" | "openrouter";
+      const pingModelByProvider: Record<typeof provider, string> = {
+        openai: "gpt-4o-mini",
+        anthropic: "claude-3-5-haiku-latest",
+        openrouter: "google/gemini-2.5-flash",
+      };
       const pingRes = await callAI(
         [{ role: "user", content: "ping" }],
         null,
         candidateKey,
         {
           provider,
-          // Cheapest model per provider; a 1-token reply is enough to prove auth.
-          model: getProviderModel(provider, "draft"),
+          model: pingModelByProvider[provider],
           temperature: 0,
-          max_tokens: 1,
+          max_tokens: 5,
         }
       );
 
