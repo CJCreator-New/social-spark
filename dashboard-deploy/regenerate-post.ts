@@ -1066,6 +1066,28 @@ function getProviderModel(provider: string, quality: string): string {
   return quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
 }
 
+function shouldUseUserKeyOnly(keyMode?: string | null): boolean {
+  return String(keyMode || "fallback").trim() === "always";
+}
+
+function shouldFallbackToUserKey(status: number): boolean {
+  return status === 429 || status === 402 || status === 503;
+}
+
+function clampMaxTokensForProvider(provider: string, model: string, maxTokens?: number): number | undefined {
+  if (typeof maxTokens !== "number") return undefined;
+
+  const normalizedModel = model.toLowerCase();
+  // Gemini (via Lovable gateway or OpenRouter) reliably serves tool-calling
+  // completions up to ~8k output tokens; higher requests intermittently return
+  // upstream 400s with 0 output tokens generated. Cap to a safe ceiling.
+  if ((provider === "lovable" || provider === "openrouter") && normalizedModel.includes("gemini")) {
+    return Math.min(maxTokens, 8000);
+  }
+
+  return maxTokens;
+}
+
 async function callOpenAiCompatibleDirect(
   url: string,
   messages: Array<{ role: string; content: string }>,
@@ -1221,16 +1243,20 @@ async function callAI(
   const quality = opts.quality || "draft";
   const temperature = typeof opts.temperature === "number" ? opts.temperature : 0.7;
   const model = opts.model || getProviderModel(provider, quality);
+  const maxTokens = clampMaxTokensForProvider(provider, model, opts.max_tokens);
+  if (typeof opts.max_tokens === "number" && maxTokens !== opts.max_tokens) {
+    console.warn(`[ai] clamped max_tokens for ${provider}/${model}: ${opts.max_tokens} -> ${maxTokens}`);
+  }
   
   if (provider === "openai") {
-    return callOpenAiCompatibleDirect("https://api.openai.com/v1/chat/completions", messages, tool, apiKey, model, temperature, opts.max_tokens);
+    return callOpenAiCompatibleDirect("https://api.openai.com/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
   } else if (provider === "openrouter") {
-    return callOpenAiCompatibleDirect("https://openrouter.ai/api/v1/chat/completions", messages, tool, apiKey, model, temperature, opts.max_tokens);
+    return callOpenAiCompatibleDirect("https://openrouter.ai/api/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
   } else if (provider === "anthropic") {
-    return callAnthropicDirect(messages, tool, apiKey, model, temperature, opts.max_tokens);
+    return callAnthropicDirect(messages, tool, apiKey, model, temperature, maxTokens);
   } else if (provider === "lovable") {
     // Lovable AI Gateway speaks the OpenAI-compatible wire protocol
-    return callOpenAiCompatibleDirect("https://ai.gateway.lovable.dev/v1/chat/completions", messages, tool, apiKey, model, temperature, opts.max_tokens);
+    return callOpenAiCompatibleDirect("https://ai.gateway.lovable.dev/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
   }
 
   return { status: 400, error: `Unsupported API provider: ${provider}` };
@@ -1548,8 +1574,10 @@ async function callAIGatewayOnce(
 ): Promise<GatewayResult> {
   let userApiKey = opts.userApiKey;
   let userApiProvider = opts.userApiProvider;
+  let userUseOwnKey = Boolean(userApiKey && userApiProvider);
+  let userKeyMode: "fallback" | "always" = "fallback";
 
-  if ((!userApiKey || userApiKey === "USER_KEY_STORED_SERVERSIDE") && opts.userToken) {
+  if (opts.userToken) {
     try {
       const supabaseUrl = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_URL") : null;
       const supabaseAnonKey = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_ANON_KEY") : null;
@@ -1571,6 +1599,8 @@ async function callAIGatewayOnce(
           if (row && row.decrypted_key) {
             userApiKey = row.decrypted_key;
             userApiProvider = row.api_provider;
+            userUseOwnKey = row.use_own_key ?? userUseOwnKey;
+            userKeyMode = row.key_mode === "always" ? "always" : "fallback";
           }
         }
       }
@@ -1579,8 +1609,13 @@ async function callAIGatewayOnce(
     }
   }
 
-  // If userApiKey is provided, route through callAI helper
-  if (userApiKey && userApiProvider) {
+  const canUseUserKey = Boolean(userUseOwnKey && userApiKey && userApiProvider);
+
+  if (shouldUseUserKeyOnly(userKeyMode)) {
+    if (!canUseUserKey) {
+      return { status: 402, error: "User API key is required in always mode." };
+    }
+
     // Asynchronously log the fallback usage to the audit log
     const supabaseUrl = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_URL") : null;
     const supabaseServiceKey = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") : null;
@@ -1620,10 +1655,14 @@ async function callAIGatewayOnce(
       }
     }
 
+    // Use a model that matches the user's provider — never carry a platform
+    // (Google/Gemini) model id into an OpenAI/Anthropic endpoint or the
+    // provider will 400 on an unknown model.
+    const userModelAlways = getProviderModel(userApiProvider as string, opts.quality || "draft");
     return callAI(messages, tool, userApiKey, {
       provider: userApiProvider as any,
       quality: opts.quality,
-      model: opts.model,
+      model: userModelAlways,
       temperature: opts.temperature,
       timeoutMs: opts.timeoutMs,
       max_tokens: opts.max_tokens,
@@ -1676,9 +1715,23 @@ async function callAIGatewayOnce(
     // 5xx / 429 / 402 / timeout → try next provider in chain
   }
 
+  const platformResult = { status: 503, error: "All platform AI providers are currently unavailable." };
+
+  if (shouldFallbackToUserKey(platformResult.status) && canUseUserKey) {
+    const userModelFallback = getProviderModel(userApiProvider as string, opts.quality || "draft");
+    return callAI(messages, tool, userApiKey as string, {
+      provider: userApiProvider as any,
+      quality: opts.quality,
+      model: userModelFallback,
+      temperature: opts.temperature,
+      timeoutMs: opts.timeoutMs,
+      max_tokens: opts.max_tokens,
+    });
+  }
+
   // All configured providers exhausted
   console.error("[waterfall] all platform providers failed or unconfigured");
-  return { status: 503, error: "All platform AI providers are currently unavailable." };
+  return platformResult;
 }
 
 /**
@@ -1940,7 +1993,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI is not configured." }, 500);
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets.");
+      return jsonResponse({
+        error: "AI is not configured.",
+        message: "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets."
+      }, 500);
+    }
 
     const targetTopic = (newTopic && newTopic.trim()) || post.topic || "general topic";
     const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
@@ -1956,7 +2015,7 @@ Deno.serve(async (req: Request) => {
       .join("\n");
 
     const systemMsg = buildSystemMessage(payload, { isSinglePost: true });
-    
+
     // Phase D: Diff-aware regen logic
     // Construct a specific comparison if a tweak is provided
     let diffContext = "";
@@ -1969,7 +2028,7 @@ CRITIQUE & REWRITE GUIDANCE:
 `;
     }
 
-    const userMsg = buildUserMessage(payload, { isSinglePost: true }) + 
+    const userMsg = buildUserMessage(payload, { isSinglePost: true }) +
       `\n\nREWRITE CONTEXT:\n- Day: ${post.day} (${post.dow})\n- Topic: ${targetTopic}` +
       (post.title ? `\n- Previous Title Ref: "${post.title}"` : "") +
       `\n\nCURRENT VERSION:\n- Title: "${post.title || ''}"\n- Hook: "${post.hook || ''}"\n- Body: "${(post.body || '').slice(0, 800)}"\n- CTA: "${post.cta || ''}"\n` +
@@ -2079,7 +2138,7 @@ CRITIQUE & REWRITE GUIDANCE:
     if (Array.isArray(parsed.body_variants)) {
       candidates.push(...parsed.body_variants.map(v => String(v || "")));
     }
-    
+
     if (candidates.length > 1) {
       const judgeRes = await scoreVariants(candidates, payload, LOVABLE_API_KEY || "");
       parsed.variant_scores = judgeRes.scores;
@@ -2093,7 +2152,7 @@ CRITIQUE & REWRITE GUIDANCE:
     if (!regenerated) {
       return jsonResponse({ error: "Failed to normalize post response." }, 500);
     }
-    
+
     // Attach scores
     regenerated.variant_scores = parsed.variant_scores;
 
