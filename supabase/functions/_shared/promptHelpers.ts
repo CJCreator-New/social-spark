@@ -1707,10 +1707,11 @@ async function callAIGatewayOnce(
   const platformResult = { status: 503, error: "All platform AI providers are currently unavailable." };
 
   if (shouldFallbackToUserKey(platformResult.status) && canUseUserKey) {
+    const userModelFallback = getProviderModel(userApiProvider as string, opts.quality || "draft");
     return callAI(messages, tool, userApiKey as string, {
       provider: userApiProvider as any,
       quality: opts.quality,
-      model: opts.model,
+      model: userModelFallback,
       temperature: opts.temperature,
       timeoutMs: opts.timeoutMs,
       max_tokens: opts.max_tokens,
