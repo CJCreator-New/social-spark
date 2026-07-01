@@ -46,7 +46,13 @@ Deno.serve(async (req: Request) => {
     if (!rateLimitCheck.allowed) return jsonResponse({ error: "Rate limit exceeded." }, 429);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI not configured." }, 500);
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets.");
+      return jsonResponse({
+        error: "AI is not configured.",
+        message: "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets."
+      }, 500);
+    }
 
     const post = body.post || {};
     const systemMsg = `[ROLE]

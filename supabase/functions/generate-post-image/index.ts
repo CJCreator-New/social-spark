@@ -122,7 +122,13 @@ Deno.serve(async (req: Request) => {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return jsonResponse({ error: "Storage is not configured." }, 500);
     }
-    if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI image generation is not configured." }, 500);
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets.");
+      return jsonResponse({
+        error: "AI is not configured.",
+        message: "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets."
+      }, 500);
+    }
 
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "");

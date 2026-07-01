@@ -1066,6 +1066,17 @@ export function shouldFallbackToUserKey(status: number): boolean {
   return status === 429 || status === 402 || status === 503;
 }
 
+function clampMaxTokensForProvider(provider: string, model: string, maxTokens?: number): number | undefined {
+  if (typeof maxTokens !== "number") return undefined;
+
+  const normalizedModel = model.toLowerCase();
+  if ((provider === "lovable" || provider === "openrouter") && normalizedModel.includes("gemini")) {
+    return Math.min(maxTokens, 8192);
+  }
+
+  return maxTokens;
+}
+
 async function callOpenAiCompatibleDirect(
   url: string,
   messages: Array<{ role: string; content: string }>,
@@ -1221,16 +1232,20 @@ export async function callAI(
   const quality = opts.quality || "draft";
   const temperature = typeof opts.temperature === "number" ? opts.temperature : 0.7;
   const model = opts.model || getProviderModel(provider, quality);
+  const maxTokens = clampMaxTokensForProvider(provider, model, opts.max_tokens);
+  if (typeof opts.max_tokens === "number" && maxTokens !== opts.max_tokens) {
+    console.warn(`[ai] clamped max_tokens for ${provider}/${model}: ${opts.max_tokens} -> ${maxTokens}`);
+  }
   
   if (provider === "openai") {
-    return callOpenAiCompatibleDirect("https://api.openai.com/v1/chat/completions", messages, tool, apiKey, model, temperature, opts.max_tokens);
+    return callOpenAiCompatibleDirect("https://api.openai.com/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
   } else if (provider === "openrouter") {
-    return callOpenAiCompatibleDirect("https://openrouter.ai/api/v1/chat/completions", messages, tool, apiKey, model, temperature, opts.max_tokens);
+    return callOpenAiCompatibleDirect("https://openrouter.ai/api/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
   } else if (provider === "anthropic") {
-    return callAnthropicDirect(messages, tool, apiKey, model, temperature, opts.max_tokens);
+    return callAnthropicDirect(messages, tool, apiKey, model, temperature, maxTokens);
   } else if (provider === "lovable") {
     // Lovable AI Gateway speaks the OpenAI-compatible wire protocol
-    return callOpenAiCompatibleDirect("https://ai.gateway.lovable.dev/v1/chat/completions", messages, tool, apiKey, model, temperature, opts.max_tokens);
+    return callOpenAiCompatibleDirect("https://ai.gateway.lovable.dev/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
   }
 
   return { status: 400, error: `Unsupported API provider: ${provider}` };

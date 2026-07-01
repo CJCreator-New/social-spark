@@ -1,6 +1,21 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getE2EAuthFlag } from "@/lib/e2eFixtures";
 
+function getSupabaseRuntimeConfig(): { url: string; key: string } {
+  if (typeof window !== "undefined") {
+    const customUrl = localStorage.getItem("contentforge_custom_supabase_url") || "";
+    const customKey = localStorage.getItem("contentforge_custom_supabase_anon_key") || "";
+    if (customUrl && customKey) {
+      return { url: customUrl, key: customKey };
+    }
+  }
+
+  return {
+    url: (import.meta.env.VITE_SUPABASE_URL as string) || "",
+    key: (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "",
+  };
+}
+
 /**
  * Validates the API key format client-side before any network calls.
  * - OpenAI: sk-followed by at least 32 alphanumeric characters
@@ -39,8 +54,7 @@ export async function saveUserApiKey(apiKey: string, provider: 'openai' | 'anthr
     throw new Error("User session not found");
   }
 
-  const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
-  const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
+  const { url: SUPABASE_URL, key: SUPABASE_KEY } = getSupabaseRuntimeConfig();
 
   // Check if we are in a mock Supabase environment
   if (!SUPABASE_URL || SUPABASE_URL.includes("mock.supabase.co")) {
@@ -90,8 +104,7 @@ export async function validateUserApiKey(
     throw new Error("User session not found");
   }
 
-  const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
-  const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
+  const { url: SUPABASE_URL, key: SUPABASE_KEY } = getSupabaseRuntimeConfig();
 
   // In a mock Supabase environment there is no provider to call — treat a
   // well-formed key as valid so local/E2E flows aren't blocked.
@@ -135,8 +148,7 @@ export async function getUserApiKey(): Promise<{
     return { apiKey: null, hasKey: false, provider: null, useOwnKey: false, keyMode: 'fallback', settingsError: false };
   }
 
-  const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
-  const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
+  const { url: SUPABASE_URL, key: SUPABASE_KEY } = getSupabaseRuntimeConfig();
 
   // Check if we are in a mock Supabase environment
   if (!SUPABASE_URL || SUPABASE_URL.includes("mock.supabase.co")) {
@@ -204,7 +216,11 @@ export async function getUserApiKey(): Promise<{
       settingsError: settings.settingsError,
     };
   } catch (err) {
-    console.error("getUserApiKey failed:", err);
+    if (err instanceof TypeError && /Failed to fetch/i.test(err.message)) {
+      console.warn("getUserApiKey: Supabase edge function is unreachable. Falling back to safe defaults.");
+    } else {
+      console.error("getUserApiKey failed:", err);
+    }
     return {
       apiKey: null,
       hasKey: false,
@@ -228,7 +244,7 @@ export async function getQuotaStatus(): Promise<{
   const token = await getAccessToken();
   if (!token) return DEFAULT;
 
-  const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+  const { url: SUPABASE_URL } = getSupabaseRuntimeConfig();
 
   // Check if we are in a mock Supabase environment
   if (!SUPABASE_URL || SUPABASE_URL.includes("mock.supabase.co")) {
@@ -265,8 +281,7 @@ export async function setUseOwnKey(enabled: boolean, keyMode: 'fallback' | 'alwa
     throw new Error("User session not found");
   }
 
-  const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
-  const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
+  const { url: SUPABASE_URL, key: SUPABASE_KEY } = getSupabaseRuntimeConfig();
 
   // Check if we are in a mock Supabase environment
   if (!SUPABASE_URL || SUPABASE_URL.includes("mock.supabase.co")) {
@@ -305,8 +320,7 @@ export async function deleteUserApiKey(): Promise<void> {
     throw new Error("User session not found");
   }
 
-  const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
-  const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
+  const { url: SUPABASE_URL, key: SUPABASE_KEY } = getSupabaseRuntimeConfig();
 
   // Check if we are in a mock Supabase environment
   if (!SUPABASE_URL || SUPABASE_URL.includes("mock.supabase.co")) {

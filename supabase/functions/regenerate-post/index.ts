@@ -110,7 +110,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI is not configured." }, 500);
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets.");
+      return jsonResponse({
+        error: "AI is not configured.",
+        message: "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets."
+      }, 500);
+    }
 
     const targetTopic = (newTopic && newTopic.trim()) || post.topic || "general topic";
     const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
@@ -126,7 +132,7 @@ Deno.serve(async (req: Request) => {
       .join("\n");
 
     const systemMsg = buildSystemMessage(payload, { isSinglePost: true });
-    
+
     // Phase D: Diff-aware regen logic
     // Construct a specific comparison if a tweak is provided
     let diffContext = "";
@@ -139,7 +145,7 @@ CRITIQUE & REWRITE GUIDANCE:
 `;
     }
 
-    const userMsg = buildUserMessage(payload, { isSinglePost: true }) + 
+    const userMsg = buildUserMessage(payload, { isSinglePost: true }) +
       `\n\nREWRITE CONTEXT:\n- Day: ${post.day} (${post.dow})\n- Topic: ${targetTopic}` +
       (post.title ? `\n- Previous Title Ref: "${post.title}"` : "") +
       `\n\nCURRENT VERSION:\n- Title: "${post.title || ''}"\n- Hook: "${post.hook || ''}"\n- Body: "${(post.body || '').slice(0, 800)}"\n- CTA: "${post.cta || ''}"\n` +
@@ -249,7 +255,7 @@ CRITIQUE & REWRITE GUIDANCE:
     if (Array.isArray(parsed.body_variants)) {
       candidates.push(...parsed.body_variants.map(v => String(v || "")));
     }
-    
+
     if (candidates.length > 1) {
       const judgeRes = await scoreVariants(candidates, payload, LOVABLE_API_KEY || "");
       parsed.variant_scores = judgeRes.scores;
@@ -263,7 +269,7 @@ CRITIQUE & REWRITE GUIDANCE:
     if (!regenerated) {
       return jsonResponse({ error: "Failed to normalize post response." }, 500);
     }
-    
+
     // Attach scores
     regenerated.variant_scores = parsed.variant_scores;
 

@@ -44,7 +44,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI not configured." }, 500);
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets.");
+      return jsonResponse({
+        error: "AI is not configured.",
+        message: "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets."
+      }, 500);
+    }
 
     // Prepare the payload for the target platform
     const targetPayload = {
@@ -54,7 +60,7 @@ Deno.serve(async (req: Request) => {
     };
 
     const systemMsg = buildSystemMessage(targetPayload, { isSinglePost: true });
-    
+
     const userMsg = `REPURPOSE INSTRUCTION:
 Take the following ${sourcePlatform} post and rewrite it specifically for ${targetPlatform}.
 
@@ -140,7 +146,7 @@ Return the result as a single post object using return_post.`;
     if (Array.isArray(parsed.body_variants)) {
       candidates.push(...parsed.body_variants.map(v => String(v || "")));
     }
-    
+
     if (candidates.length > 1) {
       const judgeRes = await scoreVariants(candidates, targetPayload, LOVABLE_API_KEY || "");
       parsed.variant_scores = judgeRes.scores;

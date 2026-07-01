@@ -1,6 +1,7 @@
 import React from "react";
 import { Post, WizardForm } from "./constants";
-import { resolvePlatform, shortDateLabel, dateForDow } from "@/lib/calendarSchedule";
+import { shortDateLabel, dateForDow } from "@/lib/calendarSchedule";
+import { resolvePlatform } from "@/lib/platformCopy";
 import { TopicGapBadge } from "@/components/TopicGapBadge";
 import { HashtagChipEditor } from "@/components/HashtagChipEditor";
 

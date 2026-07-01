@@ -555,6 +555,14 @@ const Index = () => {
       toast.success(imageUrl ? "Cover image applied ✓" : "Cover image removed");
     }
   }, [posts, setPostsWithHistory]);
+  const handleApplyCompare = useCallback((idx: number, rewrittenPost: Post) => {
+    const updated = [...posts];
+    if (updated[idx]) {
+      updated[idx] = { ...updated[idx], ...rewrittenPost };
+      setPostsWithHistory(updated);
+      toast.success("Persona rewrite applied");
+    }
+  }, [posts, setPostsWithHistory]);
 
   // Feature: Hashtag editor — update a single post's hashtags
   const handleHashtagsChange = useCallback((idx: number, newHashtags: string) => {
@@ -2822,6 +2830,7 @@ const Index = () => {
                   copyMenuRef={copyMenuRef}
                   handleFocusedRegenerate={handleFocusedRegenerate}
                   handleApplyCta={handleApplyCta}
+                  handleApplyCompare={handleApplyCompare}
                   handleUseAsSeed={handleUseAsSeed}
                   handleApplyImage={handleApplyImage}
                   saveCalendar={saveCalendar}

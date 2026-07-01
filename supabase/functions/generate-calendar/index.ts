@@ -81,7 +81,11 @@ Deno.serve(async (req: Request) => {
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      return jsonResponse({ error: "AI is not configured." }, 500);
+      console.error("LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets.");
+      return jsonResponse({
+        error: "AI is not configured.",
+        message: "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets."
+      }, 500);
     }
 
     // Trend-aware generation: fetch top trending topics for this industry/platform
@@ -215,14 +219,14 @@ Deno.serve(async (req: Request) => {
 
     let parsed = parseResult.parsed as Record<string, unknown>;
     let initialPosts = Array.isArray(parsed.posts) ? parsed.posts : [];
-    
+
     // Task 4: LLM-as-judge scoring for each post in the calendar
     const scoredPosts = await Promise.all(initialPosts.map(async (p: any) => {
       const candidates = [String(p.body || "")];
       if (Array.isArray(p.body_variants)) {
         candidates.push(...p.body_variants.map((v: any) => String(v || "")));
       }
-      
+
       if (candidates.length > 1) {
         const judgeRes = await scoreVariants(candidates, payload, LOVABLE_API_KEY || "");
         p.variant_scores = judgeRes.scores;

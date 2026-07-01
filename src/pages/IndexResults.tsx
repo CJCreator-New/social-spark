@@ -53,6 +53,7 @@ interface IndexResultsProps {
   copyMenuRef: React.RefObject<HTMLDivElement | null>;
   handleFocusedRegenerate: (metric: any, guidance: string) => void;
   handleApplyCta: (idx: number, newCta: string) => void;
+  handleApplyCompare?: (idx: number, post: Post) => void;
   handleUseAsSeed: (post: Post) => void;
   handleApplyImage: (idx: number, imageUrl: string) => void;
   saveCalendar: () => void;
@@ -116,6 +117,7 @@ export function IndexResults({
   copyMenuRef,
   handleFocusedRegenerate,
   handleApplyCta,
+  handleApplyCompare,
   handleUseAsSeed,
   handleApplyImage,
   saveCalendar,
@@ -706,7 +708,7 @@ export function IndexResults({
           platform={form.platform}
           isOpen={personaCompareOpen}
           onClose={() => setPersonaCompareOpen(false)}
-          onApplyCompare={handleApplyCompare}
+          onApplyCompare={(rewritten) => handleApplyCompare?.(activeDay, rewritten)}
         />
       )}
     </div>
