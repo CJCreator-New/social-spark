@@ -196,7 +196,7 @@ Deno.serve(async (req: Request) => {
       quality: payload.quality,
       userToken: token || null,
       userIp: ipAddress,
-      max_tokens: 12288
+      max_tokens: 8000
     });
     if (aiRes.status !== 200) {
       if (aiRes.status === 503) {
@@ -263,7 +263,7 @@ Deno.serve(async (req: Request) => {
           quality: payload.quality,
           userToken: token || null,
           userIp: ipAddress,
-          max_tokens: 12288
+          max_tokens: 8000
         });
 
         if (polishRes.status === 200) {

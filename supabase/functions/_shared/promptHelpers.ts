@@ -1070,8 +1070,11 @@ function clampMaxTokensForProvider(provider: string, model: string, maxTokens?: 
   if (typeof maxTokens !== "number") return undefined;
 
   const normalizedModel = model.toLowerCase();
+  // Gemini (via Lovable gateway or OpenRouter) reliably serves tool-calling
+  // completions up to ~8k output tokens; higher requests intermittently return
+  // upstream 400s with 0 output tokens generated. Cap to a safe ceiling.
   if ((provider === "lovable" || provider === "openrouter") && normalizedModel.includes("gemini")) {
-    return Math.min(maxTokens, 8192);
+    return Math.min(maxTokens, 8000);
   }
 
   return maxTokens;
@@ -1644,10 +1647,14 @@ async function callAIGatewayOnce(
       }
     }
 
+    // Use a model that matches the user's provider — never carry a platform
+    // (Google/Gemini) model id into an OpenAI/Anthropic endpoint or the
+    // provider will 400 on an unknown model.
+    const userModelAlways = getProviderModel(userApiProvider as string, opts.quality || "draft");
     return callAI(messages, tool, userApiKey, {
       provider: userApiProvider as any,
       quality: opts.quality,
-      model: opts.model,
+      model: userModelAlways,
       temperature: opts.temperature,
       timeoutMs: opts.timeoutMs,
       max_tokens: opts.max_tokens,
@@ -1703,10 +1710,11 @@ async function callAIGatewayOnce(
   const platformResult = { status: 503, error: "All platform AI providers are currently unavailable." };
 
   if (shouldFallbackToUserKey(platformResult.status) && canUseUserKey) {
+    const userModelFallback = getProviderModel(userApiProvider as string, opts.quality || "draft");
     return callAI(messages, tool, userApiKey as string, {
       provider: userApiProvider as any,
       quality: opts.quality,
-      model: opts.model,
+      model: userModelFallback,
       temperature: opts.temperature,
       timeoutMs: opts.timeoutMs,
       max_tokens: opts.max_tokens,
