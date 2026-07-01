@@ -61,7 +61,7 @@ export default function FinalCTA() {
                 >
                   Get started free
                 </Link>
-                <a href="#" className="ld-w-final-link" aria-label="See a product demo">
+                <a href="#how-it-works" className="ld-w-final-link" aria-label="See how ContentForge works">
                   See a demo <ArrowRight size={14} aria-hidden="true" />
                 </a>
               </div>

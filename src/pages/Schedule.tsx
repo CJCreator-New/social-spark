@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
 import { ScheduleSkeleton } from "@/components/ScheduleSkeleton";
+import { ErrorState } from "@/components/ErrorState";
 import { VirtualizedList } from "@/components/VirtualizedList";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -89,7 +90,7 @@ export default function Schedule() {
   const cancelScheduledPostMutation = useCancelScheduledPostMutation();
   const updateScheduledTimeMutation = useUpdateScheduledPostTimeMutation();
 
-  const { data: scheduleData, isLoading: loading, error: scheduleError, fetchNextPage, hasNextPage, isFetchingNextPage } = useScheduleInfiniteQuery(user?.id, PAGE_SIZE);
+  const { data: scheduleData, isLoading: loading, error: scheduleError, refetch: refetchSchedule, fetchNextPage, hasNextPage, isFetchingNextPage } = useScheduleInfiniteQuery(user?.id, PAGE_SIZE);
   const { data: profileData } = useProfileQuery(user?.id);
 
   const mergedCalendars = useMemo(() => {
@@ -297,14 +298,20 @@ export default function Schedule() {
 
         {loading ? (
           <ScheduleSkeleton rows={5} />
+        ) : scheduleError ? (
+          <ErrorState
+            title="Couldn't load your schedule"
+            description={scheduleError instanceof Error ? scheduleError.message : "Something went wrong while fetching your scheduled posts."}
+            onRetry={() => refetchSchedule()}
+          />
         ) : rows.length === 0 ? (
           <div className="sc-empty">
             <div className="sc-empty-illus" aria-hidden="true"><Timer size={34} strokeWidth={1.6} /></div>
             <div className="sc-empty-title">Nothing in the <em>queue</em> yet</div>
-            <p className="sc-empty-sub">Open a calendar and click <strong style={{ color: "#c8f09a" }}>Schedule week</strong> to populate this view with draft and publish actions.</p>
+            <p className="sc-empty-sub">Open a calendar and click <strong style={{ color: "#c2410c" }}>Schedule week</strong> to populate this view with draft and publish actions.</p>
             <Link to="/app" className="sc-empty-cta">Create a calendar</Link>
             <div style={{ marginTop: 12 }}>
-              <Link to="/my-calendars" className="text-xs text-slate-500 hover:text-[#c8f09a] transition-colors underline">
+              <Link to="/my-calendars" className="text-xs text-slate-500 hover:text-[#c2410c] transition-colors underline">
                 Or schedule an existing calendar →
               </Link>
             </div>
@@ -368,17 +375,17 @@ export default function Schedule() {
             <span>Day {row.post_day}</span>
             {cal && <span>· {cal.title}</span>}
             {row.workflow_status === "failed" && row.failure_reason && (
-              <span style={{ color: "#f09a9a" }}>· {row.failure_reason}</span>
+              <span style={{ color: "#b91c1c" }}>· {row.failure_reason}</span>
             )}
           </div>
           {isEditing && (
             <div className="sc-edit">
-              <span style={{ fontSize: 10, color: "#7a7a8e", letterSpacing: ".1em", textTransform: "uppercase" }}>Reschedule</span>
+              <span style={{ fontSize: 10, color: "#78716c", letterSpacing: ".1em", textTransform: "uppercase" }}>Reschedule</span>
               <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} />
               <input type="time" value={editTime} onChange={e => setEditTime(e.target.value)} />
               <button className="sc-act sc-act-p" onClick={() => saveEdit(row)}>Save</button>
               <button className="sc-act" onClick={() => setEditId(null)}>Cancel</button>
-              <span style={{ fontSize: 10, color: "#5a5a72", marginLeft: 4 }}>
+              <span style={{ fontSize: 10, color: "#a8a29e", marginLeft: 4 }}>
                 in {(cal?.timezone || profileTz || browserTimezone())}
               </span>
             </div>

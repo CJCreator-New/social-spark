@@ -103,7 +103,12 @@ export default function LandingHero() {
               >
                 Get started free
               </Link>
-              <button className="ld-w-cta-secondary" aria-label="Watch 60 second demo video">
+              <button
+                type="button"
+                className="ld-w-cta-secondary"
+                aria-label="See how ContentForge works"
+                onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })}
+              >
                 <Play size={14} className="play-icon" aria-hidden="true" />
                 Watch 60s demo
               </button>

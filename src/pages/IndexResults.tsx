@@ -475,20 +475,20 @@ export function IndexResults({
                 ⚡ Quick Tone Tweaks ▾
               </button>
               {tweakOpenIdx === activeDay && (
-                <div className="tweak-menu absolute left-0 right-0 z-50 mt-1 bg-neutral-900 border border-neutral-800 rounded-md shadow-lg" role="menu">
-                  <button className="tweak-opt w-full text-left p-2 text-xs hover:bg-neutral-800" onClick={() => { regenerateDay(activeDay, "shorter"); setTweakOpenIdx(null); }}>Make shorter</button>
-                  <button className="tweak-opt w-full text-left p-2 text-xs hover:bg-neutral-800" onClick={() => { regenerateDay(activeDay, "punchier"); setTweakOpenIdx(null); }}>Make punchier</button>
-                  <button className="tweak-opt w-full text-left p-2 text-xs hover:bg-neutral-800" onClick={() => { regenerateDay(activeDay, "add-stat"); setTweakOpenIdx(null); }}>Add a stat</button>
+                <div className="tweak-menu absolute left-0 right-0 z-50 mt-1 bg-card border border-border rounded-md shadow-xl" role="menu">
+                  <button className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted" onClick={() => { regenerateDay(activeDay, "shorter"); setTweakOpenIdx(null); }}>Make shorter</button>
+                  <button className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted" onClick={() => { regenerateDay(activeDay, "punchier"); setTweakOpenIdx(null); }}>Make punchier</button>
+                  <button className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted" onClick={() => { regenerateDay(activeDay, "add-stat"); setTweakOpenIdx(null); }}>Add a stat</button>
                   <button
-                    className="tweak-opt w-full text-left p-2 text-xs hover:bg-neutral-800"
+                    className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted"
                     onClick={() => { regenerateDay(activeDay, "remove-emoji"); setTweakOpenIdx(null); }}
                     disabled={!hasEmoji(p.title + " " + p.hook + " " + p.body + " " + p.cta)}
                   >
                     Remove emoji
                   </button>
-                  <button className="tweak-opt w-full text-left p-2 text-xs hover:bg-neutral-800" onClick={() => { regenerateDay(activeDay, "clean-formatting"); setTweakOpenIdx(null); }}>Clean formatting symbols</button>
-                  <button className="tweak-opt w-full text-left p-2 text-xs hover:bg-neutral-800" onClick={() => { regenerateDay(activeDay, "more-personal"); setTweakOpenIdx(null); }}>More personal</button>
-                  <button className="tweak-opt w-full text-left p-2 text-xs hover:bg-neutral-800" onClick={() => { regenerateDay(activeDay, "enhance"); setTweakOpenIdx(null); }}>Enhance for performance</button>
+                  <button className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted" onClick={() => { regenerateDay(activeDay, "clean-formatting"); setTweakOpenIdx(null); }}>Clean formatting symbols</button>
+                  <button className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted" onClick={() => { regenerateDay(activeDay, "more-personal"); setTweakOpenIdx(null); }}>More personal</button>
+                  <button className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted" onClick={() => { regenerateDay(activeDay, "enhance"); setTweakOpenIdx(null); }}>Enhance for performance</button>
                 </div>
               )}
             </div>

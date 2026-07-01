@@ -346,9 +346,9 @@ export function AdminDashboard() {
                     <div key={industry} className="flex items-center justify-between">
                       <span className="text-sm">{industry}</span>
                       <div className="flex items-center gap-2">
-                        <div className="h-2 w-40 bg-gray-200 rounded">
+                        <div className="h-2 w-40 bg-muted rounded">
                           <div
-                            className="h-full bg-blue-500 rounded"
+                            className="h-full bg-primary rounded"
                             style={{
                               width: `${(count / Math.max(...Object.values(stats.usage.industryDistribution))) * 100}%`,
                             }}

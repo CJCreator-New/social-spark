@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
-  Sparkles, Calendar, BarChart2, Users,
-  Zap, Target,
+  Wand2, Save, Repeat, Users,
+  Zap, CheckCircle2,
 } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -15,27 +15,27 @@ const CARDS = [
     id: "ai",
     span: "ld-w-bento-col-8",
     tall: true,
-    icon: Sparkles,
-    title: "Brand-aware AI writing",
-    desc: "ContentForge learns your tone, your vocabulary, and your audience — then writes in your voice, not a generic one.",
+    icon: Wand2,
+    title: "Quick tone tweaks, one click",
+    desc: "Make it shorter, punchier, or more personal — regenerate any post instantly without starting the brief over.",
     extra: "tone",
   },
   {
     id: "limits",
     span: "ld-w-bento-col-4",
     tall: true,
-    icon: Target,
-    title: "Platform character limits",
-    desc: "Every post automatically respects LinkedIn, X, Instagram, and Threads' exact constraints. No manual trimming.",
+    icon: Save,
+    title: "Autosave & draft recovery",
+    desc: "Every edit is saved as you go. Close the tab, come back tomorrow — your calendar picks up right where you left it.",
     extra: null,
   },
   {
     id: "schedule",
     span: "ld-w-bento-col-4",
     tall: false,
-    icon: Calendar,
-    title: "Schedule & export",
-    desc: "Export your full week as a CSV or push directly to your scheduling tool.",
+    icon: Repeat,
+    title: "Repurpose in one click",
+    desc: "Turn a LinkedIn post into a tweet thread or an Instagram caption without rewriting from scratch.",
     extra: null,
   },
   {
@@ -60,9 +60,9 @@ const CARDS = [
     id: "analytics",
     span: "ld-w-bento-col-6",
     tall: false,
-    icon: BarChart2,
-    title: "Performance analytics",
-    desc: "See which hooks get engagement, which CTAs convert, and which platforms drive the best results for your brand.",
+    icon: CheckCircle2,
+    title: "Clean, publish-ready output",
+    desc: "No stray markdown, no robotic phrasing, no manual cleanup. Every post ships exactly as it should look.",
     extra: null,
   },
 ];

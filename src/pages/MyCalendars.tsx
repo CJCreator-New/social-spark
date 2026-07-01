@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
 import { SkeletonList } from "@/components/SkeletonList";
+import { ErrorState } from "@/components/ErrorState";
 import { VirtualizedList } from "@/components/VirtualizedList";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import {
@@ -286,9 +287,9 @@ export default function MyCalendars() {
         <meta name="description" content="View and manage your saved AI content calendars. Search, star, rename, duplicate, or delete your content archives." />
       </Helmet>
       {lastDeleted && (
-        <div style={{ maxWidth: 760, margin: '0 auto 12px', padding: 12, background: '#121218', border: '1px solid rgba(200,240,154,0.06)', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ color: '#c8f09a' }}>
-            Deleted “{lastDeleted.title}” — <button onClick={undoDelete} style={{ color: '#fff', marginLeft: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', padding: '6px 10px', borderRadius: 6 }}>Undo</button>
+        <div style={{ maxWidth: 760, margin: '0 auto 12px', padding: 12, background: '#ffffff', border: '1px solid #e7e5e4', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 20px rgba(120,113,108,0.08)' }}>
+          <div style={{ color: '#1c1917' }}>
+            Deleted "{lastDeleted.title}" — <button onClick={undoDelete} style={{ color: '#c2410c', marginLeft: 8, background: 'transparent', border: '1px solid #e7e5e4', padding: '6px 10px', borderRadius: 6 }}>Undo</button>
           </div>
         </div>
       )}
@@ -296,7 +297,7 @@ export default function MyCalendars() {
         <div className="mb-8 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-display font-normal">
-              My <em className="text-[#c8f09a]">calendars</em>
+              My <em className="text-[#c2410c]">calendars</em>
             </h1>
             <p className="text-slate-500 text-xs mt-1.5">
               Manage your saved calendar blueprints and scheduled queue items.
@@ -308,7 +309,7 @@ export default function MyCalendars() {
           <div className="mc-summary-card">
             <div className="mc-summary-label">Visible calendars</div>
             {isLoading ? (
-              <div className="animate-pulse bg-slate-700 h-8 w-16 rounded my-1"></div>
+              <div className="animate-pulse bg-muted h-8 w-16 rounded my-1"></div>
             ) : (
               <div className="mc-summary-value tabular-nums">{visibleCount}</div>
             )}
@@ -317,7 +318,7 @@ export default function MyCalendars() {
           <div className="mc-summary-card">
             <div className="mc-summary-label">Starred</div>
             {isLoading ? (
-              <div className="animate-pulse bg-slate-700 h-8 w-16 rounded my-1"></div>
+              <div className="animate-pulse bg-muted h-8 w-16 rounded my-1"></div>
             ) : (
               <div className="mc-summary-value tabular-nums">{favoriteCount}</div>
             )}
@@ -326,7 +327,7 @@ export default function MyCalendars() {
           <div className="mc-summary-card">
             <div className="mc-summary-label">Posts stored</div>
             {isLoading ? (
-              <div className="animate-pulse bg-slate-700 h-8 w-16 rounded my-1"></div>
+              <div className="animate-pulse bg-muted h-8 w-16 rounded my-1"></div>
             ) : (
               <div className="mc-summary-value tabular-nums">{totalPosts}</div>
             )}
@@ -368,6 +369,12 @@ export default function MyCalendars() {
 
         {isLoading ? (
           <SkeletonList rows={4} />
+        ) : error ? (
+          <ErrorState
+            title="Couldn't load your calendars"
+            description={error instanceof Error ? error.message : "Something went wrong while fetching your saved calendars."}
+            onRetry={() => refetch()}
+          />
         ) : items.length === 0 ? (
           <div className="mc-empty" style={{ padding: "72px 24px" }}>
             <div className="mc-empty-illus" aria-hidden="true">
