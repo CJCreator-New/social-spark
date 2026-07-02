@@ -24,7 +24,7 @@
   --adim2:    rgba(194, 65, 12, 0.04);
   --text:     #1c1917;   /* primary text */
   --text2:    #57534e;   /* secondary text */
-  --text3:    #78716c;   /* tertiary text */
+  --text3:    #5a5753;   /* tertiary text — kept in sync with Index.css's .cf-app override; a stale value here previously raced Index.css's fix for load-order-dependent cascade wins */
   --err:      #ef4444;
   --err-bg:   rgba(239, 68, 68, 0.06);
   --r-sm: 8px;

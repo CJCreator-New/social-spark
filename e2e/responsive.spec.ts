@@ -30,7 +30,10 @@ for (const viewport of viewports) {
       await enableE2EAuth(page);
 
       for (const path of ["/app", "/my-calendars", "/schedule"]) {
-        await page.goto(path);
+        // domcontentloaded, not the default "load" — these are lazy-loaded routes,
+        // and WebKit intermittently aborts with "Frame load interrupted" when the
+        // previous route's async chunk/font fetches are still in flight at goto().
+        await page.goto(path, { waitUntil: "domcontentloaded" });
         await expect(page.locator("body")).toBeVisible();
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         expect(overflow).toBeLessThanOrEqual(2);

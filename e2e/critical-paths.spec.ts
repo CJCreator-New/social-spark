@@ -1,11 +1,35 @@
 import { test, expect, type Page } from '@playwright/test'
 import { getE2EAuthFlag } from '../src/lib/e2eFixtures'
 
+// The wizard's step transitions use framer-motion (already gated on
+// prefers-reduced-motion via useReducedMotion()) — disabling motion here avoids
+// clicking wizard controls while they're still animating in, which raced
+// intermittently on Firefox (click landed during the entrance transform).
+test.use({ reducedMotion: 'reduce' })
+
 async function enableE2EAuth(page: Page) {
   await page.addInitScript((flag) => {
     window.localStorage.setItem(flag, 'true')
     window.localStorage.setItem('social_spark_onboarding_completed', 'true')
   }, getE2EAuthFlag())
+}
+
+// The first-run WelcomeBanner mounts asynchronously (it waits on useSubscription's
+// loading state) and, when it appears, pushes the industry cards down — a real
+// layout shift, not an animation. Clicking before it settles can land on stale
+// coordinates. Wait for the banner to either show up or definitively not.
+async function waitForWizardReady(page: Page) {
+  await page.getByRole('note', { name: /welcome to social spark/i }).waitFor({ state: 'visible', timeout: 3000 }).catch(() => {})
+}
+
+// The banner's "visible" state can land a frame or two before its layout fully
+// settles, so a pre-wait alone isn't always enough — self-heal by re-clicking
+// (which recomputes coordinates fresh) until the click actually registers.
+async function clickAndConfirmChecked(radio: ReturnType<Page['getByRole']>) {
+  await expect(async () => {
+    await radio.click()
+    await expect(radio).toBeChecked({ timeout: 1000 })
+  }).toPass({ timeout: 10000 })
 }
 
 test.describe('Authentication Flow', () => {
@@ -41,10 +65,12 @@ test.describe('Calendar Creation Flow', () => {
 
   test('should create a full week calendar', async ({ page }) => {
     await page.goto('/app', { waitUntil: 'domcontentloaded' })
+    await waitForWizardReady(page)
 
     // Step 1: Select industry
-    await page.getByRole('radio', { name: /marketing & growth/i }).first().waitFor({ state: 'visible', timeout: 45000 })
-    await page.getByRole('radio', { name: /marketing & growth/i }).first().click()
+    const industryRadio = page.getByRole('radio', { name: /marketing & growth/i }).first()
+    await industryRadio.waitFor({ state: 'visible', timeout: 45000 })
+    await clickAndConfirmChecked(industryRadio)
     await page.getByPlaceholder(/what's the big idea/i).fill('Launch a better B2B content workflow')
     await page.getByRole('button', { name: /next step/i }).click()
 
@@ -71,13 +97,19 @@ test.describe('Calendar Creation Flow', () => {
 
   test('should create a single-day calendar', async ({ page }) => {
     await page.goto('/app', { waitUntil: 'domcontentloaded' })
+    await waitForWizardReady(page)
 
     // Step 1: Select industry, switch to single-day mode (mode toggle + date live on step 1)
-    await page.getByRole('radio', { name: /marketing & growth/i }).first().waitFor({ state: 'visible', timeout: 45000 })
-    await page.getByRole('radio', { name: /marketing & growth/i }).first().click()
+    // Assert each selection is committed before the next action — on Firefox, firing
+    // these clicks back-to-back without confirming state can race the click handler.
+    const industryRadio = page.getByRole('radio', { name: /marketing & growth/i }).first()
+    await industryRadio.waitFor({ state: 'visible', timeout: 45000 })
+    await clickAndConfirmChecked(industryRadio)
     await page.getByPlaceholder(/what's the big idea/i).fill('Launch a timely holiday campaign')
-    await page.getByRole('radio', { name: /single day/i }).click()
+    const singleDayRadio = page.getByRole('radio', { name: /single day/i })
+    await clickAndConfirmChecked(singleDayRadio)
     await page.locator('input[type="date"]').fill('2024-12-25')
+    await expect(page.locator('input[type="date"]')).toHaveValue('2024-12-25')
     await page.getByRole('button', { name: /next step/i }).click()
 
     // Step 2: Configure content
