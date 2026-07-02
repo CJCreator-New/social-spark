@@ -108,7 +108,7 @@ Deno.serve(async (req: Request) => {
     const contextLines = buildPromptContext(enrichedPayload, { includeTopics });
 
     const systemMsg = buildSystemMessage(enrichedPayload, { includeTopics });
-    const userMsg = buildUserMessage(enrichedPayload, { includeTopics });
+    const userMsg = buildUserMessage(enrichedPayload, { includeTopics, leanOutput: true });
 
     const tool = {
       type: "function",
@@ -139,30 +139,11 @@ Deno.serve(async (req: Request) => {
                     cta: { type: "string" },
                     cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
                     image_prompt: { type: "string" },
-                  // Phase A additions: plan + variants + self-check
-                  plan: {
-                    type: "object",
-                    properties: {
-                      angle: { type: "string" },
-                      hook_thesis: { type: "string" },
-                      proof_points: { type: "array", items: { type: "string" } },
-                      cta_intent: { type: "string" },
-                    },
-                    additionalProperties: false,
-                  },
-                  body_variants: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 2 },
-                  chosen_index: { type: "number" },
-                  word_count: { type: "number", description: "Actual word count of the generated body." },
-                  self_check: {
-                    type: "object",
-                    properties: {
-                      forbidden_violations: { type: "array", items: { type: "string" } },
-                      checks_passed: { type: "boolean" },
-                      notes: { type: "string" },
-                    },
-                    additionalProperties: false,
-                  },
-                  forbidden: { type: "array", items: { type: "string" } },
+                  // NOTE: plan/body_variants/self_check/etc. were removed from the
+                  // 7-post calendar schema. Combined with the large per-post schema,
+                  // they made Gemini's forced tool-call fail with an upstream 400
+                  // (reproduced deterministically against the AI gateway).
+                  // Variant scoring degrades gracefully when body_variants is absent.
                   hashtags: {
                     type: "string",
                     description: isLongFormPlatform(payload.platform)
