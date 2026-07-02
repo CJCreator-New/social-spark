@@ -58,7 +58,7 @@ function FeatureA() {
   }, []);
 
   return (
-    <div ref={ref} className="ld-w-feature-visual" aria-label="AI writing engine demo">
+    <div ref={ref} className="ld-w-feature-visual" role="img" aria-label="AI writing engine demo">
       <div className="ld-w-code-label">Your brief</div>
       <div className="ld-w-code-block" aria-live="polite">
         <span className="ld-w-typed-text" />
@@ -76,20 +76,21 @@ function FeatureA() {
 
 function FeatureB() {
   return (
-    <div className="ld-w-feature-visual" aria-label="Multi-platform scheduling calendar">
-      <div className="ld-w-cal-grid" role="table" aria-label="Weekly content calendar">
-        <div className="ld-w-cal-head" role="columnheader" />
-        {DAYS.map(d => <div key={d} className="ld-w-cal-head" role="columnheader">{d}</div>)}
+    <div className="ld-w-feature-visual" role="img" aria-label="Multi-platform scheduling calendar">
+      {/* Decorative mockup with fabricated demo data — hidden from AT rather than
+          marked up as a fully spec-compliant ARIA table; the wrapper's aria-label
+          above already describes it in prose for screen reader users. */}
+      <div className="ld-w-cal-grid" aria-hidden="true">
+        <div className="ld-w-cal-head" />
+        {DAYS.map(d => <div key={d} className="ld-w-cal-head">{d}</div>)}
 
         {PLATFORMS.map((plat, pi) => (
           <div key={plat} style={{ display: "contents" }}>
-            <div className="ld-w-cal-label" role="rowheader">{plat}</div>
+            <div className="ld-w-cal-label">{plat}</div>
             {DAYS.map((_, di) => (
               <div
                 key={di}
                 className={`ld-w-cal-cell${POSTED.has(`${pi}-${di}`) ? " posted" : ""}`}
-                role="cell"
-                aria-label={POSTED.has(`${pi}-${di}`) ? `${plat} post on ${DAYS[di]}` : ""}
               />
             ))}
           </div>

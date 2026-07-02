@@ -34,7 +34,7 @@ export default function Privacy() {
             <h2>How we use your information</h2>
             <ul>
               <li>To operate your account and provide the core features of ContentForge.</li>
-              <li>To send your content prompts to our AI providers (via the Lovable AI Gateway, and Google/OpenAI-compatible models) in order to generate posts.</li>
+              <li>To send your content prompts to our AI providers (via the Lovable AI Gateway, and Google/OpenAI-compatible models) in order to generate posts. If you add your own API key ("Bring Your Own Key") for OpenAI, Anthropic, or OpenRouter, your prompts are sent directly to that provider using your key, not through the Lovable AI Gateway.</li>
               <li>To process subscription payments via Razorpay and manage your plan and quota.</li>
               <li>To maintain security, prevent abuse, and enforce rate limits and quotas.</li>
             </ul>
@@ -52,7 +52,7 @@ export default function Privacy() {
             <ul>
               <li><strong>Supabase</strong> — authentication, database, and storage.</li>
               <li><strong>Razorpay</strong> — payment processing for paid plans.</li>
-              <li><strong>Lovable AI Gateway / model providers</strong> — AI content generation.</li>
+              <li><strong>Lovable AI Gateway / model providers</strong> — AI content generation. If you enable "Bring Your Own Key," your prompts route directly to your chosen provider — OpenAI, Anthropic, or OpenRouter — instead of the gateway.</li>
               <li><strong>Google</strong> — optional OAuth sign-in.</li>
             </ul>
 

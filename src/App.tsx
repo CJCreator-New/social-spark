@@ -67,7 +67,9 @@ const App = () => {
                   <Route path="/privacy" element={<Suspense fallback={<RouteFallback title="Privacy Policy" />}><Privacy /></Suspense>} />
                   <Route path="/terms" element={<Suspense fallback={<RouteFallback title="Terms of Service" />}><Terms /></Suspense>} />
                   <Route path="/docs" element={<Suspense fallback={<RouteFallback title="Docs" />}><Docs /></Suspense>} />
-                  <Route path="/__e2e/crash" element={<E2ECrashRoute />} />
+                  {import.meta.env.DEV && (
+                    <Route path="/__e2e/crash" element={<E2ECrashRoute />} />
+                  )}
                   <Route
                     element={
                       <ProtectedRoute>
@@ -80,7 +82,7 @@ const App = () => {
                     <Route
                       path="/app"
                       element={
-                        <Suspense fallback={<RouteFallback title="ContentForge Workspace" />}>
+                        <Suspense fallback={<RouteFallback title="ContentForge Workspace" nested />}>
                           <Index />
                         </Suspense>
                       }
@@ -88,7 +90,7 @@ const App = () => {
                     <Route
                       path="/profile"
                       element={
-                        <Suspense fallback={<RouteFallback title="Profile Settings" />}>
+                        <Suspense fallback={<RouteFallback title="Profile Settings" nested />}>
                           <Profile />
                         </Suspense>
                       }
@@ -96,7 +98,7 @@ const App = () => {
                     <Route
                       path="/my-calendars"
                       element={
-                        <Suspense fallback={<RouteFallback title="My Calendars" />}>
+                        <Suspense fallback={<RouteFallback title="My Calendars" nested />}>
                           <MyCalendars />
                         </Suspense>
                       }
@@ -104,7 +106,7 @@ const App = () => {
                     <Route
                       path="/calendar/:id"
                       element={
-                        <Suspense fallback={<RouteFallback title="Calendar Workspace" />}>
+                        <Suspense fallback={<RouteFallback title="Calendar Workspace" nested />}>
                           <CalendarDetail />
                         </Suspense>
                       }
@@ -112,7 +114,7 @@ const App = () => {
                     <Route
                       path="/schedule"
                       element={
-                        <Suspense fallback={<RouteFallback title="Scheduling & Queue" />}>
+                        <Suspense fallback={<RouteFallback title="Scheduling & Queue" nested />}>
                           <Schedule />
                         </Suspense>
                       }

@@ -71,7 +71,7 @@ export default function Testimonials() {
         <div className="ld-w-quotes-grid" role="list">
           {QUOTES.map((q) => (
             <article key={q.name} className="ld-w-quote-card" role="listitem">
-              <div className="ld-w-stars" aria-label="5 out of 5 stars">
+              <div className="ld-w-stars" role="img" aria-label="5 out of 5 stars">
                 {["★", "★", "★", "★", "★"].map((star, i) => (
                   <span key={i} aria-hidden="true">{star}</span>
                 ))}

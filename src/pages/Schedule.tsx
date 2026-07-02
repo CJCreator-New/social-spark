@@ -380,12 +380,12 @@ export default function Schedule() {
           </div>
           {isEditing && (
             <div className="sc-edit">
-              <span style={{ fontSize: 10, color: "#78716c", letterSpacing: ".1em", textTransform: "uppercase" }}>Reschedule</span>
+              <span style={{ fontSize: 10, color: "#5a5753", letterSpacing: ".1em", textTransform: "uppercase" }}>Reschedule</span>
               <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} />
               <input type="time" value={editTime} onChange={e => setEditTime(e.target.value)} />
               <button className="sc-act sc-act-p" onClick={() => saveEdit(row)}>Save</button>
               <button className="sc-act" onClick={() => setEditId(null)}>Cancel</button>
-              <span style={{ fontSize: 10, color: "#a8a29e", marginLeft: 4 }}>
+              <span style={{ fontSize: 10, color: "#5a5753", marginLeft: 4 }}>
                 in {(cal?.timezone || profileTz || browserTimezone())}
               </span>
             </div>

@@ -20,14 +20,14 @@ interface CalendarItemProps {
 }
 
 function platformBadgeStyle(platform?: string | null): React.CSSProperties {
-  if (!platform) return { background: "#f5f5f4", color: "#78716c", border: "1px solid #e7e5e4" };
+  if (!platform) return { background: "#f5f5f4", color: "#5a5753", border: "1px solid #e7e5e4" };
   const p = platform.toLowerCase();
   if (p.includes("linkedin"))  return { background: "#dbeafe", color: "#1d4ed8", border: "1px solid #bfdbfe" };
   if (p.includes("twitter") || p.includes("x")) return { background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd" };
   if (p.includes("instagram")) return { background: "#fce7f3", color: "#be185d", border: "1px solid #fbcfe8" };
   if (p.includes("facebook"))  return { background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" };
   if (p.includes("newsletter") || p.includes("blog")) return { background: "#fef3c7", color: "#d97706", border: "1px solid #fde68a" };
-  return { background: "#f5f5f4", color: "#78716c", border: "1px solid #e7e5e4" };
+  return { background: "#f5f5f4", color: "#5a5753", border: "1px solid #e7e5e4" };
 }
 
 export const CalendarItem = React.memo(function CalendarItem({
@@ -124,7 +124,7 @@ export const CalendarItem = React.memo(function CalendarItem({
                 padding: 4,
                 display: "flex",
                 alignItems: "center",
-                color: "#a8a29e",
+                color: "#5a5753",
                 transition: "color 0.15s",
               }}
               onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
@@ -225,7 +225,7 @@ export const CalendarItem = React.memo(function CalendarItem({
 
       {/* Card footer */}
       <div className="flex justify-between items-center mt-4 pt-3" style={{ borderTop: "1px solid #f5f5f4" }}>
-        <div className="flex gap-2 text-[11px]" style={{ color: "#78716c" }}>
+        <div className="flex gap-2 text-[11px]" style={{ color: "#5a5753" }}>
           <span>{postCount} posts</span>
           {it.industry_label && (
             <>
@@ -234,7 +234,7 @@ export const CalendarItem = React.memo(function CalendarItem({
             </>
           )}
         </div>
-        <span className="text-[11px]" style={{ color: "#78716c" }}>
+        <span className="text-[11px]" style={{ color: "#5a5753" }}>
           {new Date(it.created_at).toLocaleDateString()}
         </span>
       </div>

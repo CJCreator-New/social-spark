@@ -125,7 +125,7 @@ export function PlanSettings() {
 
               <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                 <span style={{ fontSize: 22, fontWeight: 700, color: "#c2410c", fontFamily: "var(--font-display,'Lora',Georgia,serif)" }}>{plan.price}</span>
-                <span style={{ fontSize: 12, color: "#78716c" }}>{plan.cadence}</span>
+                <span style={{ fontSize: 12, color: "#5a5753" }}>{plan.cadence}</span>
               </div>
 
               <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>

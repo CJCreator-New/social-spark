@@ -1,5 +1,7 @@
 
 -- 1. wizard_drafts table
+-- (Already idempotent vs. 20260508173000_create_wizard_drafts.sql via IF NOT EXISTS;
+-- this pass adds the explicit authenticated/service_role grants the first migration lacked.)
 CREATE TABLE IF NOT EXISTS public.wizard_drafts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,

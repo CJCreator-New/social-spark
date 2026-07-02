@@ -12,10 +12,17 @@ declare const Deno: any;
 
 // Shared helpers used across generate-calendar, generate-single-post, regenerate-post.
 
-// ALLOWED_ORIGIN can be set to a single origin (e.g. "https://app.socialspark.com") to
-// restrict CORS on these endpoints. Falls back to "*" when unset so local/preview
-// environments keep working without configuration.
-const allowedOrigin = (typeof Deno !== "undefined" ? Deno.env.get("ALLOWED_ORIGIN") : undefined) || "*";
+// ALLOWED_ORIGIN must be set to a single origin (e.g. "https://app.socialspark.com") to
+// restrict CORS on these endpoints. Deno.deploy/Supabase edge functions always set
+// DENO_DEPLOYMENT_ID in deployed environments; only fall back to "*" for local dev
+// (`supabase functions serve`), where DENO_DEPLOYMENT_ID is unset. This keeps a missing
+// ALLOWED_ORIGIN from silently reopening CORS in production.
+const isDeployed = typeof Deno !== "undefined" && !!Deno.env.get("DENO_DEPLOYMENT_ID");
+const configuredOrigin = typeof Deno !== "undefined" ? Deno.env.get("ALLOWED_ORIGIN") : undefined;
+if (isDeployed && !configuredOrigin) {
+  throw new Error("ALLOWED_ORIGIN must be set in deployed environments");
+}
+const allowedOrigin = configuredOrigin || "*";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": allowedOrigin,
@@ -1038,7 +1045,7 @@ function getExemplars(platform: string, style?: string): string[] {
  */
 function buildUserMessage(
   payload: GenerationPayload,
-  opts: { includeTopics?: boolean; isSinglePost?: boolean } = {}
+  opts: { includeTopics?: boolean; isSinglePost?: boolean; leanOutput?: boolean } = {}
 ): string {
   const topicLine = opts.isSinglePost
     ? `Topic: ${payload.topic || payload.coreIdea || '(not specified)'}`
@@ -1046,7 +1053,12 @@ function buildUserMessage(
 
   const brief = `BRIEF:\n- Industry: ${payload.industryLabel || payload.industry || '(not specified)'}\n- ${topicLine}\n- Audience: ${payload.audiences.length ? payload.audiences.join(', ') : '(not specified)'}\n- Voice: ${payload.voice || '(not specified)'}\n- Style: ${payload.style || '(not specified)'}\n- Goals: ${payload.goals.length ? payload.goals.join(', ') : '(not specified)'}\n- Length target: ${payload.length || 'medium'}\n- Structure target: ${payload.structure || 'mixed'}\n${payload.extra ? `- Extra: ${payload.extra}` : ''}\n`;
 
-  const ask = `Return the result via the provided function tool. Include a lightweight plan first (plan.angle, plan.hook_thesis, plan.proof_points[], plan.cta_intent) before the final body. Also provide 3 hook_options, 2 cta_options, and up to 2 body_variants. Provide a self_check object listing any forbidden rule violations.`;
+  // Lean mode (7-post calendars): the full "plan + variants + self_check" ask combined
+  // with a large tool schema makes Gemini's forced tool-call fail with an upstream 400.
+  // Keep the ask minimal for calendar-sized outputs.
+  const ask = opts.leanOutput
+    ? `Return the result via the provided function tool. Also provide 3 hook_options and 2 cta_options per post.`
+    : `Return the result via the provided function tool. Include a lightweight plan first (plan.angle, plan.hook_thesis, plan.proof_points[], plan.cta_intent) before the final body. Also provide 3 hook_options, 2 cta_options, and up to 2 body_variants. Provide a self_check object listing any forbidden rule violations.`;
 
   return brief + "\n" + ask;
 }

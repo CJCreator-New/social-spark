@@ -299,7 +299,7 @@ export default function MyCalendars() {
             <h1 className="text-3xl font-display font-normal">
               My <em className="text-[#c2410c]">calendars</em>
             </h1>
-            <p className="text-slate-500 text-xs mt-1.5">
+            <p className="text-muted-foreground text-xs mt-1.5">
               Manage your saved calendar blueprints and scheduled queue items.
             </p>
           </div>

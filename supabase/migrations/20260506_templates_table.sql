@@ -1,6 +1,11 @@
 -- Phase 4: Templates Table Migration
 -- Allows users to save and reuse form configurations as templates
 -- Created: 2026-05-06
+--
+-- NOTE: 20260507053815_f3d13a7e-b5a1-4257-91c6-77fd89ce1f1e.sql also creates
+-- `public.templates` (a narrower, non-shared version). This file is authoritative
+-- — it created the table first, and the later migration was guarded in 2026-07-02
+-- to no-op if the table already exists rather than erroring on replay.
 
 -- Create templates table
 create table public.templates (

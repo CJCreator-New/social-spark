@@ -222,7 +222,7 @@ export function ApiKeySettings() {
 
   if (fetching) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#78716c", fontSize: 13, padding: "20px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#5a5753", fontSize: 13, padding: "20px 0" }}>
         <Loader2 className="animate-spin" size={16} style={{ color: "#c2410c" }} />
         <span>Loading API key configurations...</span>
       </div>
@@ -263,7 +263,7 @@ export function ApiKeySettings() {
             />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, color: "#78716c" }}>
+            <span style={{ fontSize: 11, color: "#5a5753" }}>
               Resets {quota.planPeriodEnd ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(quota.planPeriodEnd)) : "next month"}
             </span>
             {settingsError && (
@@ -368,7 +368,7 @@ export function ApiKeySettings() {
                 right: "12px",
                 background: "none",
                 border: "none",
-                color: "#78716c",
+                color: "#5a5753",
                 cursor: "pointer",
                 padding: 0,
                 display: "flex",
@@ -379,22 +379,22 @@ export function ApiKeySettings() {
             </button>
           </div>
           {savedKeyPreview && (
-            <div style={{ fontSize: "11px", color: "#78716c", marginTop: "4px" }}>
+            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: "4px" }}>
               Currently configured key ends in <span className="font-mono">{savedKeyPreview.slice(-4)}</span>
             </div>
           )}
           {provider === "openai" && (
-            <div style={{ fontSize: "11px", color: "#78716c", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
               <Info size={11} /> Format: <code>sk-...</code> (32+ characters)
             </div>
           )}
           {provider === "anthropic" && (
-            <div style={{ fontSize: "11px", color: "#78716c", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
               <Info size={11} /> Format: <code>sk-ant-...</code>
             </div>
           )}
           {provider === "openrouter" && (
-            <div style={{ fontSize: "11px", color: "#78716c", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
               <Info size={11} /> Format: <code>sk-or-...</code>
             </div>
           )}
@@ -475,7 +475,7 @@ export function ApiKeySettings() {
                 <option value="always">Always — use my key for all content generation</option>
               </select>
             </div>
-            <div style={{ fontSize: "11px", color: "#78716c", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
               <Info size={11} />
               {keyMode === "always"
                 ? "Your key will be used directly. Platform credits are not consumed."
@@ -555,7 +555,7 @@ export function ApiKeySettings() {
                 onClick={() => setConfirmDelete(false)}
                 style={{
                   background: "transparent",
-                  color: "#78716c",
+                  color: "#5a5753",
                   border: "1px solid #d6d3d1",
                   borderRadius: "6px",
                   padding: "4px 10px",
@@ -579,7 +579,7 @@ export function ApiKeySettings() {
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             {syncStatus === "default" && (
-              <span style={{ fontSize: 10, padding: "2px 8px", background: "#f5f5f4", color: "#78716c", border: "1px solid #e7e5e4", borderRadius: 99 }}>
+              <span style={{ fontSize: 10, padding: "2px 8px", background: "#f5f5f4", color: "#5a5753", border: "1px solid #e7e5e4", borderRadius: 99 }}>
                 Default Project
               </span>
             )}

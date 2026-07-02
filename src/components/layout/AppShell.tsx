@@ -94,7 +94,7 @@ export function AppShell({ children }: AppShellProps) {
 
         {/* Right: User Avatar & Actions */}
         <div className="flex items-center gap-3">
-          <span className="hidden sm:inline text-xs font-medium truncate max-w-[140px]" style={{ color: "#78716c" }}>
+          <span className="hidden sm:inline text-xs font-medium truncate max-w-[140px]" style={{ color: "#5a5753" }}>
             {user?.email || "Creator"}
           </span>
           <div className="w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs border" style={{ backgroundColor: "#fef3c7", color: "#c2410c", borderColor: "#c2410c", borderWidth: 1.5 }}>
@@ -159,9 +159,9 @@ export function AppShell({ children }: AppShellProps) {
       {/* MAIN CONTENT AREA */}
       <main id="main-content" className="flex-1 w-full max-w-[1100px] mx-auto px-4 md:px-8 py-8 flex flex-col" style={{ paddingBottom: 80 }}>
         {/* Breadcrumb */}
-        <div className="mb-6 flex items-center gap-2 text-xs" style={{ color: "#78716c" }}>
+        <div className="mb-6 flex items-center gap-2 text-xs" style={{ color: "#5a5753" }}>
           {isCalendarDetail ? (
-            <Link to="/my-calendars" style={{ color: "#78716c", textDecoration: "none", transition: "color 0.15s" }} onMouseEnter={e => (e.currentTarget.style.color = "#c2410c")} onMouseLeave={e => (e.currentTarget.style.color = "#78716c")}>My calendars</Link>
+            <Link to="/my-calendars" style={{ color: "#5a5753", textDecoration: "none", transition: "color 0.15s" }} onMouseEnter={e => (e.currentTarget.style.color = "#c2410c")} onMouseLeave={e => (e.currentTarget.style.color = "#78716c")}>My calendars</Link>
           ) : (
             <span>Workspace</span>
           )}

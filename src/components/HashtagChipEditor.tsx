@@ -1,15 +1,26 @@
 import React, { useState, useRef, useCallback } from "react";
 import { resolvePlatform } from "@/lib/platformCopy";
 
+// Warm-editorial-palette, WCAG AA-accessible replacements for the previous
+// off-palette pastel blue/cyan/purple badge colors (which also failed
+// color-contrast at the small font size + opacity this guidance renders at).
+const PLATFORM_BADGE_COLORS = {
+  instagram: "#9a3412",
+  linkedin: "#92400e",
+  twitter: "#78350f",
+  facebook: "#57534e",
+  neutral: "#a16207",
+} as const;
+
 export function platformHashtagGuidance(platform: string): { label: string; color: string } {
   const s = (platform || "").toLowerCase();
-  if (s.includes("instagram") || s === "ig") return { label: "Instagram: 20–30 hashtags", color: "#f0d49a" };
-  if (s.includes("linkedin")) return { label: "LinkedIn: 3–5 hashtags", color: "#9ab5f0" };
-  if (s.includes("twitter") || s.includes("x/") || s === "x") return { label: "Twitter/X: 1–2 hashtags", color: "#9aecf0" };
-  if (s.includes("facebook") || s === "fb") return { label: "Facebook: 2–3 hashtags", color: "#9a9af0" };
-  if (s.includes("newsletter")) return { label: "Newsletter: hashtags optional", color: "#f59e0b" };
-  if (s.includes("blog")) return { label: "Blog: hashtags optional", color: "#f59e0b" };
-  return { label: "Hashtags optional", color: "#f59e0b" };
+  if (s.includes("instagram") || s === "ig") return { label: "Instagram: 20–30 hashtags", color: PLATFORM_BADGE_COLORS.instagram };
+  if (s.includes("linkedin")) return { label: "LinkedIn: 3–5 hashtags", color: PLATFORM_BADGE_COLORS.linkedin };
+  if (s.includes("twitter") || s.includes("x/") || s === "x") return { label: "Twitter/X: 1–2 hashtags", color: PLATFORM_BADGE_COLORS.twitter };
+  if (s.includes("facebook") || s === "fb") return { label: "Facebook: 2–3 hashtags", color: PLATFORM_BADGE_COLORS.facebook };
+  if (s.includes("newsletter")) return { label: "Newsletter: hashtags optional", color: PLATFORM_BADGE_COLORS.neutral };
+  if (s.includes("blog")) return { label: "Blog: hashtags optional", color: PLATFORM_BADGE_COLORS.neutral };
+  return { label: "Hashtags optional", color: PLATFORM_BADGE_COLORS.neutral };
 }
 
 export function parseHashtagsFromString(raw: string): string[] {

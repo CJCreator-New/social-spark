@@ -2,10 +2,17 @@ declare const Deno: any;
 
 // Shared helpers used across generate-calendar, generate-single-post, regenerate-post.
 
-// ALLOWED_ORIGIN can be set to a single origin (e.g. "https://app.socialspark.com") to
-// restrict CORS on these endpoints. Falls back to "*" when unset so local/preview
-// environments keep working without configuration.
-const allowedOrigin = (typeof Deno !== "undefined" ? Deno.env.get("ALLOWED_ORIGIN") : undefined) || "*";
+// ALLOWED_ORIGIN must be set to a single origin (e.g. "https://app.socialspark.com") to
+// restrict CORS on these endpoints. Deno.deploy/Supabase edge functions always set
+// DENO_DEPLOYMENT_ID in deployed environments; only fall back to "*" for local dev
+// (`supabase functions serve`), where DENO_DEPLOYMENT_ID is unset. This keeps a missing
+// ALLOWED_ORIGIN from silently reopening CORS in production.
+const isDeployed = typeof Deno !== "undefined" && !!Deno.env.get("DENO_DEPLOYMENT_ID");
+const configuredOrigin = typeof Deno !== "undefined" ? Deno.env.get("ALLOWED_ORIGIN") : undefined;
+if (isDeployed && !configuredOrigin) {
+  throw new Error("ALLOWED_ORIGIN must be set in deployed environments");
+}
+const allowedOrigin = configuredOrigin || "*";
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": allowedOrigin,

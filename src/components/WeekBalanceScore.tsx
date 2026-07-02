@@ -94,9 +94,9 @@ function computeWeekBalance(posts: Post[]): BalanceResult {
   let barColor: string;
 
   if (score >= 80) { label = "Excellent"; color = WARM_PALETTE.scoreHigh; barColor = WARM_PALETTE.scoreHigh; }
-  else if (score >= 60) { label = "Good"; color = "#a3d977"; barColor = "#a3d977"; }
-  else if (score >= 40) { label = "Fair"; color = "#f0d49a"; barColor = "#f0d49a"; }
-  else { label = "Needs Work"; color = "#f09a9a"; barColor = "#f09a9a"; }
+  else if (score >= 60) { label = "Good"; color = WARM_PALETTE.scoreHigh; barColor = WARM_PALETTE.scoreHigh; }
+  else if (score >= 40) { label = "Fair"; color = WARM_PALETTE.scoreMed; barColor = WARM_PALETTE.scoreMed; }
+  else { label = "Needs Work"; color = WARM_PALETTE.scoreLow; barColor = WARM_PALETTE.scoreLow; }
 
   return { score, label, color, barColor, warnings };
 }

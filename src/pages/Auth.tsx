@@ -249,7 +249,7 @@ export default function AuthPage() {
             </button>
             {import.meta.env.DEV && (
               <div style={{ marginTop: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0", color: "#78716c", fontSize: 11 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0", color: "#5a5753", fontSize: 11 }}>
                   <div style={{ flex: 1, height: 1, background: "#e7e5e4" }} />
                   <span>Developer Sandbox</span>
                   <div style={{ flex: 1, height: 1, background: "#e7e5e4" }} />

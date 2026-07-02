@@ -57,7 +57,7 @@ export default function SocialProofBar() {
                 viewBox="0 0 120 24"
                 width="120"
                 height="24"
-                style={{ color: "#78716c" }}
+                style={{ color: "#5a5753" }}
               >
                 {logo.svg}
               </svg>

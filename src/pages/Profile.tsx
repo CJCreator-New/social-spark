@@ -58,7 +58,7 @@ function TemplatesList() {
     }
   }
 
-  if (loading) return <div style={{ color: '#78716c', fontSize: 13 }}>Loading templates…</div>;
+  if (loading) return <div style={{ color: '#5a5753', fontSize: 13 }}>Loading templates…</div>;
   if (templates.length === 0) return (
     <EmptyState
       icon={LayoutTemplate}
@@ -75,7 +75,7 @@ function TemplatesList() {
         <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, border: '1px solid #e7e5e4', padding: '10px 12px', borderRadius: 10, background: '#ffffff' }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, color: '#1c1917', fontSize: 13 }}>{t.name}</div>
-            <div style={{ fontSize: 11, color: '#78716c', marginTop: 2 }}>{t.description || ''} · {new Date(t.created_at).toLocaleString()}</div>
+            <div style={{ fontSize: 11, color: '#5a5753', marginTop: 2 }}>{t.description || ''} · {new Date(t.created_at).toLocaleString()}</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="pf-add-btn" onClick={() => handleLoad(t)}>Load</button>
@@ -409,7 +409,7 @@ export default function Profile() {
         {activeTab === 'profile' && (
           <div className="pf-card">
             {profileLoading ? (
-              <div style={{ color: "#78716c", fontSize: 13 }}>Loading…</div>
+              <div style={{ color: "#5a5753", fontSize: 13 }}>Loading…</div>
             ) : (
               <>
                 <div className="pf-row">
@@ -428,7 +428,7 @@ export default function Profile() {
                 <label className="pf-label" htmlFor="pf-name">Display name</label>
                 <input id="pf-name" className="pf-input" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your name" />
 
-                <label className="pf-label" htmlFor="pf-email">Email <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: '#a8a29e', fontSize: 10 }}>(cannot be changed here)</span></label>
+                <label className="pf-label" htmlFor="pf-email">Email <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: '#5a5753', fontSize: 10 }}>(cannot be changed here)</span></label>
                 <input id="pf-email" className="pf-input" value={user?.email || ""} readOnly aria-readonly="true" style={{ cursor: 'default', opacity: 0.7 }} />
 
                 <label className="pf-label" htmlFor="pf-tz">Default timezone</label>

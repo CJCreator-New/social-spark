@@ -75,25 +75,25 @@ export default function PostInsights({ post, platform, topic }: { post: Post; pl
             </span>
           )}
         </div>
-        <div style={{ fontSize: 11, color: "#78716c", fontWeight: 500 }}>{niceLabelFor(platform)}</div>
+        <div style={{ fontSize: 11, color: "#5a5753", fontWeight: 500 }}>{niceLabelFor(platform)}</div>
       </div>
 
       {/* Metrics grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
         <div style={{ fontSize: 13 }}>
-          <div style={{ color: "#78716c", fontSize: 11, marginBottom: 2 }}>Length</div>
-          <div style={{ fontWeight: 600, color: "#1c1917" }}>{f.charCount.toLocaleString()} / {f.limit.toLocaleString()} <span style={{ fontWeight: 400, color: "#78716c" }}>({percentOfLimit}%)</span></div>
+          <div style={{ color: "#5a5753", fontSize: 11, marginBottom: 2 }}>Length</div>
+          <div style={{ fontWeight: 600, color: "#1c1917" }}>{f.charCount.toLocaleString()} / {f.limit.toLocaleString()} <span style={{ fontWeight: 400, color: "#5a5753" }}>({percentOfLimit}%)</span></div>
         </div>
         <div style={{ fontSize: 13 }} title={healthTooltip}>
-          <div style={{ color: "#78716c", fontSize: 11, marginBottom: 2 }}>Health</div>
+          <div style={{ color: "#5a5753", fontSize: 11, marginBottom: 2 }}>Health</div>
           <div style={{ fontWeight: 600, color: healthColor, textTransform: "capitalize" }}>{ins.health}</div>
         </div>
         <div style={{ fontSize: 13 }}>
-          <div style={{ color: "#78716c", fontSize: 11, marginBottom: 2 }}>Hashtags</div>
-          <div style={{ fontWeight: 600, color: "#1c1917" }}>{ins.hashtagLabel} <span style={{ fontWeight: 400, color: "#78716c" }}>· {ins.hashtagState}</span></div>
+          <div style={{ color: "#5a5753", fontSize: 11, marginBottom: 2 }}>Hashtags</div>
+          <div style={{ fontWeight: 600, color: "#1c1917" }}>{ins.hashtagLabel} <span style={{ fontWeight: 400, color: "#5a5753" }}>· {ins.hashtagState}</span></div>
         </div>
         <div style={{ fontSize: 13 }}>
-          <div style={{ color: "#78716c", fontSize: 11, marginBottom: 2 }}>Hook strength</div>
+          <div style={{ color: "#5a5753", fontSize: 11, marginBottom: 2 }}>Hook strength</div>
           <div style={{ fontWeight: 600, color: "#1c1917" }}>{ins.hookScore ? `${Math.round(ins.hookScore * 100)}%` : "—"}</div>
         </div>
       </div>
@@ -111,7 +111,7 @@ export default function PostInsights({ post, platform, topic }: { post: Post; pl
       {/* Suggestions */}
       {ins.recommendations && ins.recommendations.length > 0 && (
         <div style={{ marginTop: 10, fontSize: 12 }}>
-          <div style={{ marginBottom: 6, color: "#78716c", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>Suggestions</div>
+          <div style={{ marginBottom: 6, color: "#5a5753", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>Suggestions</div>
           <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
             {ins.recommendations.slice(0, 4).map((r: string, i: number) => (
               <li key={i} style={{ color: "#57534e", paddingLeft: 14, position: "relative" }}>

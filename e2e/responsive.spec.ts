@@ -19,7 +19,7 @@ for (const viewport of viewports) {
 
     test("public and auth routes keep primary actions visible", async ({ page }) => {
       await page.goto("/");
-      await expect(page.getByRole("link", { name: /create your first calendar/i })).toBeVisible();
+      await expect(page.getByRole("link", { name: /get started free/i }).first()).toBeVisible();
 
       await page.goto("/auth");
       await expect(page.getByRole("button", { name: /^sign in$/i })).toBeVisible();

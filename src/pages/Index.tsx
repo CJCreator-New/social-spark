@@ -31,7 +31,7 @@ import { WelcomeBanner } from "@/components/WelcomeBanner";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { FontStyle, applyStyle } from "@/lib/unicodeFonts";
 import { useWizardStore } from "@/stores/useWizardStore";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Helmet } from "react-helmet-async";
 import { OnboardingTour } from "@/components/OnboardingTour";
 
@@ -430,7 +430,18 @@ const screenVariants = {
   exit: { opacity: 0, y: -10, transition: { duration: 0.18, ease: "easeIn" } },
 } as const;
 
+// Wizard step transitions previously ignored prefers-reduced-motion (unlike the
+// landing page, which already respects it everywhere). This variant swaps in a
+// near-instant, transform-free transition for users who've asked for less motion.
+const reducedScreenVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.01 } },
+  exit: { opacity: 0, transition: { duration: 0.01 } },
+} as const;
+
 const Index = () => {
+  const prefersReducedMotion = useReducedMotion();
+  const activeScreenVariants = prefersReducedMotion ? reducedScreenVariants : screenVariants;
   const {
     step, setStep,
     form, setForm,
@@ -1909,7 +1920,7 @@ const Index = () => {
           padding: "10px 16px",
           textAlign: "center",
           fontSize: "12px",
-          color: "#f0d49a",
+          color: "#92400e",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
@@ -1918,12 +1929,12 @@ const Index = () => {
           position: "relative"
         }}>
           <span>⚠️ Sandbox Mode Active (using mock test data)</span>
-          <button 
+          <button
             onClick={disableSandboxMode}
             style={{
               background: "rgba(240, 212, 154, 0.2)",
               border: "1px solid rgba(240, 212, 154, 0.4)",
-              color: "#f0d49a",
+              color: "#92400e",
               padding: "2px 8px",
               borderRadius: "4px",
               cursor: "pointer",
@@ -2059,7 +2070,7 @@ const Index = () => {
           {step === 1 && <motion.div
             key="step-1"
             className="screen active"
-            variants={screenVariants}
+            variants={activeScreenVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
@@ -2425,7 +2436,7 @@ const Index = () => {
           {step === 2 && <motion.div
             key="step-2"
             className="screen active"
-            variants={screenVariants}
+            variants={activeScreenVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
@@ -2713,7 +2724,7 @@ const Index = () => {
           {step === 3 && <motion.div
             key="step-3"
             className="screen active"
-            variants={screenVariants}
+            variants={activeScreenVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
@@ -2779,7 +2790,7 @@ const Index = () => {
           {step === 4 && <motion.div
             key="step-4"
             className="screen active"
-            variants={screenVariants}
+            variants={activeScreenVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
@@ -2905,7 +2916,7 @@ const Index = () => {
               style={{
                 width: 28, height: 28, borderRadius: "50%",
                 background: "rgba(120,113,108,0.12)", border: "1px solid rgba(120,113,108,0.2)",
-                color: "#78716c", fontSize: 12, fontWeight: 700,
+                color: "#5a5753", fontSize: 12, fontWeight: 700,
                 cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
               }}
             >

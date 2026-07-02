@@ -1,5 +1,7 @@
 
-CREATE TABLE public.templates (
+-- Guarded to no-op if 20260506_templates_table.sql already created this table
+-- (see note there — that migration is authoritative for `public.templates`).
+CREATE TABLE IF NOT EXISTS public.templates (
   id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id uuid NOT NULL,
   name text NOT NULL,
@@ -11,14 +13,23 @@ CREATE TABLE public.templates (
 
 ALTER TABLE public.templates ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users view own templates" ON public.templates FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users insert own templates" ON public.templates FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users update own templates" ON public.templates FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users delete own templates" ON public.templates FOR DELETE USING (auth.uid() = user_id);
+DO $$ BEGIN
+  CREATE POLICY "Users view own templates" ON public.templates FOR SELECT USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Users insert own templates" ON public.templates FOR INSERT WITH CHECK (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Users update own templates" ON public.templates FOR UPDATE USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Users delete own templates" ON public.templates FOR DELETE USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DROP TRIGGER IF EXISTS update_templates_updated_at ON public.templates;
 CREATE TRIGGER update_templates_updated_at
 BEFORE UPDATE ON public.templates
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-CREATE INDEX idx_templates_user_created ON public.templates(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_templates_user_created ON public.templates(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_saved_calendars_user_created ON public.saved_calendars(user_id, created_at DESC);

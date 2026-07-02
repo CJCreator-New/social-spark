@@ -72,15 +72,15 @@ test.describe('Calendar Creation Flow', () => {
   test('should create a single-day calendar', async ({ page }) => {
     await page.goto('/app', { waitUntil: 'domcontentloaded' })
 
-    // Step 1: Select industry
+    // Step 1: Select industry, switch to single-day mode (mode toggle + date live on step 1)
     await page.getByRole('radio', { name: /marketing & growth/i }).first().waitFor({ state: 'visible', timeout: 45000 })
     await page.getByRole('radio', { name: /marketing & growth/i }).first().click()
     await page.getByPlaceholder(/what's the big idea/i).fill('Launch a timely holiday campaign')
-    await page.getByRole('button', { name: /next step/i }).click()
-
-    // Step 2: Switch to single-day mode
     await page.getByRole('radio', { name: /single day/i }).click()
     await page.locator('input[type="date"]').fill('2024-12-25')
+    await page.getByRole('button', { name: /next step/i }).click()
+
+    // Step 2: Configure content
     await page.getByPlaceholder(/add a custom topic/i).fill('Holiday Marketing Tips')
     await page.getByRole('button', { name: /^add$/i }).click()
 
@@ -112,11 +112,12 @@ test.describe('Calendar Management', () => {
   test('should allow calendar deletion', async ({ page }) => {
     await expect(page.getByText('E2E Marketing Launch Week')).toBeVisible({ timeout: 15000 })
 
-    // Click delete button on first calendar
-    await page.getByRole('button', { name: /^delete$/i }).first().click()
-
-    // Confirm deletion
+    // Open the calendar's actions menu, then click Delete
+    await page.getByRole('button', { name: /calendar actions/i }).first().click()
     await page.getByRole('button', { name: /^delete$/i }).click()
+
+    // Confirm deletion in the confirmation dialog (ConfirmDialog defaults confirmLabel to "OK")
+    await page.getByRole('button', { name: /^ok$/i }).click()
 
     // Should show success message
     await expect(page.getByText(/deleted/i).first()).toBeVisible({ timeout: 15000 })
