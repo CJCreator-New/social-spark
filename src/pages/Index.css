@@ -474,12 +474,12 @@
   gap: 6px;
 }
 .cf-app .cf-nav-btn.primary {
-  color: #07080d;
+  color: hsl(var(--primary-foreground));
   background: var(--accent);
 }
 .cf-app .cf-nav-btn.primary:hover {
   background: var(--color-primary-hover);
-  box-shadow: 0 2px 10px rgba(200, 240, 154, 0.2);
+  box-shadow: 0 2px 10px rgba(194, 65, 12, 0.2);
 }
 .cf-app .cf-nav-link {
   color: var(--text2);
@@ -515,8 +515,8 @@
 }
 .cf-app .cf-nav-status.saved {
   color: var(--accent);
-  border-color: rgba(200, 240, 154, 0.2);
-  background: rgba(200, 240, 154, 0.04);
+  border-color: rgba(194, 65, 12, 0.2);
+  background: rgba(194, 65, 12, 0.04);
 }
 .cf-app .cf-nav-status.error {
   color: var(--err);
@@ -565,7 +565,7 @@
   padding: 4px 10px;
   border-radius: 99px;
   background: var(--adim);
-  border: 1px solid rgba(200, 240, 154, 0.2);
+  border: 1px solid rgba(194, 65, 12, 0.2);
   color: var(--accent);
   white-space: nowrap;
   font-weight: 500;
@@ -642,7 +642,7 @@
   letter-spacing: 0.5px;
   padding: 2px 8px;
   background: var(--adim);
-  border: 1px solid rgba(200, 240, 154, 0.25);
+  border: 1px solid rgba(194, 65, 12, 0.25);
   color: var(--accent);
   border-radius: 99px;
   margin-left: 8px;
@@ -732,9 +732,9 @@
 }
 .cf-app .cf-user-dropdown-trigger:hover,
 .cf-app .cf-user-dropdown-trigger.active {
-  border-color: rgba(200, 240, 154, 0.35);
+  border-color: rgba(194, 65, 12, 0.35);
   color: var(--accent);
-  background: rgba(200, 240, 154, 0.04);
+  background: rgba(194, 65, 12, 0.04);
 }
 .cf-app .cf-user-avatar {
   font-size: 14px;

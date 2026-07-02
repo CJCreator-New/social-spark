@@ -7,9 +7,9 @@ export function platformHashtagGuidance(platform: string): { label: string; colo
   if (s.includes("linkedin")) return { label: "LinkedIn: 3–5 hashtags", color: "#9ab5f0" };
   if (s.includes("twitter") || s.includes("x/") || s === "x") return { label: "Twitter/X: 1–2 hashtags", color: "#9aecf0" };
   if (s.includes("facebook") || s === "fb") return { label: "Facebook: 2–3 hashtags", color: "#9a9af0" };
-  if (s.includes("newsletter")) return { label: "Newsletter: hashtags optional", color: "#c8f09a" };
-  if (s.includes("blog")) return { label: "Blog: hashtags optional", color: "#c8f09a" };
-  return { label: "Hashtags optional", color: "#c8f09a" };
+  if (s.includes("newsletter")) return { label: "Newsletter: hashtags optional", color: "#f59e0b" };
+  if (s.includes("blog")) return { label: "Blog: hashtags optional", color: "#f59e0b" };
+  return { label: "Hashtags optional", color: "#f59e0b" };
 }
 
 export function parseHashtagsFromString(raw: string): string[] {

@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import type { Post } from "@/components/wizard/constants";
+import { WARM_PALETTE } from "@/lib/theme";
 
 interface WeekBalanceScoreProps {
   posts: Post[];
@@ -20,7 +21,7 @@ interface BalanceResult {
 }
 
 function computeWeekBalance(posts: Post[]): BalanceResult {
-  if (posts.length === 0) return { score: 100, label: "Excellent", color: "#c8f09a", barColor: "#c8f09a", warnings: [] };
+  if (posts.length === 0) return { score: 100, label: "Excellent", color: WARM_PALETTE.scoreHigh, barColor: WARM_PALETTE.scoreHigh, warnings: [] };
 
   const warnings: BalanceWarning[] = [];
   let deductions = 0;
@@ -92,7 +93,7 @@ function computeWeekBalance(posts: Post[]): BalanceResult {
   let color: string;
   let barColor: string;
 
-  if (score >= 80) { label = "Excellent"; color = "#c8f09a"; barColor = "#c8f09a"; }
+  if (score >= 80) { label = "Excellent"; color = WARM_PALETTE.scoreHigh; barColor = WARM_PALETTE.scoreHigh; }
   else if (score >= 60) { label = "Good"; color = "#a3d977"; barColor = "#a3d977"; }
   else if (score >= 40) { label = "Fair"; color = "#f0d49a"; barColor = "#f0d49a"; }
   else { label = "Needs Work"; color = "#f09a9a"; barColor = "#f09a9a"; }

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { WARM_PALETTE } from "@/lib/theme";
 
 /**
  * Razorpay Standard Web Checkout helper.
@@ -142,7 +143,7 @@ export async function startRazorpayCheckout(params: CheckoutParams): Promise<Che
       name: params.name || "Social Spark",
       description: params.description || order.label,
       prefill: params.prefill,
-      theme: { color: "#c8f09a" },
+      theme: { color: WARM_PALETTE.checkout },
       handler: async (response: RazorpaySuccessResponse) => {
         try {
           // 3) Verify the signature server-side before trusting success

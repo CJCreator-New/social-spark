@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader2 } from "lucide-react";
+import { PageLoader } from "@/components/ui/PageLoader";
 import "@/styles/pages.css";
 
 // Section components (eager — no Three.js inside them)
@@ -39,21 +39,7 @@ export default function Landing() {
 
   // Loading spinner while auth state resolves
   if (loading) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "#faf8f4" }}
-        aria-live="polite"
-      >
-        <Loader2
-          className="animate-spin"
-          size={28}
-          style={{ color: "#c2410c" }}
-          aria-hidden="true"
-        />
-        <span className="sr-only">Loading…</span>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   // Redirect authenticated users to the app
@@ -78,7 +64,7 @@ export default function Landing() {
       {/* Skip to main content — accessibility */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-white focus:text-[#c2410c] focus:rounded-lg focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#c2410c]"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-card focus:text-primary focus:rounded-lg focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary"
       >
         Skip to main content
       </a>

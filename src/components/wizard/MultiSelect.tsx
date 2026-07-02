@@ -3,7 +3,7 @@ import { Caret } from "./SelectField";
 
 function Check() {
   return (
-    <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="#07080d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary-foreground">
       <path d="M1.5 4.5L3.5 6.5L7.5 2.5" />
     </svg>
   );
@@ -91,7 +91,7 @@ export function MultiSelect({ label, options, value, onChange, placeholder, max 
                   type="button"
                   role="option"
                   aria-selected={isSelected}
-                  className={`ms-opt ${isSelected ? "sel" : ""} focus:bg-[rgba(255,255,255,0.05)] focus:outline-none`}
+                  className={`ms-opt ${isSelected ? "sel" : ""} focus:bg-secondary focus:outline-none`}
                   onClick={() => toggle(o)}
                   style={{ textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', background: 'none', color: 'inherit', font: 'inherit' }}
                 >

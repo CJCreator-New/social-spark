@@ -1,24 +1,4 @@
 /* Consolidated Page Stylesheets */
-/* Dark tokens are now scoped to .ld (landing) and .auth-app / .rp-app (auth/reset)
-   so they do NOT bleed into the warm authenticated app. */
-
-/* Shared dark-page local tokens — applied inside .auth-app, .rp-app only */
-.auth-app,
-.rp-app {
-  --bg: #06080e;
-  --bg2: #0a0d14;
-  --panel: rgba(12, 14, 23, 0.82);
-  --panel-border: rgba(255, 255, 255, 0.06);
-  --panel-strong: rgba(18, 21, 34, 0.94);
-  --border-strong: rgba(255, 255, 255, 0.12);
-  --accent-dim: rgba(200, 240, 154, 0.12);
-  --text: #edeae3;
-  --muted-2: #5a5a72;
-  --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
-  --accent: #c8f09a;
-  --border: rgba(255, 255, 255, 0.06);
-  --muted: #7c8294;
-}
 
 /* ==========================================================================
    LANDING PAGE STYLES (.ld)
@@ -1647,22 +1627,22 @@
    ========================================================================== */
 
 .lg-app { min-height:100vh; background:
-  radial-gradient(circle at 16% 18%, rgba(200,240,154,0.10), transparent 24%),
-  radial-gradient(circle at 82% 10%, rgba(130,233,198,0.08), transparent 24%),
-  linear-gradient(180deg, #05060a 0%, #0a0d14 100%);
-  color:#f2efe7; font-family:var(--font-body); padding:64px 24px 100px; }
+  radial-gradient(circle at 16% 18%, hsl(var(--primary) / 0.05), transparent 24%),
+  radial-gradient(circle at 82% 10%, hsl(var(--primary) / 0.03), transparent 24%),
+  hsl(var(--background));
+  color:hsl(var(--foreground)); font-family:var(--font-body); padding:64px 24px 100px; }
 .lg-inner { max-width:720px; margin:0 auto; }
-.lg-back { font-size:12px; color:#7a7a8e; text-decoration:none; transition:color .15s; display:inline-block; margin-bottom:24px; }
-.lg-back:hover { color:#c8f09a; }
-.lg-eyebrow { font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:#c8f09a; font-weight:800; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
-.lg-eyebrow::before { content:''; display:block; width:22px; height:1px; background:#c8f09a; }
+.lg-back { font-size:12px; color:hsl(var(--muted-foreground)); text-decoration:none; transition:color .15s; display:inline-block; margin-bottom:24px; }
+.lg-back:hover { color:hsl(var(--primary)); }
+.lg-eyebrow { font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:hsl(var(--primary)); font-weight:800; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+.lg-eyebrow::before { content:''; display:block; width:22px; height:1px; background:hsl(var(--primary)); }
 .lg-title { font-family:var(--font-display); font-size:clamp(2rem, 4vw, 2.7rem); font-weight:500; margin:0 0 8px; letter-spacing:-.04em; line-height:1.05; }
-.lg-updated { font-size:12px; color:#7c8294; margin-bottom:32px; }
-.lg-body h2 { font-family:var(--font-display); font-size:18px; font-weight:600; color:#f2efe7; margin:28px 0 10px; letter-spacing:-.01em; }
-.lg-body p, .lg-body li { font-size:14px; line-height:1.75; color:#a2a6b6; margin:0 0 12px; }
+.lg-updated { font-size:12px; color:hsl(var(--muted-foreground)); margin-bottom:32px; }
+.lg-body h2 { font-family:var(--font-display); font-size:18px; font-weight:600; color:hsl(var(--foreground)); margin:28px 0 10px; letter-spacing:-.01em; }
+.lg-body p, .lg-body li { font-size:14px; line-height:1.75; color:hsl(var(--muted-foreground)); margin:0 0 12px; }
 .lg-body ul { padding-left:20px; margin:0 0 12px; }
-.lg-body a { color:#c8f09a; text-decoration:underline; text-decoration-color:rgba(200,240,154,0.3); }
-.lg-body strong { color:#f2efe7; }
+.lg-body a { color:hsl(var(--primary)); text-decoration:underline; text-decoration-color:hsl(var(--primary) / 0.3); }
+.lg-body strong { color:hsl(var(--foreground)); }
 
 @media (max-width: 540px) {
   .lg-app { padding:32px 16px 80px; }

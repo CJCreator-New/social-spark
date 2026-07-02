@@ -55,14 +55,13 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
           <span>Performance Score</span>
           {keySource === "user" && (
             <span
+              className="bg-accent text-primary"
               style={{
                 fontSize: "10px",
                 fontWeight: "600",
-                background: "rgba(200, 240, 154, 0.12)",
-                color: "#c8f09a",
                 padding: "2px 6px",
                 borderRadius: "4px",
-                border: "1px solid rgba(200, 240, 154, 0.2)"
+                border: "1px solid hsl(var(--primary) / 0.2)"
               }}
               title={keyMode === "always" ? "Your API key is set as the primary provider" : "Your API key was used as a fallback"}
             >

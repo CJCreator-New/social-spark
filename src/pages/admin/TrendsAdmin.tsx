@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getTrends, TrendItem } from '../../lib/trendsApi';
+import { Button } from '@/components/ui/button';
 
 export default function TrendsAdmin() {
   const [items, setItems] = useState<TrendItem[]>([]);
@@ -34,7 +35,7 @@ export default function TrendsAdmin() {
             <li key={it.id} className="border p-2 my-2">
               <div className="font-bold">{it.title}</div>
               <div className="text-sm text-muted">{it.platform} · score: {it.score}</div>
-              <button onClick={() => del(it.id)} className="mt-2 bg-red-600 text-white px-2 py-1 rounded">Delete</button>
+              <Button onClick={() => del(it.id)} variant="destructive" size="sm" className="mt-2">Delete</Button>
             </li>
           ))}
         </ul>

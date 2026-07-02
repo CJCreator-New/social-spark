@@ -115,10 +115,10 @@ describe("postPerformanceScore tests", () => {
 
   describe("getScoreColor", () => {
     it("should return correct colors for various score ranges", () => {
-      expect(getScoreColor(9)).toBe("#c8f09a");
+      expect(getScoreColor(9)).toBe("#15803d");
       expect(getScoreColor(7)).toBe("#ffd700");
-      expect(getScoreColor(5)).toBe("#ff9500");
-      expect(getScoreColor(2)).toBe("#ff6b6b");
+      expect(getScoreColor(5)).toBe("#b45309");
+      expect(getScoreColor(2)).toBe("#b91c1c");
     });
   });
 

@@ -2641,9 +2641,9 @@ const Index = () => {
                       onClick={() => generate(true)}
                       disabled={isGenerating}
                       style={{
-                        background: 'rgba(200,240,154,.2)',
-                        border: '1px solid rgba(200,240,154,.3)',
-                        color: '#c8f09a',
+                        background: 'hsl(var(--primary) / 0.1)',
+                        border: '1px solid hsl(var(--primary) / 0.3)',
+                        color: 'hsl(var(--primary))',
                         padding: '5px 10px',
                         borderRadius: '4px',
                         cursor: isGenerating ? 'not-allowed' : 'pointer',

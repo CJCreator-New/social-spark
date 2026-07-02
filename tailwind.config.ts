@@ -69,6 +69,19 @@ export default {
           linkedin: "hsl(var(--linkedin))",
           twitter: "hsl(var(--twitter))",
         },
+        surface: {
+          DEFAULT: "hsl(var(--card))",
+          muted: "hsl(var(--surface-muted))",
+          elevated: "hsl(var(--surface-elevated))",
+        },
+        brand: "hsl(var(--primary))",
+        "accent-warm": "hsl(var(--accent-warm))",
+        overlay: "hsl(var(--overlay-scrim))",
+        score: {
+          high: "hsl(var(--score-high))",
+          med: "hsl(var(--score-med))",
+          low: "hsl(var(--score-low))",
+        },
         design: {
           bg: "var(--color-bg)",
           surface: "var(--color-surface)",

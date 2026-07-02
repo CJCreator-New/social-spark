@@ -720,7 +720,7 @@
 
 .cf-app .btn-p {
   background: var(--accent);
-  color: #07080d;
+  color: hsl(var(--primary-foreground));
 }
 
 /* Shimmer sweep pseudo-element */
@@ -1677,7 +1677,7 @@
 
 .cf-app .sample-cta {
   background: var(--accent);
-  color: #07080d;
+  color: hsl(var(--primary-foreground));
   padding: 7px 14px;
   border-radius: 6px;
   font-size: 12px;

@@ -162,8 +162,8 @@ export default function AuthPage() {
                   {loading ? (
                     <span style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ animation: "spin 0.8s linear infinite" }}>
-                        <circle cx="7" cy="7" r="5.5" stroke="rgba(7,8,13,0.35)" strokeWidth="2" />
-                        <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="#07080d" strokeWidth="2" strokeLinecap="round" />
+                        <circle cx="7" cy="7" r="5.5" stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
+                        <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
                       </svg>
                       Sending…
                     </span>
@@ -222,8 +222,8 @@ export default function AuthPage() {
                   {loading ? (
                     <span style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ animation: "spin 0.8s linear infinite" }}>
-                        <circle cx="7" cy="7" r="5.5" stroke="rgba(7,8,13,0.35)" strokeWidth="2" />
-                        <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="#07080d" strokeWidth="2" strokeLinecap="round" />
+                        <circle cx="7" cy="7" r="5.5" stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
+                        <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
                       </svg>
                       {tab === "signin" ? "Signing in…" : "Creating account…"}
                     </span>

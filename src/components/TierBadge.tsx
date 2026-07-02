@@ -1,10 +1,11 @@
 import { Crown, Zap, Sparkles } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
+import { WARM_PALETTE } from "@/lib/theme";
 
 const CONFIG = {
-  free: { label: "Free", icon: Sparkles, color: "#9a9aae", bg: "rgba(255,255,255,0.06)", border: "var(--border2)" },
-  starter: { label: "Starter", icon: Zap, color: "#c8f09a", bg: "rgba(200,240,154,0.12)", border: "rgba(200,240,154,0.2)" },
-  pro: { label: "Pro", icon: Crown, color: "#c8f09a", bg: "rgba(200,240,154,0.12)", border: "rgba(200,240,154,0.2)" },
+  free: { label: "Free", icon: Sparkles, color: WARM_PALETTE.textMuted, bg: "hsl(var(--muted))", border: "hsl(var(--border))" },
+  starter: { label: "Starter", icon: Zap, color: WARM_PALETTE.primary, bg: "hsl(var(--accent))", border: "hsl(var(--primary) / 0.25)" },
+  pro: { label: "Pro", icon: Crown, color: WARM_PALETTE.primary, bg: "hsl(var(--accent))", border: "hsl(var(--primary) / 0.25)" },
 } as const;
 
 /** Small pill showing the user's current effective tier. */

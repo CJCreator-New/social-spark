@@ -1,4 +1,5 @@
 import { Post } from "@/lib/calendarSchedule";
+import { WARM_PALETTE } from "@/lib/theme";
 
 export interface PerformanceScore {
   hookStrength: number; // 1-10: Does opening line create curiosity?
@@ -306,10 +307,10 @@ export function getWeakestPerformanceMetric(score: PerformanceScore): Performanc
  * Get color indicator for score (1-10)
  */
 export function getScoreColor(score: number): string {
-  if (score >= 8) return "#c8f09a"; // Accent green
+  if (score >= 8) return WARM_PALETTE.scoreHigh;
   if (score >= 6) return "#ffd700"; // Golden
-  if (score >= 4) return "#ff9500"; // Orange
-  return "#ff6b6b"; // Red
+  if (score >= 4) return WARM_PALETTE.scoreMed;
+  return WARM_PALETTE.scoreLow;
 }
 
 /**
@@ -406,8 +407,8 @@ export function getEngagementPrediction(post: Post, platform: string = ""): "Hig
 export type EngagementLevel = "High" | "Medium" | "Low";
 
 export const ENGAGEMENT_BADGE: Record<EngagementLevel, { emoji: string; color: string; bg: string }> = {
-  High:   { emoji: "🟢", color: "#c8f09a",  bg: "rgba(200,240,154,0.12)" },
-  Medium: { emoji: "🟡", color: "#f0d49a",  bg: "rgba(240,212,154,0.12)" },
-  Low:    { emoji: "🔴", color: "#f09a9a",  bg: "rgba(240,154,154,0.12)" },
+  High:   { emoji: "🟢", color: WARM_PALETTE.scoreHigh, bg: "rgba(21,128,61,0.10)" },
+  Medium: { emoji: "🟡", color: WARM_PALETTE.scoreMed,  bg: "rgba(180,83,9,0.10)" },
+  Low:    { emoji: "🔴", color: WARM_PALETTE.scoreLow,  bg: "rgba(185,28,28,0.10)" },
 };
 

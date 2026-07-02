@@ -186,8 +186,8 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
               className="cpbtn"
               style={{
                 flex: 1, padding: "6px", fontSize: 11,
-                background: schedulerType === "buffer" ? "rgba(200,240,154,0.12)" : "transparent",
-                borderColor: schedulerType === "buffer" ? "#c8f09a" : "rgba(255,255,255,0.1)",
+                background: schedulerType === "buffer" ? "var(--adim)" : "transparent",
+                borderColor: schedulerType === "buffer" ? "var(--accent)" : "var(--border2)",
                 color: schedulerType === "buffer" ? "var(--accent)" : "var(--text2)",
               }}
               onClick={() => setSchedulerType("buffer")}
@@ -199,8 +199,8 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
               className="cpbtn"
               style={{
                 flex: 1, padding: "6px", fontSize: 11,
-                background: schedulerType === "hootsuite" ? "rgba(200,240,154,0.12)" : "transparent",
-                borderColor: schedulerType === "hootsuite" ? "#c8f09a" : "rgba(255,255,255,0.1)",
+                background: schedulerType === "hootsuite" ? "var(--adim)" : "transparent",
+                borderColor: schedulerType === "hootsuite" ? "var(--accent)" : "var(--border2)",
                 color: schedulerType === "hootsuite" ? "var(--accent)" : "var(--text2)",
               }}
               onClick={() => setSchedulerType("hootsuite")}

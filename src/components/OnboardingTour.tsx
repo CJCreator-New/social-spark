@@ -61,26 +61,23 @@ export function OnboardingTour({ onSeeExample, onClose }: OnboardingTourProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/75 backdrop-blur-md p-4">
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-overlay/40 backdrop-blur-sm p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ type: "spring", duration: 0.4, bounce: 0 }}
-        className="w-full max-w-lg rounded-2xl border border-white/10 p-6 relative overflow-hidden"
-        style={{
-          background: "linear-gradient(135deg, #10121d 0%, #080910 100%)",
-          boxShadow: "0 24px 60px rgba(0, 0, 0, 0.6)",
-        }}
+        className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 relative overflow-hidden"
+        style={{ boxShadow: "var(--shadow-card)" }}
       >
         {/* Glow decoration */}
-        <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-[radial-gradient(circle_at_center,rgba(200,240,154,0.08)_0%,transparent_70%)] pointer-events-none" />
+        <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-[radial-gradient(circle_at_center,hsl(var(--primary)/0.08)_0%,transparent_70%)] pointer-events-none" />
 
         {/* Close button */}
         <button
           type="button"
           onClick={handleFinish}
-          className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-full hover:bg-white/5"
+          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-secondary"
           aria-label="Skip tour"
         >
           <X size={18} />
@@ -88,7 +85,7 @@ export function OnboardingTour({ onSeeExample, onClose }: OnboardingTourProps) {
 
         <div className="flex flex-col items-center text-center mt-4">
           {/* Step Icon */}
-          <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-[#c8f09a] mb-6 shadow-inner">
+          <div className="w-16 h-16 rounded-2xl bg-accent border border-border flex items-center justify-center text-primary mb-6 shadow-inner">
             <IconComponent size={28} />
           </div>
 
@@ -97,37 +94,34 @@ export function OnboardingTour({ onSeeExample, onClose }: OnboardingTourProps) {
             {steps.map((_, idx) => (
               <div
                 key={idx}
-                className="h-1.5 rounded-full transition-all duration-300"
-                style={{
-                  width: idx + 1 === step ? 24 : 6,
-                  background: idx + 1 === step ? "#c8f09a" : "rgba(255,255,255,0.15)",
-                }}
+                className={`h-1.5 rounded-full transition-all duration-300 ${idx + 1 === step ? "bg-primary" : "bg-border"}`}
+                style={{ width: idx + 1 === step ? 24 : 6 }}
               />
             ))}
           </div>
 
-          <h2 className="font-display text-2xl font-normal text-[#edeae3] leading-tight mb-3">
+          <h2 className="font-display text-2xl font-normal text-foreground leading-tight mb-3">
             {current.title}
           </h2>
-          <p className="text-sm text-slate-400 leading-relaxed max-w-sm mb-8">
+          <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mb-8">
             {current.description}
           </p>
         </div>
 
         {/* Actions Footer */}
-        <div className="flex flex-col sm:flex-row gap-3 mt-4 border-t border-white/5 pt-5">
+        <div className="flex flex-col sm:flex-row gap-3 mt-4 border-t border-border pt-5">
           {step === 1 ? (
             <>
               <button
                 type="button"
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-[#07080d] bg-gradient-to-r from-[#c8f09a] to-[#a0e86b] hover:shadow-lg hover:shadow-[#c8f09a]/10 active:scale-[0.96] transition-all duration-200"
+                className="glass-button w-full py-2.5 px-4 rounded-xl text-xs font-semibold active:scale-[0.96] transition-all duration-200"
                 onClick={handleSeeExample}
               >
                 ✨ See Example Calendar
               </button>
               <button
                 type="button"
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-300 border border-white/10 hover:bg-white/[0.02] active:scale-[0.96] transition-all duration-200"
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-foreground border border-border hover:bg-secondary active:scale-[0.96] transition-all duration-200"
                 onClick={handleNext}
               >
                 Start Setup Guide
@@ -137,14 +131,14 @@ export function OnboardingTour({ onSeeExample, onClose }: OnboardingTourProps) {
             <>
               <button
                 type="button"
-                className="w-full sm:w-1/3 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-400 border border-transparent hover:text-slate-200 active:scale-[0.96] transition-all duration-200"
+                className="w-full sm:w-1/3 py-2.5 px-4 rounded-xl text-xs font-semibold text-muted-foreground border border-transparent hover:text-foreground active:scale-[0.96] transition-all duration-200"
                 onClick={handleBack}
               >
                 Back
               </button>
               <button
                 type="button"
-                className="w-full sm:w-2/3 py-2.5 px-4 rounded-xl text-xs font-semibold text-[#07080d] bg-gradient-to-r from-[#c8f09a] to-[#a0e86b] hover:shadow-lg hover:shadow-[#c8f09a]/10 active:scale-[0.96] transition-all duration-200 flex items-center justify-center gap-1.5"
+                className="glass-button w-full sm:w-2/3 py-2.5 px-4 rounded-xl text-xs font-semibold active:scale-[0.96] transition-all duration-200 flex items-center justify-center gap-1.5"
                 onClick={handleNext}
               >
                 <span>{step === steps.length ? "Got it, let's start!" : "Next Step"}</span>
