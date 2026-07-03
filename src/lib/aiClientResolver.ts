@@ -1,8 +1,8 @@
-import { getUserApiKey } from "./apiKeyManager";
+import { getUserApiKey, type ApiProvider } from "./apiKeyManager";
 
 export async function resolveAiClient(
   platformAvailable: boolean
-): Promise<{ apiKey: string; provider: 'openai' | 'anthropic' | 'openrouter'; source: 'platform' | 'user' }> {
+): Promise<{ apiKey: string; provider: ApiProvider; source: 'platform' | 'user' }> {
   // Platform path (used when platformAvailable=true or keyMode='fallback')
   if (platformAvailable) {
     const platformKey = (import.meta.env.VITE_PLATFORM_AI_KEY as string) || "";
