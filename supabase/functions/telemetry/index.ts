@@ -11,13 +11,26 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:8080",
 ]);
 
+// Also allow any *.lovable.app and *.lovableproject.com subdomain (preview URLs).
+const ALLOWED_ORIGIN_PATTERNS = [
+  /^https:\/\/[a-z0-9-]+\.lovable\.app$/i,
+  /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/i,
+];
+
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+  return ALLOWED_ORIGIN_PATTERNS.some((re) => re.test(origin));
+}
+
 function corsHeadersFor(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") || "";
-  const allowOrigin = ALLOWED_ORIGINS.has(origin) ? origin : "";
+  const allowOrigin = isAllowedOrigin(origin) ? origin : "";
   return {
     ...(allowOrigin ? { "Access-Control-Allow-Origin": allowOrigin, "Vary": "Origin" } : {}),
     "Access-Control-Allow-Headers":
       "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 }
 
@@ -25,7 +38,7 @@ export async function handle(req: Request): Promise<Response> {
   const cors = corsHeadersFor(req);
 
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: cors });
+    return new Response(null, { status: 204, headers: cors });
   }
 
   try {

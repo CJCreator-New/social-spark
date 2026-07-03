@@ -24,9 +24,21 @@ const allowedOrigins = (configuredOrigin || (isDeployed ? "" : "*"))
   .map((o) => o.trim())
   .filter(Boolean);
 
+const LOVABLE_ORIGIN_PATTERNS = [
+  /^https:\/\/[a-z0-9-]+\.lovable\.app$/i,
+  /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/i,
+];
+
+function isLovableOrigin(origin: string): boolean {
+  return LOVABLE_ORIGIN_PATTERNS.some((re) => re.test(origin));
+}
+
 function resolveAllowedOrigin(requestOrigin?: string | null): string {
   if (allowedOrigins.includes("*")) return "*";
   if (requestOrigin && allowedOrigins.includes(requestOrigin)) return requestOrigin;
+  // Always allow Lovable-hosted origins so preview URLs work even without
+  // explicit ALLOWED_ORIGIN entries.
+  if (requestOrigin && isLovableOrigin(requestOrigin)) return requestOrigin;
   return allowedOrigins[0] || "";
 }
 
@@ -39,12 +51,15 @@ export const CORS_ALLOW_HEADERS =
 export const corsHeaders = {
   "Access-Control-Allow-Origin": resolveAllowedOrigin(),
   "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
 export function getCorsHeaders(requestOrigin?: string | null): Record<string, string> {
+  const origin = resolveAllowedOrigin(requestOrigin);
   return {
-    "Access-Control-Allow-Origin": resolveAllowedOrigin(requestOrigin),
+    ...(origin ? { "Access-Control-Allow-Origin": origin, "Vary": "Origin" } : {}),
     "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
   };
 }
 
