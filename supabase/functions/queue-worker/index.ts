@@ -1,6 +1,7 @@
 // Queue worker: enqueues jobs into Supabase `job_queue` table and can also
 // process the next pending job when invoked in worker mode.
-// Expects env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// Expects env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_CRON_SECRET
+import { verifyCronSecret } from "../_shared/promptHelpers.ts";
 
 type QueueJob = {
   job_type: string;
@@ -123,9 +124,7 @@ async function processJob(job: QueueJob & { id: string; lock_token?: string }) {
 
 export async function handle(req: Request) {
   try {
-    const expectedServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_KEY");
-    const svc = req.headers.get("x-service-key");
-    if (!expectedServiceKey || svc !== expectedServiceKey) {
+    if (!verifyCronSecret(req)) {
       return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), { status: 401 });
     }
 

@@ -12,7 +12,16 @@
       "PowerShell(cd \"c:\\\\Users\\\\HP\\\\OneDrive\\\\Desktop\\\\Projects\\\\AntiGravity - Google - Projects\\\\social-spark\"; Start-Process -FilePath \"powershell\" -ArgumentList \"-NoProfile -Command `\"cd 'c:\\\\Users\\\\HP\\\\OneDrive\\\\Desktop\\\\Projects\\\\AntiGravity - Google - Projects\\\\social-spark'; npm run dev 2>&1 | Tee-Object -FilePath 'C:\\\\Users\\\\HP\\\\AppData\\\\Local\\\\Temp\\\\vite-dev.log'`\"\" -WindowStyle Hidden; Start-Sleep -Seconds 8; Get-Content \"C:\\\\Users\\\\HP\\\\AppData\\\\Local\\\\Temp\\\\vite-dev.log\" -ErrorAction SilentlyContinue | Select-Object -Last 20)",
       "Bash(netstat -ano)",
       "Bash(awk '{print $5}')",
-      "Bash(xargs -r -I{} taskkill //PID {} //F)"
+      "Bash(xargs -r -I{} taskkill //PID {} //F)",
+      "Bash(grep -n \"markdown\\\\|\\\\\\\\*\\\\\\\\*\\\\|no markdown\" supabase/functions/_shared/promptHelpers.ts)",
+      "Bash(find . -iname \"netlify.toml\" -not -path \"*/node_modules/*\")",
+      "Bash(cat netlify.toml)",
+      "Bash(mkdir -p .scratch/dead-migrations)",
+      "Bash(git mv *)",
+      "Bash(mv supabase/migrations/RUN_ME_combined_catchup.sql .scratch/dead-migrations/RUN_ME_combined_catchup.sql)",
+      "Bash(node scripts/inline-edge-functions.mjs)",
+      "Bash(xargs -I{} basename {})",
+      "Bash(grep -i \"audit\\\\|\\\\.md$\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\HP\\AppData\\Local\\Temp\\claude"

@@ -36,11 +36,15 @@ ALTER FUNCTION public.get_decrypted_api_key() SET search_path = public, pgsodium
 REVOKE EXECUTE ON FUNCTION public.increment_generation_count(uuid) FROM PUBLIC, anon;
 GRANT  EXECUTE ON FUNCTION public.increment_generation_count(uuid) TO authenticated, service_role;
 
-REVOKE EXECUTE ON FUNCTION public.get_decrypted_api_key() FROM PUBLIC, anon, authenticated;
-GRANT  EXECUTE ON FUNCTION public.get_decrypted_api_key() TO service_role;
+-- get_decrypted_api_key() and upsert_encrypted_api_key() were superseded by the
+-- 3-arg/5-column BYOK versions in 20260702010000_byok_providers_and_model.sql.
+-- decrypt-api-key/index.ts calls get_decrypted_api_key() with the caller's own
+-- JWT (not the service role), so `authenticated` must keep EXECUTE here.
+REVOKE EXECUTE ON FUNCTION public.get_decrypted_api_key() FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.get_decrypted_api_key() TO authenticated, service_role;
 
-REVOKE EXECUTE ON FUNCTION public.upsert_encrypted_api_key(text, text) FROM PUBLIC, anon;
-GRANT  EXECUTE ON FUNCTION public.upsert_encrypted_api_key(text, text) TO authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.upsert_encrypted_api_key(text, text, text) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.upsert_encrypted_api_key(text, text, text) TO authenticated, service_role;
 
 REVOKE EXECUTE ON FUNCTION public.admin_grant_tier(uuid, text, integer, integer) FROM PUBLIC, anon;
 GRANT  EXECUTE ON FUNCTION public.admin_grant_tier(uuid, text, integer, integer) TO authenticated, service_role;

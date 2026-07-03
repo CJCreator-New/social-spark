@@ -1,5 +1,6 @@
 // Server-side orphan media cleanup.
 // Verifies that a media reference is not used by profiles or calendars before deleting storage.
+import { verifyCronSecret } from "../_shared/promptHelpers.ts";
 
 type MediaReference = {
   id: string;
@@ -68,9 +69,7 @@ export async function handle(req: Request) {
   try {
     if (req.method !== "POST") return new Response(null, { status: 405 });
 
-    const expectedServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_KEY");
-    const svc = req.headers.get("x-service-key");
-    if (!expectedServiceKey || svc !== expectedServiceKey) {
+    if (!verifyCronSecret(req)) {
       return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), { status: 401 });
     }
 

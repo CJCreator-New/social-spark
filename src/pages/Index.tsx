@@ -33,9 +33,9 @@ import { FontStyle, applyStyle } from "@/lib/unicodeFonts";
 import { useWizardStore } from "@/stores/useWizardStore";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Helmet } from "react-helmet-async";
-import { OnboardingTour } from "@/components/OnboardingTour";
 
 // Lazy load components to optimize bundle size
+const OnboardingTour = lazy(() => import("@/components/OnboardingTour").then(m => ({ default: m.OnboardingTour })));
 const DraftRecoveryDialog = lazy(() => import("@/components/DraftRecoveryDialog").then(m => ({ default: m.DraftRecoveryDialog })));
 const BatchEditModal = lazy(() => import("@/components/BatchEditModal").then(m => ({ default: m.BatchEditModal })));
 const PerformanceScoreCard = lazy(() => import("@/components/PerformanceScoreCard").then(m => ({ default: m.PerformanceScoreCard })));
@@ -1908,10 +1908,12 @@ const Index = () => {
         <meta name="description" content="Use the AI-guided setup wizard to generate high-engagement social media content calendars tailored to your specific brand, niche, and target audience." />
       </Helmet>
       {showOnboarding && (
-        <OnboardingTour
-          onSeeExample={loadSample}
-          onClose={() => setShowOnboarding(false)}
-        />
+        <Suspense fallback={null}>
+          <OnboardingTour
+            onSeeExample={loadSample}
+            onClose={() => setShowOnboarding(false)}
+          />
+        </Suspense>
       )}
       {isE2EModeActive && (
         <div style={{

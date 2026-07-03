@@ -36,7 +36,26 @@ describe("resolveAiClient", () => {
 
     expect(result.source).toBe("platform");
     expect(result.apiKey).toBe("platform-secret-key-xyz");
-    expect(result.provider).toBe("openai");
+    // Platform key is the Lovable AI Gateway (Gemini-family), not OpenAI.
+    expect(result.provider).toBe("gemini");
+  });
+
+  it("respects VITE_PLATFORM_AI_PROVIDER override when set to a valid provider", async () => {
+    setPlatformKey("platform-secret-key-xyz");
+    vi.stubEnv("VITE_PLATFORM_AI_PROVIDER", "anthropic");
+
+    const result = await resolveAiClient(true);
+
+    expect(result.provider).toBe("anthropic");
+  });
+
+  it("falls back to gemini when VITE_PLATFORM_AI_PROVIDER is not a valid ApiProvider", async () => {
+    setPlatformKey("platform-secret-key-xyz");
+    vi.stubEnv("VITE_PLATFORM_AI_PROVIDER", "not-a-real-provider");
+
+    const result = await resolveAiClient(true);
+
+    expect(result.provider).toBe("gemini");
   });
 
   it("does NOT call getUserApiKey when platform is available", async () => {

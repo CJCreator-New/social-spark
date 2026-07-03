@@ -10,27 +10,145 @@ declare const Deno: any;
 
 // Shared helpers used across generate-calendar, generate-single-post, regenerate-post.
 
-// ALLOWED_ORIGIN must be set to a single origin (e.g. "https://app.socialspark.com") to
-// restrict CORS on these endpoints. Deno.deploy/Supabase edge functions always set
-// DENO_DEPLOYMENT_ID in deployed environments; only fall back to "*" for local dev
-// (`supabase functions serve`), where DENO_DEPLOYMENT_ID is unset. This keeps a missing
-// ALLOWED_ORIGIN from silently reopening CORS in production.
+// ALLOWED_ORIGIN should be set to the production frontend origin (e.g.
+// "https://app.socialspark.com"; comma-separate to allow more than one, such
+// as a staging domain) to restrict CORS on these endpoints. Deno.deploy/
+// Supabase edge functions always set DENO_DEPLOYMENT_ID in deployed
+// environments; only fall back to "*" for local dev (`supabase functions
+// serve`), where DENO_DEPLOYMENT_ID is unset.
 const isDeployed = typeof Deno !== "undefined" && !!Deno.env.get("DENO_DEPLOYMENT_ID");
 const configuredOrigin = typeof Deno !== "undefined" ? Deno.env.get("ALLOWED_ORIGIN") : undefined;
 if (isDeployed && !configuredOrigin) {
-  throw new Error("ALLOWED_ORIGIN must be set in deployed environments");
+  // Fail closed, not crashed: a missing secret used to throw at module load,
+  // which made the entire function (including the OPTIONS preflight) return
+  // a non-200 and go completely unreachable. Log loudly and deny all origins
+  // instead so the function still serves requests once the secret is fixed.
+  console.error(
+    "ALLOWED_ORIGIN is not set in this deployed environment. All cross-origin requests will be rejected until it is configured in Supabase Edge Functions secrets."
+  );
 }
-const allowedOrigin = configuredOrigin || "*";
+const allowedOrigins = (configuredOrigin || (isDeployed ? "" : "*"))
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
 
+const LOVABLE_ORIGIN_PATTERNS = [
+  /^https:\/\/[a-z0-9-]+\.lovable\.app$/i,
+  /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/i,
+];
+
+function isLovableOrigin(origin: string): boolean {
+  return LOVABLE_ORIGIN_PATTERNS.some((re) => re.test(origin));
+}
+
+function resolveAllowedOrigin(requestOrigin?: string | null): string {
+  if (allowedOrigins.includes("*")) return "*";
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) return requestOrigin;
+  // Always allow Lovable-hosted origins so preview URLs work even without
+  // explicit ALLOWED_ORIGIN entries.
+  if (requestOrigin && isLovableOrigin(requestOrigin)) return requestOrigin;
+  return allowedOrigins[0] || "";
+}
+
+const CORS_ALLOW_HEADERS =
+  "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
+
+// Static default — reflects only the first configured origin. Prefer
+// getCorsHeaders(requestOrigin) per-request so Access-Control-Allow-Origin
+// matches the caller's actual origin when more than one is allowed.
 const corsHeaders = {
-  "Access-Control-Allow-Origin": allowedOrigin,
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Origin": resolveAllowedOrigin(),
+  "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
+
+function getCorsHeaders(requestOrigin?: string | null): Record<string, string> {
+  const origin = resolveAllowedOrigin(requestOrigin);
+  return {
+    ...(origin ? { "Access-Control-Allow-Origin": origin, "Vary": "Origin" } : {}),
+    "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  };
+}
 
 const VALID_DOW = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
 
 const ENRICHMENT_MODEL = "google/gemini-2.5-flash-lite";
+
+const LOG_VALUE_MAX_LENGTH = 2_000;
+const ALLOWED_AI_ENDPOINTS = new Set([
+  "https://api.openai.com/v1/chat/completions",
+  "https://openrouter.ai/api/v1/chat/completions",
+  "https://ai.gateway.lovable.dev/v1/chat/completions",
+  "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+  "https://api.moonshot.ai/v1/chat/completions",
+  "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+]);
+
+function sanitizeLogValue(value: unknown, maxLength = LOG_VALUE_MAX_LENGTH): string {
+  const raw = value instanceof Error
+    ? value.stack || value.message
+    : typeof value === "string"
+      ? value
+      : (() => {
+          try {
+            return JSON.stringify(value);
+          } catch {
+            return String(value);
+          }
+        })();
+
+  return String(raw)
+    .replace(/[\r\n\t]/g, " ")
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
+    .slice(0, maxLength);
+}
+
+/**
+ * "No markdown in post copy" is currently only a prompt instruction (see
+ * bannedPhrasesBlock/buildEngagementRules) — models that ignore it (common on
+ * cheaper providers or long-context prompts) ship raw markdown straight into
+ * the post text, breaking LinkedIn/Instagram rendering and skewing scoring.
+ * This is a deterministic backstop applied to every AI text field before it
+ * reaches the client or the scorer.
+ */
+function stripMarkdownFormatting(value: unknown): string {
+  let text = String(value || "");
+  // Bold/italic/strikethrough emphasis: **x**, __x__, *x*, _x_, ~~x~~ -> x
+  text = text.replace(/(\*\*\*|___)(.+?)\1/g, "$2");
+  text = text.replace(/(\*\*|__)(.+?)\1/g, "$2");
+  text = text.replace(/(?<![a-zA-Z0-9])(\*|_)(?!\s)(.+?)(?<!\s)\1(?![a-zA-Z0-9])/g, "$2");
+  text = text.replace(/~~(.+?)~~/g, "$1");
+  // ATX headings: leading #'s
+  text = text.replace(/^#{1,6}\s+/gm, "");
+  // Inline/fenced code
+  text = text.replace(/```([\s\S]*?)```/g, "$1");
+  text = text.replace(/`([^`]+)`/g, "$1");
+  // Markdown links: [text](url) -> text
+  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  return text;
+}
+
+function sanitizeHtmlText(value: unknown): string {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getAllowedAiEndpoint(url: string): string | null {
+  try {
+    const normalized = new URL(url);
+    normalized.hash = "";
+    normalized.search = "";
+    const endpoint = normalized.toString();
+    return ALLOWED_AI_ENDPOINTS.has(endpoint) ? endpoint : null;
+  } catch {
+    return null;
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  PLATFORM PROVIDER WATERFALL
@@ -105,23 +223,32 @@ function recordProviderFailure(name: string): void {
   s.failures++;
   if (s.failures >= CIRCUIT_THRESHOLD) {
     s.openUntil = Date.now() + CIRCUIT_RESET_MS;
-    console.warn(`[circuit-breaker] ${name} tripped after ${s.failures} failures — cooling ${CIRCUIT_RESET_MS / 1000}s`);
+    console.warn(`[circuit-breaker] ${sanitizeLogValue(name)} tripped after ${s.failures} failures - cooling ${CIRCUIT_RESET_MS / 1000}s`);
   }
   _circuitState.set(name, s);
 }
 
-function getUserIdFromToken(token?: string | null): string {
-  if (!token) return "anonymous";
+// Verifies the bearer token's signature against Supabase Auth before trusting
+// the caller's identity. This is safe to use for quota, rate-limiting, and
+// usage-tracking decisions.
+async function getVerifiedUserId(token?: string | null): Promise<string | null> {
+  if (!token) return null;
   try {
-    const parts = token.split('.');
-    if (parts.length === 3) {
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-      return payload.sub || token.slice(0, 32) || "anonymous";
-    }
-  } catch (e) {
-    console.error("getUserIdFromToken parsing failed:", e);
+    const supabaseUrl = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_URL") : null;
+    const supabaseAnonKey = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_ANON_KEY") : null;
+    if (!supabaseUrl || !supabaseAnonKey) return null;
+    // @ts-ignore: Deno dynamic import
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data, error } = await userClient.auth.getUser();
+    if (error || !data?.user) return null;
+    return data.user.id;
+  } catch (err) {
+    console.error("getVerifiedUserId failed:", err);
+    return null;
   }
-  return token.slice(0, 32) || "anonymous";
 }
 
 const LENGTH_GUIDE_WEEK: Record<string, string> = {
@@ -326,8 +453,34 @@ function jsonResponse(body: unknown, status = 200): Response {
  */
 function errorResponse(context: string, e: unknown, status = 500): Response {
   const requestId = crypto.randomUUID();
-  console.error(`[${requestId}] ${context} error:`, e instanceof Error ? e.stack : e);
+  console.error(`[${requestId}] ${sanitizeLogValue(context)} error:`, sanitizeLogValue(e));
   return jsonResponse({ error: "An unexpected error occurred. Please try again.", requestId }, status);
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  // Compare against a fixed-length buffer so the loop count doesn't itself
+  // leak the expected secret's length.
+  const len = Math.max(aBytes.length, bBytes.length, 32);
+  let diff = aBytes.length ^ bBytes.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (aBytes[i] || 0) ^ (bBytes[i] || 0);
+  }
+  return diff === 0;
+}
+
+/**
+ * Authorizes internal (cron-triggered) function calls. Uses a dedicated
+ * secret rather than SUPABASE_SERVICE_ROLE_KEY itself, so leaking this header
+ * only authorizes queue/cleanup invocation rather than full DB/service-role access.
+ */
+function verifyCronSecret(req: Request, headerName = "x-cron-secret"): boolean {
+  const expected = Deno.env.get("INTERNAL_CRON_SECRET");
+  const provided = req.headers.get(headerName);
+  if (!expected || !provided) return false;
+  return timingSafeEqual(expected, provided);
 }
 
 const MAX_REQUEST_BODY_BYTES = 256 * 1024; // 256 KB
@@ -502,39 +655,51 @@ interface RateLimitConfig {
 }
 
 async function checkRateLimit(userId: string, endpoint: string, config: RateLimitConfig): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+  const MAX_CAS_ATTEMPTS = 5;
   try {
     const kv = await Deno.openKv();
     const key = ["ratelimit", endpoint, userId];
     const now = Date.now();
     const windowStart = now - config.windowMs;
 
-    // Get current request data
-    const data = await kv.get(key);
-    let requests: number[] = (data.value as number[]) || [];
-    
-    // Clean old requests outside the window
-    requests = requests.filter(ts => ts > windowStart);
+    try {
+      // Compare-and-swap loop: re-read + re-check + versioned write so concurrent
+      // requests can't all observe the same pre-increment count and all pass.
+      for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt++) {
+        const entry = await kv.get<number[]>(key);
+        const requests = (entry.value || []).filter((ts) => ts > windowStart);
 
-    if (requests.length >= config.maxRequests) {
-      const oldestRequest = requests[0];
-      const resetAt = oldestRequest + config.windowMs;
+        if (requests.length >= config.maxRequests) {
+          const resetAt = requests[0] + config.windowMs;
+          return { allowed: false, remaining: 0, resetAt };
+        }
+
+        requests.push(now);
+        const res = await kv.atomic()
+          .check(entry)
+          .set(key, requests, { expireIn: config.windowMs })
+          .commit();
+
+        if (res.ok) {
+          return {
+            allowed: true,
+            remaining: config.maxRequests - requests.length,
+            resetAt: now + config.windowMs,
+          };
+        }
+        // Another concurrent request won the CAS race; retry with a fresh read.
+      }
+
+      // Exhausted retries under heavy contention: fail closed rather than let an
+      // unbounded number of concurrent requests all slip through unaccounted for.
+      return { allowed: false, remaining: 0, resetAt: now + config.windowMs };
+    } finally {
       await kv.close();
-      return { allowed: false, remaining: 0, resetAt };
     }
-
-    // Add current request
-    requests.push(now);
-    await kv.set(key, requests, { expireIn: config.windowMs });
-    await kv.close();
-
-    return { 
-      allowed: true, 
-      remaining: config.maxRequests - requests.length,
-      resetAt: now + config.windowMs
-    };
   } catch (e) {
     console.warn("Rate limit check failed, allowing request", e);
-    // If KV fails, allow the request
+    // Deno KV itself unavailable (not a contention issue) — fail open so a KV
+    // outage doesn't take down unrelated functionality.
     return { allowed: true, remaining: config.maxRequests, resetAt: Date.now() + config.windowMs };
   }
 }
@@ -684,7 +849,7 @@ interface GenerationPayload {
   requiredHashtags: string[];
   quality: "draft" | "polished"; // draft: single-call, polished: two-pass critique+rewrite
   userApiKey?: string;
-  userApiProvider?: "openai" | "anthropic" | "openrouter";
+  userApiProvider?: "openai" | "anthropic" | "openrouter" | "gemini" | "kimi" | "glm";
   trendingTopics?: string[];
 }
 
@@ -801,7 +966,7 @@ function cleanPayload(body: unknown): GenerationPayload {
     bannedHashtags: cleanTagList(payload.bannedHashtags, 30),
     requiredHashtags: cleanTagList(payload.requiredHashtags, 10),
     userApiKey: payload.userApiKey ? String(payload.userApiKey).trim() : undefined,
-    userApiProvider: (payload.userApiProvider && ["openai", "anthropic", "openrouter"].includes(String(payload.userApiProvider).trim()))
+    userApiProvider: (payload.userApiProvider && ["openai", "anthropic", "openrouter", "gemini", "kimi", "glm"].includes(String(payload.userApiProvider).trim()))
       ? (String(payload.userApiProvider).trim() as any)
       : undefined,
   };
@@ -1075,6 +1240,15 @@ function getProviderModel(provider: string, quality: string): string {
   if (provider === "openrouter") {
     return quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
   }
+  if (provider === "gemini") {
+    return quality === "polished" ? "gemini-2.5-pro" : "gemini-2.5-flash";
+  }
+  if (provider === "kimi") {
+    return quality === "polished" ? "kimi-k2-0905-preview" : "moonshot-v1-8k";
+  }
+  if (provider === "glm") {
+    return quality === "polished" ? "glm-4.6" : "glm-4.5-air";
+  }
   return quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
 }
 
@@ -1090,10 +1264,11 @@ function clampMaxTokensForProvider(provider: string, model: string, maxTokens?: 
   if (typeof maxTokens !== "number") return undefined;
 
   const normalizedModel = model.toLowerCase();
-  // Gemini (via Lovable gateway or OpenRouter) reliably serves tool-calling
-  // completions up to ~8k output tokens; higher requests intermittently return
-  // upstream 400s with 0 output tokens generated. Cap to a safe ceiling.
-  if ((provider === "lovable" || provider === "openrouter") && normalizedModel.includes("gemini")) {
+  // Gemini (via Lovable gateway, OpenRouter, or direct) reliably serves
+  // tool-calling completions up to ~8k output tokens; higher requests
+  // intermittently return upstream 400s with 0 output tokens generated.
+  // Cap to a safe ceiling.
+  if (provider === "gemini" || ((provider === "lovable" || provider === "openrouter") && normalizedModel.includes("gemini"))) {
     return Math.min(maxTokens, 8000);
   }
 
@@ -1111,9 +1286,14 @@ async function callOpenAiCompatibleDirect(
 ): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
   const hasTool = tool && Object.keys(tool).length > 0;
   const functionName = hasTool ? (((tool as any).function?.name || "") as string) : "";
+  const endpoint = getAllowedAiEndpoint(url);
+  if (!endpoint) {
+    console.error("Blocked AI call to unapproved endpoint:", sanitizeLogValue(url));
+    return { status: 400, error: "Unsupported AI provider endpoint." };
+  }
   
   try {
-    const res = await fetch(url, {
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -1131,14 +1311,14 @@ async function callOpenAiCompatibleDirect(
     
     if (!res.ok) {
       const text = await res.text();
-      console.error(`Direct call to ${url} failed ${res.status}:`, text);
+      console.error(`Direct call to ${sanitizeLogValue(endpoint)} failed ${res.status}:`, sanitizeLogValue(text));
       return { status: res.status, error: `API error: ${res.status}` };
     }
     
     const data = await res.json();
     return { status: 200, data };
   } catch (e) {
-    console.error(`Direct call to ${url} encountered network error:`, e);
+    console.error(`Direct call to ${sanitizeLogValue(endpoint)} encountered network error:`, sanitizeLogValue(e));
     return { status: 500, error: e instanceof Error ? e.message : "Network error" };
   }
 }
@@ -1189,7 +1369,7 @@ async function callAnthropicDirect(
     
     if (!res.ok) {
       const text = await res.text();
-      console.error("Anthropic direct API call failed:", text);
+      console.error("Anthropic direct API call failed:", sanitizeLogValue(text));
       return { status: res.status, error: `Anthropic error: ${res.status}` };
     }
     
@@ -1243,7 +1423,7 @@ async function callAI(
   tool: Record<string, unknown> | null,
   apiKey: string,
   opts: {
-    provider: "openai" | "anthropic" | "openrouter" | "lovable";
+    provider: "openai" | "anthropic" | "openrouter" | "lovable" | "gemini" | "kimi" | "glm";
     quality?: string;
     model?: string;
     temperature?: number;
@@ -1257,9 +1437,9 @@ async function callAI(
   const model = opts.model || getProviderModel(provider, quality);
   const maxTokens = clampMaxTokensForProvider(provider, model, opts.max_tokens);
   if (typeof opts.max_tokens === "number" && maxTokens !== opts.max_tokens) {
-    console.warn(`[ai] clamped max_tokens for ${provider}/${model}: ${opts.max_tokens} -> ${maxTokens}`);
+    console.warn(`[ai] clamped max_tokens for ${sanitizeLogValue(provider)}/${sanitizeLogValue(model)}: ${opts.max_tokens} -> ${maxTokens}`);
   }
-  
+
   if (provider === "openai") {
     return callOpenAiCompatibleDirect("https://api.openai.com/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
   } else if (provider === "openrouter") {
@@ -1269,6 +1449,15 @@ async function callAI(
   } else if (provider === "lovable") {
     // Lovable AI Gateway speaks the OpenAI-compatible wire protocol
     return callOpenAiCompatibleDirect("https://ai.gateway.lovable.dev/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
+  } else if (provider === "gemini") {
+    // Gemini's OpenAI-compatible endpoint
+    return callOpenAiCompatibleDirect("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
+  } else if (provider === "kimi") {
+    // Moonshot Kimi — OpenAI-compatible chat completions
+    return callOpenAiCompatibleDirect("https://api.moonshot.ai/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
+  } else if (provider === "glm") {
+    // Zhipu GLM — OpenAI-compatible chat completions
+    return callOpenAiCompatibleDirect("https://open.bigmodel.cn/api/paas/v4/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
   }
 
   return { status: 400, error: `Unsupported API provider: ${provider}` };
@@ -1586,6 +1775,7 @@ async function callAIGatewayOnce(
 ): Promise<GatewayResult> {
   let userApiKey = opts.userApiKey;
   let userApiProvider = opts.userApiProvider;
+  let userApiModel: string | null | undefined = undefined;
   let userUseOwnKey = Boolean(userApiKey && userApiProvider);
   let userKeyMode: "fallback" | "always" = "fallback";
 
@@ -1611,6 +1801,7 @@ async function callAIGatewayOnce(
           if (row && row.decrypted_key) {
             userApiKey = row.decrypted_key;
             userApiProvider = row.api_provider;
+            userApiModel = row.api_model || undefined;
             userUseOwnKey = row.use_own_key ?? userUseOwnKey;
             userKeyMode = row.key_mode === "always" ? "always" : "fallback";
           }
@@ -1667,10 +1858,11 @@ async function callAIGatewayOnce(
       }
     }
 
-    // Use a model that matches the user's provider — never carry a platform
+    // Use the user's saved model choice if they picked one; otherwise fall
+    // back to a model that matches their provider — never carry a platform
     // (Google/Gemini) model id into an OpenAI/Anthropic endpoint or the
     // provider will 400 on an unknown model.
-    const userModelAlways = getProviderModel(userApiProvider as string, opts.quality || "draft");
+    const userModelAlways = userApiModel || getProviderModel(userApiProvider as string, opts.quality || "draft");
     return callAI(messages, tool, userApiKey, {
       provider: userApiProvider as any,
       quality: opts.quality,
@@ -1694,12 +1886,12 @@ async function callAIGatewayOnce(
     if (!providerKey) continue;              // secret not configured → skip
 
     if (isCircuitOpen(entry.name)) {
-      console.info(`[waterfall] ${entry.name} circuit open — skipping`);
+      console.info(`[waterfall] ${sanitizeLogValue(entry.name)} circuit open - skipping`);
       continue;
     }
 
     const providerModel = opts.model || entry.model(quality);
-    console.info(`[waterfall] trying ${entry.name} (model: ${providerModel})`);
+    console.info(`[waterfall] trying ${sanitizeLogValue(entry.name)} (model: ${sanitizeLogValue(providerModel)})`);
 
     const result = await callAI(messages, tool, providerKey, {
       provider: entry.provider,
@@ -1711,17 +1903,17 @@ async function callAIGatewayOnce(
 
     if (result.status === 200) {
       recordProviderSuccess(entry.name);
-      console.info(`[waterfall] ${entry.name} succeeded`);
+      console.info(`[waterfall] ${sanitizeLogValue(entry.name)} succeeded`);
       return result;
     }
 
     recordProviderFailure(entry.name);
-    console.warn(`[waterfall] ${entry.name} returned ${result.status}: ${result.error}`);
+    console.warn(`[waterfall] ${sanitizeLogValue(entry.name)} returned ${result.status}: ${sanitizeLogValue(result.error)}`);
 
     // Hard 4xx (not 429/402) = request is malformed; retrying other providers won't help
     if (result.status >= 400 && result.status < 500
         && result.status !== 429 && result.status !== 402) {
-      console.error(`[waterfall] hard client error ${result.status} — aborting waterfall`);
+      console.error(`[waterfall] hard client error ${result.status} - aborting waterfall`);
       return result;
     }
     // 5xx / 429 / 402 / timeout → try next provider in chain
@@ -1730,7 +1922,7 @@ async function callAIGatewayOnce(
   const platformResult = { status: 503, error: "All platform AI providers are currently unavailable." };
 
   if (shouldFallbackToUserKey(platformResult.status) && canUseUserKey) {
-    const userModelFallback = getProviderModel(userApiProvider as string, opts.quality || "draft");
+    const userModelFallback = userApiModel || getProviderModel(userApiProvider as string, opts.quality || "draft");
     return callAI(messages, tool, userApiKey as string, {
       provider: userApiProvider as any,
       quality: opts.quality,
@@ -1795,7 +1987,7 @@ function parseAIResponse(
     }
 
     if (!funcArgs) {
-      console.error("No tool call or JSON content in AI response", JSON.stringify(data));
+      console.error("No tool call or JSON content in AI response", sanitizeLogValue(data));
       return { success: false, error: "AI returned no structured output." };
     }
 
@@ -1804,7 +1996,7 @@ function parseAIResponse(
       try {
         parsed = JSON.parse(funcArgs as string);
       } catch (e) {
-        console.error("Failed to parse function args string:", funcArgs);
+        console.error("Failed to parse function args string:", sanitizeLogValue(funcArgs));
         return { success: false, error: "Failed to parse AI output." };
       }
     } else if (typeof funcArgs === "object") {
@@ -1813,7 +2005,7 @@ function parseAIResponse(
       try {
         parsed = JSON.parse(String(funcArgs));
       } catch (e) {
-        console.error("Failed to coerce function args to JSON:", funcArgs);
+        console.error("Failed to coerce function args to JSON:", sanitizeLogValue(funcArgs));
         return { success: false, error: "Failed to parse AI output." };
       }
     }
@@ -1842,10 +2034,10 @@ function normalizePost(
   const rawHookOptions = Array.isArray(p.hook_options) ? (p.hook_options as unknown[]).map(h => String(h || "")) : undefined;
   const rawCtaOptions = Array.isArray(p.cta_options) ? (p.cta_options as unknown[]).map(c => String(c || "")) : undefined;
 
-  const hookOptions = rawHookOptions ? rawHookOptions.map(h => fixSpelling(h)) : (p.hook ? [fixSpelling(String(p.hook || ""))] : []);
-  const ctaOptions = rawCtaOptions ? rawCtaOptions.map(c => fixSpelling(c)) : (p.cta ? [fixSpelling(String(p.cta || ""))] : []);
+  const hookOptions = rawHookOptions ? rawHookOptions.map(h => sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(h)))) : (p.hook ? [sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(String(p.hook || ""))))] : []);
+  const ctaOptions = rawCtaOptions ? rawCtaOptions.map(c => sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(c)))) : (p.cta ? [sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(String(p.cta || ""))))] : []);
 
-  const body = fixSpelling(String(p.body || ""));
+  const body = sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(String(p.body || ""))));
   const actualWordCount = body.split(/\s+/).filter(Boolean).length;
   const reportedWordCount = Number(p.word_count) || actualWordCount;
 
@@ -1875,7 +2067,7 @@ function normalizePost(
       return !regex.test(body);
     });
     if (missing.length > 0) {
-      console.warn(`Post generation missing required words: ${missing.join(", ")}`);
+      console.warn(`Post generation missing required words: ${missing.map(word => sanitizeLogValue(word)).join(", ")}`);
       const selfCheckBase = p.self_check && typeof p.self_check === "object"
         ? { ...p.self_check as Record<string, unknown> }
         : { forbidden_violations: [] as string[], checks_passed: true, notes: "" };
@@ -1890,10 +2082,10 @@ function normalizePost(
 
   return {
     day: 1,
-    dow: overrideDow || p.dow || "Mon",
-    topic: p.topic || "",
-    format: p.format || "",
-    title: fixSpelling(String(p.title || "")),
+    dow: sanitizeHtmlText(overrideDow || p.dow || "Mon"),
+    topic: sanitizeHtmlText(p.topic || ""),
+    format: sanitizeHtmlText(p.format || ""),
+    title: sanitizeHtmlText(fixSpelling(String(p.title || ""))),
     // primary hook (first option) and full variants
     hook: hookOptions.length ? hookOptions[0] : "",
     hook_options: hookOptions,
@@ -1904,10 +2096,10 @@ function normalizePost(
     cta: ctaOptions.length ? ctaOptions[0] : "",
     cta_options: ctaOptions,
     hashtags: payload
-      ? applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags)
-      : p.hashtags || "",
-    rationale: fixSpelling(String(p.rationale || "")),
-    image_prompt: fixSpelling(String(p.image_prompt || "")),
+      ? sanitizeHtmlText(applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags))
+      : sanitizeHtmlText(p.hashtags || ""),
+    rationale: sanitizeHtmlText(fixSpelling(String(p.rationale || ""))),
+    image_prompt: sanitizeHtmlText(fixSpelling(String(p.image_prompt || ""))),
     // Maintain Phase A/C/D fields if present
     plan: p.plan,
     body_variants: p.body_variants,
@@ -1958,6 +2150,26 @@ function bytesFromBase64(input: string): { bytes: Uint8Array; contentType: strin
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return { bytes, contentType };
+}
+
+function normalizeCalendarId(value: unknown): string | null {
+  const calendarId = String(value || "").trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(calendarId)) {
+    return null;
+  }
+  return calendarId.toLowerCase();
+}
+
+function normalizePostDay(value: unknown): number | null {
+  const postDay = Number(value || 0);
+  if (!Number.isInteger(postDay) || postDay < 1 || postDay > 366) {
+    return null;
+  }
+  return postDay;
+}
+
+function postgrestValue(value: string): string {
+  return encodeURIComponent(value);
 }
 
 async function uploadToStorage(params: {
@@ -2024,7 +2236,7 @@ async function upsertMediaReference(params: {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -2044,12 +2256,12 @@ Deno.serve(async (req: Request) => {
 
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "");
-    const userId = getUserIdFromToken(token);
-    if (!userId || userId === "anonymous") return jsonResponse({ error: "Sign in required." }, 401);
+    const userId = await getVerifiedUserId(token);
+    if (!userId) return jsonResponse({ error: "Sign in required." }, 401);
 
     const body = await req.json().catch(() => ({})) as ImageRequest;
-    const calendarId = String(body.calendarId || "");
-    const postDay = Number(body.postDay || 0);
+    const calendarId = normalizeCalendarId(body.calendarId);
+    const postDay = normalizePostDay(body.postDay);
     const prompt = String(body.prompt || body.post?.image_prompt || "").trim();
     const aspectRatio = String(body.aspectRatio || "1:1");
     const platform = String(body.platform || "LinkedIn");
@@ -2149,7 +2361,7 @@ Deno.serve(async (req: Request) => {
     // Orphan previous images for this calendar and post day before uploading the new one
     const searchPathPattern = `${userId}/${calendarId}/day-${postDay}-`;
     const orphanRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/media_references?user_id=eq.${userId}&bucket=eq.post-images&reference_kind=eq.calendar&reference_key=eq.${calendarId}&storage_path=like.${searchPathPattern}%`,
+      `${SUPABASE_URL}/rest/v1/media_references?user_id=eq.${postgrestValue(userId)}&bucket=eq.post-images&reference_kind=eq.calendar&reference_key=eq.${postgrestValue(calendarId)}&storage_path=like.${postgrestValue(`${searchPathPattern}%`)}`,
       {
         method: "PATCH",
         headers: {

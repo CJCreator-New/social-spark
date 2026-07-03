@@ -138,7 +138,10 @@ Deno.serve(async (req) => {
 
     // Integrity: the order must belong to THIS user and the charged amount must
     // match the server-side plan price exactly. Defends against tampering.
-    if (order.notes?.user_id && order.notes.user_id !== user.id) {
+    // Require user_id to be PRESENT and equal — a missing note must not
+    // auto-pass, or an order created without it (e.g. via a leaked Razorpay
+    // key, or a create-order regression) would let anyone claim it.
+    if (order.notes?.user_id !== user.id) {
       console.warn("verify-payment: order user mismatch", { order_id: orderId, user_id: user.id });
       return jsonResponse({ verified: false, error: "Order does not belong to this account." }, 403);
     }

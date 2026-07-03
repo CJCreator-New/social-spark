@@ -36,3 +36,7 @@ Default label vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `read
 ### Domain docs
 
 Single-context layout — one `CONTEXT.md` at the repo root and `docs/adr/` for architectural decisions. See `docs/agents/domain.md`.
+
+### Full-app audit
+
+A standing, reusable prompt for a comprehensive security/AI-reliability/code-quality/UX/test audit. See `docs/agents/full-app-audit.md`.

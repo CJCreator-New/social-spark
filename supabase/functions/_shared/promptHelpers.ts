@@ -96,6 +96,31 @@ export function sanitizeLogValue(value: unknown, maxLength = LOG_VALUE_MAX_LENGT
     .slice(0, maxLength);
 }
 
+/**
+ * "No markdown in post copy" is currently only a prompt instruction (see
+ * bannedPhrasesBlock/buildEngagementRules) — models that ignore it (common on
+ * cheaper providers or long-context prompts) ship raw markdown straight into
+ * the post text, breaking LinkedIn/Instagram rendering and skewing scoring.
+ * This is a deterministic backstop applied to every AI text field before it
+ * reaches the client or the scorer.
+ */
+export function stripMarkdownFormatting(value: unknown): string {
+  let text = String(value || "");
+  // Bold/italic/strikethrough emphasis: **x**, __x__, *x*, _x_, ~~x~~ -> x
+  text = text.replace(/(\*\*\*|___)(.+?)\1/g, "$2");
+  text = text.replace(/(\*\*|__)(.+?)\1/g, "$2");
+  text = text.replace(/(?<![a-zA-Z0-9])(\*|_)(?!\s)(.+?)(?<!\s)\1(?![a-zA-Z0-9])/g, "$2");
+  text = text.replace(/~~(.+?)~~/g, "$1");
+  // ATX headings: leading #'s
+  text = text.replace(/^#{1,6}\s+/gm, "");
+  // Inline/fenced code
+  text = text.replace(/```([\s\S]*?)```/g, "$1");
+  text = text.replace(/`([^`]+)`/g, "$1");
+  // Markdown links: [text](url) -> text
+  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  return text;
+}
+
 export function sanitizeHtmlText(value: unknown): string {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -424,6 +449,32 @@ export function errorResponse(context: string, e: unknown, status = 500): Respon
   return jsonResponse({ error: "An unexpected error occurred. Please try again.", requestId }, status);
 }
 
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  // Compare against a fixed-length buffer so the loop count doesn't itself
+  // leak the expected secret's length.
+  const len = Math.max(aBytes.length, bBytes.length, 32);
+  let diff = aBytes.length ^ bBytes.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (aBytes[i] || 0) ^ (bBytes[i] || 0);
+  }
+  return diff === 0;
+}
+
+/**
+ * Authorizes internal (cron-triggered) function calls. Uses a dedicated
+ * secret rather than SUPABASE_SERVICE_ROLE_KEY itself, so leaking this header
+ * only authorizes queue/cleanup invocation rather than full DB/service-role access.
+ */
+export function verifyCronSecret(req: Request, headerName = "x-cron-secret"): boolean {
+  const expected = Deno.env.get("INTERNAL_CRON_SECRET");
+  const provided = req.headers.get(headerName);
+  if (!expected || !provided) return false;
+  return timingSafeEqual(expected, provided);
+}
+
 export const MAX_REQUEST_BODY_BYTES = 256 * 1024; // 256 KB
 
 /**
@@ -596,39 +647,51 @@ interface RateLimitConfig {
 }
 
 export async function checkRateLimit(userId: string, endpoint: string, config: RateLimitConfig): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+  const MAX_CAS_ATTEMPTS = 5;
   try {
     const kv = await Deno.openKv();
     const key = ["ratelimit", endpoint, userId];
     const now = Date.now();
     const windowStart = now - config.windowMs;
 
-    // Get current request data
-    const data = await kv.get(key);
-    let requests: number[] = (data.value as number[]) || [];
-    
-    // Clean old requests outside the window
-    requests = requests.filter(ts => ts > windowStart);
+    try {
+      // Compare-and-swap loop: re-read + re-check + versioned write so concurrent
+      // requests can't all observe the same pre-increment count and all pass.
+      for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt++) {
+        const entry = await kv.get<number[]>(key);
+        const requests = (entry.value || []).filter((ts) => ts > windowStart);
 
-    if (requests.length >= config.maxRequests) {
-      const oldestRequest = requests[0];
-      const resetAt = oldestRequest + config.windowMs;
+        if (requests.length >= config.maxRequests) {
+          const resetAt = requests[0] + config.windowMs;
+          return { allowed: false, remaining: 0, resetAt };
+        }
+
+        requests.push(now);
+        const res = await kv.atomic()
+          .check(entry)
+          .set(key, requests, { expireIn: config.windowMs })
+          .commit();
+
+        if (res.ok) {
+          return {
+            allowed: true,
+            remaining: config.maxRequests - requests.length,
+            resetAt: now + config.windowMs,
+          };
+        }
+        // Another concurrent request won the CAS race; retry with a fresh read.
+      }
+
+      // Exhausted retries under heavy contention: fail closed rather than let an
+      // unbounded number of concurrent requests all slip through unaccounted for.
+      return { allowed: false, remaining: 0, resetAt: now + config.windowMs };
+    } finally {
       await kv.close();
-      return { allowed: false, remaining: 0, resetAt };
     }
-
-    // Add current request
-    requests.push(now);
-    await kv.set(key, requests, { expireIn: config.windowMs });
-    await kv.close();
-
-    return { 
-      allowed: true, 
-      remaining: config.maxRequests - requests.length,
-      resetAt: now + config.windowMs
-    };
   } catch (e) {
     console.warn("Rate limit check failed, allowing request", e);
-    // If KV fails, allow the request
+    // Deno KV itself unavailable (not a contention issue) — fail open so a KV
+    // outage doesn't take down unrelated functionality.
     return { allowed: true, remaining: config.maxRequests, resetAt: Date.now() + config.windowMs };
   }
 }
@@ -1963,10 +2026,10 @@ export function normalizePost(
   const rawHookOptions = Array.isArray(p.hook_options) ? (p.hook_options as unknown[]).map(h => String(h || "")) : undefined;
   const rawCtaOptions = Array.isArray(p.cta_options) ? (p.cta_options as unknown[]).map(c => String(c || "")) : undefined;
 
-  const hookOptions = rawHookOptions ? rawHookOptions.map(h => sanitizeHtmlText(fixSpelling(h))) : (p.hook ? [sanitizeHtmlText(fixSpelling(String(p.hook || "")))] : []);
-  const ctaOptions = rawCtaOptions ? rawCtaOptions.map(c => sanitizeHtmlText(fixSpelling(c))) : (p.cta ? [sanitizeHtmlText(fixSpelling(String(p.cta || "")))] : []);
+  const hookOptions = rawHookOptions ? rawHookOptions.map(h => sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(h)))) : (p.hook ? [sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(String(p.hook || ""))))] : []);
+  const ctaOptions = rawCtaOptions ? rawCtaOptions.map(c => sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(c)))) : (p.cta ? [sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(String(p.cta || ""))))] : []);
 
-  const body = sanitizeHtmlText(fixSpelling(String(p.body || "")));
+  const body = sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(String(p.body || ""))));
   const actualWordCount = body.split(/\s+/).filter(Boolean).length;
   const reportedWordCount = Number(p.word_count) || actualWordCount;
 

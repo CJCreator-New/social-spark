@@ -9,6 +9,7 @@ import {
   cleanPayload,
   getVerifiedUserId,
   errorResponse,
+  stripMarkdownFormatting,
 } from "../_shared/promptHelpers.ts";
 
 const INSTRUCTIONS: Record<string, string> = {
@@ -123,7 +124,7 @@ ${text}`;
     const parseResult = parseAIResponse(aiRes.data || {}, "return_rewrite");
     if (!parseResult.success) return jsonResponse({ error: parseResult.error }, 500);
 
-    const rewrittenText = String(parseResult.parsed?.rewrittenText || "").trim();
+    const rewrittenText = stripMarkdownFormatting(parseResult.parsed?.rewrittenText || "").trim();
     if (!rewrittenText) return jsonResponse({ error: "Rewrite returned empty text." }, 500);
     return jsonResponse({ rewrittenText });
   } catch (e) {

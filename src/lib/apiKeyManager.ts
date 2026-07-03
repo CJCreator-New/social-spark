@@ -5,8 +5,16 @@ import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
 export type ApiProvider = 'openai' | 'anthropic' | 'openrouter' | 'gemini' | 'kimi' | 'glm';
 
 function getSupabaseRuntimeConfig(): { url: string; key: string } {
+  const url = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+  // The "mock Supabase" branches below exist for local/E2E use and fall back to
+  // storing the user's raw API key in plaintext localStorage. That fallback
+  // must never trigger in a production build just because VITE_SUPABASE_URL
+  // was accidentally left empty — fail loudly instead.
+  if (!url && !import.meta.env.DEV) {
+    throw new Error("VITE_SUPABASE_URL is not configured.");
+  }
   return {
-    url: (import.meta.env.VITE_SUPABASE_URL as string) || "",
+    url,
     key: (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "",
   };
 }

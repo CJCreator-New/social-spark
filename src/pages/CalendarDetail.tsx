@@ -1,5 +1,5 @@
 import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor, buildRawMarkdown, PLATFORM_LABELS, stripMarkdown } from "@/lib/platformCopy";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, lazy, Suspense } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
@@ -36,7 +36,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getE2EAuthFlag } from "@/lib/e2eFixtures";
 import e2eStore from "@/lib/e2eStore";
 
-import FeedbackModal from "@/components/FeedbackModal";
+const FeedbackModal = lazy(() => import("@/components/FeedbackModal"));
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Database, Json } from "@/integrations/supabase/types";
@@ -2420,20 +2420,22 @@ export default function CalendarDetail() {
         </div>
       )}
       {feedbackOpen && (
-        <FeedbackModal
-          open={feedbackOpen}
-          submitting={feedbackSubmitting || regenerating}
-          onClose={() => { if (!feedbackSubmitting && !regenerating) setFeedbackOpen(false); }}
-          onSubmit={async ({ feedback, category, rating }) => {
-            try {
-              setFeedbackSubmitting(true);
-              await regenerateDay(undefined, feedback, category, rating);
-              setFeedbackOpen(false);
-            } finally {
-              setFeedbackSubmitting(false);
-            }
-          }}
-        />
+        <Suspense fallback={null}>
+          <FeedbackModal
+            open={feedbackOpen}
+            submitting={feedbackSubmitting || regenerating}
+            onClose={() => { if (!feedbackSubmitting && !regenerating) setFeedbackOpen(false); }}
+            onSubmit={async ({ feedback, category, rating }) => {
+              try {
+                setFeedbackSubmitting(true);
+                await regenerateDay(undefined, feedback, category, rating);
+                setFeedbackOpen(false);
+              } finally {
+                setFeedbackSubmitting(false);
+              }
+            }}
+          />
+        </Suspense>
       )}
 
       {repurposedPost && (

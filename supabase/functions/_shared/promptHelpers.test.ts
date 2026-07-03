@@ -1,5 +1,49 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload, buildSystemMessage, buildUserMessage, shouldFallbackToUserKey, shouldUseUserKeyOnly, getProviderModel, clampMaxTokensForProvider, callAI, sanitizeLogValue, sanitizeHtmlText } from "./promptHelpers.ts";
+import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload, buildSystemMessage, buildUserMessage, shouldFallbackToUserKey, shouldUseUserKeyOnly, getProviderModel, clampMaxTokensForProvider, callAI, sanitizeLogValue, sanitizeHtmlText, stripMarkdownFormatting } from "./promptHelpers.ts";
+
+describe("stripMarkdownFormatting", () => {
+  it("strips bold and italic emphasis without losing the wrapped text", () => {
+    expect(stripMarkdownFormatting("This is **bold** and this is *italic*.")).toBe(
+      "This is bold and this is italic."
+    );
+    expect(stripMarkdownFormatting("__bold underscore__ and _italic underscore_")).toBe(
+      "bold underscore and italic underscore"
+    );
+  });
+
+  it("strips strikethrough", () => {
+    expect(stripMarkdownFormatting("~~deprecated~~ approach")).toBe("deprecated approach");
+  });
+
+  it("strips ATX headings", () => {
+    expect(stripMarkdownFormatting("# Big Heading\nBody text")).toBe("Big Heading\nBody text");
+    expect(stripMarkdownFormatting("### Smaller heading")).toBe("Smaller heading");
+  });
+
+  it("strips inline and fenced code", () => {
+    expect(stripMarkdownFormatting("Use `npm install` to set up.")).toBe("Use npm install to set up.");
+    expect(stripMarkdownFormatting("```\nconst x = 1;\n```")).toBe("\nconst x = 1;\n");
+  });
+
+  it("strips markdown links but keeps the link text", () => {
+    expect(stripMarkdownFormatting("Check out [our blog](https://example.com) today.")).toBe(
+      "Check out our blog today."
+    );
+  });
+
+  it("leaves plain text and mid-word underscores/asterisks used as punctuation untouched", () => {
+    expect(stripMarkdownFormatting("Plain text with no formatting.")).toBe("Plain text with no formatting.");
+    expect(stripMarkdownFormatting("snake_case_variable and 5 * 3 = 15")).toBe(
+      "snake_case_variable and 5 * 3 = 15"
+    );
+  });
+
+  it("handles empty/nullish input safely", () => {
+    expect(stripMarkdownFormatting("")).toBe("");
+    expect(stripMarkdownFormatting(undefined)).toBe("");
+    expect(stripMarkdownFormatting(null)).toBe("");
+  });
+});
 
 describe("promptHelpers engagement guidance", () => {
   it("adds a core-idea framework that locks the output to one angle", () => {

@@ -67,6 +67,44 @@ describe("postPerformanceScore tests", () => {
     });
   });
 
+  describe("calculatePerformanceScore edge cases (discriminating fixtures)", () => {
+    it("scores hashtagRelevance as 0 when hashtags is an empty string", () => {
+      const post: Post = { ...samplePost, hashtags: "" };
+      const score = calculatePerformanceScore(post, "AI Engineering");
+      expect(score.hashtagRelevance).toBe(0);
+    });
+
+    it("scores hashtagRelevance as 0 when hashtags contains only unrelated tags", () => {
+      const post: Post = { ...samplePost, hashtags: "#unrelatedtopic #randomstuff" };
+      const score = calculatePerformanceScore(post, "AI Engineering");
+      expect(score.hashtagRelevance).toBe(0);
+    });
+
+    it("scores hashtagRelevance high when all tags relate to the topic", () => {
+      const post: Post = { ...samplePost, hashtags: "#engineering #engineered" };
+      const score = calculatePerformanceScore(post, "AI Engineering");
+      expect(score.hashtagRelevance).toBe(100);
+    });
+
+    it("scores a CTA with no actionable verb lower than a specific, action-oriented CTA", () => {
+      const noVerbCta: Post = { ...samplePost, cta: "Thanks for reading." };
+      const actionCta: Post = { ...samplePost, cta: "Comment below with your favorite AI Engineering tool!" };
+      const weakScore = calculatePerformanceScore(noVerbCta, "AI Engineering");
+      const strongScore = calculatePerformanceScore(actionCta, "AI Engineering");
+      expect(weakScore.ctaEffectiveness).toBeLessThan(strongScore.ctaEffectiveness);
+    });
+
+    it("does not crash on non-English (non-Latin script) body text and returns a finite readability grade", () => {
+      const nonEnglishPost: Post = {
+        ...samplePost,
+        body: "कृत्रिम बुद्धिमत्ता आजकल हर जगह इस्तेमाल हो रही है। डेवलपर्स इसका उपयोग बेहतर कोड लिखने के लिए करते हैं।",
+      };
+      const score = calculatePerformanceScore(nonEnglishPost, "AI Engineering");
+      expect(Number.isFinite(score.readability)).toBe(true);
+      expect(score.readability).toBeGreaterThanOrEqual(0);
+    });
+  });
+
   describe("getWeakestPerformanceMetric", () => {
     it("should identify the weakest metric correctly", () => {
       const scores = {
