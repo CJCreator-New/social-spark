@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 
-import { saveUserApiKey, getUserApiKey, setUseOwnKey, deleteUserApiKey, getQuotaStatus, validateUserApiKey } from "@/lib/apiKeyManager";
+import { saveUserApiKey, getUserApiKey, setUseOwnKey, deleteUserApiKey, getQuotaStatus, validateUserApiKey, updateUserApiModel, type ApiProvider } from "@/lib/apiKeyManager";
+import { MODEL_CATALOG, getOpenRouterGroups, OPENROUTER_FREE_RATE_LIMIT_NOTE, CUSTOM_MODEL_SENTINEL } from "@/lib/models/catalogs";
 import { toast } from "sonner";
 import { Eye, EyeOff, Save, Key, CheckCircle2, AlertCircle, Loader2, Trash2, ShieldCheck, Info, BadgeCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export function ApiKeySettings() {
-  const [provider, setProvider] = useState<'openai' | 'anthropic' | 'openrouter'>("openai");
+  const [provider, setProvider] = useState<ApiProvider>("openai");
+  const [model, setModel] = useState<string>("");
+  const [customModel, setCustomModel] = useState<string>("");
+  const [savedModel, setSavedModel] = useState<string>("");
   const [showKey, setShowKey] = useState(false);
   const [useOwnKey, setUseOwnKeyVal] = useState(false);
   const [keyMode, setKeyMode] = useState<'fallback' | 'always'>('fallback');
@@ -84,6 +88,16 @@ export function ApiKeySettings() {
         setUseOwnKeyVal(data.useOwnKey);
         if (data.keyMode) setKeyMode(data.keyMode);
         setSettingsError(Boolean(data.settingsError));
+        if (data.apiModel) {
+          const catalogIds = data.provider ? MODEL_CATALOG[data.provider].map((m) => m.id) : [];
+          if (catalogIds.includes(data.apiModel)) {
+            setModel(data.apiModel);
+          } else {
+            setModel(CUSTOM_MODEL_SENTINEL);
+            setCustomModel(data.apiModel);
+          }
+          setSavedModel(data.apiModel);
+        }
         if (data.hasKey && data.last4) {
           const maskedValue = `••••••••${data.last4}`;
           setSavedKeyPreview(maskedValue);
@@ -113,6 +127,13 @@ export function ApiKeySettings() {
     return reason || "This key could not be verified.";
   }
 
+  // The effective model id to persist/send: custom text input when the
+  // "Custom model id..." sentinel is selected, otherwise the picked catalog id.
+  function effectiveModel(): string {
+    if (model === CUSTOM_MODEL_SENTINEL) return customModel.trim();
+    return model;
+  }
+
   // Live "Test key" — verifies the entered key against the provider without saving it.
   async function handleTest() {
     const rawKey = keyInputRef.current?.value?.trim() ?? "";
@@ -125,7 +146,7 @@ export function ApiKeySettings() {
     setTestResult(null);
     setStatusMsg(null);
     try {
-      const result = await validateUserApiKey(rawKey, provider);
+      const result = await validateUserApiKey(rawKey, provider, effectiveModel() || undefined);
       setTestResult(result);
       if (result.valid) {
         toast.success("API key verified — it works!");
@@ -157,10 +178,12 @@ export function ApiKeySettings() {
         return;
       }
 
+      const chosenModel = effectiveModel();
+
       if (isNewKey) {
         // Verify the key against the provider before storing it, so we never
         // persist a dud that would silently fail at generation time.
-        const check = await validateUserApiKey(rawKey, provider);
+        const check = await validateUserApiKey(rawKey, provider, chosenModel || undefined);
         if (!check.valid) {
           setTestResult(check);
           setStatusMsg({ text: validationMessage(check.reason), type: "error" });
@@ -168,11 +191,17 @@ export function ApiKeySettings() {
           setLoading(false);
           return;
         }
-        await saveUserApiKey(rawKey, provider);
+        await saveUserApiKey(rawKey, provider, chosenModel || undefined);
         const last4 = rawKey.slice(-4);
         setSavedKeyPreview(`••••••••${last4}`);
         setKeyFieldState("empty");
         setTestResult(null);
+        setSavedModel(chosenModel);
+      } else if (hasSavedKey && chosenModel !== savedModel) {
+        // Key is unchanged (still masked) but the model selection changed —
+        // update just the model preference without re-sending the key.
+        await updateUserApiModel(chosenModel || null);
+        setSavedModel(chosenModel);
       }
 
       await setUseOwnKey(useOwnKey, keyMode);
@@ -208,6 +237,9 @@ export function ApiKeySettings() {
       setSavedKeyPreview(null);
       setUseOwnKeyVal(false);
       setKeyFieldState("empty");
+      setModel("");
+      setCustomModel("");
+      setSavedModel("");
       setConfirmDelete(false);
       if (keyInputRef.current) keyInputRef.current.value = "";
       setStatusMsg({ text: "API key removed successfully.", type: "success" });
@@ -318,18 +350,25 @@ export function ApiKeySettings() {
             className="pf-select"
             value={provider}
             onChange={(e) => {
-              const val = e.target.value as 'openai' | 'anthropic' | 'openrouter';
+              const val = e.target.value as ApiProvider;
               setProvider(val);
               // Clear input and any stale test result when switching provider
               if (keyInputRef.current) keyInputRef.current.value = "";
               setKeyFieldState("empty");
               setTestResult(null);
+              // Clear model selection — a model id from another provider is
+              // never valid on the new provider's endpoint.
+              setModel("");
+              setCustomModel("");
             }}
             style={{ marginBottom: 0 }}
           >
-            <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
-            <option value="anthropic">Anthropic (Claude 3.5 Sonnet / Haiku)</option>
-            <option value="openrouter">OpenRouter (Any available models)</option>
+            <option value="openai">OpenAI (GPT-5 / GPT-4o)</option>
+            <option value="anthropic">Anthropic (Claude Sonnet / Haiku)</option>
+            <option value="openrouter">OpenRouter (Many models, free &amp; paid)</option>
+            <option value="gemini">Gemini (Google, direct)</option>
+            <option value="kimi">Kimi (Moonshot AI)</option>
+            <option value="glm">GLM (Zhipu AI)</option>
           </select>
         </div>
 
@@ -398,6 +437,21 @@ export function ApiKeySettings() {
               <Info size={11} /> Format: <code>sk-or-...</code>
             </div>
           )}
+          {provider === "gemini" && (
+            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              <Info size={11} /> Format: <code>AIza...</code>
+            </div>
+          )}
+          {provider === "kimi" && (
+            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              <Info size={11} /> Format: <code>sk-...</code> (Moonshot platform key)
+            </div>
+          )}
+          {provider === "glm" && (
+            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              <Info size={11} /> Format: <code>id.secret</code> (Zhipu API key)
+            </div>
+          )}
 
           {/* Live key validation */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
@@ -427,6 +481,48 @@ export function ApiKeySettings() {
               </span>
             )}
           </div>
+        </div>
+
+        <div>
+          <label className="pf-label" htmlFor="api-model">
+            Model
+          </label>
+          <select
+            id="api-model"
+            className="pf-select"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            style={{ marginBottom: 0 }}
+          >
+            <option value="">Use provider default</option>
+            {provider === "openrouter"
+              ? getOpenRouterGroups().map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.models.map((m) => (
+                      <option key={m.id} value={m.id}>{m.label}</option>
+                    ))}
+                  </optgroup>
+                ))
+              : MODEL_CATALOG[provider].map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+            <option value={CUSTOM_MODEL_SENTINEL}>Custom model id...</option>
+          </select>
+          {model === CUSTOM_MODEL_SENTINEL && (
+            <input
+              type="text"
+              className="pf-input"
+              placeholder="Enter a model id"
+              value={customModel}
+              onChange={(e) => setCustomModel(e.target.value)}
+              style={{ marginTop: 8, marginBottom: 0 }}
+            />
+          )}
+          {provider === "openrouter" && model.endsWith(":free") && (
+            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              <Info size={11} /> {OPENROUTER_FREE_RATE_LIMIT_NOTE}
+            </div>
+          )}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "6px 0" }}>

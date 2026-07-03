@@ -83,6 +83,7 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({
       hasKey: !!resultRow.decrypted_key,
       provider: resultRow.api_provider,
+      apiModel: resultRow.api_model ?? null,
       last4: resultRow.decrypted_key ? resultRow.decrypted_key.slice(-4) : null,
     });
   } catch (e) {

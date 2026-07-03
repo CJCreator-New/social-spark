@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload, buildSystemMessage, buildUserMessage, shouldFallbackToUserKey, shouldUseUserKeyOnly } from "./promptHelpers.ts";
+import { describe, expect, it, vi, afterEach } from "vitest";
+import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload, buildSystemMessage, buildUserMessage, shouldFallbackToUserKey, shouldUseUserKeyOnly, getProviderModel, clampMaxTokensForProvider, callAI } from "./promptHelpers.ts";
 
 describe("promptHelpers engagement guidance", () => {
   it("adds a core-idea framework that locks the output to one angle", () => {
@@ -200,6 +200,58 @@ describe("promptHelpers engagement guidance", () => {
       expect(shouldFallbackToUserKey(402)).toBe(true);
       expect(shouldFallbackToUserKey(503)).toBe(true);
       expect(shouldFallbackToUserKey(500)).toBe(false);
+    });
+  });
+
+  describe("new BYOK direct providers (gemini, kimi, glm)", () => {
+    it("getProviderModel returns sensible draft/polished defaults", () => {
+      expect(getProviderModel("gemini", "draft")).toBe("gemini-2.5-flash");
+      expect(getProviderModel("gemini", "polished")).toBe("gemini-2.5-pro");
+      expect(getProviderModel("kimi", "draft")).toBe("moonshot-v1-8k");
+      expect(getProviderModel("kimi", "polished")).toBe("kimi-k2-0905-preview");
+      expect(getProviderModel("glm", "draft")).toBe("glm-4.5-air");
+      expect(getProviderModel("glm", "polished")).toBe("glm-4.6");
+    });
+
+    it("clamps max_tokens for direct gemini calls, not just lovable/openrouter", () => {
+      expect(clampMaxTokensForProvider("gemini", "gemini-2.5-pro", 16000)).toBe(8000);
+      expect(clampMaxTokensForProvider("kimi", "moonshot-v1-8k", 16000)).toBe(16000);
+      expect(clampMaxTokensForProvider("glm", "glm-4.6", 16000)).toBe(16000);
+    });
+
+    describe("callAI dispatch", () => {
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      function mockFetchOk() {
+        return vi.spyOn(globalThis, "fetch").mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ choices: [{ message: { content: "{}" } }] }),
+        } as Response);
+      }
+
+      it("routes gemini to the Gemini OpenAI-compatible endpoint", async () => {
+        const fetchSpy = mockFetchOk();
+        await callAI([{ role: "user", content: "hi" }], null, "AIzafakekey", { provider: "gemini" });
+        const [url] = fetchSpy.mock.calls[0] as [string];
+        expect(url).toBe("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
+      });
+
+      it("routes kimi to the Moonshot endpoint", async () => {
+        const fetchSpy = mockFetchOk();
+        await callAI([{ role: "user", content: "hi" }], null, "sk-fakekey", { provider: "kimi" });
+        const [url] = fetchSpy.mock.calls[0] as [string];
+        expect(url).toBe("https://api.moonshot.ai/v1/chat/completions");
+      });
+
+      it("routes glm to the Zhipu endpoint", async () => {
+        const fetchSpy = mockFetchOk();
+        await callAI([{ role: "user", content: "hi" }], null, "id.secret", { provider: "glm" });
+        const [url] = fetchSpy.mock.calls[0] as [string];
+        expect(url).toBe("https://open.bigmodel.cn/api/paas/v4/chat/completions");
+      });
     });
   });
 

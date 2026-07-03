@@ -74,23 +74,20 @@ Deno.serve(async (req: Request) => {
       if (!candidateKey) {
         return jsonResponse({ valid: false, reason: "Missing API key." }, 400);
       }
-      if (!["openai", "anthropic", "openrouter"].includes(candidateProvider)) {
+      const validProviders = ["openai", "anthropic", "openrouter", "gemini", "kimi", "glm"];
+      if (!validProviders.includes(candidateProvider)) {
         return jsonResponse({ valid: false, reason: "Invalid provider." }, 400);
       }
 
-      const provider = candidateProvider as "openai" | "anthropic" | "openrouter";
-      const pingModelByProvider: Record<typeof provider, string> = {
-        openai: "gpt-4o-mini",
-        anthropic: "claude-3-5-haiku-latest",
-        openrouter: "google/gemini-2.5-flash",
-      };
+      const provider = candidateProvider as "openai" | "anthropic" | "openrouter" | "gemini" | "kimi" | "glm";
+      const candidateModel = String(body.model || "").trim() || getProviderModel(provider, "draft");
       const pingRes = await callAI(
         [{ role: "user", content: "ping" }],
         null,
         candidateKey,
         {
           provider,
-          model: pingModelByProvider[provider],
+          model: candidateModel,
           temperature: 0,
           max_tokens: 5,
         }
@@ -165,15 +162,31 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ success: true });
     }
 
+    if (action === "update-model") {
+      const newModel = String(body.model || "").trim() || null;
+      const { error: updateError } = await supabase
+        .from("user_settings")
+        .update({ api_model: newModel, updated_at: new Date().toISOString() })
+        .eq("user_id", user.id);
+
+      if (updateError) {
+        console.error("Database error during model update:", updateError);
+        return jsonResponse({ error: "An unexpected error occurred." }, 500);
+      }
+
+      return jsonResponse({ success: true });
+    }
+
     // Default Save Action
     const apiKey = String(body.apiKey || "").trim();
     const provider = String(body.provider || "").trim();
+    const apiModel = String(body.model || "").trim() || null;
 
     if (!apiKey) {
       return jsonResponse({ error: "Invalid request parameters." }, 400);
     }
 
-    if (!provider || !["openai", "anthropic", "openrouter"].includes(provider)) {
+    if (!provider || !["openai", "anthropic", "openrouter", "gemini", "kimi", "glm"].includes(provider)) {
       return jsonResponse({ error: "Invalid request parameters." }, 400);
     }
 
@@ -181,6 +194,7 @@ Deno.serve(async (req: Request) => {
     const { error: rpcError } = await supabase.rpc("upsert_encrypted_api_key", {
       p_api_key: apiKey,
       p_api_provider: provider,
+      p_api_model: apiModel,
     });
 
     if (rpcError) {

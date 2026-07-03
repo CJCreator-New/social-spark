@@ -13,6 +13,7 @@ const mockSetUseOwnKey = vi.fn();
 const mockDeleteUserApiKey = vi.fn();
 const mockGetQuotaStatus = vi.fn();
 const mockValidateUserApiKey = vi.fn();
+const mockUpdateUserApiModel = vi.fn();
 
 vi.mock("@/lib/apiKeyManager", () => ({
   saveUserApiKey: (...args: unknown[]) => mockSaveUserApiKey(...args),
@@ -21,6 +22,7 @@ vi.mock("@/lib/apiKeyManager", () => ({
   deleteUserApiKey: (...args: unknown[]) => mockDeleteUserApiKey(...args),
   getQuotaStatus: (...args: unknown[]) => mockGetQuotaStatus(...args),
   validateUserApiKey: (...args: unknown[]) => mockValidateUserApiKey(...args),
+  updateUserApiModel: (...args: unknown[]) => mockUpdateUserApiModel(...args),
 }));
 
 // Mock sonner toast
@@ -79,6 +81,7 @@ beforeEach(() => {
   mockSaveUserApiKey.mockResolvedValue(undefined);
   mockSetUseOwnKey.mockResolvedValue(undefined);
   mockDeleteUserApiKey.mockResolvedValue(undefined);
+  mockUpdateUserApiModel.mockResolvedValue(undefined);
   mockGetQuotaStatus.mockResolvedValue({ used: 0, limit: 10, useOwnKey: false, keyMode: "fallback" });
   // Default: a freshly entered key passes the live validation gate before save.
   mockValidateUserApiKey.mockResolvedValue({ valid: true });
@@ -90,15 +93,18 @@ beforeEach(() => {
 // 1. Initial Render
 // ---------------------------------------------------------------------------
 describe("ApiKeySettings — initial render", () => {
-  it("renders provider dropdown with all 3 options", async () => {
+  it("renders provider dropdown with all 6 provider options", async () => {
     await renderAndWait();
 
-    const select = screen.getByRole("combobox");
+    const select = screen.getByLabelText("API Provider");
     const options = within(select).getAllByRole("option");
     const values = options.map((o) => (o as HTMLOptionElement).value);
     expect(values).toContain("openai");
     expect(values).toContain("anthropic");
     expect(values).toContain("openrouter");
+    expect(values).toContain("gemini");
+    expect(values).toContain("kimi");
+    expect(values).toContain("glm");
   });
 
   it("password input is type='password' by default", async () => {
@@ -216,13 +222,13 @@ describe("ApiKeySettings — save button behavior", () => {
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(mockSaveUserApiKey).toHaveBeenCalledWith("sk-" + "a".repeat(32), "openai");
+      expect(mockSaveUserApiKey).toHaveBeenCalledWith("sk-" + "a".repeat(32), "openai", undefined);
     });
   });
 
   it("calls saveUserApiKey with anthropic provider when selected", async () => {
     await renderAndWait();
-    const select = screen.getByRole("combobox");
+    const select = screen.getByLabelText("API Provider");
     fireEvent.change(select, { target: { value: "anthropic" } });
 
     const input = screen.getByLabelText("API Key") as HTMLInputElement;
@@ -233,7 +239,7 @@ describe("ApiKeySettings — save button behavior", () => {
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(mockSaveUserApiKey).toHaveBeenCalledWith(anthropicKey, "anthropic");
+      expect(mockSaveUserApiKey).toHaveBeenCalledWith(anthropicKey, "anthropic", undefined);
     });
   });
 
@@ -311,7 +317,7 @@ describe("ApiKeySettings — live key validation", () => {
     fireEvent.click(screen.getByRole("button", { name: /test key/i }));
 
     await waitFor(() => {
-      expect(mockValidateUserApiKey).toHaveBeenCalledWith(key, "openai");
+      expect(mockValidateUserApiKey).toHaveBeenCalledWith(key, "openai", undefined);
     });
   });
 
@@ -457,5 +463,62 @@ describe("ApiKeySettings — delete key flow", () => {
     });
 
     expect(screen.queryByText(/currently configured key ends in/i)).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Model picker
+// ---------------------------------------------------------------------------
+describe("ApiKeySettings — model picker", () => {
+  it("resets the model selection to provider default when switching providers", async () => {
+    await renderAndWait();
+    const modelSelect = screen.getByLabelText("Model") as HTMLSelectElement;
+
+    fireEvent.change(modelSelect, { target: { value: "gpt-5" } });
+    expect(modelSelect.value).toBe("gpt-5");
+
+    const providerSelect = screen.getByLabelText("API Provider");
+    fireEvent.change(providerSelect, { target: { value: "gemini" } });
+
+    expect(modelSelect.value).toBe("");
+  });
+
+  it("shows a custom model text input when 'Custom model id...' is selected", async () => {
+    await renderAndWait();
+    const modelSelect = screen.getByLabelText("Model") as HTMLSelectElement;
+
+    fireEvent.change(modelSelect, { target: { value: "__custom__" } });
+
+    expect(screen.getByPlaceholderText(/enter a model id/i)).toBeInTheDocument();
+  });
+
+  it("forwards the selected model when saving a new key", async () => {
+    await renderAndWait();
+    const modelSelect = screen.getByLabelText("Model") as HTMLSelectElement;
+    fireEvent.change(modelSelect, { target: { value: "gpt-5-mini" } });
+
+    const input = screen.getByLabelText("API Key") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "sk-" + "a".repeat(32) } });
+
+    const form = screen.getByRole("button", { name: /save api configuration/i }).closest("form")!;
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(mockSaveUserApiKey).toHaveBeenCalledWith("sk-" + "a".repeat(32), "openai", "gpt-5-mini");
+    });
+  });
+
+  it("updates only the model (no re-save of the key) when changing model on an existing key", async () => {
+    await renderAndWait(SAVED_KEY_STATE);
+    const modelSelect = screen.getByLabelText("Model") as HTMLSelectElement;
+    fireEvent.change(modelSelect, { target: { value: "gpt-5" } });
+
+    const form = screen.getByRole("button", { name: /save api configuration/i }).closest("form")!;
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(mockUpdateUserApiModel).toHaveBeenCalledWith("gpt-5");
+    });
+    expect(mockSaveUserApiKey).not.toHaveBeenCalled();
   });
 });

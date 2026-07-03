@@ -676,7 +676,7 @@ export interface GenerationPayload {
   requiredHashtags: string[];
   quality: "draft" | "polished"; // draft: single-call, polished: two-pass critique+rewrite
   userApiKey?: string;
-  userApiProvider?: "openai" | "anthropic" | "openrouter";
+  userApiProvider?: "openai" | "anthropic" | "openrouter" | "gemini" | "kimi" | "glm";
   trendingTopics?: string[];
 }
 
@@ -793,7 +793,7 @@ export function cleanPayload(body: unknown): GenerationPayload {
     bannedHashtags: cleanTagList(payload.bannedHashtags, 30),
     requiredHashtags: cleanTagList(payload.requiredHashtags, 10),
     userApiKey: payload.userApiKey ? String(payload.userApiKey).trim() : undefined,
-    userApiProvider: (payload.userApiProvider && ["openai", "anthropic", "openrouter"].includes(String(payload.userApiProvider).trim()))
+    userApiProvider: (payload.userApiProvider && ["openai", "anthropic", "openrouter", "gemini", "kimi", "glm"].includes(String(payload.userApiProvider).trim()))
       ? (String(payload.userApiProvider).trim() as any)
       : undefined,
   };
@@ -1067,6 +1067,15 @@ export function getProviderModel(provider: string, quality: string): string {
   if (provider === "openrouter") {
     return quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
   }
+  if (provider === "gemini") {
+    return quality === "polished" ? "gemini-2.5-pro" : "gemini-2.5-flash";
+  }
+  if (provider === "kimi") {
+    return quality === "polished" ? "kimi-k2-0905-preview" : "moonshot-v1-8k";
+  }
+  if (provider === "glm") {
+    return quality === "polished" ? "glm-4.6" : "glm-4.5-air";
+  }
   return quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
 }
 
@@ -1078,14 +1087,15 @@ export function shouldFallbackToUserKey(status: number): boolean {
   return status === 429 || status === 402 || status === 503;
 }
 
-function clampMaxTokensForProvider(provider: string, model: string, maxTokens?: number): number | undefined {
+export function clampMaxTokensForProvider(provider: string, model: string, maxTokens?: number): number | undefined {
   if (typeof maxTokens !== "number") return undefined;
 
   const normalizedModel = model.toLowerCase();
-  // Gemini (via Lovable gateway or OpenRouter) reliably serves tool-calling
-  // completions up to ~8k output tokens; higher requests intermittently return
-  // upstream 400s with 0 output tokens generated. Cap to a safe ceiling.
-  if ((provider === "lovable" || provider === "openrouter") && normalizedModel.includes("gemini")) {
+  // Gemini (via Lovable gateway, OpenRouter, or direct) reliably serves
+  // tool-calling completions up to ~8k output tokens; higher requests
+  // intermittently return upstream 400s with 0 output tokens generated.
+  // Cap to a safe ceiling.
+  if (provider === "gemini" || ((provider === "lovable" || provider === "openrouter") && normalizedModel.includes("gemini"))) {
     return Math.min(maxTokens, 8000);
   }
 
@@ -1235,7 +1245,7 @@ export async function callAI(
   tool: Record<string, unknown> | null,
   apiKey: string,
   opts: {
-    provider: "openai" | "anthropic" | "openrouter" | "lovable";
+    provider: "openai" | "anthropic" | "openrouter" | "lovable" | "gemini" | "kimi" | "glm";
     quality?: string;
     model?: string;
     temperature?: number;
@@ -1251,7 +1261,7 @@ export async function callAI(
   if (typeof opts.max_tokens === "number" && maxTokens !== opts.max_tokens) {
     console.warn(`[ai] clamped max_tokens for ${provider}/${model}: ${opts.max_tokens} -> ${maxTokens}`);
   }
-  
+
   if (provider === "openai") {
     return callOpenAiCompatibleDirect("https://api.openai.com/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
   } else if (provider === "openrouter") {
@@ -1261,6 +1271,15 @@ export async function callAI(
   } else if (provider === "lovable") {
     // Lovable AI Gateway speaks the OpenAI-compatible wire protocol
     return callOpenAiCompatibleDirect("https://ai.gateway.lovable.dev/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
+  } else if (provider === "gemini") {
+    // Gemini's OpenAI-compatible endpoint
+    return callOpenAiCompatibleDirect("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
+  } else if (provider === "kimi") {
+    // Moonshot Kimi — OpenAI-compatible chat completions
+    return callOpenAiCompatibleDirect("https://api.moonshot.ai/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
+  } else if (provider === "glm") {
+    // Zhipu GLM — OpenAI-compatible chat completions
+    return callOpenAiCompatibleDirect("https://open.bigmodel.cn/api/paas/v4/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
   }
 
   return { status: 400, error: `Unsupported API provider: ${provider}` };
@@ -1578,6 +1597,7 @@ async function callAIGatewayOnce(
 ): Promise<GatewayResult> {
   let userApiKey = opts.userApiKey;
   let userApiProvider = opts.userApiProvider;
+  let userApiModel: string | null | undefined = undefined;
   let userUseOwnKey = Boolean(userApiKey && userApiProvider);
   let userKeyMode: "fallback" | "always" = "fallback";
 
@@ -1603,6 +1623,7 @@ async function callAIGatewayOnce(
           if (row && row.decrypted_key) {
             userApiKey = row.decrypted_key;
             userApiProvider = row.api_provider;
+            userApiModel = row.api_model || undefined;
             userUseOwnKey = row.use_own_key ?? userUseOwnKey;
             userKeyMode = row.key_mode === "always" ? "always" : "fallback";
           }
@@ -1659,10 +1680,11 @@ async function callAIGatewayOnce(
       }
     }
 
-    // Use a model that matches the user's provider — never carry a platform
+    // Use the user's saved model choice if they picked one; otherwise fall
+    // back to a model that matches their provider — never carry a platform
     // (Google/Gemini) model id into an OpenAI/Anthropic endpoint or the
     // provider will 400 on an unknown model.
-    const userModelAlways = getProviderModel(userApiProvider as string, opts.quality || "draft");
+    const userModelAlways = userApiModel || getProviderModel(userApiProvider as string, opts.quality || "draft");
     return callAI(messages, tool, userApiKey, {
       provider: userApiProvider as any,
       quality: opts.quality,
@@ -1722,7 +1744,7 @@ async function callAIGatewayOnce(
   const platformResult = { status: 503, error: "All platform AI providers are currently unavailable." };
 
   if (shouldFallbackToUserKey(platformResult.status) && canUseUserKey) {
-    const userModelFallback = getProviderModel(userApiProvider as string, opts.quality || "draft");
+    const userModelFallback = userApiModel || getProviderModel(userApiProvider as string, opts.quality || "draft");
     return callAI(messages, tool, userApiKey as string, {
       provider: userApiProvider as any,
       quality: opts.quality,

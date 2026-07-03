@@ -6,6 +6,7 @@ import {
   getUserApiKey,
   deleteUserApiKey,
   setUseOwnKey,
+  updateUserApiModel,
 } from "../apiKeyManager";
 
 // Use vi.hoisted to declare mocks that are referenced inside vi.mock calls, avoiding hoisting TDZ issues.
@@ -140,6 +141,44 @@ describe("validateApiKeyFormat", () => {
     });
   });
 
+  describe("Gemini", () => {
+    it("accepts valid AIza... key", () => {
+      expect(validateApiKeyFormat("AIza" + "a".repeat(32), "gemini")).toBe(true);
+    });
+
+    it("rejects key without AIza prefix", () => {
+      expect(validateApiKeyFormat("sk-" + "a".repeat(32), "gemini")).toBe(false);
+    });
+
+    it("rejects key that is too short", () => {
+      expect(validateApiKeyFormat("AIzashort", "gemini")).toBe(false);
+    });
+  });
+
+  describe("Kimi", () => {
+    it("accepts valid sk- key", () => {
+      expect(validateApiKeyFormat("sk-" + "a".repeat(32), "kimi")).toBe(true);
+    });
+
+    it("rejects key that is too short", () => {
+      expect(validateApiKeyFormat("sk-short", "kimi")).toBe(false);
+    });
+  });
+
+  describe("GLM", () => {
+    it("accepts valid id.secret key", () => {
+      expect(validateApiKeyFormat("a".repeat(24) + "." + "b".repeat(20), "glm")).toBe(true);
+    });
+
+    it("rejects key without a dot separator", () => {
+      expect(validateApiKeyFormat("a".repeat(44), "glm")).toBe(false);
+    });
+
+    it("rejects key that is too short", () => {
+      expect(validateApiKeyFormat("short.short", "glm")).toBe(false);
+    });
+  });
+
   describe("Cross-provider rejection", () => {
     it("rejects non-sk prefix for openai", () => {
       expect(validateApiKeyFormat("ant-key-" + "a".repeat(32), "openai")).toBe(false);
@@ -251,6 +290,20 @@ describe("saveUserApiKey", () => {
     const headers = opts.headers as Record<string, string>;
     expect(headers["Authorization"]).toBe(`Bearer test-access-token`);
   });
+
+  it("forwards the optional model param in the request body", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ success: true }),
+    } as Response);
+
+    await saveUserApiKey(VALID_KEY, "openai", "gpt-5-mini");
+
+    const [, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(opts.body as string);
+    expect(body.model).toBe("gpt-5-mini");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -268,7 +321,7 @@ describe("getUserApiKey", () => {
   it("returns null values when not authenticated (no session)", async () => {
     mockGetSession.mockResolvedValue(NO_SESSION);
     const result = await getUserApiKey();
-    expect(result).toEqual({ apiKey: null, hasKey: false, provider: null, useOwnKey: false, keyMode: 'fallback', settingsError: false });
+    expect(result).toEqual({ apiKey: null, hasKey: false, provider: null, apiModel: null, useOwnKey: false, keyMode: 'fallback', settingsError: false });
   });
 
   it("returns null apiKey when no user_settings row exists", async () => {
@@ -324,6 +377,7 @@ describe("getUserApiKey", () => {
       apiKey: null,
       hasKey: false,
       provider: null,
+      apiModel: null,
       useOwnKey: false,
       keyMode: 'fallback',
       settingsError: true,
@@ -494,6 +548,7 @@ describe("localStorage Fallback", () => {
         apiKey: VALID_OPENAI_KEY,
         hasKey: true,
         provider: "openai",
+        apiModel: null,
         useOwnKey: true,
         keyMode: "always",
         last4: "aaaa",
@@ -504,6 +559,7 @@ describe("localStorage Fallback", () => {
       await deleteUserApiKey();
       expect(localStorage.getItem("social_spark_user_api_key")).toBeNull();
       expect(localStorage.getItem("social_spark_user_api_provider")).toBeNull();
+      expect(localStorage.getItem("social_spark_user_api_model")).toBeNull();
       expect(localStorage.getItem("social_spark_use_own_key")).toBeNull();
       expect(localStorage.getItem("social_spark_key_mode")).toBeNull();
     });
@@ -541,6 +597,7 @@ describe("localStorage Fallback", () => {
         apiKey: null,
         hasKey: false,
         provider: null,
+        apiModel: null,
         useOwnKey: false,
         keyMode: "fallback",
         settingsError: true,
@@ -580,6 +637,7 @@ describe("localStorage Fallback", () => {
         apiKey: null,
         hasKey: false,
         provider: null,
+        apiModel: null,
         useOwnKey: false,
         keyMode: "fallback",
         settingsError: true,
@@ -677,5 +735,56 @@ describe("validateUserApiKey", () => {
     const result = await validateUserApiKey(VALID_KEY, "openai");
     expect(result).toEqual({ valid: true });
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("forwards the optional model param when provided", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ valid: true }),
+    } as Response);
+
+    await validateUserApiKey(VALID_KEY, "openai", "gpt-5");
+
+    const [, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(opts.body as string);
+    expect(body.model).toBe("gpt-5");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateUserApiModel
+// ---------------------------------------------------------------------------
+describe("updateUserApiModel", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetSession.mockResolvedValue(VALID_SESSION);
+    vi.stubEnv("VITE_SUPABASE_URL", "https://real-project.supabase.co");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("posts action='update-model' with the new model id", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ success: true }),
+    } as Response);
+
+    await updateUserApiModel("gpt-5-mini");
+
+    const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/functions/v1/encrypt-api-key");
+    const body = JSON.parse(opts.body as string);
+    expect(body.action).toBe("update-model");
+    expect(body.model).toBe("gpt-5-mini");
+  });
+
+  it("throws 'User session not found' when not authenticated", async () => {
+    mockGetSession.mockResolvedValue(NO_SESSION);
+    await expect(updateUserApiModel("gpt-5-mini")).rejects.toThrow("User session not found");
   });
 });
