@@ -24,6 +24,56 @@ export const VALID_DOW = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun
 
 export const ENRICHMENT_MODEL = "google/gemini-2.5-flash-lite";
 
+const LOG_VALUE_MAX_LENGTH = 2_000;
+const ALLOWED_AI_ENDPOINTS = new Set([
+  "https://api.openai.com/v1/chat/completions",
+  "https://openrouter.ai/api/v1/chat/completions",
+  "https://ai.gateway.lovable.dev/v1/chat/completions",
+  "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+  "https://api.moonshot.ai/v1/chat/completions",
+  "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+]);
+
+export function sanitizeLogValue(value: unknown, maxLength = LOG_VALUE_MAX_LENGTH): string {
+  const raw = value instanceof Error
+    ? value.stack || value.message
+    : typeof value === "string"
+      ? value
+      : (() => {
+          try {
+            return JSON.stringify(value);
+          } catch {
+            return String(value);
+          }
+        })();
+
+  return String(raw)
+    .replace(/[\r\n\t]/g, " ")
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
+    .slice(0, maxLength);
+}
+
+export function sanitizeHtmlText(value: unknown): string {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getAllowedAiEndpoint(url: string): string | null {
+  try {
+    const normalized = new URL(url);
+    normalized.hash = "";
+    normalized.search = "";
+    const endpoint = normalized.toString();
+    return ALLOWED_AI_ENDPOINTS.has(endpoint) ? endpoint : null;
+  } catch {
+    return null;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  PLATFORM PROVIDER WATERFALL
 //  Ordered list of platform-level AI providers tried in sequence.
@@ -97,7 +147,7 @@ function recordProviderFailure(name: string): void {
   s.failures++;
   if (s.failures >= CIRCUIT_THRESHOLD) {
     s.openUntil = Date.now() + CIRCUIT_RESET_MS;
-    console.warn(`[circuit-breaker] ${name} tripped after ${s.failures} failures — cooling ${CIRCUIT_RESET_MS / 1000}s`);
+    console.warn(`[circuit-breaker] ${sanitizeLogValue(name)} tripped after ${s.failures} failures - cooling ${CIRCUIT_RESET_MS / 1000}s`);
   }
   _circuitState.set(name, s);
 }
@@ -114,6 +164,30 @@ export function getUserIdFromToken(token?: string | null): string {
     console.error("getUserIdFromToken parsing failed:", e);
   }
   return token.slice(0, 32) || "anonymous";
+}
+
+// Verifies the bearer token's signature against Supabase Auth before trusting
+// the caller's identity. Unlike getUserIdFromToken (which only decodes the
+// JWT payload and can be forged with any `sub`), this is safe to use for
+// quota, rate-limiting, and usage-tracking decisions.
+export async function getVerifiedUserId(token?: string | null): Promise<string | null> {
+  if (!token) return null;
+  try {
+    const supabaseUrl = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_URL") : null;
+    const supabaseAnonKey = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_ANON_KEY") : null;
+    if (!supabaseUrl || !supabaseAnonKey) return null;
+    // @ts-ignore: Deno dynamic import
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data, error } = await userClient.auth.getUser();
+    if (error || !data?.user) return null;
+    return data.user.id;
+  } catch (err) {
+    console.error("getVerifiedUserId failed:", err);
+    return null;
+  }
 }
 
 export const LENGTH_GUIDE_WEEK: Record<string, string> = {
@@ -318,7 +392,7 @@ export function jsonResponse(body: unknown, status = 200): Response {
  */
 export function errorResponse(context: string, e: unknown, status = 500): Response {
   const requestId = crypto.randomUUID();
-  console.error(`[${requestId}] ${context} error:`, e instanceof Error ? e.stack : e);
+  console.error(`[${requestId}] ${sanitizeLogValue(context)} error:`, sanitizeLogValue(e));
   return jsonResponse({ error: "An unexpected error occurred. Please try again.", requestId }, status);
 }
 
@@ -1113,9 +1187,14 @@ async function callOpenAiCompatibleDirect(
 ): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
   const hasTool = tool && Object.keys(tool).length > 0;
   const functionName = hasTool ? (((tool as any).function?.name || "") as string) : "";
+  const endpoint = getAllowedAiEndpoint(url);
+  if (!endpoint) {
+    console.error("Blocked AI call to unapproved endpoint:", sanitizeLogValue(url));
+    return { status: 400, error: "Unsupported AI provider endpoint." };
+  }
   
   try {
-    const res = await fetch(url, {
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -1133,14 +1212,14 @@ async function callOpenAiCompatibleDirect(
     
     if (!res.ok) {
       const text = await res.text();
-      console.error(`Direct call to ${url} failed ${res.status}:`, text);
+      console.error(`Direct call to ${sanitizeLogValue(endpoint)} failed ${res.status}:`, sanitizeLogValue(text));
       return { status: res.status, error: `API error: ${res.status}` };
     }
     
     const data = await res.json();
     return { status: 200, data };
   } catch (e) {
-    console.error(`Direct call to ${url} encountered network error:`, e);
+    console.error(`Direct call to ${sanitizeLogValue(endpoint)} encountered network error:`, sanitizeLogValue(e));
     return { status: 500, error: e instanceof Error ? e.message : "Network error" };
   }
 }
@@ -1191,7 +1270,7 @@ async function callAnthropicDirect(
     
     if (!res.ok) {
       const text = await res.text();
-      console.error("Anthropic direct API call failed:", text);
+      console.error("Anthropic direct API call failed:", sanitizeLogValue(text));
       return { status: res.status, error: `Anthropic error: ${res.status}` };
     }
     
@@ -1259,7 +1338,7 @@ export async function callAI(
   const model = opts.model || getProviderModel(provider, quality);
   const maxTokens = clampMaxTokensForProvider(provider, model, opts.max_tokens);
   if (typeof opts.max_tokens === "number" && maxTokens !== opts.max_tokens) {
-    console.warn(`[ai] clamped max_tokens for ${provider}/${model}: ${opts.max_tokens} -> ${maxTokens}`);
+    console.warn(`[ai] clamped max_tokens for ${sanitizeLogValue(provider)}/${sanitizeLogValue(model)}: ${opts.max_tokens} -> ${maxTokens}`);
   }
 
   if (provider === "openai") {
@@ -1708,12 +1787,12 @@ async function callAIGatewayOnce(
     if (!providerKey) continue;              // secret not configured → skip
 
     if (isCircuitOpen(entry.name)) {
-      console.info(`[waterfall] ${entry.name} circuit open — skipping`);
+      console.info(`[waterfall] ${sanitizeLogValue(entry.name)} circuit open - skipping`);
       continue;
     }
 
     const providerModel = opts.model || entry.model(quality);
-    console.info(`[waterfall] trying ${entry.name} (model: ${providerModel})`);
+    console.info(`[waterfall] trying ${sanitizeLogValue(entry.name)} (model: ${sanitizeLogValue(providerModel)})`);
 
     const result = await callAI(messages, tool, providerKey, {
       provider: entry.provider,
@@ -1725,17 +1804,17 @@ async function callAIGatewayOnce(
 
     if (result.status === 200) {
       recordProviderSuccess(entry.name);
-      console.info(`[waterfall] ${entry.name} succeeded`);
+      console.info(`[waterfall] ${sanitizeLogValue(entry.name)} succeeded`);
       return result;
     }
 
     recordProviderFailure(entry.name);
-    console.warn(`[waterfall] ${entry.name} returned ${result.status}: ${result.error}`);
+    console.warn(`[waterfall] ${sanitizeLogValue(entry.name)} returned ${result.status}: ${sanitizeLogValue(result.error)}`);
 
     // Hard 4xx (not 429/402) = request is malformed; retrying other providers won't help
     if (result.status >= 400 && result.status < 500
         && result.status !== 429 && result.status !== 402) {
-      console.error(`[waterfall] hard client error ${result.status} — aborting waterfall`);
+      console.error(`[waterfall] hard client error ${result.status} - aborting waterfall`);
       return result;
     }
     // 5xx / 429 / 402 / timeout → try next provider in chain
@@ -1809,7 +1888,7 @@ export function parseAIResponse(
     }
 
     if (!funcArgs) {
-      console.error("No tool call or JSON content in AI response", JSON.stringify(data));
+      console.error("No tool call or JSON content in AI response", sanitizeLogValue(data));
       return { success: false, error: "AI returned no structured output." };
     }
 
@@ -1818,7 +1897,7 @@ export function parseAIResponse(
       try {
         parsed = JSON.parse(funcArgs as string);
       } catch (e) {
-        console.error("Failed to parse function args string:", funcArgs);
+        console.error("Failed to parse function args string:", sanitizeLogValue(funcArgs));
         return { success: false, error: "Failed to parse AI output." };
       }
     } else if (typeof funcArgs === "object") {
@@ -1827,7 +1906,7 @@ export function parseAIResponse(
       try {
         parsed = JSON.parse(String(funcArgs));
       } catch (e) {
-        console.error("Failed to coerce function args to JSON:", funcArgs);
+        console.error("Failed to coerce function args to JSON:", sanitizeLogValue(funcArgs));
         return { success: false, error: "Failed to parse AI output." };
       }
     }
@@ -1856,10 +1935,10 @@ export function normalizePost(
   const rawHookOptions = Array.isArray(p.hook_options) ? (p.hook_options as unknown[]).map(h => String(h || "")) : undefined;
   const rawCtaOptions = Array.isArray(p.cta_options) ? (p.cta_options as unknown[]).map(c => String(c || "")) : undefined;
 
-  const hookOptions = rawHookOptions ? rawHookOptions.map(h => fixSpelling(h)) : (p.hook ? [fixSpelling(String(p.hook || ""))] : []);
-  const ctaOptions = rawCtaOptions ? rawCtaOptions.map(c => fixSpelling(c)) : (p.cta ? [fixSpelling(String(p.cta || ""))] : []);
+  const hookOptions = rawHookOptions ? rawHookOptions.map(h => sanitizeHtmlText(fixSpelling(h))) : (p.hook ? [sanitizeHtmlText(fixSpelling(String(p.hook || "")))] : []);
+  const ctaOptions = rawCtaOptions ? rawCtaOptions.map(c => sanitizeHtmlText(fixSpelling(c))) : (p.cta ? [sanitizeHtmlText(fixSpelling(String(p.cta || "")))] : []);
 
-  const body = fixSpelling(String(p.body || ""));
+  const body = sanitizeHtmlText(fixSpelling(String(p.body || "")));
   const actualWordCount = body.split(/\s+/).filter(Boolean).length;
   const reportedWordCount = Number(p.word_count) || actualWordCount;
 
@@ -1889,7 +1968,7 @@ export function normalizePost(
       return !regex.test(body);
     });
     if (missing.length > 0) {
-      console.warn(`Post generation missing required words: ${missing.join(", ")}`);
+      console.warn(`Post generation missing required words: ${missing.map(word => sanitizeLogValue(word)).join(", ")}`);
       const selfCheckBase = p.self_check && typeof p.self_check === "object"
         ? { ...p.self_check as Record<string, unknown> }
         : { forbidden_violations: [] as string[], checks_passed: true, notes: "" };
@@ -1904,10 +1983,10 @@ export function normalizePost(
 
   return {
     day: 1,
-    dow: overrideDow || p.dow || "Mon",
-    topic: p.topic || "",
-    format: p.format || "",
-    title: fixSpelling(String(p.title || "")),
+    dow: sanitizeHtmlText(overrideDow || p.dow || "Mon"),
+    topic: sanitizeHtmlText(p.topic || ""),
+    format: sanitizeHtmlText(p.format || ""),
+    title: sanitizeHtmlText(fixSpelling(String(p.title || ""))),
     // primary hook (first option) and full variants
     hook: hookOptions.length ? hookOptions[0] : "",
     hook_options: hookOptions,
@@ -1918,10 +1997,10 @@ export function normalizePost(
     cta: ctaOptions.length ? ctaOptions[0] : "",
     cta_options: ctaOptions,
     hashtags: payload
-      ? applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags)
-      : p.hashtags || "",
-    rationale: fixSpelling(String(p.rationale || "")),
-    image_prompt: fixSpelling(String(p.image_prompt || "")),
+      ? sanitizeHtmlText(applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags))
+      : sanitizeHtmlText(p.hashtags || ""),
+    rationale: sanitizeHtmlText(fixSpelling(String(p.rationale || ""))),
+    image_prompt: sanitizeHtmlText(fixSpelling(String(p.image_prompt || ""))),
     // Maintain Phase A/C/D fields if present
     plan: p.plan,
     body_variants: p.body_variants,

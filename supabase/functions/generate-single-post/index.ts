@@ -22,7 +22,7 @@ import {
   normalizePost,
   scoreVariants,
   recordServerTelemetryEvent,
-  getUserIdFromToken,
+  getVerifiedUserId,
   errorResponse,
   checkQuota,
   incrementGenerationCount,
@@ -47,8 +47,8 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "");
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
-    const userId = getUserIdFromToken(token);
-    if (!userId || userId === "anonymous") return jsonResponse({ error: "Sign in required." }, 401);
+    const userId = await getVerifiedUserId(token);
+    if (!userId) return jsonResponse({ error: "Sign in required." }, 401);
     const rateLimitCheck = await checkRateLimit(userId, "generate-single-post", {
       maxRequests: 20,
       windowMs: 60 * 1000,

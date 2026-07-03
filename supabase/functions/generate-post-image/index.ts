@@ -4,7 +4,7 @@ import {
   corsHeaders,
   jsonResponse,
   checkRateLimit,
-  getUserIdFromToken,
+  getVerifiedUserId,
   errorResponse,
 } from "../_shared/promptHelpers.ts";
 
@@ -132,8 +132,8 @@ Deno.serve(async (req: Request) => {
 
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "");
-    const userId = getUserIdFromToken(token);
-    if (!userId || userId === "anonymous") return jsonResponse({ error: "Sign in required." }, 401);
+    const userId = await getVerifiedUserId(token);
+    if (!userId) return jsonResponse({ error: "Sign in required." }, 401);
 
     const body = await req.json().catch(() => ({})) as ImageRequest;
     const calendarId = String(body.calendarId || "");

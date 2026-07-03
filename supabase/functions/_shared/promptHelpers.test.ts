@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload, buildSystemMessage, buildUserMessage, shouldFallbackToUserKey, shouldUseUserKeyOnly, getProviderModel, clampMaxTokensForProvider, callAI } from "./promptHelpers.ts";
+import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload, buildSystemMessage, buildUserMessage, shouldFallbackToUserKey, shouldUseUserKeyOnly, getProviderModel, clampMaxTokensForProvider, callAI, sanitizeLogValue, sanitizeHtmlText } from "./promptHelpers.ts";
 
 describe("promptHelpers engagement guidance", () => {
   it("adds a core-idea framework that locks the output to one angle", () => {
@@ -153,7 +153,34 @@ describe("promptHelpers engagement guidance", () => {
     });
   });
 
+  describe("getVerifiedUserId", () => {
+    it("returns null when no token is provided", async () => {
+      const { getVerifiedUserId } = require("./promptHelpers.ts");
+      expect(await getVerifiedUserId(null)).toBeNull();
+      expect(await getVerifiedUserId(undefined)).toBeNull();
+      expect(await getVerifiedUserId("")).toBeNull();
+    });
+
+    it("does not trust the raw JWT payload the way getUserIdFromToken does", async () => {
+      // Same forged token used in the getUserIdFromToken tests above — a
+      // signature-verified lookup must not simply echo back its `sub` claim
+      // without checking Supabase Auth (outside a Deno runtime this resolves
+      // to null since there is no SUPABASE_URL/anon key to verify against).
+      const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMy1hYmMiLCJleHAiOjE3MTgyOTI4Mzd9.signature";
+      const { getVerifiedUserId } = require("./promptHelpers.ts");
+      expect(await getVerifiedUserId(token)).toBeNull();
+    });
+  });
+
   describe("requiredWords", () => {
+    it("sanitizes values used in logs", () => {
+      expect(sanitizeLogValue("ok\r\ninjected: true\tend")).toBe("ok  injected: true end");
+    });
+
+    it("escapes generated text before returning normalized posts", () => {
+      expect(sanitizeHtmlText('<script>alert("x")</script>')).toBe("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
+    });
+
     it("builds required words prompt block correctly", () => {
       const { buildRequiredWordsBlock } = require("./promptHelpers.ts");
       const block = buildRequiredWordsBlock(["growth", "startup"]);
@@ -186,6 +213,23 @@ describe("promptHelpers engagement guidance", () => {
       expect(result.self_check.checks_passed).toBe(false);
       expect(result.self_check.forbidden_violations).toContain('Missing required word: "scaleup"');
       expect(result.self_check.forbidden_violations).toContain('Missing required word: "retention"');
+    });
+
+    it("escapes normalized AI-generated post fields", () => {
+      const { normalizePost } = require("./promptHelpers.ts");
+      const result = normalizePost({
+        title: "<b>Title</b>",
+        hook: "<img src=x onerror=alert(1)>",
+        body: "Body with <script>alert(1)</script>",
+        cta: "Click <here>",
+        hashtags: "#safe",
+        dow: "Mon",
+      }, "Mon");
+
+      expect(result.title).toBe("&lt;b&gt;Title&lt;/b&gt;");
+      expect(result.hook).toContain("&lt;img");
+      expect(result.body).toContain("&lt;script&gt;");
+      expect(result.cta).toBe("Click &lt;here&gt;");
     });
   });
 
