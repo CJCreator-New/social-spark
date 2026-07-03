@@ -15,6 +15,7 @@ const CARDS = [
     id: "ai",
     span: "ld-w-bento-col-8",
     tall: true,
+    featured: true,
     icon: Wand2,
     title: "Quick tone tweaks, one click",
     desc: "Make it shorter, punchier, or more personal — regenerate any post instantly without starting the brief over.",
@@ -24,6 +25,7 @@ const CARDS = [
     id: "limits",
     span: "ld-w-bento-col-4",
     tall: true,
+    featured: false,
     icon: Save,
     title: "Autosave & draft recovery",
     desc: "Every edit is saved as you go. Close the tab, come back tomorrow — your calendar picks up right where you left it.",
@@ -33,6 +35,7 @@ const CARDS = [
     id: "schedule",
     span: "ld-w-bento-col-4",
     tall: false,
+    featured: false,
     icon: Repeat,
     title: "Repurpose in one click",
     desc: "Turn a LinkedIn post into a tweet thread or an Instagram caption without rewriting from scratch.",
@@ -42,6 +45,7 @@ const CARDS = [
     id: "templates",
     span: "ld-w-bento-col-8",
     tall: false,
+    featured: false,
     icon: Zap,
     title: "Brief templates",
     desc: "Start from curated templates for product launches, thought leadership, promotions, and more — then customize.",
@@ -51,6 +55,7 @@ const CARDS = [
     id: "collab",
     span: "ld-w-bento-col-6",
     tall: false,
+    featured: false,
     icon: Users,
     title: "Team collaboration",
     desc: "Multiple brand voices, shared calendars, and role-based access for agencies and marketing teams.",
@@ -60,6 +65,7 @@ const CARDS = [
     id: "analytics",
     span: "ld-w-bento-col-6",
     tall: false,
+    featured: false,
     icon: CheckCircle2,
     title: "Clean, publish-ready output",
     desc: "No stray markdown, no robotic phrasing, no manual cleanup. Every post ships exactly as it should look.",
@@ -142,10 +148,11 @@ export default function BentoGrid() {
             return (
               <article
                 key={card.id}
-                className={`ld-w-bento-card ${card.span}${card.tall ? " tall" : ""}`}
+                className={`ld-w-bento-card ${card.span}${card.tall ? " tall" : ""}${card.featured ? " featured" : ""}`}
                 role="listitem"
                 aria-label={card.title}
               >
+                {card.featured && <div className="ld-w-bento-conic-border" aria-hidden="true" />}
                 <div className="ld-w-bento-icon" aria-hidden="true">
                   <Icon size={18} />
                 </div>

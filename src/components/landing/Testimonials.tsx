@@ -25,23 +25,50 @@ const QUOTES = [
   },
 ];
 
+const ALL_QUOTES = [...QUOTES, ...QUOTES];
+
+function QuoteCard({ q }: { q: (typeof QUOTES)[number] }) {
+  return (
+    <article className="ld-w-quote-card">
+      <div className="ld-w-stars" role="img" aria-label="5 out of 5 stars">
+        {["★", "★", "★", "★", "★"].map((star, i) => (
+          <span key={i} aria-hidden="true">{star}</span>
+        ))}
+      </div>
+
+      <blockquote className="ld-w-quote-text">
+        {q.text}
+      </blockquote>
+
+      <footer className="ld-w-quote-footer">
+        <div className="ld-w-avatar" aria-hidden="true">{q.initials}</div>
+        <div>
+          <cite className="ld-w-quote-name" style={{ fontStyle: "normal" }}>{q.name}</cite>
+          <div className="ld-w-quote-role">{q.role}</div>
+        </div>
+      </footer>
+    </article>
+  );
+}
+
 export default function Testimonials() {
   const sectionRef = useRef<HTMLElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const tweenRef = useRef<gsap.core.Tween | null>(null);
+  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 768;
 
   useEffect(() => {
     if (!sectionRef.current) return;
     const noMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (noMotion) return;
 
-    const cards = sectionRef.current.querySelectorAll(".ld-w-quote-card");
     gsap.fromTo(
-      cards,
-      { y: 32, opacity: 0 },
+      sectionRef.current.querySelector(".ld-w-quotes-head"),
+      { y: 24, opacity: 0 },
       {
         y: 0,
         opacity: 1,
-        stagger: 0.1,
-        duration: 0.75,
+        duration: 0.7,
         ease: "power3.out",
         scrollTrigger: {
           trigger: sectionRef.current,
@@ -53,6 +80,24 @@ export default function Testimonials() {
 
     return () => { ScrollTrigger.getAll().forEach(t => t.kill()); };
   }, []);
+
+  useEffect(() => {
+    if (!innerRef.current || !isDesktop) return;
+    const noMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (noMotion) return;
+
+    tweenRef.current = gsap.to(innerRef.current, {
+      x: "-50%",
+      duration: 42,
+      ease: "none",
+      repeat: -1,
+    });
+
+    return () => { tweenRef.current?.kill(); };
+  }, [isDesktop]);
+
+  const pauseTicker = () => tweenRef.current?.pause();
+  const resumeTicker = () => tweenRef.current?.resume();
 
   return (
     <section
@@ -67,28 +112,26 @@ export default function Testimonials() {
             Loved by <em>content creators</em>
           </h2>
         </div>
+      </div>
 
-        <div className="ld-w-quotes-grid" role="list">
-          {QUOTES.map((q) => (
-            <article key={q.name} className="ld-w-quote-card" role="listitem">
-              <div className="ld-w-stars" role="img" aria-label="5 out of 5 stars">
-                {["★", "★", "★", "★", "★"].map((star, i) => (
-                  <span key={i} aria-hidden="true">{star}</span>
-                ))}
-              </div>
+      {/* Screen-reader accessible list; visual track below is a decorative duplicate */}
+      <ul className="sr-only" aria-label="Customer testimonials">
+        {QUOTES.map((q) => (
+          <li key={q.name}>{q.text} — {q.name}, {q.role}</li>
+        ))}
+      </ul>
 
-              <blockquote className="ld-w-quote-text" cite={`#${q.name.replace(/\s/g, "").toLowerCase()}`}>
-                {q.text}
-              </blockquote>
-
-              <footer className="ld-w-quote-footer">
-                <div className="ld-w-avatar" aria-hidden="true">{q.initials}</div>
-                <div>
-                  <cite className="ld-w-quote-name" style={{ fontStyle: "normal" }}>{q.name}</cite>
-                  <div className="ld-w-quote-role">{q.role}</div>
-                </div>
-              </footer>
-            </article>
+      <div
+        className="ld-w-quotes-track"
+        onMouseEnter={pauseTicker}
+        onMouseLeave={resumeTicker}
+        aria-hidden="true"
+      >
+        <div ref={innerRef} className="ld-w-quotes-inner">
+          {ALL_QUOTES.map((q, i) => (
+            <div key={`${q.name}-${i}`} className="ld-w-quote-slide">
+              <QuoteCard q={q} />
+            </div>
           ))}
         </div>
       </div>

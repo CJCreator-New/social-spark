@@ -9,9 +9,9 @@ description: |
   Proactively use when the user asks "what are competitors doing", "what features are we missing",
   "how does X compare to us", or wants a refreshed competitive/feature gap analysis.
 tools:
-  - view_file
-  - list_dir
-  - grep_search
+  - Read
+  - Glob
+  - Grep
   - WebSearch
   - WebFetch
 ---

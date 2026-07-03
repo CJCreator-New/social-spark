@@ -56,10 +56,13 @@ export default function FinalCTA() {
               <div className="ld-w-final-actions">
                 <Link
                   to="/auth"
-                  className="ld-w-cta-primary"
+                  className="ld-w-cta-primary ld-w-cta-sparkle"
                   aria-label="Get started free with ContentForge"
                 >
                   Get started free
+                  <span className="ld-w-sparkle ld-w-sparkle-1" aria-hidden="true" />
+                  <span className="ld-w-sparkle ld-w-sparkle-2" aria-hidden="true" />
+                  <span className="ld-w-sparkle ld-w-sparkle-3" aria-hidden="true" />
                 </Link>
                 <a href="#how-it-works" className="ld-w-final-link" aria-label="See how ContentForge works">
                   See a demo <ArrowRight size={14} aria-hidden="true" />

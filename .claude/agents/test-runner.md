@@ -5,13 +5,13 @@ description: |
   Specialized for test assertions, test mocks, playwright configurations, and CI test runners.
   Proactively use to verify correctness before merging code.
 tools:
-  - view_file
-  - write_to_file
-  - replace_file_content
-  - multi_replace_file_content
-  - list_dir
-  - grep_search
-  - run_command
+  - Read
+  - Write
+  - Edit
+  - MultiEdit
+  - Glob
+  - Grep
+  - Bash
 ---
 
 # Test Runner

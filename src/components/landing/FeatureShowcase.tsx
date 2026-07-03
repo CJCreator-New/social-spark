@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -191,8 +191,35 @@ const FEATURES = [
   },
 ];
 
+function useSpotlight(sectionRef: RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+    const isTouchDevice = typeof navigator !== "undefined" && navigator.maxTouchPoints > 0;
+    if (isTouchDevice) return;
+
+    const visuals = section.querySelectorAll<HTMLElement>(".ld-w-feature-visual");
+    const handlers: Array<{ el: HTMLElement; move: (e: MouseEvent) => void }> = [];
+
+    visuals.forEach((el) => {
+      const move = (e: MouseEvent) => {
+        const rect = el.getBoundingClientRect();
+        el.style.setProperty("--spot-x", `${e.clientX - rect.left}px`);
+        el.style.setProperty("--spot-y", `${e.clientY - rect.top}px`);
+      };
+      el.addEventListener("mousemove", move);
+      handlers.push({ el, move });
+    });
+
+    return () => {
+      handlers.forEach(({ el, move }) => el.removeEventListener("mousemove", move));
+    };
+  }, [sectionRef]);
+}
+
 export default function FeatureShowcase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  useSpotlight(sectionRef);
 
   useEffect(() => {
     if (!sectionRef.current) return;

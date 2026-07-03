@@ -5,13 +5,13 @@ description: |
   Specialized for database design, auth configuration, Row-Level Security (RLS) enforcement, and server-side utilities.
   Proactively use when changing data schema or backend infrastructure.
 tools:
-  - view_file
-  - write_to_file
-  - replace_file_content
-  - multi_replace_file_content
-  - list_dir
-  - grep_search
-  - run_command
+  - Read
+  - Write
+  - Edit
+  - MultiEdit
+  - Glob
+  - Grep
+  - Bash
 ---
 
 # Supabase Architect

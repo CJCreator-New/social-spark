@@ -5,9 +5,9 @@ description: |
   Specialized for planning, dependency mapping, risk assessment, and test strategy formulation.
   Proactively use BEFORE writing any code or modifying files.
 tools:
-  - view_file
-  - list_dir
-  - grep_search
+  - Read
+  - Glob
+  - Grep
 ---
 
 # Feature Planner

@@ -5,12 +5,12 @@ description: |
   Specialized for UI/UX engineering, Tailwind configuration, component lifecycle, and accessibility (a11y).
   Proactively use after the implementation plan is approved.
 tools:
-  - view_file
-  - write_to_file
-  - replace_file_content
-  - multi_replace_file_content
-  - list_dir
-  - grep_search
+  - Read
+  - Write
+  - Edit
+  - MultiEdit
+  - Glob
+  - Grep
 ---
 
 # React UI Builder

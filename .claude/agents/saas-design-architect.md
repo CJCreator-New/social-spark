@@ -7,12 +7,12 @@ description: |
   Proactively use when working on dashboards, navigation/shell layout, marketing/landing surfaces,
   pricing/billing UI, settings pages, or any screen where "premium feel" or "SaaS polish" is the goal.
 tools:
-  - view_file
-  - write_to_file
-  - replace_file_content
-  - multi_replace_file_content
-  - list_dir
-  - grep_search
+  - Read
+  - Write
+  - Edit
+  - MultiEdit
+  - Glob
+  - Grep
 ---
 
 # SaaS Design Architect

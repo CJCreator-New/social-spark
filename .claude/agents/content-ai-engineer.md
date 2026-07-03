@@ -5,12 +5,12 @@ description: |
   Use this agent when working on prompt flows, brand memory, scoring, regeneration, repurposing, rewrite actions, and Edge Functions calling AI.
   Proactively use for any task involving LLM prompts, model parameters, or post-generation analysis.
 tools:
-  - view_file
-  - write_to_file
-  - replace_file_content
-  - multi_replace_file_content
-  - list_dir
-  - grep_search
+  - Read
+  - Write
+  - Edit
+  - MultiEdit
+  - Glob
+  - Grep
 ---
 
 # Content AI Engineer

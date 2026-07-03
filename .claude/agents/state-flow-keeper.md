@@ -5,12 +5,12 @@ description: |
   Specialized for global application state, local storage sync, draft recovery, and timezone-aware transitions.
   Proactively use when state synchronization or wizard steps are modified.
 tools:
-  - view_file
-  - write_to_file
-  - replace_file_content
-  - multi_replace_file_content
-  - list_dir
-  - grep_search
+  - Read
+  - Write
+  - Edit
+  - MultiEdit
+  - Glob
+  - Grep
 ---
 
 # State Flow Keeper

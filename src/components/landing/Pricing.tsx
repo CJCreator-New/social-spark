@@ -91,6 +91,24 @@ export default function Pricing() {
       }
     );
 
+    const featureItems = sectionRef.current.querySelectorAll(".ld-w-price-features li");
+    gsap.fromTo(
+      featureItems,
+      { x: -8, opacity: 0 },
+      {
+        x: 0,
+        opacity: 1,
+        stagger: 0.03,
+        duration: 0.4,
+        ease: "power2.out",
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 70%",
+          toggleActions: "play none none none",
+        },
+      }
+    );
+
     return () => { ScrollTrigger.getAll().forEach(t => t.kill()); };
   }, []);
 
@@ -141,7 +159,10 @@ export default function Pricing() {
               aria-label={`${tier.name} plan${tier.recommended ? ", most popular" : ""}`}
             >
               {tier.recommended && (
-                <span className="ld-w-recommended-badge" aria-hidden="true">Most popular</span>
+                <>
+                  <div className="ld-w-price-conic-border" aria-hidden="true" />
+                  <span className="ld-w-recommended-badge" aria-hidden="true">Most popular</span>
+                </>
               )}
 
               <div className="ld-w-price-tier">{tier.name}</div>

@@ -8,13 +8,13 @@ description: |
   Proactively use before releases, after large feature merges, or when asked for a "test report" or
   "QA pass" of the application.
 tools:
-  - view_file
-  - write_to_file
-  - replace_file_content
-  - multi_replace_file_content
-  - list_dir
-  - grep_search
-  - run_command
+  - Read
+  - Write
+  - Edit
+  - MultiEdit
+  - Glob
+  - Grep
+  - Bash
 ---
 
 # QA Test Auditor
