@@ -3,7 +3,7 @@ declare const Deno: any;
 // repurpose-post/index.ts
 // Takes an existing post and rewrites it for a DIFFERENT target platform.
 import {
-  corsHeaders,
+  getCorsHeaders,
   jsonResponse,
   checkRateLimit,
   cleanPayload,
@@ -17,7 +17,7 @@ import {
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
   try {
     const body = await req.json();

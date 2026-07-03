@@ -23,12 +23,15 @@ create policy "Admins can view admin users list"
     )
   );
 
--- RLS Policy: Only super-admin (defined in auth metadata) can manage admins
+-- RLS Policy: Only app admins can manage admins
 create policy "Super admin can manage admin users"
   on public.admin_users
   for all
   using (
-    auth.jwt() ->> 'role' = 'admin'
+    public.has_role(auth.uid(), 'admin'::public.app_role)
+  )
+  with check (
+    public.has_role(auth.uid(), 'admin'::public.app_role)
   );
 
 -- Grant permissions

@@ -46,6 +46,7 @@ CREATE OR REPLACE FUNCTION public.upsert_encrypted_api_key(
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pgsodium
 AS $$
 DECLARE
   v_user_id UUID;
@@ -93,6 +94,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pgsodium
 AS $$
 DECLARE
   v_user_id UUID;

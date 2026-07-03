@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
 import { isE2EMode, type GeneratePostImagePayload } from "./shared";
 
 export function useGeneratePostImageMutation() {
@@ -13,7 +14,7 @@ export function useGeneratePostImageMutation() {
           prompt: payload.prompt,
         };
       }
-      const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+      const SUPABASE_URL = resolveFunctionsBaseUrl((import.meta.env.VITE_SUPABASE_URL as string) || "");
       const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-post-image`, {

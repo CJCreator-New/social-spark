@@ -2,7 +2,7 @@ declare const Deno: any;
 
 // Regenerate a single post in a 7-day calendar via Lovable AI Gateway.
 import {
-  corsHeaders,
+  getCorsHeaders,
   LENGTH_GUIDE_SINGLE as LENGTH_GUIDE,
   STRUCTURE_GUIDE,
   bannedPhrasesBlock,
@@ -62,7 +62,7 @@ function buildEnhanceTweakInstruction(focusMetric?: string): string {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
   }
 
   try {

@@ -1,26 +1,28 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { checkRateLimit, corsHeaders } from "../_shared/promptHelpers.ts";
+import { checkRateLimit, getCorsHeaders } from "../_shared/promptHelpers.ts";
 import { getPlan, isPaidPlan } from "../_shared/plans.ts";
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json",
-      "Content-Security-Policy": "default-src 'none'",
-      "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "no-store",
-    },
-  });
-}
 
 // Razorpay enforces a minimum charge of 100 paise (₹1.00).
 const MIN_AMOUNT_PAISE = 100;
 
 Deno.serve(async (req) => {
+  const cors = getCorsHeaders(req.headers.get("origin"));
+
+  function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: {
+        ...cors,
+        "Content-Type": "application/json",
+        "Content-Security-Policy": "default-src 'none'",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: cors });
   }
 
   try {

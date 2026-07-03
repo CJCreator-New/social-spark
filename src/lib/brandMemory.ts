@@ -1,4 +1,5 @@
 import { Database } from "@/integrations/supabase/types";
+import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -87,7 +88,7 @@ export async function generateWithFallback<T = unknown>(
   body: AiGenerationRequestBody,
   abortSignal?: AbortSignal
 ): Promise<{ data: T; usedFallback: boolean; keyMode: "always" | "fallback" | null }> {
-  const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+  const SUPABASE_URL = resolveFunctionsBaseUrl((import.meta.env.VITE_SUPABASE_URL as string) || "");
   const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "";
   if (!SUPABASE_KEY) {
     console.error(

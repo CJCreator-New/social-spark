@@ -129,30 +129,6 @@ describe("promptHelpers engagement guidance", () => {
     expect(p.quality).toBe("draft");
   });
 
-  describe("getUserIdFromToken", () => {
-    it("returns JWT sub claim if valid token is provided", () => {
-      // Mock valid JWT with sub = "user-123-abc"
-      // Header: {"alg":"HS256","typ":"JWT"}
-      // Payload: {"sub":"user-123-abc","exp":1718292837}
-      const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMy1hYmMiLCJleHAiOjE3MTgyOTI4Mzd9.signature";
-      const { getUserIdFromToken } = require("./promptHelpers.ts");
-      expect(getUserIdFromToken(token)).toBe("user-123-abc");
-    });
-
-    it("falls back to sliced token if no sub is present", () => {
-      const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiJEb2UifQ.signature";
-      const { getUserIdFromToken } = require("./promptHelpers.ts");
-      expect(getUserIdFromToken(token)).toBe(token.slice(0, 32));
-    });
-
-    it("returns anonymous if token is null, empty or undefined", () => {
-      const { getUserIdFromToken } = require("./promptHelpers.ts");
-      expect(getUserIdFromToken(null)).toBe("anonymous");
-      expect(getUserIdFromToken(undefined)).toBe("anonymous");
-      expect(getUserIdFromToken("")).toBe("anonymous");
-    });
-  });
-
   describe("getVerifiedUserId", () => {
     it("returns null when no token is provided", async () => {
       const { getVerifiedUserId } = require("./promptHelpers.ts");
@@ -161,11 +137,10 @@ describe("promptHelpers engagement guidance", () => {
       expect(await getVerifiedUserId("")).toBeNull();
     });
 
-    it("does not trust the raw JWT payload the way getUserIdFromToken does", async () => {
-      // Same forged token used in the getUserIdFromToken tests above — a
-      // signature-verified lookup must not simply echo back its `sub` claim
-      // without checking Supabase Auth (outside a Deno runtime this resolves
-      // to null since there is no SUPABASE_URL/anon key to verify against).
+    it("does not trust an unsigned token payload", async () => {
+      // A signature-verified lookup must not simply echo back a forged `sub`
+      // claim without checking Supabase Auth (outside a Deno runtime this
+      // resolves to null since there is no SUPABASE_URL/anon key).
       const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMy1hYmMiLCJleHAiOjE3MTgyOTI4Mzd9.signature";
       const { getVerifiedUserId } = require("./promptHelpers.ts");
       expect(await getVerifiedUserId(token)).toBeNull();

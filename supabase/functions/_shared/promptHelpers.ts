@@ -2,23 +2,51 @@ declare const Deno: any;
 
 // Shared helpers used across generate-calendar, generate-single-post, regenerate-post.
 
-// ALLOWED_ORIGIN must be set to a single origin (e.g. "https://app.socialspark.com") to
-// restrict CORS on these endpoints. Deno.deploy/Supabase edge functions always set
-// DENO_DEPLOYMENT_ID in deployed environments; only fall back to "*" for local dev
-// (`supabase functions serve`), where DENO_DEPLOYMENT_ID is unset. This keeps a missing
-// ALLOWED_ORIGIN from silently reopening CORS in production.
+// ALLOWED_ORIGIN should be set to the production frontend origin (e.g.
+// "https://app.socialspark.com"; comma-separate to allow more than one, such
+// as a staging domain) to restrict CORS on these endpoints. Deno.deploy/
+// Supabase edge functions always set DENO_DEPLOYMENT_ID in deployed
+// environments; only fall back to "*" for local dev (`supabase functions
+// serve`), where DENO_DEPLOYMENT_ID is unset.
 const isDeployed = typeof Deno !== "undefined" && !!Deno.env.get("DENO_DEPLOYMENT_ID");
 const configuredOrigin = typeof Deno !== "undefined" ? Deno.env.get("ALLOWED_ORIGIN") : undefined;
 if (isDeployed && !configuredOrigin) {
-  throw new Error("ALLOWED_ORIGIN must be set in deployed environments");
+  // Fail closed, not crashed: a missing secret used to throw at module load,
+  // which made the entire function (including the OPTIONS preflight) return
+  // a non-200 and go completely unreachable. Log loudly and deny all origins
+  // instead so the function still serves requests once the secret is fixed.
+  console.error(
+    "ALLOWED_ORIGIN is not set in this deployed environment. All cross-origin requests will be rejected until it is configured in Supabase Edge Functions secrets."
+  );
 }
-const allowedOrigin = configuredOrigin || "*";
+const allowedOrigins = (configuredOrigin || (isDeployed ? "" : "*"))
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
 
+function resolveAllowedOrigin(requestOrigin?: string | null): string {
+  if (allowedOrigins.includes("*")) return "*";
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) return requestOrigin;
+  return allowedOrigins[0] || "";
+}
+
+export const CORS_ALLOW_HEADERS =
+  "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
+
+// Static default — reflects only the first configured origin. Prefer
+// getCorsHeaders(requestOrigin) per-request so Access-Control-Allow-Origin
+// matches the caller's actual origin when more than one is allowed.
 export const corsHeaders = {
-  "Access-Control-Allow-Origin": allowedOrigin,
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Origin": resolveAllowedOrigin(),
+  "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
 };
+
+export function getCorsHeaders(requestOrigin?: string | null): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": resolveAllowedOrigin(requestOrigin),
+    "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
+  };
+}
 
 export const VALID_DOW = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
 
@@ -152,24 +180,9 @@ function recordProviderFailure(name: string): void {
   _circuitState.set(name, s);
 }
 
-export function getUserIdFromToken(token?: string | null): string {
-  if (!token) return "anonymous";
-  try {
-    const parts = token.split('.');
-    if (parts.length === 3) {
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-      return payload.sub || token.slice(0, 32) || "anonymous";
-    }
-  } catch (e) {
-    console.error("getUserIdFromToken parsing failed:", e);
-  }
-  return token.slice(0, 32) || "anonymous";
-}
-
 // Verifies the bearer token's signature against Supabase Auth before trusting
-// the caller's identity. Unlike getUserIdFromToken (which only decodes the
-// JWT payload and can be forged with any `sub`), this is safe to use for
-// quota, rate-limiting, and usage-tracking decisions.
+// the caller's identity. This is safe to use for quota, rate-limiting, and
+// usage-tracking decisions.
 export async function getVerifiedUserId(token?: string | null): Promise<string | null> {
   if (!token) return null;
   try {

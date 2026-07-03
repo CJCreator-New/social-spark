@@ -1,17 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getE2EAuthFlag } from "@/lib/e2eFixtures";
+import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
 
 export type ApiProvider = 'openai' | 'anthropic' | 'openrouter' | 'gemini' | 'kimi' | 'glm';
 
 function getSupabaseRuntimeConfig(): { url: string; key: string } {
-  if (typeof window !== "undefined") {
-    const customUrl = localStorage.getItem("contentforge_custom_supabase_url") || "";
-    const customKey = localStorage.getItem("contentforge_custom_supabase_anon_key") || "";
-    if (customUrl && customKey) {
-      return { url: customUrl, key: customKey };
-    }
-  }
-
   return {
     url: (import.meta.env.VITE_SUPABASE_URL as string) || "",
     key: (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "",
@@ -77,7 +70,7 @@ export async function saveUserApiKey(apiKey: string, provider: ApiProvider, mode
     return;
   }
 
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/encrypt-api-key`, {
+  const res = await fetch(`${resolveFunctionsBaseUrl(SUPABASE_URL)}/functions/v1/encrypt-api-key`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -126,7 +119,7 @@ export async function validateUserApiKey(
     return { valid: true };
   }
 
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/encrypt-api-key`, {
+  const res = await fetch(`${resolveFunctionsBaseUrl(SUPABASE_URL)}/functions/v1/encrypt-api-key`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -166,7 +159,7 @@ export async function updateUserApiModel(model: string | null): Promise<void> {
     return;
   }
 
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/encrypt-api-key`, {
+  const res = await fetch(`${resolveFunctionsBaseUrl(SUPABASE_URL)}/functions/v1/encrypt-api-key`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -219,7 +212,7 @@ export async function getUserApiKey(): Promise<{
   }
 
   // Call the Edge Function to decrypt the key (which now returns metadata only)
-  const decPromise = fetch(`${SUPABASE_URL}/functions/v1/decrypt-api-key`, {
+  const decPromise = fetch(`${resolveFunctionsBaseUrl(SUPABASE_URL)}/functions/v1/decrypt-api-key`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -344,7 +337,7 @@ export async function setUseOwnKey(enabled: boolean, keyMode: 'fallback' | 'alwa
     return;
   }
 
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/encrypt-api-key`, {
+  const res = await fetch(`${resolveFunctionsBaseUrl(SUPABASE_URL)}/functions/v1/encrypt-api-key`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -386,7 +379,7 @@ export async function deleteUserApiKey(): Promise<void> {
     return;
   }
 
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-api-key`, {
+  const res = await fetch(`${resolveFunctionsBaseUrl(SUPABASE_URL)}/functions/v1/delete-api-key`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -1,7 +1,7 @@
 declare const Deno: any;
 
 import {
-  corsHeaders,
+  getCorsHeaders,
   jsonResponse,
   checkRateLimit,
   getVerifiedUserId,
@@ -46,6 +46,26 @@ function bytesFromBase64(input: string): { bytes: Uint8Array; contentType: strin
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return { bytes, contentType };
+}
+
+function normalizeCalendarId(value: unknown): string | null {
+  const calendarId = String(value || "").trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(calendarId)) {
+    return null;
+  }
+  return calendarId.toLowerCase();
+}
+
+function normalizePostDay(value: unknown): number | null {
+  const postDay = Number(value || 0);
+  if (!Number.isInteger(postDay) || postDay < 1 || postDay > 366) {
+    return null;
+  }
+  return postDay;
+}
+
+function postgrestValue(value: string): string {
+  return encodeURIComponent(value);
 }
 
 async function uploadToStorage(params: {
@@ -112,7 +132,7 @@ async function upsertMediaReference(params: {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -136,8 +156,8 @@ Deno.serve(async (req: Request) => {
     if (!userId) return jsonResponse({ error: "Sign in required." }, 401);
 
     const body = await req.json().catch(() => ({})) as ImageRequest;
-    const calendarId = String(body.calendarId || "");
-    const postDay = Number(body.postDay || 0);
+    const calendarId = normalizeCalendarId(body.calendarId);
+    const postDay = normalizePostDay(body.postDay);
     const prompt = String(body.prompt || body.post?.image_prompt || "").trim();
     const aspectRatio = String(body.aspectRatio || "1:1");
     const platform = String(body.platform || "LinkedIn");
@@ -237,7 +257,7 @@ Deno.serve(async (req: Request) => {
     // Orphan previous images for this calendar and post day before uploading the new one
     const searchPathPattern = `${userId}/${calendarId}/day-${postDay}-`;
     const orphanRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/media_references?user_id=eq.${userId}&bucket=eq.post-images&reference_kind=eq.calendar&reference_key=eq.${calendarId}&storage_path=like.${searchPathPattern}%`,
+      `${SUPABASE_URL}/rest/v1/media_references?user_id=eq.${postgrestValue(userId)}&bucket=eq.post-images&reference_kind=eq.calendar&reference_key=eq.${postgrestValue(calendarId)}&storage_path=like.${postgrestValue(`${searchPathPattern}%`)}`,
       {
         method: "PATCH",
         headers: {

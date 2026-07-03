@@ -2,7 +2,7 @@ declare const Deno: any;
 
 // Generate a 7-day content calendar via Lovable AI Gateway
 import {
-  corsHeaders,
+  getCorsHeaders,
   LENGTH_GUIDE_WEEK as LENGTH_GUIDE,
   STRUCTURE_GUIDE,
   bannedPhrasesBlock,
@@ -33,7 +33,7 @@ import {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
   }
 
   try {

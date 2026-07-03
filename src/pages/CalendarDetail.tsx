@@ -2,6 +2,7 @@ import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor, bui
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
 import { useCalendarQuery, useProfileQuery, useProfileUpdateMutation, useScheduledPostsQuery, useCreateCalendarMutation, useRegeneratePostMutation, useUpdateSavedCalendarMutation, useRepurposePostMutation, useGeneratePostImageMutation, useInlineRewriteMutation } from "@/hooks/useAppQueries";
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
@@ -481,7 +482,7 @@ export default function CalendarDetail() {
     if (!user) { toast.error("Sign in required"); return; }
     setReformatting(true);
     try {
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_URL = resolveFunctionsBaseUrl(import.meta.env.VITE_SUPABASE_URL);
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const { data: { session } } = await supabase.auth.getSession();
       const next: Post[] = [...posts];

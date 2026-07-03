@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { WARM_PALETTE } from "@/lib/theme";
+import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
 
 /**
  * Razorpay Standard Web Checkout helper.
@@ -114,7 +115,7 @@ export async function startRazorpayCheckout(params: CheckoutParams): Promise<Che
     throw new Error("Please sign in to continue with payment.");
   }
 
-  const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+  const SUPABASE_URL = resolveFunctionsBaseUrl((import.meta.env.VITE_SUPABASE_URL as string) || "");
 
   const scriptOk = await loadRazorpayScript();
   if (!scriptOk || !window.Razorpay) {

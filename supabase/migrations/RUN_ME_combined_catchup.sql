@@ -36,7 +36,22 @@ CREATE POLICY "Admins can view admin users list"
 DROP POLICY IF EXISTS "Super admin can manage admin users" ON public.admin_users;
 CREATE POLICY "Super admin can manage admin users"
   ON public.admin_users FOR ALL
-  USING (auth.jwt() ->> 'role' = 'admin');
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.user_roles
+      WHERE user_id = auth.uid()
+        AND role = 'admin'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.user_roles
+      WHERE user_id = auth.uid()
+        AND role = 'admin'
+    )
+  );
 
 GRANT SELECT ON public.admin_users TO authenticated;
 GRANT INSERT, UPDATE, DELETE ON public.admin_users TO authenticated;
@@ -92,6 +107,7 @@ END $$;
 CREATE OR REPLACE FUNCTION public.get_decrypted_api_key()
 RETURNS TABLE (decrypted_key TEXT, api_provider TEXT)
 LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pgsodium
 AS $$
 DECLARE
   v_user_id UUID;
@@ -281,6 +297,7 @@ CREATE OR REPLACE FUNCTION public.upsert_encrypted_api_key(
 )
 RETURNS VOID
 LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pgsodium
 AS $$
 DECLARE
   v_user_id UUID;

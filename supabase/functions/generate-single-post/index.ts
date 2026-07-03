@@ -2,7 +2,7 @@ declare const Deno: any;
 
 // Generate a SINGLE post (one chosen day) via Lovable AI Gateway.
 import {
-  corsHeaders,
+  getCorsHeaders,
   VALID_DOW,
   LENGTH_GUIDE_SINGLE as LENGTH_GUIDE,
   STRUCTURE_GUIDE,
@@ -30,7 +30,7 @@ import {
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
   try {
     const body = await req.json();

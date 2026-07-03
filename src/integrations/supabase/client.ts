@@ -25,13 +25,6 @@ function createMissingSupabaseProxy(): ReturnType<typeof createClient<Database>>
 }
 
 const getSupabaseConfig = () => {
-  if (typeof window !== "undefined") {
-    const customUrl = localStorage.getItem("contentforge_custom_supabase_url");
-    const customKey = localStorage.getItem("contentforge_custom_supabase_anon_key");
-    if (customUrl && customKey) {
-      return { url: customUrl, key: customKey };
-    }
-  }
   return {
     url: import.meta.env.VITE_SUPABASE_URL || "",
     key: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "",

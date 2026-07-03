@@ -16,9 +16,6 @@ interface ScheduleResult {
   message?: string;
 }
 
-const BUFFER_KEY_STORAGE = "contentforge_buffer_api_key";
-const HOOTSUITE_KEY_STORAGE = "contentforge_hootsuite_api_key";
-
 const BUFFER_PROFILE_STORAGE = "contentforge_buffer_profile_id";
 const HOOTSUITE_PROFILE_STORAGE = "contentforge_hootsuite_profile_id";
 
@@ -30,8 +27,8 @@ function buildPostText(post: Post, platform: string): string {
 export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platform, postTimes = {} }) => {
   const [schedulerType, setSchedulerType] = useState<"buffer" | "hootsuite">("buffer");
   
-  const [bufferKey, setBufferKey] = useState(() => localStorage.getItem(BUFFER_KEY_STORAGE) || "");
-  const [hootsuiteKey, setHootsuiteKey] = useState(() => localStorage.getItem(HOOTSUITE_KEY_STORAGE) || "");
+  const [bufferKey, setBufferKey] = useState("");
+  const [hootsuiteKey, setHootsuiteKey] = useState("");
   
   const [bufferProfileId, setBufferProfileId] = useState(() => localStorage.getItem(BUFFER_PROFILE_STORAGE) || "");
   const [hootsuiteProfileId, setHootsuiteProfileId] = useState(() => localStorage.getItem(HOOTSUITE_PROFILE_STORAGE) || "");
@@ -40,35 +37,12 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
   const [scheduling, setScheduling] = useState(false);
   const [results, setResults] = useState<ScheduleResult[]>([]);
   
-  const [bufferKeySaved, setBufferKeySaved] = useState(!!localStorage.getItem(BUFFER_KEY_STORAGE));
-  const [hootsuiteKeySaved, setHootsuiteKeySaved] = useState(!!localStorage.getItem(HOOTSUITE_KEY_STORAGE));
-
-  const saveBufferKey = () => {
-    if (bufferKey.trim()) {
-      localStorage.setItem(BUFFER_KEY_STORAGE, bufferKey.trim());
-      setBufferKeySaved(true);
-      toast.success("Buffer API key saved locally ✓");
-    }
-  };
-
   const clearBufferKey = () => {
-    localStorage.removeItem(BUFFER_KEY_STORAGE);
     setBufferKey("");
-    setBufferKeySaved(false);
-  };
-
-  const saveHootsuiteKey = () => {
-    if (hootsuiteKey.trim()) {
-      localStorage.setItem(HOOTSUITE_KEY_STORAGE, hootsuiteKey.trim());
-      setHootsuiteKeySaved(true);
-      toast.success("Hootsuite API key saved locally ✓");
-    }
   };
 
   const clearHootsuiteKey = () => {
-    localStorage.removeItem(HOOTSUITE_KEY_STORAGE);
     setHootsuiteKey("");
-    setHootsuiteKeySaved(false);
   };
 
   const scheduleAll = async () => {
@@ -234,16 +208,13 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
                       fontFamily: "var(--font-body)", outline: "none",
                     }}
                   />
-                  <button type="button" className="cpbtn done" style={{ fontSize: 11, padding: "5px 10px" }} onClick={saveBufferKey}>
-                    Save
-                  </button>
-                  {bufferKeySaved && (
+                  {bufferKey.trim() && (
                     <button type="button" className="cpbtn" style={{ fontSize: 11, padding: "5px 10px", color: "var(--err)" }} onClick={clearBufferKey}>
                       Clear
                     </button>
                   )}
                 </div>
-                {bufferKeySaved && <div style={{ fontSize: 10, color: "var(--accent)", opacity: 0.75 }}>✓ API key saved locally</div>}
+                <div style={{ fontSize: 10, color: "var(--text3)", opacity: 0.75 }}>Access token is kept in memory for this tab only.</div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -285,16 +256,13 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
                       fontFamily: "var(--font-body)", outline: "none",
                     }}
                   />
-                  <button type="button" className="cpbtn done" style={{ fontSize: 11, padding: "5px 10px" }} onClick={saveHootsuiteKey}>
-                    Save
-                  </button>
-                  {hootsuiteKeySaved && (
+                  {hootsuiteKey.trim() && (
                     <button type="button" className="cpbtn" style={{ fontSize: 11, padding: "5px 10px", color: "var(--err)" }} onClick={clearHootsuiteKey}>
                       Clear
                     </button>
                   )}
                 </div>
-                {hootsuiteKeySaved && <div style={{ fontSize: 10, color: "var(--accent)", opacity: 0.75 }}>✓ API key saved locally</div>}
+                <div style={{ fontSize: 10, color: "var(--text3)", opacity: 0.75 }}>Access token is kept in memory for this tab only.</div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -348,7 +316,7 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
           )}
 
           <div style={{ fontSize: 10, color: "var(--text3)", fontStyle: "italic", lineHeight: 1.5, marginTop: 4 }}>
-            ⚠️ Your API keys are stored only in your browser's localStorage and never sent to our servers.
+            API access tokens are kept in memory for this tab only and are sent directly to the selected scheduler API.
           </div>
         </div>
       )}

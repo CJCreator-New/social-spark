@@ -1,7 +1,7 @@
 declare const Deno: any;
 
 import {
-  corsHeaders,
+  getCorsHeaders,
   jsonResponse,
   checkRateLimit,
   callAIGateway,
@@ -12,7 +12,7 @@ import {
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
   try {
     const body = await req.json().catch(() => ({}));
