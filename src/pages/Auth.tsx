@@ -7,6 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getE2EAuthFlag } from "@/lib/e2eFixtures";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { LogoMark } from "@/components/brand/Logo";
+import { APP_NAME } from "@/constants/branding";
 import "@/styles/pages.css";
 
 export default function AuthPage() {
@@ -93,10 +95,10 @@ export default function AuthPage() {
   return (
     <>
       <Helmet>
-        <title>Sign in or create an account — ContentForge</title>
-        <meta name="description" content="Sign in to ContentForge or create a free account to generate AI-powered weekly content calendars for LinkedIn, X, Instagram, and more." />
+        <title>Sign in or create an account — {APP_NAME}</title>
+        <meta name="description" content={`Sign in to ${APP_NAME} or create a free account to generate AI-powered weekly content calendars for LinkedIn, X, Instagram, and more.`} />
         <link rel="canonical" href="https://contentforged.lovable.app/auth" />
-        <meta property="og:title" content="Sign in to ContentForge" />
+        <meta property="og:title" content={`Sign in to ${APP_NAME}`} />
         <meta property="og:description" content="Access your AI-powered content calendar workspace." />
         <meta property="og:url" content="https://contentforged.lovable.app/auth" />
         <meta name="robots" content="noindex, follow" />
@@ -106,7 +108,7 @@ export default function AuthPage() {
           <section className="auth-marketing" aria-label="Product overview">
             <div>
               <div className="auth-brand">
-                <div className="auth-mark">CF</div>
+                <LogoMark size="xl" />
                 <div className="auth-brand-text">
                   <div className="auth-eyebrow">AI content studio</div>
                   <h1 className="auth-title">Content<em>Forge</em></h1>

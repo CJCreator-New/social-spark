@@ -126,35 +126,6 @@
   text-decoration: none;
   flex-shrink: 0;
 }
-.ld-w-logo-mark {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: #c2410c;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  transition: box-shadow 0.2s var(--ease-smooth), transform 0.2s var(--ease-spring);
-}
-.ld-w-logo:hover .ld-w-logo-mark {
-  box-shadow: 0 0 12px rgba(194, 65, 12, 0.35);
-  transform: scale(1.05);
-}
-.ld-w-logo-text {
-  font-size: 17px;
-  color: #57534e;
-  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-}
-.ld-w-logo-text em {
-  font-family: var(--font-display, 'Lora', Georgia, serif);
-  font-style: italic;
-  font-weight: 600;
-  color: #c2410c;
-  font-synthesis: none;
-}
 .ld-w-nav-links {
   display: flex;
   align-items: center;
@@ -1431,16 +1402,6 @@
 .auth-marketing > * { position: relative; z-index: 1; }
 
 .auth-brand { display: flex; align-items: center; gap: 12px; }
-.auth-mark {
-  width: 42px; height: 42px; border-radius: 14px;
-  display: grid; place-items: center;
-  background: #ffedd5;
-  color: #c2410c;
-  font-weight: 900;
-  font-size: 13px;
-  letter-spacing: -.03em;
-  border: 1.5px solid #c2410c;
-}
 .auth-brand-text { display: flex; flex-direction: column; line-height: 1.05; }
 .auth-eyebrow {
   font-size: 10px; letter-spacing: .18em; text-transform: uppercase;

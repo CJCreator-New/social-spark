@@ -5,6 +5,7 @@ import { useCalendarQuery } from "@/hooks/useAppQueries";
 import { cn } from "@/lib/utils";
 import { Sparkles, CalendarDays, Clock, UserCircle, LogOut } from "lucide-react";
 import { motion } from "framer-motion";
+import { Logo } from "@/components/brand/Logo";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -57,10 +58,7 @@ export function AppShell({ children }: AppShellProps) {
       {/* TOP NAVBAR (sticky, warm white) */}
       <header className="sticky top-0 z-40 w-full border-b px-6 md:px-8 h-16 flex items-center justify-between" style={{ backgroundColor: "#ffffff", borderColor: "#e7e5e4", boxShadow: "0 2px 10px rgba(120,113,108,0.03)" }}>
         {/* Left: Brand */}
-        <Link to="/app" className="flex items-center gap-2 font-bold text-lg hover:opacity-90 transition-opacity" style={{ fontFamily: "var(--font-display)", color: "#c2410c", textDecoration: "none" }}>
-          <Sparkles className="w-5 h-5" style={{ color: "#c2410c" }} />
-          <span>ContentForge</span>
-        </Link>
+        <Logo variant="full" size="md" href="/app" className="hover:opacity-90 transition-opacity" />
 
         {/* Center: Navigation Links (Desktop) */}
         <nav className="hidden md:flex items-center gap-6" aria-label="Main Navigation">

@@ -1,4 +1,6 @@
 import { SkeletonList } from "@/components/SkeletonList";
+import { LogoMark } from "@/components/brand/Logo";
+import { APP_NAME } from "@/constants/branding";
 
 interface RouteFallbackProps {
   title?: string;
@@ -13,7 +15,7 @@ interface RouteFallbackProps {
   nested?: boolean;
 }
 
-export function RouteFallback({ title = "ContentForge", ariaLabel = "Loading page", nested = false }: RouteFallbackProps) {
+export function RouteFallback({ title = APP_NAME, ariaLabel = "Loading page", nested = false }: RouteFallbackProps) {
   const Tag = nested ? "div" : "main";
   // role="status" only when nested — a <main> already has the landmark role;
   // overriding it with role="status" would strip that role and reintroduce
@@ -21,6 +23,7 @@ export function RouteFallback({ title = "ContentForge", ariaLabel = "Loading pag
   return (
     <Tag role={nested ? "status" : undefined} aria-label={ariaLabel} className="min-h-screen bg-background text-foreground px-4 py-8 md:px-6">
       <div className="mx-auto flex min-h-[70vh] w-full max-w-7xl flex-col justify-center rounded-3xl border border-border bg-card/80 px-4 py-8 shadow-[var(--shadow-card)] backdrop-blur-sm md:px-8">
+        <LogoMark size="lg" animated className="mb-4" />
         <h1 className="font-display text-3xl font-normal mb-4 md:text-4xl">
           {title}
         </h1>

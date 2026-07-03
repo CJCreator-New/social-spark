@@ -19,17 +19,29 @@
     <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/67310f73-e5e7-4fe2-be68-d401c8573a96/id-preview-489803fc--b31b4522-b054-4b2f-ac2d-d7f2a2953cef.lovable.app-1778132437871.png">
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#c2410c" />
   </head>
   <body style="background:#faf8f4;color:#1c1917;margin:0;">
     <div id="root">
       <div id="boot-fallback" style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif;background:#faf8f4;">
         <div style="text-align:center;opacity:0.7;">
-          <div style="width:32px;height:32px;border:3px solid rgba(194,65,12,0.15);border-top-color:#c2410c;border-radius:50%;margin:0 auto 14px;animation:cf-spin 0.9s linear infinite;"></div>
+          <!-- fill values below must stay in sync with BRAND_COLOR in src/constants/branding.ts -->
+          <svg width="32" height="32" viewBox="0 0 32 32" style="margin:0 auto 14px;display:block;animation:cf-pulse 1.4s ease-in-out infinite;">
+            <rect x="0" y="0" width="32" height="32" rx="9" fill="#c2410c"/>
+            <path fill="#ffffff" d="M16 6 C 20 10, 22.5 14, 21 18.5 C 20 21.8, 17 24, 14 24 C 10.5 24, 8 21.3, 8 18 C 8 14.2, 10.5 11, 13.5 8.2 C 14.5 7.3, 15.3 6.6, 16 6 Z"/>
+            <path fill="#c2410c" d="M14.5 14 C 16.5 16, 17.3 18, 16.3 20 C 15.6 21.4, 14 22, 12.6 21.3 C 11.3 20.6, 10.8 19, 11.4 17.6 C 12 16.1, 13.2 14.9, 14.5 14 Z"/>
+          </svg>
           <div style="font-size:13px;color:#57534e;">Loading ContentForge…</div>
         </div>
       </div>
     </div>
-    <style>@keyframes cf-spin{to{transform:rotate(360deg)}}</style>
+    <style>
+      @keyframes cf-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(0.94); } }
+      @media (prefers-reduced-motion: reduce) {
+        #boot-fallback svg { animation: none !important; }
+      }
+    </style>
     <script>
       // Watchdog: if React hasn't replaced #root within 10s, show a reload prompt
       // so users never see a permanent blank screen.

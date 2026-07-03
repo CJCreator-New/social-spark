@@ -9,7 +9,10 @@
       "Bash(git add *)",
       "PowerShell(ls \"c:\\\\Users\\\\HP\\\\OneDrive\\\\Desktop\\\\Projects\\\\AntiGravity - Google - Projects\\\\social-spark\\\\.claude\\\\skills\\\\\" 2>$null)",
       "PowerShell(if \\(-not $?\\) { \"no skills dir\" })",
-      "PowerShell(cd \"c:\\\\Users\\\\HP\\\\OneDrive\\\\Desktop\\\\Projects\\\\AntiGravity - Google - Projects\\\\social-spark\"; Start-Process -FilePath \"powershell\" -ArgumentList \"-NoProfile -Command `\"cd 'c:\\\\Users\\\\HP\\\\OneDrive\\\\Desktop\\\\Projects\\\\AntiGravity - Google - Projects\\\\social-spark'; npm run dev 2>&1 | Tee-Object -FilePath 'C:\\\\Users\\\\HP\\\\AppData\\\\Local\\\\Temp\\\\vite-dev.log'`\"\" -WindowStyle Hidden; Start-Sleep -Seconds 8; Get-Content \"C:\\\\Users\\\\HP\\\\AppData\\\\Local\\\\Temp\\\\vite-dev.log\" -ErrorAction SilentlyContinue | Select-Object -Last 20)"
+      "PowerShell(cd \"c:\\\\Users\\\\HP\\\\OneDrive\\\\Desktop\\\\Projects\\\\AntiGravity - Google - Projects\\\\social-spark\"; Start-Process -FilePath \"powershell\" -ArgumentList \"-NoProfile -Command `\"cd 'c:\\\\Users\\\\HP\\\\OneDrive\\\\Desktop\\\\Projects\\\\AntiGravity - Google - Projects\\\\social-spark'; npm run dev 2>&1 | Tee-Object -FilePath 'C:\\\\Users\\\\HP\\\\AppData\\\\Local\\\\Temp\\\\vite-dev.log'`\"\" -WindowStyle Hidden; Start-Sleep -Seconds 8; Get-Content \"C:\\\\Users\\\\HP\\\\AppData\\\\Local\\\\Temp\\\\vite-dev.log\" -ErrorAction SilentlyContinue | Select-Object -Last 20)",
+      "Bash(netstat -ano)",
+      "Bash(awk '{print $5}')",
+      "Bash(xargs -r -I{} taskkill //PID {} //F)"
     ],
     "additionalDirectories": [
       "C:\\Users\\HP\\AppData\\Local\\Temp\\claude"

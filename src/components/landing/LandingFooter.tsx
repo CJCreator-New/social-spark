@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { Linkedin, Twitter, Github } from "lucide-react";
+import { Logo } from "@/components/brand/Logo";
+import { APP_NAME } from "@/constants/branding";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
@@ -21,16 +23,7 @@ export default function LandingFooter() {
       <div className="ld-w-wrap">
         <div className="ld-w-footer-top">
           {/* Logo */}
-          <Link to="/" className="ld-w-logo" aria-label="ContentForge home">
-            <div className="ld-w-logo-mark" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M3 9h12M9 3v12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <span className="ld-w-logo-text">
-              Content<em>Forge</em>
-            </span>
-          </Link>
+          <Logo variant="full" size="lg" href="/" className="ld-w-logo" />
 
           {/* Nav links */}
           <nav className="ld-w-footer-links" aria-label="Footer navigation">
@@ -62,7 +55,7 @@ export default function LandingFooter() {
         <hr className="ld-w-footer-divider" />
 
         <div className="ld-w-footer-bottom">
-          <span>© {new Date().getFullYear()} ContentForge · Built for content creators</span>
+          <span>© {new Date().getFullYear()} {APP_NAME} · Built for content creators</span>
           <span className="ld-w-footer-made">Crafted with care ♥</span>
         </div>
       </div>
