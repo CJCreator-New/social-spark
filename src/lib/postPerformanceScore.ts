@@ -182,6 +182,7 @@ function estimateReadability(text: string): number {
 
   const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0).length || 1;
   const words = text.split(/\s+/).filter((w) => w.trim().length > 0).length;
+  if (words === 0) return 0;
   const syllables = estimateSyllables(text);
 
   // Flesch-Kincaid Grade = 0.39(W/S) + 11.8(Sy/W) - 15.59

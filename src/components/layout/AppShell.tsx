@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCalendarQuery } from "@/hooks/useAppQueries";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { cn } from "@/lib/utils";
-import { Sparkles, CalendarDays, Clock, UserCircle, LogOut } from "lucide-react";
+import { Sparkles, CalendarDays, Clock, UserCircle, LogOut, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/brand/Logo";
 
@@ -19,12 +20,14 @@ export function AppShell({ children }: AppShellProps) {
   const isCalendarDetail = location.pathname.startsWith("/calendar/") && !!routeCalendarId;
   const { data: calendarData } = useCalendarQuery(isCalendarDetail ? routeCalendarId : undefined);
   const [isOpen, setIsOpen] = useState(false);
+  const { isAdmin } = useIsAdmin();
 
   const menuItems = [
     { label: "New calendar", path: "/app", icon: Sparkles },
     { label: "My calendars", path: "/my-calendars", icon: CalendarDays },
     { label: "Schedule", path: "/schedule", icon: Clock },
     { label: "Profile", path: "/profile", icon: UserCircle },
+    ...(isAdmin ? [{ label: "Admin", path: "/admin", icon: ShieldCheck }] : []),
   ];
 
   // Close mobile sidebar on route change
@@ -50,13 +53,13 @@ export function AppShell({ children }: AppShellProps) {
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-semibold focus:no-underline"
-        style={{ backgroundColor: "#c2410c", color: "#ffffff", boxShadow: "0 4px 12px rgba(194,65,12,0.3)" }}
+        style={{ backgroundColor: "var(--color-primary)", color: "var(--color-surface)", boxShadow: "0 4px 12px rgba(194,65,12,0.3)" }}
       >
         Skip to main content
       </a>
 
       {/* TOP NAVBAR (sticky, warm white) */}
-      <header className="sticky top-0 z-40 w-full border-b px-6 md:px-8 h-16 flex items-center justify-between" style={{ backgroundColor: "#ffffff", borderColor: "#e7e5e4", boxShadow: "0 2px 10px rgba(120,113,108,0.03)" }}>
+      <header className="sticky top-0 z-40 w-full border-b px-6 md:px-8 h-16 flex items-center justify-between" style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)", boxShadow: "0 2px 10px rgba(120,113,108,0.03)" }}>
         {/* Left: Brand */}
         <Logo variant="full" size="md" href="/app" className="hover:opacity-90 transition-opacity" />
 
@@ -72,7 +75,7 @@ export function AppShell({ children }: AppShellProps) {
                 style={{
                   fontSize: 13,
                   fontWeight: isActive ? 600 : 500,
-                  color: isActive ? "#c2410c" : "#57534e",
+                  color: isActive ? "var(--color-primary)" : "var(--color-text-secondary)",
                   textDecoration: "none",
                   transition: "color 0.15s",
                 }}
@@ -82,7 +85,7 @@ export function AppShell({ children }: AppShellProps) {
                   <motion.div
                     layoutId="activeTabIndicator"
                     className="absolute left-0 right-0"
-                    style={{ bottom: -17, height: 2, backgroundColor: "#c2410c", borderRadius: 9999 }}
+                    style={{ bottom: -17, height: 2, backgroundColor: "var(--color-primary)", borderRadius: 9999 }}
                   />
                 )}
               </Link>
@@ -92,18 +95,18 @@ export function AppShell({ children }: AppShellProps) {
 
         {/* Right: User Avatar & Actions */}
         <div className="flex items-center gap-3">
-          <span className="hidden sm:inline text-xs font-medium truncate max-w-[140px]" style={{ color: "#5a5753" }}>
+          <span className="hidden sm:inline text-xs font-medium truncate max-w-[140px]" style={{ color: "var(--color-text-secondary)" }}>
             {user?.email || "Creator"}
           </span>
-          <div className="w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs border" style={{ backgroundColor: "#fef3c7", color: "#c2410c", borderColor: "#c2410c", borderWidth: 1.5 }}>
+          <div className="w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs border" style={{ backgroundColor: "var(--color-primary-light)", color: "var(--color-primary)", borderColor: "var(--color-primary)", borderWidth: 1.5 }}>
             {initial}
           </div>
           <button
             onClick={handleSignOut}
             className="flex items-center gap-1.5 rounded-full text-xs transition-all"
-            style={{ padding: "6px 12px", color: "#57534e", background: "none", border: "none", cursor: "pointer" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#c2410c"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(194,65,12,0.05)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#57534e"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent"; }}
+            style={{ padding: "6px 12px", color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--color-primary)"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(194,65,12,0.05)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--color-text-secondary)"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent"; }}
             title="Sign out"
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -114,7 +117,7 @@ export function AppShell({ children }: AppShellProps) {
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="md:hidden p-1.5 transition-colors"
-            style={{ color: "#57534e", background: "none", border: "none", cursor: "pointer" }}
+            style={{ color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer" }}
             aria-label="Toggle navigation menu"
             aria-expanded={isOpen}
             aria-controls="mobile-nav-drawer"
@@ -128,7 +131,7 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Mobile Drawer menu (warm) */}
       {isOpen && (
-        <div id="mobile-nav-drawer" className="md:hidden fixed inset-x-0 top-16 z-30 flex flex-col p-6 border-b" style={{ backgroundColor: "#ffffff", borderColor: "#e7e5e4" }} role="navigation" aria-label="Mobile navigation">
+        <div id="mobile-nav-drawer" className="md:hidden fixed inset-x-0 top-16 z-30 flex flex-col p-6 border-b" style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }} role="navigation" aria-label="Mobile navigation">
           <nav className="flex flex-col gap-3">
             {menuItems.map((item) => {
               const isActive = location.pathname === item.path || (item.path === "/my-calendars" && location.pathname.startsWith("/calendar/"));
@@ -138,7 +141,7 @@ export function AppShell({ children }: AppShellProps) {
                   to={item.path}
                   className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all"
                   style={{
-                    color: isActive ? "#c2410c" : "#57534e",
+                    color: isActive ? "var(--color-primary)" : "var(--color-text-secondary)",
                     backgroundColor: isActive ? "rgba(194,65,12,0.05)" : "transparent",
                     fontWeight: isActive ? 600 : 500,
                     textDecoration: "none",
@@ -157,14 +160,14 @@ export function AppShell({ children }: AppShellProps) {
       {/* MAIN CONTENT AREA */}
       <main id="main-content" className="flex-1 w-full max-w-[1100px] mx-auto px-4 md:px-8 py-8 flex flex-col" style={{ paddingBottom: 80 }}>
         {/* Breadcrumb */}
-        <div className="mb-6 flex items-center gap-2 text-xs" style={{ color: "#5a5753" }}>
+        <div className="mb-6 flex items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
           {isCalendarDetail ? (
-            <Link to="/my-calendars" style={{ color: "#5a5753", textDecoration: "none", transition: "color 0.15s" }} onMouseEnter={e => (e.currentTarget.style.color = "#c2410c")} onMouseLeave={e => (e.currentTarget.style.color = "#78716c")}>My calendars</Link>
+            <Link to="/my-calendars" style={{ color: "var(--color-text-secondary)", textDecoration: "none", transition: "color 0.15s" }} onMouseEnter={e => (e.currentTarget.style.color = "var(--color-primary)")} onMouseLeave={e => (e.currentTarget.style.color = "var(--color-text-muted)")}>My calendars</Link>
           ) : (
             <span>Workspace</span>
           )}
           <span>/</span>
-          <span style={{ color: "#1c1917", fontWeight: 500 }}>{breadcrumbLabel}</span>
+          <span style={{ color: "var(--color-text)", fontWeight: 500 }}>{breadcrumbLabel}</span>
         </div>
 
         {/* Inner page content */}

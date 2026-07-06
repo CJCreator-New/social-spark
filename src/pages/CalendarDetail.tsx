@@ -38,6 +38,7 @@ import e2eStore from "@/lib/e2eStore";
 
 const FeedbackModal = lazy(() => import("@/components/FeedbackModal"));
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
+import { ErrorState } from "@/components/ErrorState";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Database, Json } from "@/integrations/supabase/types";
 import type { Post } from "@/components/wizard/constants";
@@ -391,6 +392,7 @@ export default function CalendarDetail() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [scheduling, setScheduling] = useState(false);
+  const [pendingScheduleConflict, setPendingScheduleConflict] = useState<{ rows: Record<string, unknown>[]; count: number } | null>(null);
   const [timezone, setTimezone] = useState<string>(browserTimezone());
   const [profileTimezone, setProfileTimezone] = useState<string>("");
   const [trackingUrl, setTrackingUrl] = useState<string>("");
@@ -415,7 +417,7 @@ export default function CalendarDetail() {
   const [pastPostText, setPastPostText] = useState<string[]>([]);
   const tzList = listTimezones();
 
-  const { data: calendarData, isLoading: calendarLoading, error: calendarError } = useCalendarQuery(id);
+  const { data: calendarData, isLoading: calendarLoading, error: calendarError, refetch: refetchCalendar } = useCalendarQuery(id);
   const { data: profileData } = useProfileQuery(user?.id);
   const { data: scheduledPostsData } = useScheduledPostsQuery(id);
   const updateCalendarMutation = useUpdateSavedCalendarMutation(id);
@@ -543,12 +545,11 @@ export default function CalendarDetail() {
 
   // Handle calendar data loading
   useEffect(() => {
-    if (!calendarData) return;
-    if (calendarError) {
-      toast.error("Calendar not found");
-      navigate("/my-calendars");
-      return;
-    }
+    // calendarError implies calendarData is undefined, so this must be checked
+    // before the `!calendarData` guard below — otherwise it's unreachable and the
+    // page is left silently stuck (see inline ErrorState in the render below for
+    // the actual user-facing recovery UI; this effect no longer navigates away).
+    if (calendarError || !calendarData) return;
 
     let cancelled = false;
     const load = async () => {
@@ -1360,8 +1361,8 @@ export default function CalendarDetail() {
     try {
       const ws = parseLocalDate(weekStart) || nextMonday();
       const tz = timezone || profileTimezone || browserTimezone();
-      const rows = posts.map((post, idx) => {
-        const d = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + idx);
+      const rows = posts.map((post) => {
+        const d = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + (post.day - 1));
         const dateStr = toDateInputValue(d);
         const time = postTimes[String(post.day)] || suggestedTimeForDay(post.day, platform);
         const f = formatForPlatform(post, platform);
@@ -1377,6 +1378,33 @@ export default function CalendarDetail() {
           post_snapshot: post as unknown as never,
         };
       });
+
+      // Check for posts already scheduled at the same platform+time from a different
+      // calendar — the upsert below is only idempotent on (calendar_id, post_day), so
+      // without this check two unrelated posts could silently double-book a slot.
+      const scheduledTimes = rows.map((r) => r.scheduled_at);
+      const { data: conflicts } = await supabase
+        .from("scheduled_posts")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("platform", platform || "")
+        .neq("calendar_id", id)
+        .in("scheduled_at", scheduledTimes);
+      if (conflicts && conflicts.length > 0) {
+        setPendingScheduleConflict({ rows, count: conflicts.length });
+        return;
+      }
+
+      await commitScheduleWeek(rows, tz);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not schedule");
+    } finally {
+      setScheduling(false);
+    }
+  }
+
+  async function commitScheduleWeek(rows: Record<string, unknown>[], tz: string) {
+    try {
       // Idempotent upsert keyed on (calendar_id, post_day) — preserves existing rows on partial failure
       const { error } = await supabase
         .from("scheduled_posts")
@@ -1450,6 +1478,18 @@ export default function CalendarDetail() {
   }, [posts, platform]);
 
   const sampleMode = false;
+
+  if (calendarError) {
+    return (
+      <WorkspacePage size="wide">
+        <ErrorState
+          title="Couldn't load this calendar"
+          description={calendarError instanceof Error ? calendarError.message : "This calendar may have been deleted, or something went wrong while fetching it."}
+          onRetry={() => refetchCalendar()}
+        />
+      </WorkspacePage>
+    );
+  }
 
   if (loading) return <WorkspacePage size="wide"><div className="cd-inner">Loading…</div></WorkspacePage>;
 
@@ -2499,6 +2539,21 @@ export default function CalendarDetail() {
           message={`This will create a new calendar reformatted for ${niceLabelFor(pendingReformatTarget)} and leave the current one untouched.`}
           onCancel={() => setPendingReformatTarget(null)}
           onConfirm={async () => { setPendingReformatTarget(null); await reformatAllForPlatform(pendingReformatTarget); }}
+        />
+      )}
+      {pendingScheduleConflict && (
+        <ConfirmDialog
+          title="Time slot already taken"
+          message={`${pendingScheduleConflict.count} post${pendingScheduleConflict.count === 1 ? " is" : "s are"} already scheduled for ${niceLabelFor(platform)} at the same time from another calendar. Schedule anyway?`}
+          confirmLabel="Schedule anyway"
+          onCancel={() => setPendingScheduleConflict(null)}
+          onConfirm={async () => {
+            const conflict = pendingScheduleConflict;
+            setPendingScheduleConflict(null);
+            setScheduling(true);
+            const tz = timezone || profileTimezone || browserTimezone();
+            await commitScheduleWeek(conflict.rows, tz);
+          }}
         />
       )}
       {p && (

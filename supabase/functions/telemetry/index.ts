@@ -136,7 +136,7 @@ export async function handle(req: Request): Promise<Response> {
     });
   } catch (e) {
     console.error("Telemetry handler error", e);
-    return new Response(JSON.stringify({ ok: false, error: String(e) }), {
+    return new Response(JSON.stringify({ ok: false, error: "Internal server error" }), {
       status: 500,
       headers: { ...cors, "Content-Type": "application/json" },
     });

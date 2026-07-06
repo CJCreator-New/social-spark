@@ -62,7 +62,11 @@ export function AdminDashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [apiKeyStatuses, setApiKeyStatuses] = useState<ApiKeyStatusRow[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogRow[]>([]);
+  const [apiKeyDataLoading, setApiKeyDataLoading] = useState(true);
+  const [apiKeyDataError, setApiKeyDataError] = useState<string | null>(null);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(true);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
   const [compUserId, setCompUserId] = useState("");
   const [compTier, setCompTier] = useState<"starter" | "pro" | "free">("starter");
   const [compBusy, setCompBusy] = useState(false);
@@ -93,35 +97,48 @@ export function AdminDashboard() {
 
     // Fetch API key metadata from admin view (no raw keys)
     const loadApiKeyData = async () => {
+      setApiKeyDataLoading(true);
       try {
-        const { data: statuses } = await supabase
+        const { data: statuses, error: statusesError } = await supabase
           .from('admin_user_key_status' as any)
           .select('*');
+        if (statusesError) throw statusesError;
         if (statuses) setApiKeyStatuses(statuses as unknown as ApiKeyStatusRow[]);
 
-        const { data: logs } = await supabase
+        const { data: logs, error: logsError } = await supabase
           .from('api_key_audit_log' as any)
           .select('*')
           .order('created_at', { ascending: false })
           .limit(50);
+        if (logsError) throw logsError;
         if (logs) setAuditLogs(logs as unknown as AuditLogRow[]);
+        setApiKeyDataError(null);
       } catch (err) {
         console.error('Failed to load API key admin data:', err);
+        setApiKeyDataError(err instanceof Error ? err.message : 'Failed to load API key data');
+      } finally {
+        setApiKeyDataLoading(false);
       }
     };
     loadApiKeyData();
 
     // Fetch payments ledger (admin RLS allows reading all)
     const loadPayments = async () => {
+      setPaymentsLoading(true);
       try {
-        const { data: rows } = await supabase
+        const { data: rows, error: rowsError } = await supabase
           .from('admin_payments' as any)
           .select('*')
           .order('created_at', { ascending: false })
           .limit(100);
+        if (rowsError) throw rowsError;
         if (rows) setPayments(rows as unknown as PaymentRow[]);
+        setPaymentsError(null);
       } catch (err) {
         console.error('Failed to load payments:', err);
+        setPaymentsError(err instanceof Error ? err.message : 'Failed to load payments');
+      } finally {
+        setPaymentsLoading(false);
       }
     };
     loadPayments();
@@ -468,7 +485,14 @@ export function AdminDashboard() {
             </Button>
           </div>
 
-          {payments.length === 0 ? (
+          {paymentsLoading ? (
+            <SkeletonList rows={3} />
+          ) : paymentsError ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{paymentsError}</AlertDescription>
+            </Alert>
+          ) : payments.length === 0 ? (
             <p className="text-sm text-gray-500">No payments yet.</p>
           ) : (
             <div className="space-y-2">
@@ -477,14 +501,14 @@ export function AdminDashboard() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-slate-400">{p.user_id.slice(0, 8)}…</span>
                     {p.tier_granted && (
-                      <Badge variant="outline" className="text-lime-400 border-lime-400/40 text-[10px] capitalize">{p.tier_granted}</Badge>
+                      <Badge variant="outline" className="text-emerald-700 border-emerald-700/40 text-[10px] capitalize">{p.tier_granted}</Badge>
                     )}
                     {p.is_comp ? (
-                      <Badge variant="outline" className="text-sky-400 border-sky-400/40 text-[10px]">Comp</Badge>
+                      <Badge variant="outline" className="text-sky-700 border-sky-700/40 text-[10px]">Comp</Badge>
                     ) : (
                       <Badge variant="outline" className="text-[10px]">₹{(p.amount / 100).toFixed(0)}</Badge>
                     )}
-                    <Badge variant="outline" className={`text-[10px] ${p.status === 'paid' ? 'text-lime-400 border-lime-400/40' : 'text-slate-500'}`}>{p.status}</Badge>
+                    <Badge variant="outline" className={`text-[10px] ${p.status === 'paid' ? 'text-emerald-700 border-emerald-700/40' : 'text-slate-500'}`}>{p.status}</Badge>
                   </div>
                   <div className="flex items-center gap-3 text-slate-600">
                     {p.period_end && <span>until {new Date(p.period_end).toLocaleDateString()}</span>}
@@ -509,7 +533,14 @@ export function AdminDashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {apiKeyStatuses.length === 0 ? (
+          {apiKeyDataLoading ? (
+            <SkeletonList rows={3} />
+          ) : apiKeyDataError ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{apiKeyDataError}</AlertDescription>
+            </Alert>
+          ) : apiKeyStatuses.length === 0 ? (
             <p className="text-sm text-gray-500">No users have configured a fallback key.</p>
           ) : (
             <div className="space-y-3">
@@ -521,12 +552,12 @@ export function AdminDashboard() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-xs text-slate-400">{row.user_id.slice(0, 8)}…</span>
                         {row.has_own_key ? (
-                          <Badge variant="outline" className="text-lime-400 border-lime-400/40 text-[10px]">Key set</Badge>
+                          <Badge variant="outline" className="text-emerald-700 border-emerald-700/40 text-[10px]">Key set</Badge>
                         ) : (
                           <Badge variant="outline" className="text-slate-500 text-[10px]">No key</Badge>
                         )}
                         {row.use_own_key && (
-                          <Badge variant="outline" className="text-sky-400 border-sky-400/40 text-[10px]">Fallback ON</Badge>
+                          <Badge variant="outline" className="text-sky-700 border-sky-700/40 text-[10px]">Fallback ON</Badge>
                         )}
                         {row.api_provider && (
                           <Badge variant="outline" className="text-[10px]">{row.api_provider}</Badge>

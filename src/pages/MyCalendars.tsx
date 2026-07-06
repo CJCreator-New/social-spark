@@ -47,6 +47,11 @@ export default function MyCalendars() {
   const [deleting, setDeleting] = useState(false);
   const [lastDeleted, setLastDeleted] = useState<SavedCalendar | null>(null);
   const lastDeletedTimer = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      if (lastDeletedTimer.current) window.clearTimeout(lastDeletedTimer.current);
+    };
+  }, []);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameSaving, setRenameSaving] = useState(false);
@@ -73,6 +78,16 @@ export default function MyCalendars() {
   useEffect(() => {
     if (error instanceof Error) toast.error(error.message);
   }, [error]);
+
+  // Search/favorites filtering below only runs over already-loaded pages. Once the
+  // user narrows the list, eagerly fetch the rest so results/counts aren't silently
+  // limited to whatever happened to be paged in.
+  const isFiltering = Boolean(debouncedSearch.trim()) || favOnly;
+  useEffect(() => {
+    if (isFiltering && hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [isFiltering, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const items = useMemo(() => data?.pages.flatMap((page) => page.items) || [], [data]);
 
@@ -107,11 +122,12 @@ export default function MyCalendars() {
 
   const visibleSubtitle = useMemo(() => {
     const hasSearch = debouncedSearch.trim().length > 0;
-    if (favOnly && hasSearch) return "Starred matching search";
-    if (hasSearch) return "Matching search query";
-    if (favOnly) return "Starred items only";
+    const loadingSuffix = isFiltering && isFetchingNextPage ? " (still loading full results…)" : "";
+    if (favOnly && hasSearch) return `Starred matching search${loadingSuffix}`;
+    if (hasSearch) return `Matching search query${loadingSuffix}`;
+    if (favOnly) return `Starred items only${loadingSuffix}`;
     return "All saved calendars";
-  }, [favOnly, debouncedSearch]);
+  }, [favOnly, debouncedSearch, isFiltering, isFetchingNextPage]);
 
   const toggleFavorite = useCallback(async (it: SavedCalendar) => {
     const next = !it.is_favorite;

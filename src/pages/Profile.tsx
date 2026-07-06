@@ -12,6 +12,8 @@ import { ApiKeySettings } from "@/components/settings/ApiKeySettings";
 import { PlanSettings } from "@/components/settings/PlanSettings";
 import { TierBadge } from "@/components/TierBadge";
 import { EmptyState } from "@/components/EmptyState";
+import { SkeletonList } from "@/components/SkeletonList";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { LayoutTemplate } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Helmet } from "react-helmet-async";
@@ -34,14 +36,16 @@ function TemplatesList() {
 
   const { data: templates = [], isLoading: loading } = useTemplatesQuery(user?.id);
   const deleteTemplateMutation = useDeleteTemplateMutation(user?.id);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this template?')) return;
     try {
       await deleteTemplateMutation.mutateAsync(id);
       toast.success('Template deleted');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Delete failed');
+    } finally {
+      setPendingDeleteId(null);
     }
   }
 
@@ -58,7 +62,7 @@ function TemplatesList() {
     }
   }
 
-  if (loading) return <div style={{ color: '#5a5753', fontSize: 13 }}>Loading templates…</div>;
+  if (loading) return <SkeletonList rows={3} />;
   if (templates.length === 0) return (
     <EmptyState
       icon={LayoutTemplate}
@@ -79,10 +83,19 @@ function TemplatesList() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="pf-add-btn" onClick={() => handleLoad(t)}>Load</button>
-            <button className="pf-add-btn" onClick={() => handleDelete(t.id)}>Delete</button>
+            <button className="pf-add-btn" onClick={() => setPendingDeleteId(t.id)}>Delete</button>
           </div>
         </div>
       ))}
+      {pendingDeleteId && (
+        <ConfirmDialog
+          title="Delete template"
+          message="This template will be permanently deleted. This can't be undone."
+          confirmLabel="Delete"
+          onConfirm={() => handleDelete(pendingDeleteId)}
+          onCancel={() => setPendingDeleteId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -184,56 +197,60 @@ export default function Profile() {
     if (file.size > 2 * 1024 * 1024) return toast.error("Image must be under 2MB");
     setUploading(true);
     const previousUrl = avatarUrl;
-    const extByType: Record<string, string> = {
-      "image/png": "png",
-      "image/jpeg": "jpg",
-      "image/webp": "webp",
-    };
-    const path = `${user.id}/avatar.${extByType[file.type]}`;
-    const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, {
-      upsert: true,
-      contentType: file.type,
-    });
-    if (upErr) { setUploading(false); return toast.error(upErr.message); }
-    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-    const newUrl = data.publicUrl;
-    const { error: updErr } = await supabase.from("profiles").update({ avatar_url: newUrl }).eq("user_id", user.id);
-    if (updErr) {
-      await supabase.storage.from("avatars").remove([path]);
-      setUploading(false);
-      return toast.error(updErr.message);
-    }
-    setAvatarUrl(newUrl);
     try {
-      mediaManager.addMediaRef(user.id, newUrl);
-    } catch {
-      /* media reference tracking is best effort */
-    }
-    await (supabase.from as any)("media_references").upsert({
-      user_id: user.id,
-      bucket: "avatars",
-      storage_path: path,
-      public_url: newUrl,
-      reference_kind: "avatar",
-      reference_key: user.id,
-      reference_count: 1,
-      last_referenced_at: new Date().toISOString(),
-      orphaned_at: null,
-      deleted_at: null,
-    }, { onConflict: "bucket,storage_path" });
-    if (previousUrl) {
-      const oldPath = getAvatarPathFromPublicUrl(previousUrl);
-      if (oldPath && oldPath !== path) void supabase.storage.from("avatars").remove([oldPath]);
-      if (oldPath && oldPath !== path) {
-        void (supabase.from as any)("media_references")
-          .update({ reference_count: 0, orphaned_at: new Date().toISOString(), last_referenced_at: new Date().toISOString() })
-          .eq("bucket", "avatars")
-          .eq("storage_path", oldPath);
+      const extByType: Record<string, string> = {
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/webp": "webp",
+      };
+      const path = `${user.id}/avatar.${extByType[file.type]}`;
+      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      });
+      if (upErr) return toast.error(upErr.message);
+      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      const newUrl = data.publicUrl;
+      const { error: updErr } = await supabase.from("profiles").update({ avatar_url: newUrl }).eq("user_id", user.id);
+      if (updErr) {
+        await supabase.storage.from("avatars").remove([path]);
+        return toast.error(updErr.message);
       }
+      setAvatarUrl(newUrl);
+      try {
+        mediaManager.addMediaRef(user.id, newUrl);
+      } catch {
+        /* media reference tracking is best effort */
+      }
+      await (supabase.from as any)("media_references").upsert({
+        user_id: user.id,
+        bucket: "avatars",
+        storage_path: path,
+        public_url: newUrl,
+        reference_kind: "avatar",
+        reference_key: user.id,
+        reference_count: 1,
+        last_referenced_at: new Date().toISOString(),
+        orphaned_at: null,
+        deleted_at: null,
+      }, { onConflict: "bucket,storage_path" });
+      if (previousUrl) {
+        const oldPath = getAvatarPathFromPublicUrl(previousUrl);
+        if (oldPath && oldPath !== path) void supabase.storage.from("avatars").remove([oldPath]);
+        if (oldPath && oldPath !== path) {
+          void (supabase.from as any)("media_references")
+            .update({ reference_count: 0, orphaned_at: new Date().toISOString(), last_referenced_at: new Date().toISOString() })
+            .eq("bucket", "avatars")
+            .eq("storage_path", oldPath);
+        }
+      }
+      if (fileRef.current) fileRef.current.value = "";
+      toast.success("Avatar updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Avatar upload failed");
+    } finally {
+      setUploading(false);
     }
-    if (fileRef.current) fileRef.current.value = "";
-    setUploading(false);
-    toast.success("Avatar updated");
   }
 
   function toggleGoal(g: string) {

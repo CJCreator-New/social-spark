@@ -1,4 +1,5 @@
 import React, { Suspense, useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { formatForPlatform, niceLabelFor, stripMarkdown } from "@/lib/platformCopy";
 import { suggestedTimeForDay } from "@/lib/postingTimes";
 import { shortDateLabel, dateForDow } from "@/lib/calendarSchedule";
@@ -17,6 +18,7 @@ import { hasEmoji } from "@/components/wizard/PostDetailCard";
 import { toast } from "sonner";
 import type { Post, WizardForm } from "@/components/wizard/constants";
 import { Button } from "@/components/ui/button";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { Loader2, Key, Sparkles, Check, Pin, RefreshCw, Sliders, Image as ImageIcon, Eye, Download, Users, Settings } from "lucide-react";
 
 interface IndexResultsProps {
@@ -149,6 +151,7 @@ export function IndexResults({
   const p = posts[activeDay];
   const [personaCompareOpen, setPersonaCompareOpen] = useState(false);
   const [tweakOpenIdx, setTweakOpenIdx] = useState<number | null>(null);
+  const [confirmStartOver, setConfirmStartOver] = useState(false);
 
   // AI Image generation states
   const [pasteImageUrl, setPasteImageUrl] = useState("");
@@ -354,10 +357,28 @@ export function IndexResults({
           <Button
             variant="ghost"
             className="min-h-11"
-            onClick={() => { clearDraft(); setPostsWithHistory([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setStep(1); setError(""); }}
+            onClick={() => {
+              if (savedId) {
+                clearDraft(); setPostsWithHistory([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setStep(1); setError("");
+              } else {
+                setConfirmStartOver(true);
+              }
+            }}
           >
             ← Start over
           </Button>
+          {confirmStartOver && (
+            <ConfirmDialog
+              title="Start over?"
+              message="This will discard your generated posts. This can't be undone unless you've already saved this calendar."
+              confirmLabel="Discard and start over"
+              onCancel={() => setConfirmStartOver(false)}
+              onConfirm={() => {
+                setConfirmStartOver(false);
+                clearDraft(); setPostsWithHistory([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setStep(1); setError("");
+              }}
+            />
+          )}
           <Button
             variant="ghost"
             className="min-h-11"
@@ -381,16 +402,22 @@ export function IndexResults({
           <BufferScheduler posts={posts} platform={form.platform} postTimes={postTimes} />
           
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 }}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-xs"
-              onClick={saveCalendar}
-              disabled={saving || !!savedId || sampleMode}
-              title={sampleMode ? "Sample mode — start your own to save" : ""}
-            >
-              {savedId ? "Saved to Library ✓" : saving ? "Saving…" : "Save Calendar"}
-            </Button>
+            {savedId ? (
+              <Button variant="outline" size="sm" className="w-full text-xs" asChild>
+                <Link to={`/calendar/${savedId}`}>View saved calendar →</Link>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs"
+                onClick={saveCalendar}
+                disabled={saving || sampleMode}
+                title={sampleMode ? "Sample mode — start your own to save" : ""}
+              >
+                {saving ? "Saving…" : "Save Calendar"}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -401,7 +428,7 @@ export function IndexResults({
               ⚙️ Batch Edit
             </Button>
           </div>
-          
+
           <div style={{ display: "flex", gap: 6, width: "100%", marginTop: 8 }}>
             <Button variant="default" size="sm" className="w-full font-medium" style={{ background: "var(--accent)", color: "#000" }} onClick={copyAll}>
               {copiedAll ? "All copied ✓" : `Copy all ${posts.length} posts`}
@@ -635,7 +662,7 @@ export function IndexResults({
 
         {/* Section 4: Live feed preview */}
         {p && (
-          <div className="action-block" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
+          <div className="action-block" role="region" aria-label="Feed preview" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
             <h3 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text2)", fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
               <Eye size={14} />
               <span>Feed Preview</span>

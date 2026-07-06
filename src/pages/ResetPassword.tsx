@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { PASSWORD_MIN_LENGTH, validatePassword } from "@/lib/passwordPolicy";
 import "@/styles/pages.css";
 
 export default function ResetPassword() {
@@ -39,7 +40,8 @@ export default function ResetPassword() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (password.length < 6) return setError("Password must be at least 6 characters.");
+    const passwordErr = validatePassword(password);
+    if (passwordErr) return setError(passwordErr);
     if (password !== confirm) return setError("Passwords do not match.");
     setLoading(true);
     const { error: err } = await supabase.auth.updateUser({ password });
@@ -81,9 +83,9 @@ export default function ResetPassword() {
           {ready && !linkExpired && (
             <form onSubmit={handleSubmit}>
               <label className="rp-label" htmlFor="rp-password">New password</label>
-              <input id="rp-password" className="rp-input" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters" />
+              <input id="rp-password" className="rp-input" type="password" required minLength={PASSWORD_MIN_LENGTH} value={password} onChange={e => setPassword(e.target.value)} placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`} />
               <label className="rp-label" htmlFor="rp-confirm">Confirm password</label>
-              <input id="rp-confirm" className="rp-input" type="password" required minLength={6} value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat it" />
+              <input id="rp-confirm" className="rp-input" type="password" required minLength={PASSWORD_MIN_LENGTH} value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat it" />
               {error && <div className="rp-err">{error}</div>}
               <button className="rp-btn" type="submit" disabled={loading}>{loading ? "Saving…" : "Update password"}</button>
               <div className="rp-link-row">

@@ -120,8 +120,17 @@ const App = () => {
                         </Suspense>
                       }
                     />
+                    <Route
+                      path="/admin"
+                      element={
+                        <AdminRoute>
+                          <Suspense fallback={<RouteFallback title="Admin Dashboard" nested />}>
+                            <Admin />
+                          </Suspense>
+                        </AdminRoute>
+                      }
+                    />
                   </Route>
-                  <Route path="/admin" element={<ProtectedRoute><AdminRoute><Suspense fallback={<RouteFallback title="Admin Dashboard" />}><Admin /></Suspense></AdminRoute></ProtectedRoute>} />
                   <Route path="*" element={<Suspense fallback={<RouteFallback title="Not Found" />}><NotFound /></Suspense>} />
                 </Routes>
               </AuthProvider>

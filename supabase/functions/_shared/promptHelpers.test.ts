@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload, buildSystemMessage, buildUserMessage, shouldFallbackToUserKey, shouldUseUserKeyOnly, getProviderModel, clampMaxTokensForProvider, callAI, sanitizeLogValue, sanitizeHtmlText, stripMarkdownFormatting } from "./promptHelpers.ts";
+import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload, buildSystemMessage, buildUserMessage, shouldFallbackToUserKey, shouldUseUserKeyOnly, getProviderModel, clampMaxTokensForProvider, callAI, sanitizeLogValue, stripMarkdownFormatting } from "./promptHelpers.ts";
 
 describe("stripMarkdownFormatting", () => {
   it("strips bold and italic emphasis without losing the wrapped text", () => {
@@ -196,10 +196,6 @@ describe("promptHelpers engagement guidance", () => {
       expect(sanitizeLogValue("ok\r\ninjected: true\tend")).toBe("ok  injected: true end");
     });
 
-    it("escapes generated text before returning normalized posts", () => {
-      expect(sanitizeHtmlText('<script>alert("x")</script>')).toBe("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
-    });
-
     it("builds required words prompt block correctly", () => {
       const { buildRequiredWordsBlock } = require("./promptHelpers.ts");
       const block = buildRequiredWordsBlock(["growth", "startup"]);
@@ -234,21 +230,29 @@ describe("promptHelpers engagement guidance", () => {
       expect(result.self_check.forbidden_violations).toContain('Missing required word: "retention"');
     });
 
-    it("escapes normalized AI-generated post fields", () => {
+    it("does not HTML-entity-encode normalized AI-generated post fields (plain-text output only)", () => {
+      // normalizePost output is always consumed as plain text (React text nodes,
+      // clipboard copy, Markdown/PDF export, image-generation prompts) — never
+      // as raw HTML — so it must NOT be HTML-entity-encoded. Encoding here would
+      // leak literal "&#39;", "&amp;", etc. into copy-pasted and exported text.
       const { normalizePost } = require("./promptHelpers.ts");
       const result = normalizePost({
-        title: "<b>Title</b>",
-        hook: "<img src=x onerror=alert(1)>",
-        body: "Body with <script>alert(1)</script>",
-        cta: "Click <here>",
+        title: "India's <startup> ecosystem",
+        hook: "They're not just flagging issues",
+        body: "This isn't future-gazing; it's happening now. R&D matters.",
+        cta: "Click here",
         hashtags: "#safe",
         dow: "Mon",
       }, "Mon");
 
-      expect(result.title).toBe("&lt;b&gt;Title&lt;/b&gt;");
-      expect(result.hook).toContain("&lt;img");
-      expect(result.body).toContain("&lt;script&gt;");
-      expect(result.cta).toBe("Click &lt;here&gt;");
+      expect(result.title).toBe("India's <startup> ecosystem");
+      expect(result.hook).toContain("They're");
+      expect(result.body).toContain("isn't");
+      expect(result.body).toContain("R&D");
+      expect(result.cta).toBe("Click here");
+      expect(result.title).not.toContain("&#39;");
+      expect(result.body).not.toContain("&#39;");
+      expect(result.body).not.toContain("&amp;");
     });
   });
 

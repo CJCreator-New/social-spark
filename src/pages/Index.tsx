@@ -458,10 +458,6 @@ const Index = () => {
     keySource, setKeySource, setKeyMode
   } = useWizardStore();
 
-  const [errorForBoundary, setErrorForBoundary] = useState<Error | null>(null);
-  if (errorForBoundary) {
-    throw errorForBoundary;
-  }
 
   const [recentCalendars, setRecentCalendars] = useState<{ id: string; title: string; platform: string | null; industry_label: string | null; created_at: string }[]>([]);
   const [genMsg, setGenMsg] = useState("");
@@ -1008,6 +1004,10 @@ const Index = () => {
     setForm(f => ({ ...f, [k]: v }));
     setError("");
   }, []);
+  const [bannedWordsText, setBannedWordsText] = useState(form.bannedWords.join(", "));
+  const [requiredWordsText, setRequiredWordsText] = useState(form.requiredWords.join(", "));
+  useEffect(() => { setBannedWordsText(form.bannedWords.join(", ")); }, [form.bannedWords]);
+  useEffect(() => { setRequiredWordsText(form.requiredWords.join(", ")); }, [form.requiredWords]);
   const toggleChip = (k: "goals", v: string) => {
     blockAutosaveRef.current = false;
     setForm(f => ({ ...f, [k]: f[k].includes(v) ? f[k].filter(x => x !== v) : [...f[k], v] }));
@@ -1333,10 +1333,6 @@ const Index = () => {
         `${isRetry ? 'Regenerated' : 'Generated'} ${isDay ? 'post' : 'week'} successfully${inferredTopics ? " — topics were inferred from your core idea" : ""}`,
       );
     } catch (err) {
-      if (err instanceof Error && err.message === "AI_UNAVAILABLE") {
-        setErrorForBoundary(err);
-        return;
-      }
       if (typeof telemetry?.sendEvent === "function") telemetry.sendEvent("generate_error", { user: user?.id, mode: form.mode, error: String(err) });
       cleanup();
       const aborted = err instanceof DOMException && err.name === "AbortError";
@@ -1365,6 +1361,7 @@ const Index = () => {
       } else {
         setError(userMessage);
       }
+      setStep(2);
     }
   }
 
@@ -2610,8 +2607,9 @@ const Index = () => {
                           type="text"
                           className="ti"
                           placeholder="e.g. game-changer, synergy, leverage"
-                          value={form.bannedWords.join(", ")}
-                          onChange={e => upd("bannedWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                          value={bannedWordsText}
+                          onChange={e => setBannedWordsText(e.target.value)}
+                          onBlur={() => upd("bannedWords", bannedWordsText.split(",").map(s => s.trim()).filter(Boolean))}
                         />
                       </div>
                       <div>
@@ -2621,8 +2619,9 @@ const Index = () => {
                           type="text"
                           className="ti"
                           placeholder="e.g. our product name, RAG, India"
-                          value={form.requiredWords.join(", ")}
-                          onChange={e => upd("requiredWords", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                          value={requiredWordsText}
+                          onChange={e => setRequiredWordsText(e.target.value)}
+                          onBlur={() => upd("requiredWords", requiredWordsText.split(",").map(s => s.trim()).filter(Boolean))}
                         />
                       </div>
                     </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { RouteFallback } from "@/components/layout/RouteFallback";
+import { toast } from "sonner";
 
 export function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAdmin, loading } = useIsAdmin();
@@ -17,6 +18,10 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(timeout);
   }, [loading]);
 
+  useEffect(() => {
+    if (!loading && !isAdmin) toast.error("You don't have admin access");
+  }, [loading, isAdmin]);
+
   if (loading) {
     if (timedOut) {
       return <RouteFallback title="Permission check timed out" ariaLabel="Permission check timed out" />;
@@ -25,6 +30,8 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
       <RouteFallback title="Checking permissions" ariaLabel="Checking admin permissions" />
     );
   }
-  if (!isAdmin) return <Navigate to="/app" replace />;
+  if (!isAdmin) {
+    return <Navigate to="/app" replace />;
+  }
   return <>{children}</>;
 }

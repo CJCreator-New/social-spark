@@ -83,6 +83,7 @@ export default function Schedule() {
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [pendingCancel, setPendingCancel] = useState<ScheduledRow | null>(null);
+  const [pendingConflict, setPendingConflict] = useState<{ row: ScheduledRow; newIso: string } | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const tzList = listTimezones();
   const log = createScopedLogger('Schedule');
@@ -214,11 +215,31 @@ export default function Schedule() {
   }
 
   async function saveEdit(row: ScheduledRow) {
-    const log = createScopedLogger('Schedule-SaveEdit');
     if (!editDate || !editTime) return;
-    const cal = calendars[row.calendar_id];
-    const tz = cal?.timezone || profileTz || browserTimezone();
+    // editDate/editTime were populated by startEdit() using viewTz, so they must be
+    // converted back to UTC using that same timezone — not the calendar's stored timezone.
+    const tz = viewTz;
     const newIso = zonedToUtcIso(editDate, editTime, tz);
+
+    if (!user) return;
+    const { data: conflicts } = await supabase
+      .from("scheduled_posts")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("platform", row.platform)
+      .eq("scheduled_at", newIso)
+      .neq("id", row.id)
+      .limit(1);
+    if (conflicts && conflicts.length > 0) {
+      setPendingConflict({ row, newIso });
+      return;
+    }
+
+    await commitEdit(row, newIso);
+  }
+
+  async function commitEdit(row: ScheduledRow, newIso: string) {
+    const log = createScopedLogger('Schedule-SaveEdit');
     try {
       await updateScheduledTimeMutation.mutateAsync({ id: row.id, scheduledAt: newIso });
     } catch (error) {
@@ -227,7 +248,7 @@ export default function Schedule() {
     }
     setRows(p => p.map(r => r.id === row.id ? { ...r, scheduled_at: newIso } : r));
     setEditId(null);
-    log.info(`Post time updated`, { postId: row.id, newTime: newIso, timezone: tz });
+    log.info(`Post time updated`, { postId: row.id, newTime: newIso });
     toast.success("Time updated");
   }
 
@@ -349,6 +370,15 @@ export default function Schedule() {
           message={`${pendingCancel.post_snapshot?.title || pendingCancel.post_snapshot?.topic || `Day ${pendingCancel.post_day}`} will be removed from the queue.`}
           onCancel={() => setPendingCancel(null)}
           onConfirm={async () => { setPendingCancel(null); await confirmCancelRow(pendingCancel); }}
+        />
+      )}
+      {pendingConflict && (
+        <ConfirmDialog
+          title="Time slot already taken"
+          message={`Another post for ${niceLabelFor(pendingConflict.row.platform)} is already scheduled at this exact time. Schedule this one anyway?`}
+          confirmLabel="Schedule anyway"
+          onCancel={() => setPendingConflict(null)}
+          onConfirm={async () => { const c = pendingConflict; setPendingConflict(null); await commitEdit(c.row, c.newIso); }}
         />
       )}
     </>

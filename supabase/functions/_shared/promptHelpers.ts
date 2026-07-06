@@ -121,15 +121,6 @@ export function stripMarkdownFormatting(value: unknown): string {
   return text;
 }
 
-export function sanitizeHtmlText(value: unknown): string {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function getAllowedAiEndpoint(url: string): string | null {
   try {
     const normalized = new URL(url);
@@ -2026,10 +2017,10 @@ export function normalizePost(
   const rawHookOptions = Array.isArray(p.hook_options) ? (p.hook_options as unknown[]).map(h => String(h || "")) : undefined;
   const rawCtaOptions = Array.isArray(p.cta_options) ? (p.cta_options as unknown[]).map(c => String(c || "")) : undefined;
 
-  const hookOptions = rawHookOptions ? rawHookOptions.map(h => sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(h)))) : (p.hook ? [sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(String(p.hook || ""))))] : []);
-  const ctaOptions = rawCtaOptions ? rawCtaOptions.map(c => sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(c)))) : (p.cta ? [sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(String(p.cta || ""))))] : []);
+  const hookOptions = rawHookOptions ? rawHookOptions.map(h => fixSpelling(stripMarkdownFormatting(h))) : (p.hook ? [fixSpelling(stripMarkdownFormatting(String(p.hook || "")))] : []);
+  const ctaOptions = rawCtaOptions ? rawCtaOptions.map(c => fixSpelling(stripMarkdownFormatting(c))) : (p.cta ? [fixSpelling(stripMarkdownFormatting(String(p.cta || "")))] : []);
 
-  const body = sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(String(p.body || ""))));
+  const body = fixSpelling(stripMarkdownFormatting(String(p.body || "")));
   const actualWordCount = body.split(/\s+/).filter(Boolean).length;
   const reportedWordCount = Number(p.word_count) || actualWordCount;
 
@@ -2074,10 +2065,10 @@ export function normalizePost(
 
   return {
     day: 1,
-    dow: sanitizeHtmlText(overrideDow || p.dow || "Mon"),
-    topic: sanitizeHtmlText(p.topic || ""),
-    format: sanitizeHtmlText(p.format || ""),
-    title: sanitizeHtmlText(fixSpelling(String(p.title || ""))),
+    dow: String(overrideDow || p.dow || "Mon"),
+    topic: String(p.topic || ""),
+    format: String(p.format || ""),
+    title: fixSpelling(String(p.title || "")),
     // primary hook (first option) and full variants
     hook: hookOptions.length ? hookOptions[0] : "",
     hook_options: hookOptions,
@@ -2088,10 +2079,10 @@ export function normalizePost(
     cta: ctaOptions.length ? ctaOptions[0] : "",
     cta_options: ctaOptions,
     hashtags: payload
-      ? sanitizeHtmlText(applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags))
-      : sanitizeHtmlText(p.hashtags || ""),
-    rationale: sanitizeHtmlText(fixSpelling(String(p.rationale || ""))),
-    image_prompt: sanitizeHtmlText(fixSpelling(String(p.image_prompt || ""))),
+      ? applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags)
+      : String(p.hashtags || ""),
+    rationale: fixSpelling(String(p.rationale || "")),
+    image_prompt: fixSpelling(String(p.image_prompt || "")),
     // Maintain Phase A/C/D fields if present
     plan: p.plan,
     body_variants: p.body_variants,

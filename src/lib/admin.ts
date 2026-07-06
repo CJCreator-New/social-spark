@@ -43,62 +43,31 @@ export interface AdminStats {
   };
 }
 
+interface AdminCalendarStatsRpcResult {
+  calendarsToday: number;
+  calendarsWeek: number;
+  activeUsersToday: number;
+  activeUsersWeek: number;
+  totalCalendars: number;
+  platformDistribution: Record<string, number>;
+  industryDistribution: Record<string, number>;
+}
+
 export async function fetchAdminStats(): Promise<AdminStats> {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-  const platformDistribution: Record<string, number> = {};
-  const industryDistribution: Record<string, number> = {};
-  let activeToday = 0;
-  let activeWeek = 0;
-  let calToday = 0;
-  let calWeek = 0;
-  let totalCalendars = 0;
-
-  try {
-    const { count: cToday } = await supabase
-      .from('saved_calendars')
-      .select('id', { count: 'exact', head: true })
-      .gt('created_at', today.toISOString());
-    calToday = cToday || 0;
-
-    const { count: cWeek } = await supabase
-      .from('saved_calendars')
-      .select('id', { count: 'exact', head: true })
-      .gt('created_at', weekAgo.toISOString());
-    calWeek = cWeek || 0;
-
-    const { data: usersToday } = await supabase
-      .from('saved_calendars')
-      .select('user_id')
-      .gt('created_at', today.toISOString());
-    activeToday = new Set((usersToday || []).map((r) => r.user_id)).size;
-
-    const { data: usersWeek } = await supabase
-      .from('saved_calendars')
-      .select('user_id')
-      .gt('created_at', weekAgo.toISOString());
-    activeWeek = new Set((usersWeek || []).map((r) => r.user_id)).size;
-
-    const { data: calendars, count } = await supabase
-      .from('saved_calendars')
-      .select('platform, industry', { count: 'exact' });
-    totalCalendars = count || 0;
-    (calendars || []).forEach((c) => {
-      if (c.platform) platformDistribution[c.platform] = (platformDistribution[c.platform] || 0) + 1;
-      if (c.industry) industryDistribution[c.industry] = (industryDistribution[c.industry] || 0) + 1;
-    });
-  } catch (err) {
-    console.error('Failed to fetch admin stats:', err);
-  }
+  // saved_calendars RLS scopes rows to auth.uid() = user_id with no admin-bypass
+  // policy, so this must go through an admin-gated SECURITY DEFINER RPC rather
+  // than querying the table directly — otherwise an admin only ever sees their
+  // own calendars, silently, with no indication the numbers are wrong.
+  const { data, error } = await supabase.rpc('admin_calendar_stats' as any);
+  if (error) throw error;
+  const result = data as unknown as AdminCalendarStatsRpcResult;
 
   return {
     overview: {
-      activeUsersToday: activeToday,
-      activeUsersWeek: activeWeek,
-      calendarsGeneratedToday: calToday,
-      calendarsGeneratedWeek: calWeek,
+      activeUsersToday: result.activeUsersToday,
+      activeUsersWeek: result.activeUsersWeek,
+      calendarsGeneratedToday: result.calendarsToday,
+      calendarsGeneratedWeek: result.calendarsWeek,
       apiSuccessRate: 100,
       apiErrorRate: 0,
     },
@@ -111,10 +80,10 @@ export async function fetchAdminStats(): Promise<AdminStats> {
     },
     errors: { total24h: 0, byType: {}, topErrors: [] },
     usage: {
-      platformDistribution,
-      industryDistribution,
+      platformDistribution: result.platformDistribution || {},
+      industryDistribution: result.industryDistribution || {},
       avgSessionDuration: 0,
-      totalCalendarsCreated: totalCalendars,
+      totalCalendarsCreated: result.totalCalendars,
     },
     rateLimit: {
       activeKeys: 0,
