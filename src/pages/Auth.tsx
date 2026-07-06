@@ -25,11 +25,18 @@ export default function AuthPage() {
   const routerLocation = useLocation();
   const { user } = useAuth();
 
-  const from = (routerLocation.state as { from?: { pathname: string } } | null)?.from?.pathname || "/app";
+  // Preserve a same-origin relative `?next=` (e.g. /.lovable/oauth/consent?...) so
+  // the OAuth consent flow returns the user to the consent screen after login.
+  const rawNext = new URLSearchParams(routerLocation.search).get("next");
+  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
+  const from = nextPath
+    || (routerLocation.state as { from?: { pathname: string } } | null)?.from?.pathname
+    || "/app";
 
   useEffect(() => {
     if (user) navigate(from, { replace: true });
   }, [user, navigate, from]);
+
 
   async function handleEmailAuth(e: React.FormEvent) {
     e.preventDefault();
@@ -44,7 +51,7 @@ export default function AuthPage() {
         const { data, error: err } = await supabase.auth.signUp({
           email, password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: `${window.location.origin}${nextPath ?? "/"}`,
             data: { display_name: name || email.split("@")[0] },
           },
         });
@@ -82,7 +89,7 @@ export default function AuthPage() {
     setError("");
     setGoogleLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+      const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: `${window.location.origin}${nextPath ?? ""}` });
       if (result.error) setError(result.error.message || "Google sign-in failed.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed.");
