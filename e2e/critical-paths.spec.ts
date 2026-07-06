@@ -154,6 +154,22 @@ test.describe('Calendar Management', () => {
     // Should show success message
     await expect(page.getByText(/deleted/i).first()).toBeVisible({ timeout: 15000 })
   })
+
+  test('should bridge from an existing calendar into the Schedule page with its posts visible', async ({ page }) => {
+    await expect(page.getByText('E2E Marketing Launch Week')).toBeVisible({ timeout: 15000 })
+
+    // Open the fixture calendar from the list.
+    await page.getByText('E2E Marketing Launch Week').click()
+    await expect(page).toHaveURL(/.*calendar\//, { timeout: 15000 })
+
+    // Now navigate to the schedule queue and confirm this calendar's posts show up there
+    // (the fixture data pre-seeds scheduled rows for this calendar's days 1 & 2).
+    await page.goto('/schedule', { waitUntil: 'domcontentloaded' })
+    await expect(page).toHaveURL(/.*schedule/)
+    await expect(page.getByRole('heading', { name: /my schedule/i })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText(/test day 1/i)).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText(/test day 2/i)).toBeVisible({ timeout: 15000 })
+  })
 })
 
 test.describe('Schedule Management', () => {
@@ -176,6 +192,37 @@ test.describe('Schedule Management', () => {
       await approveButton.click()
       await expect(page.locator('.sc-status.approved').first()).toBeVisible({ timeout: 15000 })
     }
+  })
+
+  test('should edit a scheduled post\'s date/time from the Schedule page and persist the change', async ({ page }) => {
+    // Open the actions menu for the first row and start a reschedule.
+    await page.getByRole('button', { name: /actions for day/i }).first().click()
+    await page.getByRole('menuitem', { name: /reschedule/i }).click()
+
+    const dateInput = page.locator('input[type="date"]').first()
+    const timeInput = page.locator('input[type="time"]').first()
+    await expect(dateInput).toBeVisible({ timeout: 10000 })
+
+    // Pick a date far enough in the future that it won't collide with the other
+    // fixture row, so this exercises the "no conflict, commits directly" path.
+    await dateInput.fill('2026-08-03')
+    await timeInput.fill('14:30')
+    await page.getByRole('button', { name: /^save$/i }).click()
+
+    // Either the change commits immediately, or (if it happens to collide with
+    // another row) the conflict dialog appears — accept the overwrite so the
+    // assertion below is stable either way.
+    const conflictButton = page.getByRole('button', { name: /schedule anyway/i })
+    if (await conflictButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await conflictButton.click()
+    }
+
+    await expect(page.getByText(/time updated/i)).toBeVisible({ timeout: 15000 })
+
+    // Reload to confirm the new time was actually persisted, not just held in local state.
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(page.getByRole('heading', { name: /my schedule/i })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText(/aug 3/i).first()).toBeVisible({ timeout: 15000 })
   })
 })
 

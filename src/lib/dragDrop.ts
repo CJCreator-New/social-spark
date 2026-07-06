@@ -21,14 +21,10 @@ export function swapItems<T>(arr: T[], indexA: number, indexB: number): T[] {
   return newArr;
 }
 
-/**
- * Handle drag start event
- */
-export function handleDragStart(e: React.DragEvent<HTMLElement>, index: number): void {
-  e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData("application/json", JSON.stringify({ index }));
+let cachedDragImage: HTMLDivElement | null = null;
 
-  // Create a custom drag image
+function getDragImageEl(): HTMLDivElement {
+  if (cachedDragImage) return cachedDragImage;
   const dragImage = document.createElement("div");
   dragImage.textContent = `Moving post`;
   dragImage.style.position = "absolute";
@@ -38,9 +34,24 @@ export function handleDragStart(e: React.DragEvent<HTMLElement>, index: number):
   dragImage.style.padding = "8px 16px";
   dragImage.style.borderRadius = "6px";
   dragImage.style.fontSize = "12px";
+  cachedDragImage = dragImage;
+  return dragImage;
+}
+
+/**
+ * Handle drag start event
+ */
+export function handleDragStart(e: React.DragEvent<HTMLElement>, index: number): void {
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("application/json", JSON.stringify({ index }));
+
+  // Reuse a single detached drag-image node instead of creating one per drag
+  const dragImage = getDragImageEl();
   document.body.appendChild(dragImage);
   e.dataTransfer.setDragImage(dragImage, 0, 0);
-  setTimeout(() => document.body.removeChild(dragImage), 0);
+  setTimeout(() => {
+    if (dragImage.parentNode) dragImage.parentNode.removeChild(dragImage);
+  }, 0);
 }
 
 /**

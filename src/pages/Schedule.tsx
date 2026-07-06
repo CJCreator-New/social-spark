@@ -226,7 +226,7 @@ export default function Schedule() {
       .from("scheduled_posts")
       .select("id")
       .eq("user_id", user.id)
-      .eq("platform", row.platform)
+      .eq("platform", row.platform ?? "")
       .eq("scheduled_at", newIso)
       .neq("id", row.id)
       .limit(1);
