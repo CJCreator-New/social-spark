@@ -22,6 +22,7 @@ const Landing = lazyWithRetry(() => import("./pages/Landing"));
 const Privacy = lazyWithRetry(() => import("./pages/Privacy"));
 const Terms = lazyWithRetry(() => import("./pages/Terms"));
 const Docs = lazyWithRetry(() => import("./pages/Docs"));
+const OAuthConsent = lazyWithRetry(() => import("./pages/OAuthConsent"));
 
 function E2ECrashRoute(): JSX.Element {
   throw new Error("Test error");
@@ -68,6 +69,7 @@ const App = () => {
                   <Route path="/privacy" element={<Suspense fallback={<RouteFallback title="Privacy Policy" />}><Privacy /></Suspense>} />
                   <Route path="/terms" element={<Suspense fallback={<RouteFallback title="Terms of Service" />}><Terms /></Suspense>} />
                   <Route path="/docs" element={<Suspense fallback={<RouteFallback title="Docs" />}><Docs /></Suspense>} />
+                  <Route path="/.lovable/oauth/consent" element={<Suspense fallback={<RouteFallback title="Authorize" />}><OAuthConsent /></Suspense>} />
                   {import.meta.env.DEV && (
                     <Route path="/__e2e/crash" element={<E2ECrashRoute />} />
                   )}
