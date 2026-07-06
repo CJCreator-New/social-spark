@@ -1,11 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { mcpPlugin } from '@lovable.dev/mcp-js/stacks/supabase/vite'
 
 const SUPABASE_PROJECT_URL = "https://mbxlvsftyifovbkpsvyw.supabase.co";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), mcpPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
