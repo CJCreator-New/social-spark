@@ -86,7 +86,7 @@ export default function FooterCanvas() {
 
     // 8. Animation & Render Loop
     let animationFrameId: number;
-    let clock = new THREE.Clock();
+    const clock = new THREE.Clock();
     let isVisible = true;
 
     const io = new IntersectionObserver(

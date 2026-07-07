@@ -4,16 +4,23 @@ import {
   getCorsHeaders,
   jsonResponse,
   checkRateLimit,
+  checkContentLength,
   callAIGateway,
   parseAIResponse,
   cleanPayload,
   getVerifiedUserId,
   errorResponse,
+  checkQuota,
+  incrementGenerationCount,
+  quotaExceededMessage,
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
+
+  const contentLengthError = checkContentLength(req);
+  if (contentLengthError) return contentLengthError;
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -36,6 +43,20 @@ Deno.serve(async (req: Request) => {
       windowMs: 60 * 1000,
     });
     if (!rateLimitCheck.allowed) return jsonResponse({ error: "Rate limit exceeded." }, 429);
+
+    const quota = await checkQuota(userId);
+    const usingSharedKey =
+      !payload.userApiKey && !(quota.useOwnKey && quota.keyMode === "always");
+    if (usingSharedKey && !quota.allowed) {
+      return jsonResponse(
+        {
+          error: "QUOTA_EXCEEDED",
+          message: quotaExceededMessage(quota.tier),
+          quota: { used: quota.used, limit: quota.limit },
+        },
+        402
+      );
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) return jsonResponse({ error: "AI not configured." }, 500);
@@ -112,6 +133,11 @@ Platform: ${platform}`;
     );
 
     if (aiRes.status !== 200) return jsonResponse({ error: aiRes.error }, aiRes.status);
+
+    if (usingSharedKey) {
+      await incrementGenerationCount(userId);
+    }
+
     const parseResult = parseAIResponse(aiRes.data || {}, "return_trends");
     if (!parseResult.success) return jsonResponse({ error: parseResult.error }, 500);
 

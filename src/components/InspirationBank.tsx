@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { getTrendingTopicsForIndustry, getTrendingTopicsLastUpdated } from "@/lib/trendingTopics";
 import { useGenerateTrendsMutation } from "@/hooks/useAppQueries";
+import { useWizardStore } from "@/stores/useWizardStore";
 import { toast } from "sonner";
 
 interface InspirationBankProps {
@@ -23,6 +24,15 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
   const [customTrends, setCustomTrends] = useState<any[] | null>(null);
   const [reviewingTopic, setReviewingTopic] = useState<any | null>(null);
   const generateTrendsMutation = useGenerateTrendsMutation();
+
+  // TODO: Remove type cast once state_flow_keeper adds selectedTrendingTopics /
+  //       toggleTrendingTopic / clearTrendingTopics to WizardState.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const storeAny = useWizardStore() as any;
+  const selectedTrendingTopics: string[] = storeAny.selectedTrendingTopics ?? [];
+  // TODO: replace noop once state_flow_keeper lands the action
+  const toggleTrendingTopic: (keyword: string) => void =
+    storeAny.toggleTrendingTopic ?? (() => {});
 
   const loadAiTrending = async () => {
     try {
@@ -49,6 +59,7 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
   }, [staticTopics, customTrends]);
 
   const isAiGenerated = !!customTrends;
+  const selectionCount = selectedTrendingTopics.length;
 
   return (
     <div className="inspiration-bank">
@@ -81,6 +92,23 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
                 AI Live
               </span>
             )}
+            {/* Selected count badge — only shown when at least one topic is selected */}
+            {selectionCount > 0 && (
+              <span
+                style={{
+                  fontSize: 9,
+                  padding: "2px 7px",
+                  background: "rgba(200,240,154,0.08)",
+                  color: "var(--accent)",
+                  border: "1px solid rgba(200,240,154,0.25)",
+                  borderRadius: 99,
+                  fontWeight: 600,
+                  letterSpacing: ".03em",
+                }}
+              >
+                {selectionCount} selected for generation
+              </span>
+            )}
           </div>
           <div className="insp-subtitle">Hot topics real professionals are discussing</div>
         </div>
@@ -107,27 +135,54 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
       </div>
 
       <div className="insp-topics">
-        {displayTopics.map((t, i) => (
-          <button
-            key={i}
-            className="insp-topic"
-            onClick={() => setReviewingTopic(t)}
-            title={`${t.posts} posts this week`}
-          >
-            <div className="insp-topic-main">
-              <span className="insp-topic-name">{t.topic}</span>
-              {t.trending && <span className="insp-trending-badge">🔥</span>}
-            </div>
-            <div className="insp-topic-meta">
-              <span className="insp-category">{t.category}</span>
-              <span className="insp-count">{(t.posts / 100).toFixed(0)}k posts</span>
-            </div>
-          </button>
-        ))}
+        {displayTopics.map((t, i) => {
+          const isSelected = selectedTrendingTopics.includes(t.topic);
+          return (
+            <button
+              key={i}
+              className="insp-topic"
+              onClick={() => setReviewingTopic(t)}
+              title={`${t.posts} posts this week`}
+              style={
+                isSelected
+                  ? {
+                      borderColor: "var(--accent)",
+                      background: "rgba(200,240,154,0.07)",
+                    }
+                  : undefined
+              }
+            >
+              <div className="insp-topic-main">
+                <span className="insp-topic-name">{t.topic}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  {t.trending && <span className="insp-trending-badge">🔥</span>}
+                  {isSelected && (
+                    <span
+                      aria-label="Selected"
+                      style={{
+                        fontSize: 10,
+                        color: "var(--accent)",
+                        fontWeight: 700,
+                        lineHeight: 1,
+                      }}
+                    >
+                      ✓
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="insp-topic-meta">
+                <span className="insp-category">{t.category}</span>
+                <span className="insp-count">{(t.posts / 100).toFixed(0)}k posts</span>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       <div className="insp-hint">
-        ✨ Click any topic to add it to your week. Mix trending topics for maximum reach.
+        ✨ Click any topic to review it. Use <em>Use This Trend</em> inside the review to add it
+        for generation.
       </div>
 
       {reviewingTopic && (
@@ -218,6 +273,22 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
                 {platform || "your selected platform"} among professionals in the {industry} space.
                 Adding this topic will optimize your posts for current feed algorithms.
               </div>
+
+              {/* Selection status indicator inside modal */}
+              {selectedTrendingTopics.includes(reviewingTopic.topic) && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "var(--accent)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <span>✓</span>
+                  <span>Already added to generation queue</span>
+                </div>
+              )}
             </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
@@ -229,6 +300,37 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
               >
                 Cancel
               </button>
+
+              {/* "Use This Trend" — toggles the topic in the store's selectedTrendingTopics */}
+              <button
+                type="button"
+                className="cpbtn"
+                onClick={() => {
+                  toggleTrendingTopic(reviewingTopic.topic);
+                  const nowSelected = !selectedTrendingTopics.includes(reviewingTopic.topic);
+                  toast.success(
+                    nowSelected
+                      ? `"${reviewingTopic.topic}" added to trend queue ✓`
+                      : `"${reviewingTopic.topic}" removed from trend queue`
+                  );
+                  setReviewingTopic(null);
+                }}
+                style={{
+                  fontSize: 11,
+                  padding: "5px 12px",
+                  borderColor: selectedTrendingTopics.includes(reviewingTopic.topic)
+                    ? "var(--accent)"
+                    : undefined,
+                  color: selectedTrendingTopics.includes(reviewingTopic.topic)
+                    ? "var(--accent)"
+                    : undefined,
+                }}
+              >
+                {selectedTrendingTopics.includes(reviewingTopic.topic)
+                  ? "✓ Remove from Trends"
+                  : "Use This Trend"}
+              </button>
+
               <button
                 type="button"
                 className="cpbtn done"
@@ -239,7 +341,7 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
                 }}
                 style={{ fontSize: 11, padding: "5px 12px" }}
               >
-                Confirm & Add
+                Confirm &amp; Add
               </button>
             </div>
           </div>

@@ -4,7 +4,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCalendarQuery } from "@/hooks/useAppQueries";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { cn } from "@/lib/utils";
-import { Sparkles, CalendarDays, Clock, UserCircle, LogOut, ShieldCheck } from "lucide-react";
+import {
+  Sparkles,
+  CalendarDays,
+  Clock,
+  UserCircle,
+  LogOut,
+  ShieldCheck,
+  Recycle,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/brand/Logo";
 
@@ -25,6 +33,7 @@ export function AppShell({ children }: AppShellProps) {
   const menuItems = [
     { label: "New calendar", path: "/app", icon: Sparkles },
     { label: "My calendars", path: "/my-calendars", icon: CalendarDays },
+    { label: "Repurpose", path: "/repurpose", icon: Recycle },
     { label: "Schedule", path: "/schedule", icon: Clock },
     { label: "Profile", path: "/profile", icon: UserCircle },
     ...(isAdmin ? [{ label: "Admin", path: "/admin", icon: ShieldCheck }] : []),

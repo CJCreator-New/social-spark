@@ -318,7 +318,7 @@ const ConfigSchema = z.object({
     bannedHashtagsMax: z.number().positive(),
     requiredHashtagsMax: z.number().positive(),
   }),
-  platformLimits: z.record(z.number().positive()),
+  platformLimits: z.record(z.string(), z.number().positive()),
 });
 
 type Config = z.infer<typeof ConfigSchema>;

@@ -1109,7 +1109,7 @@ export default function CalendarDetail() {
         return;
       }
 
-      let repurposed: Post = {
+      const repurposed: Post = {
         ...result,
         day: sourcePost.day,
         dow: sourcePost.dow,

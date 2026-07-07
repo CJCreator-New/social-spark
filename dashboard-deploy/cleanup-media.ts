@@ -683,10 +683,13 @@ function selectRelevantExamples(
 // ─── TREND-AWARE GENERATION ───────────────────────────────────────────────
 
 /**
- * Fetch top trending topic titles for an industry/platform from the
- * trending_topics table, for injection into generation prompts.
+ * Fetch top trending keywords for an industry from the public.trends table,
+ * for injection into generation prompts.
  * Returns an empty array if Supabase env vars are missing or the query fails
  * — trend context is an enhancement, never a hard dependency.
+ *
+ * Note: `platform` param is accepted for API compatibility but not used for
+ * filtering since the trends table has no platform column.
  */
 async function getTrendingTopics(
   industry?: string,
@@ -703,17 +706,18 @@ async function getTrendingTopics(
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
     let query = supabase
-      .from("trending_topics")
-      .select("title")
-      .order("score", { ascending: false })
+      .from("trends")
+      .select("keyword")
+      .order("volume", { ascending: false })
       .limit(limit);
 
-    if (industry) query = query.eq("industry", industry);
-    if (platform) query = query.eq("platform", platform);
+    // Filter by category using a loose case-insensitive match on industry.
+    // platform is intentionally unused — trends table has no platform column.
+    if (industry) query = query.ilike("category", `%${industry}%`);
 
     const { data, error } = await query;
     if (error || !Array.isArray(data)) return [];
-    return data.map((row: { title: string }) => row.title).filter(Boolean);
+    return data.map((row: { keyword: string }) => row.keyword).filter(Boolean);
   } catch (e) {
     console.warn("getTrendingTopics failed, continuing without trend context", e);
     return [];
@@ -2489,6 +2493,6 @@ export async function handle(req: Request) {
       status: 200,
     });
   } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500 });
+    return new Response(JSON.stringify({ ok: false, error: sanitizeLogValue(e) }), { status: 500 });
   }
 }

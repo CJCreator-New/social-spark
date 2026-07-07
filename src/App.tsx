@@ -34,6 +34,7 @@ const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const MyCalendars = lazyWithRetry(() => import("./pages/MyCalendars"));
 const CalendarDetail = lazyWithRetry(() => import("./pages/CalendarDetail"));
 const Schedule = lazyWithRetry(() => import("./pages/Schedule"));
+const Repurpose = lazyWithRetry(() => import("./pages/Repurpose"));
 const Admin = lazyWithRetry(() =>
   import("./pages/Admin").then((m) => ({ default: m.AdminDashboard }))
 );
@@ -170,6 +171,14 @@ const App = () => {
                       element={
                         <Suspense fallback={<RouteFallback title="Scheduling & Queue" nested />}>
                           <Schedule />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/repurpose"
+                      element={
+                        <Suspense fallback={<RouteFallback title="Repurpose Studio" nested />}>
+                          <Repurpose />
                         </Suspense>
                       }
                     />

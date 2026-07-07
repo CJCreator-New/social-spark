@@ -83,8 +83,9 @@ describe("resolveAiClient", () => {
 
     expect(result.source).toBe("user");
     expect(result.provider).toBe("openai");
-    // Verify key is present but we don't assert its raw value here (consumer responsibility)
-    expect(result.apiKey).toBeTruthy();
+    // BYOK keys are decrypted server-side only; the client never receives a
+    // usable apiKey for the "user" source (F-012 — no more placeholder string).
+    expect(result.apiKey).toBeUndefined();
   });
 
   it("returns source='user' for Anthropic provider", async () => {
@@ -101,6 +102,7 @@ describe("resolveAiClient", () => {
 
     expect(result.source).toBe("user");
     expect(result.provider).toBe("anthropic");
+    expect(result.apiKey).toBeUndefined();
   });
 
   // -------------------------------------------------------------------------

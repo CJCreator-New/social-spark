@@ -35,6 +35,12 @@ export default defineConfig({
             if (id.includes("gsap")) {
               return "gsap";
             }
+            if (id.includes("@radix-ui")) {
+              return "radix";
+            }
+            if (id.includes("@tanstack")) {
+              return "tanstack";
+            }
             return "vendor";
           }
         },

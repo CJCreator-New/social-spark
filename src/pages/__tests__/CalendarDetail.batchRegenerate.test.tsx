@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Post } from "@/components/wizard/constants";
@@ -15,7 +15,12 @@ vi.mock("@/integrations/supabase/client", () => ({
       getUser: vi.fn(() => Promise.resolve({ data: { user: null } })),
     },
     from: vi.fn(() => ({
-      select: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: [], error: null })) })),
+      select: vi.fn(() => ({
+        order: vi.fn(() => ({
+          limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
+        })),
+        eq: vi.fn(() => Promise.resolve({ data: [], error: null })),
+      })),
       update: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: null, error: null })) })),
     })),
   },
@@ -25,10 +30,11 @@ vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({ user: { id: "user-1" } }),
 }));
 
+const mockNavigate = vi.fn();
 vi.mock("react-router-dom", () => ({
   Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) =>
     React.createElement("a", { href: to, ...props }, children),
-  useNavigate: () => vi.fn(),
+  useNavigate: () => mockNavigate,
   useParams: () => ({ id: "cal-1" }),
 }));
 
@@ -44,6 +50,30 @@ vi.mock("sonner", () => ({
     loading: vi.fn(),
     dismiss: vi.fn(),
   },
+}));
+
+vi.mock("@/components/BufferScheduler", () => ({
+  BufferScheduler: () => <div data-testid="buffer-scheduler" />,
+}));
+
+vi.mock("@/components/PersonaCompare", () => ({
+  PersonaCompare: () => null,
+}));
+
+vi.mock("@/components/WeekBalanceScore", () => ({
+  WeekBalanceScore: () => <div data-testid="week-balance-score" />,
+}));
+
+vi.mock("@/components/PostInsights", () => ({
+  default: () => <div data-testid="post-insights" />,
+}));
+
+vi.mock("@/components/PerformanceScoreCard", () => ({
+  PerformanceScoreCard: () => <div data-testid="performance-score-card" />,
+}));
+
+vi.mock("@/components/TopicGapBadge", () => ({
+  TopicGapBadge: () => null,
 }));
 
 function makePost(day: number, dow: string, title: string): Post {
@@ -85,6 +115,7 @@ const mockCalendarData = {
 
 const mockRegenerateMutateAsync = vi.fn();
 const mockUpdateCalendarMutateAsync = vi.fn();
+const MOCK_SCHEDULED_POSTS: any[] = [];
 
 vi.mock("@/hooks/useAppQueries", () => ({
   useCalendarQuery: () => ({
@@ -95,7 +126,7 @@ vi.mock("@/hooks/useAppQueries", () => ({
   }),
   useProfileQuery: () => ({ data: null }),
   useProfileUpdateMutation: () => ({ mutateAsync: vi.fn() }),
-  useScheduledPostsQuery: () => ({ data: [] }),
+  useScheduledPostsQuery: () => ({ data: MOCK_SCHEDULED_POSTS }),
   useCreateCalendarMutation: () => ({ mutateAsync: vi.fn() }),
   useRegeneratePostMutation: () => ({ mutateAsync: mockRegenerateMutateAsync }),
   useUpdateSavedCalendarMutation: () => ({ mutateAsync: mockUpdateCalendarMutateAsync }),
@@ -130,6 +161,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   vi.stubGlobal("fetch", OLD_FETCH);
 });
 

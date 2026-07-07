@@ -1,7 +1,7 @@
 // Queue worker: enqueues jobs into Supabase `job_queue` table and can also
 // process the next pending job when invoked in worker mode.
 // Expects env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_CRON_SECRET
-import { verifyCronSecret } from "../_shared/promptHelpers.ts";
+import { verifyCronSecret, sanitizeLogValue } from "../_shared/promptHelpers.ts";
 
 type QueueJob = {
   job_type: string;
@@ -120,12 +120,12 @@ async function processJob(job: QueueJob & { id: string; lock_token?: string }) {
       next_attempt_at: failed
         ? new Date().toISOString()
         : new Date(Date.now() + backoffMs).toISOString(),
-      last_error: String(error),
+      last_error: sanitizeLogValue(error),
       locked_at: null,
       lock_token: null,
       updated_at: new Date().toISOString(),
     });
-    return { ok: false, error: String(error) };
+    return { ok: false, error: sanitizeLogValue(error) };
   }
 }
 
@@ -153,6 +153,6 @@ export async function handle(req: Request) {
       status: 200,
     });
   } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500 });
+    return new Response(JSON.stringify({ ok: false, error: sanitizeLogValue(e) }), { status: 500 });
   }
 }

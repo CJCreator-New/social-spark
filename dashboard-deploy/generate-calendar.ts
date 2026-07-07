@@ -683,10 +683,13 @@ function selectRelevantExamples(
 // ─── TREND-AWARE GENERATION ───────────────────────────────────────────────
 
 /**
- * Fetch top trending topic titles for an industry/platform from the
- * trending_topics table, for injection into generation prompts.
+ * Fetch top trending keywords for an industry from the public.trends table,
+ * for injection into generation prompts.
  * Returns an empty array if Supabase env vars are missing or the query fails
  * — trend context is an enhancement, never a hard dependency.
+ *
+ * Note: `platform` param is accepted for API compatibility but not used for
+ * filtering since the trends table has no platform column.
  */
 async function getTrendingTopics(
   industry?: string,
@@ -703,17 +706,18 @@ async function getTrendingTopics(
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
     let query = supabase
-      .from("trending_topics")
-      .select("title")
-      .order("score", { ascending: false })
+      .from("trends")
+      .select("keyword")
+      .order("volume", { ascending: false })
       .limit(limit);
 
-    if (industry) query = query.eq("industry", industry);
-    if (platform) query = query.eq("platform", platform);
+    // Filter by category using a loose case-insensitive match on industry.
+    // platform is intentionally unused — trends table has no platform column.
+    if (industry) query = query.ilike("category", `%${industry}%`);
 
     const { data, error } = await query;
     if (error || !Array.isArray(data)) return [];
-    return data.map((row: { title: string }) => row.title).filter(Boolean);
+    return data.map((row: { keyword: string }) => row.keyword).filter(Boolean);
   } catch (e) {
     console.warn("getTrendingTopics failed, continuing without trend context", e);
     return [];
@@ -2462,7 +2466,7 @@ Deno.serve(async (req: Request) => {
     const trendingTopics = await getTrendingTopics(payload.industry, payload.platform);
 
     // Phase D: Topic enrichment pre-call (calendar only)
-    let enrichedPayload = { ...payload, trendingTopics };
+    const enrichedPayload = { ...payload, trendingTopics };
     if (payload.topics.length > 0 || payload.coreIdea) {
       const enrichedTopics = await enrichTopics(payload, LOVABLE_API_KEY);
       if (enrichedTopics && enrichedTopics.length >= 7) {
@@ -2606,33 +2610,17 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: parseResult.error }, 500);
     }
 
-    let parsed = parseResult.parsed as Record<string, unknown>;
-    let initialPosts = Array.isArray(parsed.posts) ? parsed.posts : [];
+    const parsed = parseResult.parsed as Record<string, unknown>;
+    const initialPosts = Array.isArray(parsed.posts) ? parsed.posts : [];
 
-    // Task 4: LLM-as-judge scoring for each post in the calendar
-    const scoredPosts = await Promise.all(
-      initialPosts.map(async (p: any) => {
-        const candidates = [String(p.body || "")];
-        if (Array.isArray(p.body_variants)) {
-          candidates.push(...p.body_variants.map((v: any) => String(v || "")));
-        }
-
-        if (candidates.length > 1) {
-          const judgeRes = await scoreVariants(candidates, payload, LOVABLE_API_KEY || "");
-          p.variant_scores = judgeRes.scores;
-          p.chosen_index = judgeRes.winner_index;
-          // Auto-pick the winner
-          if (judgeRes.winner_index > 0 && judgeRes.winner_index < candidates.length) {
-            p.body = candidates[judgeRes.winner_index];
-          }
-        }
-
-        const normalized = normalizePost(p, p.dow, payload);
-        return normalized || p;
-      })
-    );
-
-    let posts = scoredPosts;
+    // Calendar posts are intentionally single-shot: body_variants was removed
+    // from the return_calendar tool schema (see comment above) because the
+    // larger per-post schema plus variant fields made Gemini's forced tool-call
+    // fail with an upstream 400. There is no candidate set to run the
+    // LLM-as-judge scorer (scoreVariants) against here, unlike
+    // generate-single-post/regenerate-post/repurpose-post, which do request
+    // variants and score them.
+    let posts = initialPosts.map((p: any) => normalizePost(p, p.dow, payload) || p);
     if (posts.length === 0) {
       return jsonResponse({ error: "AI returned an empty calendar." }, 500);
     }

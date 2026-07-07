@@ -1,3 +1,10 @@
+-- F-022: this is the AUTHORITATIVE current grant state for the BYOK RPCs.
+-- 20260703073516_harden_function_privileges.sql and
+-- 20260703080952_...sql also touch these grants, but this migration is the
+-- one that actually reflects reality on every environment — treat it as the
+-- source of truth for "what is currently granted" and leave the earlier two
+-- in place only as historical record; do not try to reconcile by editing them.
+--
 -- Self-healing repair for the BYOK RPC drift described in the audit:
 -- 20260703080952 revoked `authenticated` EXECUTE on get_decrypted_api_key()
 -- and tried to REVOKE/GRANT the already-dropped 2-arg upsert_encrypted_api_key

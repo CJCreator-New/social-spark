@@ -1,6 +1,6 @@
 // Server-side orphan media cleanup.
 // Verifies that a media reference is not used by profiles or calendars before deleting storage.
-import { verifyCronSecret } from "../_shared/promptHelpers.ts";
+import { verifyCronSecret, sanitizeLogValue } from "../_shared/promptHelpers.ts";
 
 type MediaReference = {
   id: string;
@@ -101,6 +101,6 @@ export async function handle(req: Request) {
       status: 200,
     });
   } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500 });
+    return new Response(JSON.stringify({ ok: false, error: sanitizeLogValue(e) }), { status: 500 });
   }
 }

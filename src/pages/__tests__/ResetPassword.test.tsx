@@ -81,7 +81,7 @@ describe("ResetPassword", () => {
     fireEvent.click(screen.getByRole("button", { name: /update password/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/password must be at least 8 characters/i)).toBeInTheDocument();
+      expect(screen.getByText(/password must be at least 10 characters/i)).toBeInTheDocument();
     });
     expect(mockUpdateUser).not.toHaveBeenCalled();
   });
@@ -89,10 +89,10 @@ describe("ResetPassword", () => {
   it("rejects mismatched passwords without calling updateUser", async () => {
     await renderReady();
     fireEvent.change(screen.getByLabelText(/new password/i), {
-      target: { value: "longenoughpassword" },
+      target: { value: "longenoughpassword1" },
     });
     fireEvent.change(screen.getByLabelText(/confirm password/i), {
-      target: { value: "differentpassword" },
+      target: { value: "differentpassword1" },
     });
     fireEvent.click(screen.getByRole("button", { name: /update password/i }));
 
@@ -105,15 +105,15 @@ describe("ResetPassword", () => {
   it("submits successfully with a valid matching password and redirects", async () => {
     await renderReady();
     fireEvent.change(screen.getByLabelText(/new password/i), {
-      target: { value: "longenoughpassword" },
+      target: { value: "longenoughpassword1" },
     });
     fireEvent.change(screen.getByLabelText(/confirm password/i), {
-      target: { value: "longenoughpassword" },
+      target: { value: "longenoughpassword1" },
     });
     fireEvent.click(screen.getByRole("button", { name: /update password/i }));
 
     await waitFor(() => {
-      expect(mockUpdateUser).toHaveBeenCalledWith({ password: "longenoughpassword" });
+      expect(mockUpdateUser).toHaveBeenCalledWith({ password: "longenoughpassword1" });
     });
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith("Password updated");
@@ -127,10 +127,10 @@ describe("ResetPassword", () => {
     });
     await renderReady();
     fireEvent.change(screen.getByLabelText(/new password/i), {
-      target: { value: "longenoughpassword" },
+      target: { value: "longenoughpassword1" },
     });
     fireEvent.change(screen.getByLabelText(/confirm password/i), {
-      target: { value: "longenoughpassword" },
+      target: { value: "longenoughpassword1" },
     });
     fireEvent.click(screen.getByRole("button", { name: /update password/i }));
 

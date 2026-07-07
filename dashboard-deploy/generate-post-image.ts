@@ -683,10 +683,13 @@ function selectRelevantExamples(
 // ─── TREND-AWARE GENERATION ───────────────────────────────────────────────
 
 /**
- * Fetch top trending topic titles for an industry/platform from the
- * trending_topics table, for injection into generation prompts.
+ * Fetch top trending keywords for an industry from the public.trends table,
+ * for injection into generation prompts.
  * Returns an empty array if Supabase env vars are missing or the query fails
  * — trend context is an enhancement, never a hard dependency.
+ *
+ * Note: `platform` param is accepted for API compatibility but not used for
+ * filtering since the trends table has no platform column.
  */
 async function getTrendingTopics(
   industry?: string,
@@ -703,17 +706,18 @@ async function getTrendingTopics(
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
     let query = supabase
-      .from("trending_topics")
-      .select("title")
-      .order("score", { ascending: false })
+      .from("trends")
+      .select("keyword")
+      .order("volume", { ascending: false })
       .limit(limit);
 
-    if (industry) query = query.eq("industry", industry);
-    if (platform) query = query.eq("platform", platform);
+    // Filter by category using a loose case-insensitive match on industry.
+    // platform is intentionally unused — trends table has no platform column.
+    if (industry) query = query.ilike("category", `%${industry}%`);
 
     const { data, error } = await query;
     if (error || !Array.isArray(data)) return [];
-    return data.map((row: { title: string }) => row.title).filter(Boolean);
+    return data.map((row: { keyword: string }) => row.keyword).filter(Boolean);
   } catch (e) {
     console.warn("getTrendingTopics failed, continuing without trend context", e);
     return [];
@@ -2516,9 +2520,32 @@ async function upsertMediaReference(params: {
   }
 }
 
+async function verifyCalendarOwnership(params: {
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  calendarId: string;
+  userId: string;
+}): Promise<boolean> {
+  const res = await fetch(
+    `${params.supabaseUrl}/rest/v1/saved_calendars?id=eq.${postgrestValue(params.calendarId)}&user_id=eq.${postgrestValue(params.userId)}&select=id`,
+    {
+      headers: {
+        authorization: `Bearer ${params.serviceRoleKey}`,
+        apikey: params.serviceRoleKey,
+      },
+    }
+  );
+  if (!res.ok) return false;
+  const rows = await res.json().catch(() => []);
+  return Array.isArray(rows) && rows.length > 0;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
+
+  const contentLengthError = checkContentLength(req);
+  if (contentLengthError) return contentLengthError;
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -2558,11 +2585,34 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Missing calendar, post day, or image prompt." }, 400);
     }
 
+    const ownsCalendar = await verifyCalendarOwnership({
+      supabaseUrl: SUPABASE_URL,
+      serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+      calendarId,
+      userId,
+    });
+    if (!ownsCalendar) {
+      return jsonResponse({ error: "Calendar not found." }, 403);
+    }
+
     const rateLimitCheck = await checkRateLimit(userId, "generate-post-image", {
       maxRequests: 8,
       windowMs: 60 * 1000,
     });
     if (!rateLimitCheck.allowed) return jsonResponse({ error: "Rate limit exceeded." }, 429);
+
+    const quota = await checkQuota(userId);
+    const usingSharedKey = !(quota.useOwnKey && quota.keyMode === "always");
+    if (usingSharedKey && !quota.allowed) {
+      return jsonResponse(
+        {
+          error: "QUOTA_EXCEEDED",
+          message: quotaExceededMessage(quota.tier),
+          quota: { used: quota.used, limit: quota.limit },
+        },
+        402
+      );
+    }
 
     let platformStyle = "";
     if (platform === "LinkedIn") {
@@ -2617,15 +2667,19 @@ Deno.serve(async (req: Request) => {
 
     if (!imageRes.ok) {
       const text = await imageRes.text().catch(() => "");
-      console.error(`Image gateway error ${imageRes.status}. Response body:`, text);
+      console.error(`Image gateway error ${imageRes.status}. Response body:`, sanitizeLogValue(text));
       return jsonResponse(
         { error: `Image generation failed (${imageRes.status}).` },
         imageRes.status || 500
       );
     }
 
+    if (usingSharedKey) {
+      await incrementGenerationCount(userId);
+    }
+
     const imageData = await imageRes.json().catch((err) => {
-      console.error("Failed to parse image generator JSON response:", err);
+      console.error("Failed to parse image generator JSON response:", sanitizeLogValue(err));
       return null;
     });
 
@@ -2651,7 +2705,7 @@ Deno.serve(async (req: Request) => {
       bytes = new Uint8Array(await assetRes.arrayBuffer());
       contentType = assetRes.headers.get("content-type") || "image/png";
     } else {
-      console.error("Unknown API response shape:", JSON.stringify(imageData));
+      console.error("Unknown API response shape:", sanitizeLogValue(imageData));
       return jsonResponse({ error: "Image generator did not return an image." }, 500);
     }
 
@@ -2674,7 +2728,7 @@ Deno.serve(async (req: Request) => {
     );
     if (!orphanRes.ok) {
       const text = await orphanRes.text().catch(() => "");
-      console.warn(`Failed to orphan old media references: ${orphanRes.status}`, text);
+      console.warn(`Failed to orphan old media references: ${orphanRes.status}`, sanitizeLogValue(text));
     }
 
     const ext = contentType.includes("jpeg")

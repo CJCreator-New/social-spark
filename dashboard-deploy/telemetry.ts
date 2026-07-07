@@ -683,10 +683,13 @@ function selectRelevantExamples(
 // ─── TREND-AWARE GENERATION ───────────────────────────────────────────────
 
 /**
- * Fetch top trending topic titles for an industry/platform from the
- * trending_topics table, for injection into generation prompts.
+ * Fetch top trending keywords for an industry from the public.trends table,
+ * for injection into generation prompts.
  * Returns an empty array if Supabase env vars are missing or the query fails
  * — trend context is an enhancement, never a hard dependency.
+ *
+ * Note: `platform` param is accepted for API compatibility but not used for
+ * filtering since the trends table has no platform column.
  */
 async function getTrendingTopics(
   industry?: string,
@@ -703,17 +706,18 @@ async function getTrendingTopics(
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
     let query = supabase
-      .from("trending_topics")
-      .select("title")
-      .order("score", { ascending: false })
+      .from("trends")
+      .select("keyword")
+      .order("volume", { ascending: false })
       .limit(limit);
 
-    if (industry) query = query.eq("industry", industry);
-    if (platform) query = query.eq("platform", platform);
+    // Filter by category using a loose case-insensitive match on industry.
+    // platform is intentionally unused — trends table has no platform column.
+    if (industry) query = query.ilike("category", `%${industry}%`);
 
     const { data, error } = await query;
     if (error || !Array.isArray(data)) return [];
-    return data.map((row: { title: string }) => row.title).filter(Boolean);
+    return data.map((row: { keyword: string }) => row.keyword).filter(Boolean);
   } catch (e) {
     console.warn("getTrendingTopics failed, continuing without trend context", e);
     return [];
@@ -2467,7 +2471,16 @@ export async function handle(req: Request): Promise<Response> {
 
     const eventName = String(payload.name || payload.event || "unknown");
     if (!ALLOWED_EVENT_NAMES.has(eventName)) {
-      // Silently drop unknown events instead of erroring the fire-and-forget caller.
+      // F-019: a typo'd event name should be visible to the developer who
+      // introduced it. In deployed environments, keep swallowing unknown
+      // events with a low-noise 202 so a fire-and-forget caller never errors.
+      const isDeployed = typeof Deno !== "undefined" && !!Deno.env.get("DENO_DEPLOYMENT_ID");
+      if (!isDeployed) {
+        return new Response(JSON.stringify({ ok: false, error: `unknown event: ${eventName}` }), {
+          status: 400,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify({ ok: true }), {
         status: 202,
         headers: { ...cors, "Content-Type": "application/json" },

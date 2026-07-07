@@ -530,6 +530,7 @@ const Index = () => {
     setCustomTopic,
     extraTopics,
     setExtraTopics,
+    selectedTrendingTopics,
     posts,
     setPosts,
     postTimes,
@@ -1466,8 +1467,13 @@ const Index = () => {
             topic: form.topics[0] || form.coreIdea,
             dow: targetDow,
             date: form.targetDate,
+            ...(selectedTrendingTopics.length > 0 ? { trendingTopics: selectedTrendingTopics } : {}),
           }
-        : { ...baseBody, topics: form.topics };
+        : {
+            ...baseBody,
+            topics: form.topics,
+            ...(selectedTrendingTopics.length > 0 ? { trendingTopics: selectedTrendingTopics } : {}),
+          };
 
       // If no explicit topics were provided, log telemetry and mark payload so server can note inference
       const topicsEmpty = isDay ? !form.topics[0] : form.topics.length === 0;

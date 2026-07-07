@@ -76,13 +76,34 @@ function scoreHookStrength(hook: string, platform?: string): number {
 }
 
 /**
+ * Common English stopwords that carry no topical meaning on their own.
+ * Excluded before matching topic words against CTA/hashtag text, so a topic
+ * like "The future of AI" doesn't award a bonus for "the" or "of" appearing
+ * incidentally in unrelated CTA/hashtag text.
+ */
+const STOPWORDS = new Set([
+  "a", "an", "the", "of", "in", "on", "for", "to", "and", "or", "is", "are",
+  "was", "were", "be", "been", "being", "this", "that", "these", "those",
+  "with", "from", "by", "as", "at", "it", "its", "your", "you", "our", "we",
+  "how", "what", "why", "who", "which",
+]);
+
+/** Non-stopword topic tokens, lowercased. */
+function meaningfulTopicWords(topic: string): string[] {
+  return topic
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-z0-9]/g, ""))
+    .filter((w) => w.length > 0 && !STOPWORDS.has(w));
+}
+
+/**
  * Score CTA effectiveness (specific action vs vague engagement)
  */
 function scoreCtaEffectiveness(cta: string, topic: string, platform?: string): number {
   if (!cta || cta.length < 5) return 2; // No CTA
 
   const ctaLower = cta.toLowerCase();
-  const topicLower = topic.toLowerCase();
   const plat = (platform || "").toLowerCase();
 
   // Highest value: specific, topic-related CTAs
@@ -101,8 +122,9 @@ function scoreCtaEffectiveness(cta: string, topic: string, platform?: string): n
     score = 7;
   }
 
-  // Bonus if CTA relates to topic
-  if (topicLower && ctaLower.includes(topicLower.split(" ")[0])) {
+  // Bonus if CTA relates to a meaningful (non-stopword) topic word
+  const topicWords = meaningfulTopicWords(topic);
+  if (topicWords.some((word) => ctaLower.includes(word))) {
     score += 2;
   }
 
@@ -133,11 +155,17 @@ function scoreCtaEffectiveness(cta: string, topic: string, platform?: string): n
 }
 
 /**
- * Strip common suffixes so word forms like "strategy"/"strategies" or
- * "marketing"/"marketed" are recognized as related.
+ * Strip common suffixes so word forms like "strategy"/"strategies",
+ * "marketing"/"marketed", "growing"/"growth", "warmth"/"warm", or
+ * "happiness"/"happy" are recognized as related.
  */
 function stem(word: string): string {
-  return word.replace(/(ies)$/, "y").replace(/(ing|ers|er|ed|es|s)$/, "");
+  return word
+    .replace(/(ies)$/, "y")
+    .replace(/(ness)$/, "")
+    .replace(/(tion|sion)$/, "t")
+    .replace(/(th)$/, "")
+    .replace(/(ing|ers|er|ed|es|s)$/, "");
 }
 
 /**
@@ -153,10 +181,7 @@ function scoreHashtagRelevance(hashtags: string, topic: string): number {
 
   if (hashtagList.length === 0) return 0;
 
-  const topicWords = topic
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 3);
+  const topicWords = meaningfulTopicWords(topic).filter((w) => w.length > 3);
   const topicStems = topicWords.map(stem);
 
   const relatedTags = hashtagList.filter((tag) => {
@@ -179,7 +204,7 @@ function scoreHashtagRelevance(hashtags: string, topic: string): number {
 function estimateReadability(text: string): number {
   if (!text || text.length < 20) return 0;
 
-  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0).length || 1;
+  const sentences = text.split(/[.!?;\n]+|\s+—\s+|--/).filter((s) => s.trim().length > 0).length || 1;
   const words = text.split(/\s+/).filter((w) => w.trim().length > 0).length;
   if (words === 0) return 0;
   const syllables = estimateSyllables(text);

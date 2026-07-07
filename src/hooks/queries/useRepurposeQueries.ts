@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWizardStore } from "@/stores/useWizardStore";
 import {
   isE2EMode,
+  type ExtractedIdea,
+  type ExtractIdeasPayload,
   type GeneratedPostPayload,
   type GeneratedResponse,
   type InlineRewritePayload,
@@ -83,6 +85,74 @@ export function useRepurposePostMutation() {
       setKeySource(usedFallback ? "user" : "platform");
       setKeyMode(keyMode);
       return (data as GeneratedResponse<GeneratedPostPayload>).post;
+    },
+  });
+}
+
+export function useExtractIdeasMutation() {
+  const setKeySource = useWizardStore((state) => state.setKeySource);
+  const setKeyMode = useWizardStore((state) => state.setKeyMode);
+  return useMutation({
+    mutationFn: async (payload: ExtractIdeasPayload): Promise<ExtractedIdea[]> => {
+      if (isE2EMode()) {
+        return Array.from({ length: payload.count }).map((_, i) => ({
+          title: `E2E idea ${i + 1}`,
+          format: i % 2 === 0 ? "Contrarian take" : "How-to breakdown",
+          rationale: `E2E rationale ${i + 1}`,
+          key_points: `E2E key points ${i + 1} drawn from source.`,
+        }));
+      }
+      const { generateWithFallback } = await import("@/lib/brandMemory");
+      const { data, usedFallback, keyMode } = await generateWithFallback<{
+        ideas: ExtractedIdea[];
+      }>("extract-ideas", payload);
+      setKeySource(usedFallback ? "user" : "platform");
+      setKeyMode(keyMode);
+      return data.ideas || [];
+    },
+  });
+}
+
+const DOW_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+export function useGenerateFromIdeaMutation() {
+  const setKeySource = useWizardStore((state) => state.setKeySource);
+  const setKeyMode = useWizardStore((state) => state.setKeyMode);
+  return useMutation({
+    mutationFn: async ({
+      idea,
+      platform,
+    }: {
+      idea: ExtractedIdea;
+      platform: string;
+    }): Promise<GeneratedPostPayload> => {
+      if (isE2EMode()) {
+        return {
+          topic: idea.title,
+          format: idea.format,
+          title: `${idea.title} (${platform})`,
+          hook: `E2E hook for ${idea.title}`,
+          body: `[${platform}] E2E post grounded in: ${idea.key_points}`,
+          cta: "Save this for later.",
+          hashtags: "#e2e",
+        };
+      }
+      const { generateWithFallback } = await import("@/lib/brandMemory");
+      const { data, usedFallback, keyMode } = await generateWithFallback(
+        "generate-single-post",
+        {
+          platform,
+          topic: idea.title,
+          format: idea.format,
+          coreIdea: idea.key_points,
+          dow: DOW_NAMES[new Date().getDay()],
+          quality: "polished",
+          extra: `This post repurposes existing source material. Ground the post ONLY in these facts (do not invent statistics, names, or claims): ${idea.key_points}. The strategic angle is: ${idea.title} (${idea.format}). ${idea.rationale}`,
+        }
+      );
+      setKeySource(usedFallback ? "user" : "platform");
+      setKeyMode(keyMode);
+      return (data as GeneratedResponse<GeneratedPostPayload>).post || {};
     },
   });
 }

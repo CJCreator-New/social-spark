@@ -24,6 +24,7 @@ import {
   checkQuota,
   incrementGenerationCount,
   quotaExceededMessage,
+  checkContentLength,
 } from "../_shared/promptHelpers.ts";
 
 interface ExistingPost {
@@ -74,6 +75,9 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
   }
+
+  const contentLengthError = checkContentLength(req);
+  if (contentLengthError) return contentLengthError;
 
   try {
     const body = await req.json();

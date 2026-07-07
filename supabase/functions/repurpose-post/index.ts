@@ -6,6 +6,7 @@ import {
   getCorsHeaders,
   jsonResponse,
   checkRateLimit,
+  checkContentLength,
   cleanPayload,
   buildSystemMessage,
   callAIGateway,
@@ -14,11 +15,17 @@ import {
   getVerifiedUserId,
   scoreVariants,
   errorResponse,
+  checkQuota,
+  incrementGenerationCount,
+  quotaExceededMessage,
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
+
+  const contentLengthError = checkContentLength(req);
+  if (contentLengthError) return contentLengthError;
 
   try {
     const body = await req.json();
@@ -44,6 +51,20 @@ Deno.serve(async (req: Request) => {
     });
     if (!rateLimitCheck.allowed) {
       return jsonResponse({ error: "Rate limit exceeded." }, 429);
+    }
+
+    const quota = await checkQuota(userId);
+    const usingSharedKey =
+      !payload.userApiKey && !(quota.useOwnKey && quota.keyMode === "always");
+    if (usingSharedKey && !quota.allowed) {
+      return jsonResponse(
+        {
+          error: "QUOTA_EXCEEDED",
+          message: quotaExceededMessage(quota.tier),
+          quota: { used: quota.used, limit: quota.limit },
+        },
+        402
+      );
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -163,10 +184,14 @@ Return the result as a single post object using return_post.`;
       return jsonResponse({ error: aiRes.error }, aiRes.status);
     }
 
+    if (usingSharedKey) {
+      await incrementGenerationCount(userId);
+    }
+
     const parseResult = parseAIResponse(aiRes.data || {}, "return_post");
     if (!parseResult.success) return jsonResponse({ error: parseResult.error }, 500);
 
-    let parsed = parseResult.parsed as Record<string, unknown>;
+    const parsed = parseResult.parsed as Record<string, unknown>;
 
     // Variant scoring block
     const candidates = [String(parsed.body || "")];

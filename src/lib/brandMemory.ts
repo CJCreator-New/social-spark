@@ -125,8 +125,7 @@ export async function generateWithFallback<T = unknown>(
   if (userKeyInfo && userKeyInfo.source === "user") {
     const alwaysBody = {
       ...body,
-      userApiKey:
-        userKeyInfo.apiKey === "USER_KEY_STORED_SERVERSIDE" ? undefined : userKeyInfo.apiKey,
+      userApiKey: userKeyInfo.apiKey,
       userApiProvider: userKeyInfo.provider,
     };
     const res = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
@@ -202,8 +201,7 @@ export async function generateWithFallback<T = unknown>(
 
     const fallbackBody = {
       ...body,
-      userApiKey:
-        fallbackClient.apiKey === "USER_KEY_STORED_SERVERSIDE" ? undefined : fallbackClient.apiKey,
+      userApiKey: fallbackClient.apiKey,
       userApiProvider: fallbackClient.provider,
     };
 

@@ -111,6 +111,33 @@ describe("useWizardStore — autosaveStatus", () => {
   });
 });
 
+describe("useWizardStore — localStorage persistence (F-010 offline recovery)", () => {
+  it("persists recovery-relevant fields to localStorage under the cf:wizard key", () => {
+    act(() => {
+      useWizardStore.getState().setStep(3);
+      useWizardStore.getState().setPosts([{ day: 1 } as never]);
+    });
+
+    const raw = window.localStorage.getItem("cf:wizard");
+    expect(raw).toBeTruthy();
+    const persisted = JSON.parse(raw!);
+    expect(persisted.state.step).toBe(3);
+    expect(persisted.state.posts).toEqual([{ day: 1 }]);
+  });
+
+  it("does not persist ephemeral fields like autosaveStatus or sampleMode", () => {
+    act(() => {
+      useWizardStore.getState().setAutosaveStatus("error");
+      useWizardStore.getState().setSampleMode(true);
+    });
+
+    const raw = window.localStorage.getItem("cf:wizard");
+    const persisted = JSON.parse(raw!);
+    expect(persisted.state.autosaveStatus).toBeUndefined();
+    expect(persisted.state.sampleMode).toBeUndefined();
+  });
+});
+
 describe("useWizardStore — lockedDays", () => {
   it("toggleLockedDay adds a day to the locked set", () => {
     act(() => {
@@ -134,5 +161,57 @@ describe("useWizardStore — lockedDays", () => {
       useWizardStore.getState().reset();
     });
     expect(useWizardStore.getState().lockedDays.length).toBe(0);
+  });
+});
+
+describe("useWizardStore — trending topics", () => {
+  it("selectedTrendingTopics defaults to []", () => {
+    expect(useWizardStore.getState().selectedTrendingTopics).toEqual([]);
+  });
+
+  it("toggleTrendingTopic adds a keyword when not present", () => {
+    act(() => {
+      useWizardStore.getState().toggleTrendingTopic("AI Tools");
+    });
+    expect(useWizardStore.getState().selectedTrendingTopics).toContain("AI Tools");
+    expect(useWizardStore.getState().selectedTrendingTopics.length).toBe(1);
+  });
+
+  it("toggleTrendingTopic removes a keyword when already present", () => {
+    act(() => {
+      useWizardStore.getState().toggleTrendingTopic("AI Tools");
+      useWizardStore.getState().toggleTrendingTopic("AI Tools");
+    });
+    expect(useWizardStore.getState().selectedTrendingTopics).not.toContain("AI Tools");
+    expect(useWizardStore.getState().selectedTrendingTopics.length).toBe(0);
+  });
+
+  it("toggleTrendingTopic handles multiple toggles correctly", () => {
+    act(() => {
+      useWizardStore.getState().toggleTrendingTopic("AI Tools");
+      useWizardStore.getState().toggleTrendingTopic("Remote Work");
+      useWizardStore.getState().toggleTrendingTopic("AI Tools"); // remove first
+    });
+    const selected = useWizardStore.getState().selectedTrendingTopics;
+    expect(selected).not.toContain("AI Tools");
+    expect(selected).toContain("Remote Work");
+    expect(selected.length).toBe(1);
+  });
+
+  it("clearTrendingTopics resets to []", () => {
+    act(() => {
+      useWizardStore.getState().toggleTrendingTopic("AI Tools");
+      useWizardStore.getState().toggleTrendingTopic("Remote Work");
+      useWizardStore.getState().clearTrendingTopics();
+    });
+    expect(useWizardStore.getState().selectedTrendingTopics).toEqual([]);
+  });
+
+  it("reset() clears selectedTrendingTopics", () => {
+    act(() => {
+      useWizardStore.getState().toggleTrendingTopic("AI Tools");
+      useWizardStore.getState().reset();
+    });
+    expect(useWizardStore.getState().selectedTrendingTopics).toEqual([]);
   });
 });

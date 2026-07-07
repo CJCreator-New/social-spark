@@ -1,6 +1,6 @@
 import React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 // ---------------------------------------------------------------------------
@@ -41,11 +41,40 @@ vi.mock("react-helmet-async", () => ({
   Helmet: () => null,
 }));
 
+vi.mock("@/components/ui/dropdown-menu", () => ({
+  DropdownMenu: ({ children }: any) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: any) => children,
+  DropdownMenuContent: ({ children }: any) => <div>{children}</div>,
+  DropdownMenuItem: ({ children, onSelect, onClick }: any) => (
+    <button onClick={onClick || onSelect}>{children}</button>
+  ),
+  DropdownMenuSeparator: () => null,
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+vi.mock("@/lib/timezones", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/timezones")>("@/lib/timezones");
+  return {
+    ...actual,
+    browserTimezone: () => "UTC",
+    listTimezones: () => ["UTC"],
+  };
+});
+
+vi.mock("@/components/VirtualizedList", () => ({
+  VirtualizedList: <T,>({
+    items,
+    renderItem,
+  }: {
+    items: T[];
+    renderItem: (item: T, index: number) => React.ReactNode;
+  }) => <div>{items.map((item, index) => <React.Fragment key={index}>{renderItem(item, index)}</React.Fragment>)}</div>,
 }));
 
 const NOW_ISO = "2026-07-08T09:00:00.000Z"; // Wednesday
@@ -67,24 +96,24 @@ const mockCancelMutateAsync = vi.fn();
 const mockUpdateStatusMutateAsync = vi.fn();
 const mockUpdateTimeMutateAsync = vi.fn();
 
-function makeScheduleData() {
-  return {
-    pages: [
-      {
-        rows: [ROW],
-        calendars: {
-          "cal-1": { id: "cal-1", title: "Growth Calendar", timezone: "UTC", tracking_url: null },
-        },
-        profileTz: "UTC",
-        nextCursor: null,
+const MOCK_SCHEDULE_DATA = {
+  pages: [
+    {
+      rows: [ROW],
+      calendars: {
+        "cal-1": { id: "cal-1", title: "Growth Calendar", timezone: "UTC", tracking_url: null },
       },
-    ],
-  };
-}
+      profileTz: "UTC",
+      nextCursor: null,
+    },
+  ],
+};
+
+const MOCK_PROFILE_DATA = { default_timezone: "UTC" };
 
 vi.mock("@/hooks/useAppQueries", () => ({
   useScheduleInfiniteQuery: () => ({
-    data: makeScheduleData(),
+    data: MOCK_SCHEDULE_DATA,
     isLoading: false,
     error: null,
     refetch: vi.fn(),
@@ -92,7 +121,7 @@ vi.mock("@/hooks/useAppQueries", () => ({
     hasNextPage: false,
     isFetchingNextPage: false,
   }),
-  useProfileQuery: () => ({ data: { default_timezone: "UTC" } }),
+  useProfileQuery: () => ({ data: MOCK_PROFILE_DATA }),
   useCancelScheduledPostMutation: () => ({ mutateAsync: mockCancelMutateAsync }),
   useUpdateScheduledPostStatusMutation: () => ({ mutateAsync: mockUpdateStatusMutateAsync }),
   useUpdateScheduledPostTimeMutation: () => ({ mutateAsync: mockUpdateTimeMutateAsync }),
@@ -112,10 +141,24 @@ function openRescheduleMenu() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal(
+    "IntersectionObserver",
+    vi.fn(() => ({
+      observe: vi.fn(),
+      disconnect: vi.fn(),
+      unobserve: vi.fn(),
+      takeRecords: vi.fn(() => []),
+    }))
+  );
   mockConflictLimit.mockResolvedValue({ data: [], error: null });
   mockCancelMutateAsync.mockResolvedValue(undefined);
   mockUpdateStatusMutateAsync.mockResolvedValue(undefined);
   mockUpdateTimeMutateAsync.mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe("Schedule — conflict detection on reschedule", () => {
@@ -124,7 +167,7 @@ describe("Schedule — conflict detection on reschedule", () => {
     render(<Schedule />);
 
     openRescheduleMenu();
-    fireEvent.click(await screen.findByText(/reschedule/i));
+    fireEvent.click(await screen.findByRole("button", { name: /reschedule/i }));
 
     const dateInput = screen.getByDisplayValue(/2026-07-08/);
     fireEvent.change(dateInput, { target: { value: "2026-07-09" } });
@@ -147,7 +190,7 @@ describe("Schedule — conflict detection on reschedule", () => {
     render(<Schedule />);
 
     openRescheduleMenu();
-    fireEvent.click(await screen.findByText(/reschedule/i));
+    fireEvent.click(await screen.findByRole("button", { name: /reschedule/i }));
 
     const dateInput = screen.getByDisplayValue(/2026-07-08/);
     fireEvent.change(dateInput, { target: { value: "2026-07-09" } });
@@ -171,7 +214,7 @@ describe("Schedule — conflict detection on reschedule", () => {
     render(<Schedule />);
 
     openRescheduleMenu();
-    fireEvent.click(await screen.findByText(/reschedule/i));
+    fireEvent.click(await screen.findByRole("button", { name: /reschedule/i }));
 
     const dateInput = screen.getByDisplayValue(/2026-07-08/);
     fireEvent.change(dateInput, { target: { value: "2026-07-10" } });

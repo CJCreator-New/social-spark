@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { LogoMark } from "@/components/brand/Logo";
 import { APP_NAME } from "@/constants/branding";
+import "@/styles/pages.css";
 
 // Supabase's OAuth 2.1 namespace is beta; type it locally so TS is happy.
 type AuthorizationDetails = {
@@ -23,6 +24,20 @@ type OAuthNs = {
     id: string
   ) => Promise<{ data: AuthorizationDetails | null; error: { message: string } | null }>;
 };
+
+// F-014: the authorization server is trusted to return a same-registered-client
+// redirect, but this is a defensive backstop in case a bug or compromised
+// config ever returns something other than a normal http(s) URL — refuse to
+// navigate to javascript:/data:/malformed targets.
+function isSafeRedirectTarget(target: unknown): target is string {
+  if (typeof target !== "string" || !target) return false;
+  try {
+    const url = new URL(target, window.location.origin);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 export default function OAuthConsent() {
   const [params] = useSearchParams();
@@ -47,6 +62,9 @@ export default function OAuthConsent() {
       if (error) return setError(error.message);
       const immediate = data?.redirect_url ?? data?.redirect_to;
       if (immediate && !data?.client) {
+        if (!isSafeRedirectTarget(immediate)) {
+          return setError("Invalid redirect target returned by the authorization server.");
+        }
         window.location.href = immediate;
         return;
       }
@@ -68,9 +86,9 @@ export default function OAuthConsent() {
       return setError(error.message);
     }
     const target = data?.redirect_url ?? data?.redirect_to;
-    if (!target) {
+    if (!isSafeRedirectTarget(target)) {
       setBusy(false);
-      return setError("No redirect returned by the authorization server.");
+      return setError("No valid redirect returned by the authorization server.");
     }
     window.location.href = target;
   }
@@ -81,108 +99,58 @@ export default function OAuthConsent() {
         <title>Authorize app — {APP_NAME}</title>
         <meta name="robots" content="noindex" />
       </Helmet>
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 24,
-          background: "hsl(var(--background))",
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 460,
-            padding: 32,
-            borderRadius: 16,
-            background: "hsl(var(--card))",
-            border: "1px solid hsl(var(--border))",
-            boxShadow: "0 12px 40px hsl(var(--foreground) / 0.06)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+      <main className="oauth-consent-page">
+        <div className="oauth-consent-card">
+          <div className="oauth-consent-brand">
             <LogoMark />
-            <span style={{ fontWeight: 600, color: "hsl(var(--foreground))" }}>{APP_NAME}</span>
+            <span className="oauth-consent-brand-name">{APP_NAME}</span>
           </div>
 
           {error && (
-            <div
-              role="alert"
-              style={{
-                padding: 12,
-                borderRadius: 10,
-                background: "hsl(var(--destructive) / 0.08)",
-                color: "hsl(var(--destructive))",
-                marginBottom: 16,
-                fontSize: 14,
-              }}
-            >
+            <div role="alert" className="oauth-consent-error">
               {error}
             </div>
           )}
 
           {!details && !error && (
-            <p style={{ color: "hsl(var(--muted-foreground))" }}>Loading authorization request…</p>
+            <p className="oauth-consent-loading" aria-busy="true">
+              Loading authorization request…
+            </p>
           )}
 
           {details && (
             <>
-              <h1
-                style={{
-                  fontSize: 22,
-                  fontWeight: 700,
-                  margin: "0 0 8px",
-                  color: "hsl(var(--foreground))",
-                }}
-              >
+              <h1 className="oauth-consent-title">
                 Connect {details.client?.name ?? "an app"} to your account
               </h1>
-              <p
-                style={{
-                  color: "hsl(var(--muted-foreground))",
-                  fontSize: 14,
-                  lineHeight: 1.6,
-                  marginBottom: 20,
-                }}
-              >
+              <p className="oauth-consent-desc">
                 {details.client?.name ?? "This client"} is requesting access to use ContentForge as
-                you. It will be able to read your saved calendars and scheduled posts.
+                you. It will be able to:
               </p>
+              <ul className="oauth-consent-scopes">
+                {details.scopes && details.scopes.length > 0 ? (
+                  details.scopes.map((scope) => <li key={scope}>{scope}</li>)
+                ) : (
+                  <li>Read your saved calendars and scheduled posts.</li>
+                )}
+              </ul>
 
-              <div style={{ display: "flex", gap: 10 }}>
+              <div className="oauth-consent-actions">
                 <button
                   type="button"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() => decide(false)}
-                  style={{
-                    flex: 1,
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    border: "1px solid hsl(var(--border))",
-                    background: "transparent",
-                    color: "hsl(var(--foreground))",
-                    cursor: busy ? "not-allowed" : "pointer",
-                    fontWeight: 500,
-                  }}
+                  className="oauth-consent-btn oauth-consent-btn-deny"
                 >
                   Deny
                 </button>
                 <button
                   type="button"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() => decide(true)}
-                  style={{
-                    flex: 1,
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    border: "none",
-                    background: "hsl(var(--primary))",
-                    color: "hsl(var(--primary-foreground))",
-                    cursor: busy ? "not-allowed" : "pointer",
-                    fontWeight: 600,
-                  }}
+                  className="oauth-consent-btn oauth-consent-btn-approve"
                 >
                   {busy ? "Working…" : "Approve"}
                 </button>

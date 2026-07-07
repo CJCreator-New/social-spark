@@ -37,6 +37,10 @@ export function useScheduledPostsQuery(calendarId?: string) {
     queryKey: ["scheduled-posts-status", calendarId],
     enabled: !!calendarId,
     staleTime: 30 * 1000,
+    // F-017: publish status changes server-side (queue-worker cron), outside
+    // any user action in this tab — refetch on focus so a user tabbing back
+    // sees whether their post actually published while they were away.
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       if (!calendarId) return [];
       if (isE2EMode()) {

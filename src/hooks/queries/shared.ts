@@ -58,6 +58,20 @@ export type RepurposePayload = {
   [key: string]: unknown;
 };
 
+export type ExtractedIdea = {
+  title: string;
+  format: string;
+  rationale: string;
+  key_points: string;
+};
+
+export type ExtractIdeasPayload = {
+  source: string;
+  count: number;
+  platform?: string;
+  [key: string]: unknown;
+};
+
 export type GeneratePostImagePayload = {
   calendarId: string;
   postDay: number;

@@ -32,7 +32,7 @@ async function hmacSha256Hex(message: string, secret: string): Promise<string> {
   return toHex(sig);
 }
 
-Deno.serve(async (req) => {
+export async function handleVerifyPayment(req: Request): Promise<Response> {
   const cors = getCorsHeaders(req.headers.get("origin"));
 
   function jsonResponse(body: unknown, status = 200): Response {
@@ -216,4 +216,8 @@ Deno.serve(async (req) => {
     console.error("verify-payment handler error:", e);
     return jsonResponse({ error: "An unexpected error occurred." }, 500);
   }
-});
+}
+
+if (typeof Deno !== "undefined" && Deno.serve) {
+  Deno.serve(handleVerifyPayment);
+}

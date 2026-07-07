@@ -46,10 +46,12 @@ const COMMON_TZ_FALLBACK = [
  * @returns Array of IANA timezone identifiers
  */
 export function listTimezones(): string[] {
-  // @ts-expect-error supportedValuesOf is widely supported now (ES2023)
+  const intlWithSupportedValues = Intl as typeof Intl & {
+    supportedValuesOf?: (key: "timeZone") => string[];
+  };
   const native =
-    typeof Intl.supportedValuesOf === "function"
-      ? (Intl.supportedValuesOf("timeZone") as string[])
+    typeof intlWithSupportedValues.supportedValuesOf === "function"
+      ? intlWithSupportedValues.supportedValuesOf("timeZone")
       : null;
   return native && native.length ? native : COMMON_TZ_FALLBACK;
 }

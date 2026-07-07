@@ -29,13 +29,23 @@ export default function AuthPage() {
   // the OAuth consent flow returns the user to the consent screen after login.
   const rawNext = new URLSearchParams(routerLocation.search).get("next");
   const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
+  // Google's redirect_uri must exactly match a registered URI, so it cannot carry
+  // `nextPath`. Stash the intended destination in localStorage before redirecting
+  // and consume it here once the OAuth round-trip lands the user back on /auth.
+  const OAUTH_NEXT_STORAGE_KEY = "auth:oauth_next";
+  const storedNext =
+    typeof window !== "undefined" ? window.localStorage.getItem(OAUTH_NEXT_STORAGE_KEY) : null;
   const from =
     nextPath ||
+    storedNext ||
     (routerLocation.state as { from?: { pathname: string } } | null)?.from?.pathname ||
     "/app";
 
   useEffect(() => {
-    if (user) navigate(from, { replace: true });
+    if (user) {
+      window.localStorage.removeItem(OAUTH_NEXT_STORAGE_KEY);
+      navigate(from, { replace: true });
+    }
   }, [user, navigate, from]);
 
   async function handleEmailAuth(e: React.FormEvent) {
@@ -93,8 +103,13 @@ export default function AuthPage() {
     setError("");
     setGoogleLoading(true);
     try {
+      if (nextPath) {
+        window.localStorage.setItem(OAUTH_NEXT_STORAGE_KEY, nextPath);
+      } else {
+        window.localStorage.removeItem(OAUTH_NEXT_STORAGE_KEY);
+      }
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}${nextPath ?? ""}`,
+        redirect_uri: window.location.origin,
       });
       if (result.error) setError(result.error.message || "Google sign-in failed.");
     } catch (err) {

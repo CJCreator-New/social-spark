@@ -9,27 +9,27 @@ describe("passwordPolicy — edge cases", () => {
   });
 
   it("rejects passwords exceeding a maximum length boundary", () => {
-    const long = "a".repeat(1000);
+    const long = `${"a".repeat(999)}1`;
     // If there is a max-length rule, this will flag it; otherwise ensure no crash
     const result = validatePassword(long);
     expect(result === null || typeof result === "string").toBe(true);
   });
 
   it("rejects passwords with only special characters", () => {
-    expect(validatePassword("!@#$%")).toBe(
-      `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`
+    expect(validatePassword("!@#$%^&*()")).toBe(
+      "Password must contain at least one letter and one digit."
     );
   });
 
   it("accepts compliant passwords with Unicode characters", () => {
-    const password = "Pässwörd längéñ";
+    const password = "Pässwörd1 längéñ";
     // Should not crash and should either accept or reject with a rule message
     const result = validatePassword(password);
     expect(result === null || typeof result === "string").toBe(true);
   });
 
   it("treats leading/trailing whitespace as part of the password length", () => {
-    const trimmed = "a".repeat(PASSWORD_MIN_LENGTH);
+    const trimmed = `${"a".repeat(PASSWORD_MIN_LENGTH - 1)}1`;
     expect(validatePassword(trimmed)).toBeNull();
   });
 
@@ -40,6 +40,6 @@ describe("passwordPolicy — edge cases", () => {
   });
 
   it("accepts a password at minimum length with mixed character classes", () => {
-    expect(validatePassword("Abcdef1!")).toBeNull();
+    expect(validatePassword("Abcdefgh1!")).toBeNull();
   });
 });

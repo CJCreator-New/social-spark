@@ -95,7 +95,7 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
       }
     }
     console.warn("getSubscriptionStatus failed:", err);
-    return FREE_STATUS;
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
 

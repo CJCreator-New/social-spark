@@ -13,7 +13,7 @@ This repository contains **Social Spark**, a React + TypeScript + Supabase + Zus
 
 ## Critical Developer Rules
 
-- **Use specialized agents**: For large-scale feature additions, always run the specialized agents to guide planning (`feature-planner`), react layout (`react-ui-builder`), backend schema/Edge Functions (`supabase-architect`), LLM prompt orchestration (`content-ai-engineer`), global store flows (`state-flow-keeper`), test suites (`test-runner`), and code review checks (`code-reviewer`).
+- **Use specialized agents**: For large-scale feature additions, always run the specialized agents to guide planning (`feature-planner`), react layout (`react-ui-builder`), backend schema/Edge Functions (`supabase-architect`), LLM prompt orchestration (`content-ai-engineer`), global store flows (`state-flow-keeper`), test suites (`test-runner`), and code review checks (`code-reviewer`). For QA passes/release audits use `qa-test-auditor`, for Playwright E2E specs use `e2e-test-writer`, and for visual/product-feel polish use `saas-design-architect`.
 - **Plan before coding**: Prefer utilizing the `feature-planner` to create a formal implementation plan before making modifications to source code files.
 - **Maintain security boundaries**: Treat Auth, Row-Level Security (RLS) policies, and per-user analytics boundaries as high-risk areas. RLS must be enabled on every table.
 - **AI Graceful Fallback**: Any code interacting with AI generation must gracefully handle failed requests, timeouts, and malformed model outputs.

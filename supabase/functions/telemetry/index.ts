@@ -80,7 +80,16 @@ export async function handle(req: Request): Promise<Response> {
 
     const eventName = String(payload.name || payload.event || "unknown");
     if (!ALLOWED_EVENT_NAMES.has(eventName)) {
-      // Silently drop unknown events instead of erroring the fire-and-forget caller.
+      // F-019: a typo'd event name should be visible to the developer who
+      // introduced it. In deployed environments, keep swallowing unknown
+      // events with a low-noise 202 so a fire-and-forget caller never errors.
+      const isDeployed = typeof Deno !== "undefined" && !!Deno.env.get("DENO_DEPLOYMENT_ID");
+      if (!isDeployed) {
+        return new Response(JSON.stringify({ ok: false, error: `unknown event: ${eventName}` }), {
+          status: 400,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify({ ok: true }), {
         status: 202,
         headers: { ...cors, "Content-Type": "application/json" },

@@ -108,6 +108,60 @@ describe("postPerformanceScore tests", () => {
     });
   });
 
+  describe("F-013: scoring heuristic false positive/negative fixes", () => {
+    it("does not award a topic-match CTA bonus from a leading stopword (e.g. 'The future of AI')", () => {
+      const stopwordTopicPost: Post = {
+        ...samplePost,
+        topic: "The future of AI",
+        cta: "The best way to learn is by doing.",
+      };
+      const unrelatedTopicPost: Post = {
+        ...samplePost,
+        topic: "Personal finance",
+        cta: "The best way to learn is by doing.",
+      };
+      const stopwordScore = calculatePerformanceScore(stopwordTopicPost, "The future of AI");
+      const unrelatedScore = calculatePerformanceScore(unrelatedTopicPost, "Personal finance");
+      // Both CTAs share no meaningful topic word — scores should match instead
+      // of the "The future of AI" topic getting a false +2 bonus from "the".
+      expect(stopwordScore.ctaEffectiveness).toBe(unrelatedScore.ctaEffectiveness);
+    });
+
+    it("still awards the CTA topic-match bonus for a real, non-stopword topic word", () => {
+      const post: Post = {
+        ...samplePost,
+        topic: "The future of AI",
+        cta: "What's your take on AI?",
+      };
+      const noMatchPost: Post = {
+        ...samplePost,
+        topic: "The future of AI",
+        cta: "What's your take on this?",
+      };
+      const scoreWithMatch = calculatePerformanceScore(post, "The future of AI");
+      const scoreNoMatch = calculatePerformanceScore(noMatchPost, "The future of AI");
+      expect(scoreWithMatch.ctaEffectiveness).toBeGreaterThan(scoreNoMatch.ctaEffectiveness);
+    });
+
+    it("recognizes #growing as related to topic 'growth' (stem false negative)", () => {
+      const post: Post = { ...samplePost, topic: "Business growth", hashtags: "#growing" };
+      const score = calculatePerformanceScore(post, "Business growth");
+      expect(score.hashtagRelevance).toBe(100);
+    });
+
+    it("splits sentences on semicolons and newlines instead of inflating the readability grade", () => {
+      const semicolonBody =
+        "Short point one; short point two; short point three; short point four.";
+      const singleSentenceEquivalent = "Short point one. Short point two. Short point three. Short point four.";
+      const semicolonPost: Post = { ...samplePost, body: semicolonBody };
+      const dottedPost: Post = { ...samplePost, body: singleSentenceEquivalent };
+      const semicolonScore = calculatePerformanceScore(semicolonPost, "AI Engineering");
+      const dottedScore = calculatePerformanceScore(dottedPost, "AI Engineering");
+      // Treating ';' as a sentence boundary like '.' should produce the same grade.
+      expect(semicolonScore.readability).toBe(dottedScore.readability);
+    });
+  });
+
   describe("getWeakestPerformanceMetric", () => {
     it("should identify the weakest metric correctly", () => {
       const scores = {

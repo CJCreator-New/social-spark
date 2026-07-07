@@ -201,7 +201,7 @@ export default function HeroCanvas() {
 
     // 8. Animation & Render Loop (IntersectionObserver throttled)
     let animationFrameId: number;
-    let clock = new THREE.Clock();
+    const clock = new THREE.Clock();
     let isVisible = true;
 
     const io = new IntersectionObserver(

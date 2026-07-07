@@ -18,9 +18,15 @@ function isApiProvider(value: string): value is ApiProvider {
 // hold a live secret in a production build — this path exists for local/E2E
 // use only. Real platform-key generation happens server-side in the edge
 // functions, which is why every current call site passes platformAvailable=false.
-export async function resolveAiClient(
-  platformAvailable: boolean
-): Promise<{ apiKey: string; provider: ApiProvider; source: "platform" | "user" }> {
+export async function resolveAiClient(platformAvailable: boolean): Promise<
+  | { apiKey: string; provider: ApiProvider; source: "platform" }
+  // BYOK keys are decrypted server-side only (see api_key_security_hardening
+  // migration) — getUserApiKey() never returns the plaintext key to the
+  // client, so there is nothing real to put in `apiKey` for the user-key
+  // path. Callers must invoke the server (edge function) for user-keyed
+  // generations and cannot send a client-side Authorization header for them.
+  | { apiKey?: undefined; provider: ApiProvider; source: "user" }
+> {
   // Platform path (used when platformAvailable=true or keyMode='fallback')
   if (platformAvailable) {
     const platformKey = (import.meta.env.VITE_PLATFORM_AI_KEY as string) || "";
@@ -50,7 +56,6 @@ export async function resolveAiClient(
     userKeyInfo.provider
   ) {
     return {
-      apiKey: userKeyInfo.apiKey || "USER_KEY_STORED_SERVERSIDE",
       provider: userKeyInfo.provider,
       source: "user",
     };
@@ -59,7 +64,6 @@ export async function resolveAiClient(
   // Fallback to user-supplied key (only when useOwnKey is enabled and key exists)
   if (userKeyInfo.useOwnKey && userKeyInfo.hasKey && userKeyInfo.provider) {
     return {
-      apiKey: userKeyInfo.apiKey || "USER_KEY_STORED_SERVERSIDE",
       provider: userKeyInfo.provider,
       source: "user",
     };
