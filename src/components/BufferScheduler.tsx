@@ -24,19 +24,27 @@ function buildPostText(post: Post, platform: string): string {
   return f.text;
 }
 
-export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platform, postTimes = {} }) => {
+export const BufferScheduler: React.FC<BufferSchedulerProps> = ({
+  posts,
+  platform,
+  postTimes = {},
+}) => {
   const [schedulerType, setSchedulerType] = useState<"buffer" | "hootsuite">("buffer");
-  
+
   const [bufferKey, setBufferKey] = useState("");
   const [hootsuiteKey, setHootsuiteKey] = useState("");
-  
-  const [bufferProfileId, setBufferProfileId] = useState(() => localStorage.getItem(BUFFER_PROFILE_STORAGE) || "");
-  const [hootsuiteProfileId, setHootsuiteProfileId] = useState(() => localStorage.getItem(HOOTSUITE_PROFILE_STORAGE) || "");
+
+  const [bufferProfileId, setBufferProfileId] = useState(
+    () => localStorage.getItem(BUFFER_PROFILE_STORAGE) || ""
+  );
+  const [hootsuiteProfileId, setHootsuiteProfileId] = useState(
+    () => localStorage.getItem(HOOTSUITE_PROFILE_STORAGE) || ""
+  );
 
   const [open, setOpen] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [results, setResults] = useState<ScheduleResult[]>([]);
-  
+
   const clearBufferKey = () => {
     setBufferKey("");
   };
@@ -50,8 +58,14 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
     const apiKey = isBuffer ? bufferKey : hootsuiteKey;
     const profileId = isBuffer ? bufferProfileId : hootsuiteProfileId;
 
-    if (!apiKey.trim()) { toast.error(`Enter your ${isBuffer ? "Buffer" : "Hootsuite"} API key first`); return; }
-    if (!profileId.trim()) { toast.error(`Enter your ${isBuffer ? "Buffer" : "Hootsuite"} Profile ID first`); return; }
+    if (!apiKey.trim()) {
+      toast.error(`Enter your ${isBuffer ? "Buffer" : "Hootsuite"} API key first`);
+      return;
+    }
+    if (!profileId.trim()) {
+      toast.error(`Enter your ${isBuffer ? "Buffer" : "Hootsuite"} Profile ID first`);
+      return;
+    }
 
     // Save profile IDs to localStorage on schedule
     if (isBuffer) {
@@ -61,7 +75,7 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
     }
 
     setScheduling(true);
-    const initResults: ScheduleResult[] = posts.map(p => ({ day: p.day, status: "pending" }));
+    const initResults: ScheduleResult[] = posts.map((p) => ({ day: p.day, status: "pending" }));
     setResults(initResults);
 
     for (let i = 0; i < posts.length; i++) {
@@ -89,7 +103,7 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
           response = await fetch("https://api.bufferapp.com/1/updates/create.json", {
             method: "POST",
             headers: {
-              "Authorization": `Bearer ${apiKey.trim()}`,
+              Authorization: `Bearer ${apiKey.trim()}`,
               "Content-Type": "application/x-www-form-urlencoded",
             },
             body: new URLSearchParams(
@@ -103,7 +117,7 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
           response = await fetch("https://platform.hootsuite.com/v1/messages", {
             method: "POST",
             headers: {
-              "Authorization": `Bearer ${apiKey.trim()}`,
+              Authorization: `Bearer ${apiKey.trim()}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
@@ -116,23 +130,37 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
         }
 
         if (response.ok) {
-          setResults(prev => prev.map(r => r.day === post.day ? { ...r, status: "success", message: "Scheduled ✓" } : r));
+          setResults((prev) =>
+            prev.map((r) =>
+              r.day === post.day ? { ...r, status: "success", message: "Scheduled ✓" } : r
+            )
+          );
         } else {
           const errData = await response.json().catch(() => ({}));
-          setResults(prev => prev.map(r => r.day === post.day ? { ...r, status: "error", message: errData?.error || `HTTP ${response.status}` } : r));
+          setResults((prev) =>
+            prev.map((r) =>
+              r.day === post.day
+                ? { ...r, status: "error", message: errData?.error || `HTTP ${response.status}` }
+                : r
+            )
+          );
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Network error";
-        setResults(prev => prev.map(r => r.day === post.day ? { ...r, status: "error", message: msg } : r));
+        setResults((prev) =>
+          prev.map((r) => (r.day === post.day ? { ...r, status: "error", message: msg } : r))
+        );
       }
 
       // Small delay between API calls to avoid rate limiting
-      if (i < posts.length - 1) await new Promise(r => setTimeout(r, 400));
+      if (i < posts.length - 1) await new Promise((r) => setTimeout(r, 400));
     }
 
     setScheduling(false);
-    const successCount = results.filter(r => r.status === "success").length;
-    toast.success(`${successCount}/${posts.length} posts pushed to ${isBuffer ? "Buffer" : "Hootsuite"}`);
+    const successCount = results.filter((r) => r.status === "success").length;
+    toast.success(
+      `${successCount}/${posts.length} posts pushed to ${isBuffer ? "Buffer" : "Hootsuite"}`
+    );
   };
 
   return (
@@ -140,26 +168,35 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
       <button
         type="button"
         className="cpbtn"
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setOpen((v) => !v)}
         title="Push posts to Buffer or Hootsuite"
       >
         📤 Schedule to Buffer / Hootsuite {open ? "▲" : "▼"}
       </button>
 
       {open && (
-        <div style={{
-          marginTop: 8, padding: "16px", background: "var(--surface)",
-          border: "1px solid var(--border)", borderRadius: 12,
-          display: "flex", flexDirection: "column", gap: 12,
-          minWidth: 320,
-        }}>
+        <div
+          style={{
+            marginTop: 8,
+            padding: "16px",
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            minWidth: 320,
+          }}
+        >
           {/* Tab selector for Buffer vs Hootsuite */}
           <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
             <button
               type="button"
               className="cpbtn"
               style={{
-                flex: 1, padding: "6px", fontSize: 11,
+                flex: 1,
+                padding: "6px",
+                fontSize: 11,
                 background: schedulerType === "buffer" ? "var(--adim)" : "transparent",
                 borderColor: schedulerType === "buffer" ? "var(--accent)" : "var(--border2)",
                 color: schedulerType === "buffer" ? "var(--accent)" : "var(--text2)",
@@ -172,7 +209,9 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
               type="button"
               className="cpbtn"
               style={{
-                flex: 1, padding: "6px", fontSize: 11,
+                flex: 1,
+                padding: "6px",
+                fontSize: 11,
                 background: schedulerType === "hootsuite" ? "var(--adim)" : "transparent",
                 borderColor: schedulerType === "hootsuite" ? "var(--accent)" : "var(--border2)",
                 color: schedulerType === "hootsuite" ? "var(--accent)" : "var(--text2)",
@@ -183,7 +222,15 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
             </button>
           </div>
 
-          <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--text2)", fontWeight: 500 }}>
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: ".14em",
+              textTransform: "uppercase",
+              color: "var(--text2)",
+              fontWeight: 500,
+            }}
+          >
             {schedulerType === "buffer" ? "Buffer Scheduler" : "Hootsuite Scheduler"}
           </div>
 
@@ -192,7 +239,12 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 11, color: "var(--text3)" }}>
                   Buffer API Access Token{" "}
-                  <a href="https://buffer.com/developers/api" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
+                  <a
+                    href="https://buffer.com/developers/api"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--accent)" }}
+                  >
                     (get yours →)
                   </a>
                 </label>
@@ -200,21 +252,34 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
                   <input
                     type="password"
                     value={bufferKey}
-                    onChange={e => setBufferKey(e.target.value)}
+                    onChange={(e) => setBufferKey(e.target.value)}
                     placeholder="Enter Buffer API access token…"
                     style={{
-                      flex: 1, background: "var(--bg)", border: "1px solid var(--border2)",
-                      borderRadius: 6, padding: "6px 10px", fontSize: 12, color: "var(--text)",
-                      fontFamily: "var(--font-body)", outline: "none",
+                      flex: 1,
+                      background: "var(--bg)",
+                      border: "1px solid var(--border2)",
+                      borderRadius: 6,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      color: "var(--text)",
+                      fontFamily: "var(--font-body)",
+                      outline: "none",
                     }}
                   />
                   {bufferKey.trim() && (
-                    <button type="button" className="cpbtn" style={{ fontSize: 11, padding: "5px 10px", color: "var(--err)" }} onClick={clearBufferKey}>
+                    <button
+                      type="button"
+                      className="cpbtn"
+                      style={{ fontSize: 11, padding: "5px 10px", color: "var(--err)" }}
+                      onClick={clearBufferKey}
+                    >
                       Clear
                     </button>
                   )}
                 </div>
-                <div style={{ fontSize: 10, color: "var(--text3)", opacity: 0.75 }}>Access token is kept in memory for this tab only.</div>
+                <div style={{ fontSize: 10, color: "var(--text3)", opacity: 0.75 }}>
+                  Access token is kept in memory for this tab only.
+                </div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -225,12 +290,17 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
                 <input
                   type="text"
                   value={bufferProfileId}
-                  onChange={e => setBufferProfileId(e.target.value)}
+                  onChange={(e) => setBufferProfileId(e.target.value)}
                   placeholder="e.g. 4eb854340acb04e870000010"
                   style={{
-                    background: "var(--bg)", border: "1px solid var(--border2)",
-                    borderRadius: 6, padding: "6px 10px", fontSize: 12, color: "var(--text)",
-                    fontFamily: "var(--font-body)", outline: "none",
+                    background: "var(--bg)",
+                    border: "1px solid var(--border2)",
+                    borderRadius: 6,
+                    padding: "6px 10px",
+                    fontSize: 12,
+                    color: "var(--text)",
+                    fontFamily: "var(--font-body)",
+                    outline: "none",
                   }}
                 />
               </div>
@@ -240,7 +310,12 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 11, color: "var(--text3)" }}>
                   Hootsuite API Client Credential Token{" "}
-                  <a href="https://platform.hootsuite.com/docs/api" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
+                  <a
+                    href="https://platform.hootsuite.com/docs/api"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--accent)" }}
+                  >
                     (get yours →)
                   </a>
                 </label>
@@ -248,44 +323,71 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
                   <input
                     type="password"
                     value={hootsuiteKey}
-                    onChange={e => setHootsuiteKey(e.target.value)}
+                    onChange={(e) => setHootsuiteKey(e.target.value)}
                     placeholder="Enter Hootsuite API key…"
                     style={{
-                      flex: 1, background: "var(--bg)", border: "1px solid var(--border2)",
-                      borderRadius: 6, padding: "6px 10px", fontSize: 12, color: "var(--text)",
-                      fontFamily: "var(--font-body)", outline: "none",
+                      flex: 1,
+                      background: "var(--bg)",
+                      border: "1px solid var(--border2)",
+                      borderRadius: 6,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      color: "var(--text)",
+                      fontFamily: "var(--font-body)",
+                      outline: "none",
                     }}
                   />
                   {hootsuiteKey.trim() && (
-                    <button type="button" className="cpbtn" style={{ fontSize: 11, padding: "5px 10px", color: "var(--err)" }} onClick={clearHootsuiteKey}>
+                    <button
+                      type="button"
+                      className="cpbtn"
+                      style={{ fontSize: 11, padding: "5px 10px", color: "var(--err)" }}
+                      onClick={clearHootsuiteKey}
+                    >
                       Clear
                     </button>
                   )}
                 </div>
-                <div style={{ fontSize: 10, color: "var(--text3)", opacity: 0.75 }}>Access token is kept in memory for this tab only.</div>
+                <div style={{ fontSize: 10, color: "var(--text3)", opacity: 0.75 }}>
+                  Access token is kept in memory for this tab only.
+                </div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 11, color: "var(--text3)" }}>
                   Hootsuite Social Profile ID{" "}
-                  <span style={{ color: "var(--text3)", opacity: 0.7 }}>(find in Hootsuite developer portal)</span>
+                  <span style={{ color: "var(--text3)", opacity: 0.7 }}>
+                    (find in Hootsuite developer portal)
+                  </span>
                 </label>
                 <input
                   type="text"
                   value={hootsuiteProfileId}
-                  onChange={e => setHootsuiteProfileId(e.target.value)}
+                  onChange={(e) => setHootsuiteProfileId(e.target.value)}
                   placeholder="e.g. 12345678"
                   style={{
-                    background: "var(--bg)", border: "1px solid var(--border2)",
-                    borderRadius: 6, padding: "6px 10px", fontSize: 12, color: "var(--text)",
-                    fontFamily: "var(--font-body)", outline: "none",
+                    background: "var(--bg)",
+                    border: "1px solid var(--border2)",
+                    borderRadius: 6,
+                    padding: "6px 10px",
+                    fontSize: 12,
+                    color: "var(--text)",
+                    fontFamily: "var(--font-body)",
+                    outline: "none",
                   }}
                 />
               </div>
             </>
           )}
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: 4,
+            }}
+          >
             <div style={{ fontSize: 11, color: "var(--text3)" }}>
               {posts.length} posts · {niceLabelFor(platform)}
             </div>
@@ -293,30 +395,60 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({ posts, platfor
               type="button"
               className="cpbtn done"
               onClick={scheduleAll}
-              disabled={scheduling || (schedulerType === "buffer" ? (!bufferKey.trim() || !bufferProfileId.trim()) : (!hootsuiteKey.trim() || !hootsuiteProfileId.trim()))}
+              disabled={
+                scheduling ||
+                (schedulerType === "buffer"
+                  ? !bufferKey.trim() || !bufferProfileId.trim()
+                  : !hootsuiteKey.trim() || !hootsuiteProfileId.trim())
+              }
               style={{ fontSize: 11, padding: "6px 14px" }}
             >
-              {scheduling ? "Scheduling…" : `Push to ${schedulerType === "buffer" ? "Buffer" : "Hootsuite"} →`}
+              {scheduling
+                ? "Scheduling…"
+                : `Push to ${schedulerType === "buffer" ? "Buffer" : "Hootsuite"} →`}
             </button>
           </div>
 
           {results.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
-              {results.map(r => (
-                <div key={r.day} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+              {results.map((r) => (
+                <div
+                  key={r.day}
+                  style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}
+                >
                   <span style={{ color: "var(--text3)", minWidth: 40 }}>Day {r.day}</span>
-                  <span style={{
-                    color: r.status === "success" ? "var(--accent)" : r.status === "error" ? "var(--err)" : "var(--text3)",
-                  }}>
-                    {r.status === "pending" ? "⏳ Pending" : r.status === "success" ? "✅ " + r.message : "❌ " + r.message}
+                  <span
+                    style={{
+                      color:
+                        r.status === "success"
+                          ? "var(--accent)"
+                          : r.status === "error"
+                            ? "var(--err)"
+                            : "var(--text3)",
+                    }}
+                  >
+                    {r.status === "pending"
+                      ? "⏳ Pending"
+                      : r.status === "success"
+                        ? "✅ " + r.message
+                        : "❌ " + r.message}
                   </span>
                 </div>
               ))}
             </div>
           )}
 
-          <div style={{ fontSize: 10, color: "var(--text3)", fontStyle: "italic", lineHeight: 1.5, marginTop: 4 }}>
-            API access tokens are kept in memory for this tab only and are sent directly to the selected scheduler API.
+          <div
+            style={{
+              fontSize: 10,
+              color: "var(--text3)",
+              fontStyle: "italic",
+              lineHeight: 1.5,
+              marginTop: 4,
+            }}
+          >
+            API access tokens are kept in memory for this tab only and are sent directly to the
+            selected scheduler API.
           </div>
         </div>
       )}

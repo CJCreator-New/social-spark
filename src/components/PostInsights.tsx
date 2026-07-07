@@ -20,7 +20,15 @@ interface Post {
   chosen_index?: number;
 }
 
-export default function PostInsights({ post, platform, topic }: { post: Post; platform?: string; topic?: string }) {
+export default function PostInsights({
+  post,
+  platform,
+  topic,
+}: {
+  post: Post;
+  platform?: string;
+  topic?: string;
+}) {
   const keySource = useWizardStore((state) => state.keySource);
   const keyMode = useWizardStore((state) => state.keyMode);
   const ins = insightFor(post, platform || "LinkedIn");
@@ -28,34 +36,64 @@ export default function PostInsights({ post, platform, topic }: { post: Post; pl
 
   const percentOfLimit = Math.round((f.charCount / f.limit) * 100);
   const healthColor =
-    ins.health === "good" ? "#15803d" :
-    ins.health === "warn" ? "#a16207" :
-    "#b91c1c";
+    ins.health === "good"
+      ? "var(--color-success-text)"
+      : ins.health === "warn"
+        ? "var(--color-warning-text)"
+        : "var(--color-error-text)";
   const healthTooltip =
-    ins.health === "good" ? "No warning signs detected. Looking good!" :
-    ins.health === "warn" ? "Some minor issues found (e.g. sparse hashtags or close to character limits)." :
-    "Critical issues found (e.g. over the character limit or too many hashtags).";
+    ins.health === "good"
+      ? "No warning signs detected. Looking good!"
+      : ins.health === "warn"
+        ? "Some minor issues found (e.g. sparse hashtags or close to character limits)."
+        : "Critical issues found (e.g. over the character limit or too many hashtags).";
 
   const aiEngagement =
-    ins.hookScore && ins.hookScore >= 0.7 ? "High" :
-    ins.hookScore && ins.hookScore >= 0.4 ? "Medium" : "Low";
+    ins.hookScore && ins.hookScore >= 0.7
+      ? "High"
+      : ins.hookScore && ins.hookScore >= 0.4
+        ? "Medium"
+        : "Low";
   const aiEngagementStyle =
-    aiEngagement === "High"  ? { background: "#dcfce7", color: "#15803d" } :
-    aiEngagement === "Medium" ? { background: "#fef9c3", color: "#a16207" } :
-                                { background: "#fee2e2", color: "#b91c1c" };
+    aiEngagement === "High"
+      ? { background: "var(--color-success-bg)", color: "var(--color-success-text)" }
+      : aiEngagement === "Medium"
+        ? { background: "var(--color-warning-bg)", color: "var(--color-warning-text)" }
+        : { background: "var(--color-error-bg)", color: "var(--color-error-text)" };
 
   return (
-    <div style={{
-      border: "1px solid #e7e5e4",
-      borderRadius: 12,
-      padding: 16,
-      background: "#ffffff",
-      boxShadow: "0 4px 20px rgba(120,113,108,0.04)",
-    }}>
+    <div
+      style={{
+        border: "1px solid var(--color-border)",
+        borderRadius: 12,
+        padding: 16,
+        background: "var(--color-surface)",
+        boxShadow: "0 4px 20px rgba(120,113,108,0.04)",
+      }}
+    >
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid #f5f5f4" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 12,
+          paddingBottom: 12,
+          borderBottom: "1px solid var(--color-surface-muted)",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#44403c", textTransform: "uppercase", letterSpacing: ".08em", fontFamily: "var(--font-display,'Lora',Georgia,serif)" }}>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+              textTransform: "uppercase",
+              letterSpacing: ".08em",
+              fontFamily: "var(--font-display,'Lora',Georgia,serif)",
+            }}
+          >
             Editorial Insights
           </div>
           {keySource === "user" && (
@@ -63,47 +101,104 @@ export default function PostInsights({ post, platform, topic }: { post: Post; pl
               style={{
                 fontSize: "10px",
                 fontWeight: "600",
-                background: "#ffedd5",
-                color: "#c2410c",
+                background: "var(--color-primary-xlight)",
+                color: "var(--color-primary)",
                 padding: "1px 6px",
                 borderRadius: "4px",
-                border: "1px solid #ffedd5",
+                border: "1px solid var(--color-primary-xlight)",
               }}
-              title={keyMode === "always" ? "Your API key is set as the primary provider" : "Your API key was used as a fallback"}
+              title={
+                keyMode === "always"
+                  ? "Your API key is set as the primary provider"
+                  : "Your API key was used as a fallback"
+              }
             >
               {keyMode === "always" ? "Your key · Always" : "Your key · Fallback"}
             </span>
           )}
         </div>
-        <div style={{ fontSize: 11, color: "#5a5753", fontWeight: 500 }}>{niceLabelFor(platform)}</div>
+        <div style={{ fontSize: 11, color: "var(--color-text-secondary)", fontWeight: 500 }}>
+          {niceLabelFor(platform)}
+        </div>
       </div>
 
       {/* Metrics grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
         <div style={{ fontSize: 13 }}>
-          <div style={{ color: "#5a5753", fontSize: 11, marginBottom: 2 }}>Length</div>
-          <div style={{ fontWeight: 600, color: "#1c1917" }}>{f.charCount.toLocaleString()} / {f.limit.toLocaleString()} <span style={{ fontWeight: 400, color: "#5a5753" }}>({percentOfLimit}%)</span></div>
+          <div style={{ color: "var(--color-text-secondary)", fontSize: 11, marginBottom: 2 }}>
+            Length
+          </div>
+          <div style={{ fontWeight: 600, color: "var(--color-text)" }}>
+            {f.charCount.toLocaleString()} / {f.limit.toLocaleString()}{" "}
+            <span style={{ fontWeight: 400, color: "var(--color-text-secondary)" }}>
+              ({percentOfLimit}%)
+            </span>
+          </div>
         </div>
         <div style={{ fontSize: 13 }} title={healthTooltip}>
-          <div style={{ color: "#5a5753", fontSize: 11, marginBottom: 2 }}>Health</div>
-          <div style={{ fontWeight: 600, color: healthColor, textTransform: "capitalize" }}>{ins.health}</div>
+          <div style={{ color: "var(--color-text-secondary)", fontSize: 11, marginBottom: 2 }}>
+            Health
+          </div>
+          <div style={{ fontWeight: 600, color: healthColor, textTransform: "capitalize" }}>
+            {ins.health}
+          </div>
         </div>
         <div style={{ fontSize: 13 }}>
-          <div style={{ color: "#5a5753", fontSize: 11, marginBottom: 2 }}>Hashtags</div>
-          <div style={{ fontWeight: 600, color: "#1c1917" }}>{ins.hashtagLabel} <span style={{ fontWeight: 400, color: "#5a5753" }}>· {ins.hashtagState}</span></div>
+          <div style={{ color: "var(--color-text-secondary)", fontSize: 11, marginBottom: 2 }}>
+            Hashtags
+          </div>
+          <div style={{ fontWeight: 600, color: "var(--color-text)" }}>
+            {ins.hashtagLabel}{" "}
+            <span style={{ fontWeight: 400, color: "var(--color-text-secondary)" }}>
+              · {ins.hashtagState}
+            </span>
+          </div>
         </div>
         <div style={{ fontSize: 13 }}>
-          <div style={{ color: "#5a5753", fontSize: 11, marginBottom: 2 }}>Hook strength</div>
-          <div style={{ fontWeight: 600, color: "#1c1917" }}>{ins.hookScore ? `${Math.round(ins.hookScore * 100)}%` : "—"}</div>
+          <div style={{ color: "var(--color-text-secondary)", fontSize: 11, marginBottom: 2 }}>
+            Hook strength
+          </div>
+          <div style={{ fontWeight: 600, color: "var(--color-text)" }}>
+            {ins.hookScore ? `${Math.round(ins.hookScore * 100)}%` : "—"}
+          </div>
         </div>
       </div>
 
       {/* AI Predicted Engagement row */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 10, borderTop: "1px dashed #e7e5e4", marginBottom: ins.recommendations?.length ? 10 : 0 }}>
-        <span style={{ fontSize: 12, color: "#44403c", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingTop: 10,
+          borderTop: "1px dashed var(--color-border)",
+          marginBottom: ins.recommendations?.length ? 10 : 0,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 12,
+            color: "var(--color-text-secondary)",
+            fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
           AI Predicted Engagement
         </span>
-        <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, display: "inline-flex", alignItems: "center", gap: 3, ...aiEngagementStyle }}>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            padding: "2px 8px",
+            borderRadius: 6,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 3,
+            ...aiEngagementStyle,
+          }}
+        >
           {aiEngagement}
         </span>
       </div>
@@ -111,11 +206,47 @@ export default function PostInsights({ post, platform, topic }: { post: Post; pl
       {/* Suggestions */}
       {ins.recommendations && ins.recommendations.length > 0 && (
         <div style={{ marginTop: 10, fontSize: 12 }}>
-          <div style={{ marginBottom: 6, color: "#5a5753", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em" }}>Suggestions</div>
-          <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
+          <div
+            style={{
+              marginBottom: 6,
+              color: "var(--color-text-secondary)",
+              fontSize: 11,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: ".06em",
+            }}
+          >
+            Suggestions
+          </div>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 0,
+              listStyle: "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
             {ins.recommendations.slice(0, 4).map((r: string, i: number) => (
-              <li key={i} style={{ color: "#57534e", paddingLeft: 14, position: "relative" }}>
-                <span style={{ position: "absolute", left: 0, color: "#c2410c", fontWeight: 600 }}>→</span>
+              <li
+                key={i}
+                style={{
+                  color: "var(--color-text-secondary)",
+                  paddingLeft: 14,
+                  position: "relative",
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    color: "var(--color-primary)",
+                    fontWeight: 600,
+                  }}
+                >
+                  →
+                </span>
                 {r}
               </li>
             ))}

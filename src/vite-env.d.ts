@@ -5,4 +5,4 @@
 // full @types/node.
 declare const process: { env: Record<string, string | undefined> };
 declare const global: typeof globalThis;
-declare module 'crypto';
+declare module "crypto";

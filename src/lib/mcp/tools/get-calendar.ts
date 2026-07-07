@@ -12,7 +12,8 @@ function supabaseForUser(ctx: ToolContext) {
 export default defineTool({
   name: "get_calendar",
   title: "Get a content calendar",
-  description: "Fetch one saved ContentForge calendar (including all posts) by its ID for the signed-in user.",
+  description:
+    "Fetch one saved ContentForge calendar (including all posts) by its ID for the signed-in user.",
   inputSchema: {
     id: z.string().uuid().describe("The calendar's UUID."),
   },

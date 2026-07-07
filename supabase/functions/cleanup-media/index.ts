@@ -19,9 +19,12 @@ async function getSupabaseConfig() {
 
 async function fetchOrphans(maxAgeHours = 24): Promise<MediaReference[]> {
   const { SUPABASE_URL, SUPABASE_KEY } = await getSupabaseConfig();
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/media_references?deleted_at=is.null&orphaned_at=lt.${new Date(Date.now() - maxAgeHours * 3600 * 1000).toISOString()}&order=updated_at.asc`, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-  });
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/media_references?deleted_at=is.null&orphaned_at=lt.${new Date(Date.now() - maxAgeHours * 3600 * 1000).toISOString()}&order=updated_at.asc`,
+    {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    }
+  );
   if (!res.ok) throw new Error(`Failed to load orphan candidates: ${res.status}`);
   return res.json();
 }
@@ -29,12 +32,18 @@ async function fetchOrphans(maxAgeHours = 24): Promise<MediaReference[]> {
 async function hasDbReferences(publicUrl: string) {
   const { SUPABASE_URL, SUPABASE_KEY } = await getSupabaseConfig();
   const [profileRes, refRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/profiles?avatar_url=eq.${encodeURIComponent(publicUrl)}&select=id`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-    }),
-    fetch(`${SUPABASE_URL}/rest/v1/media_references?public_url=eq.${encodeURIComponent(publicUrl)}&deleted_at=is.null&reference_count=gt.0&select=id`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-    }),
+    fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?avatar_url=eq.${encodeURIComponent(publicUrl)}&select=id`,
+      {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      }
+    ),
+    fetch(
+      `${SUPABASE_URL}/rest/v1/media_references?public_url=eq.${encodeURIComponent(publicUrl)}&deleted_at=is.null&reference_count=gt.0&select=id`,
+      {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      }
+    ),
   ]);
   if (!profileRes.ok || !refRes.ok) return true;
   const profiles = await profileRes.json().catch(() => []);
@@ -61,7 +70,10 @@ async function markDeleted(id: string) {
       apikey: SUPABASE_KEY,
       Authorization: `Bearer ${SUPABASE_KEY}`,
     },
-    body: JSON.stringify({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
+    body: JSON.stringify({
+      deleted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }),
   });
 }
 
@@ -85,7 +97,9 @@ export async function handle(req: Request) {
       deleted.push(ref);
     }
 
-    return new Response(JSON.stringify({ ok: true, deletedCount: deleted.length, deleted }), { status: 200 });
+    return new Response(JSON.stringify({ ok: true, deletedCount: deleted.length, deleted }), {
+      status: 200,
+    });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500 });
   }

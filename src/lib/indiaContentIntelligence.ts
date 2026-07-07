@@ -32,85 +32,85 @@ export const INDIA_TRENDS: IndiaTrend[] = [
     region: "National",
     relevance: 9,
     hashtags: ["#DigitalIndia", "#ModiVision", "#DigitalTransformation"],
-    context: "Government's push for digital adoption in rural and urban areas"
+    context: "Government's push for digital adoption in rural and urban areas",
   },
   {
     topic: "Startups in Tier-2 cities",
     region: "National",
     relevance: 8,
     hashtags: ["#StartupIndia", "#Tier2Startups", "#Entrepreneurship"],
-    context: "Growing ecosystem in cities like Jaipur, Lucknow, Coimbatore"
+    context: "Growing ecosystem in cities like Jaipur, Lucknow, Coimbatore",
   },
   {
     topic: "Electric vehicle adoption",
     region: "National",
     relevance: 8,
     hashtags: ["#EVMobility", "#ElectricVehicles", "#SustainableIndia"],
-    context: "Government incentives and Ola, Tata dominance in EV market"
+    context: "Government incentives and Ola, Tata dominance in EV market",
   },
   {
     topic: "Work-life balance in Indian IT",
     region: "National",
     relevance: 7,
     hashtags: ["#WorkLifeBalance", "#ITIndustry", "#BurnoutPrevention"],
-    context: "Post-pandemic focus on employee wellbeing"
+    context: "Post-pandemic focus on employee wellbeing",
   },
   {
     topic: "Farmers' protests legacy",
     region: "North",
     relevance: 6,
     hashtags: ["#FarmersRights", "#MSP", "#AgriculturalReforms"],
-    context: "Ongoing discussions about farmer welfare and policy changes"
+    context: "Ongoing discussions about farmer welfare and policy changes",
   },
   {
     topic: "South Indian cinema OTT",
     region: "South",
     relevance: 8,
     hashtags: ["#SouthCinema", "#OTTRevolution", "#RegionalCinema"],
-    context: "Rise of regional language content on streaming platforms"
+    context: "Rise of regional language content on streaming platforms",
   },
   {
     topic: "Bengaluru tech layoffs",
     region: "South",
     relevance: 7,
     hashtags: ["#TechLayoffs", "#JobMarket", "#CareerTransition"],
-    context: "Industry adjustments affecting thousands of professionals"
+    context: "Industry adjustments affecting thousands of professionals",
   },
   {
     topic: "Mumbai real estate bubble",
     region: "West",
     relevance: 6,
     hashtags: ["#RealEstate", "#MumbaiProperty", "#HousingCrisis"],
-    context: "Skyrocketing prices and affordability concerns"
+    context: "Skyrocketing prices and affordability concerns",
   },
   {
     topic: "Ahmedabad smart city initiatives",
     region: "West",
     relevance: 7,
     hashtags: ["#SmartCities", "#Ahmedabad", "#UrbanDevelopment"],
-    context: "Gujarat's model for urban transformation"
+    context: "Gujarat's model for urban transformation",
   },
   {
     topic: "Kolkata cultural renaissance",
     region: "East",
     relevance: 6,
     hashtags: ["#KolkataCulture", "#BengaliHeritage", "#CulturalRevival"],
-    context: "Revival of arts, literature, and cultural institutions"
+    context: "Revival of arts, literature, and cultural institutions",
   },
   {
     topic: "Odisha tribal tourism",
     region: "East",
     relevance: 5,
     hashtags: ["#TribalTourism", "#Odisha", "#CulturalTourism"],
-    context: "Growing interest in indigenous cultures and experiences"
+    context: "Growing interest in indigenous cultures and experiences",
   },
   {
     topic: "Bhopal lake conservation",
     region: "Central",
     relevance: 6,
     hashtags: ["#LakeConservation", "#Bhopal", "#EnvironmentalProtection"],
-    context: "Efforts to save Upper Lake and promote eco-tourism"
-  }
+    context: "Efforts to save Upper Lake and promote eco-tourism",
+  },
 ];
 
 // Upcoming festivals and cultural events (2025-2026)
@@ -123,8 +123,8 @@ export const INDIA_FESTIVALS: FestivalInfo[] = [
     contentIdeas: [
       "Business growth and prosperity themes",
       "Family traditions and modern celebrations",
-      "Lighting up communities and overcoming darkness"
-    ]
+      "Lighting up communities and overcoming darkness",
+    ],
   },
   {
     name: "Holi",
@@ -134,8 +134,8 @@ export const INDIA_FESTIVALS: FestivalInfo[] = [
     contentIdeas: [
       "Team building and workplace celebrations",
       "Renewal and fresh starts",
-      "Cultural diversity in organizations"
-    ]
+      "Cultural diversity in organizations",
+    ],
   },
   {
     name: "Durga Puja",
@@ -145,8 +145,8 @@ export const INDIA_FESTIVALS: FestivalInfo[] = [
     contentIdeas: [
       "Strength and resilience in business",
       "Community celebrations and social bonds",
-      "Traditional values in modern contexts"
-    ]
+      "Traditional values in modern contexts",
+    ],
   },
   {
     name: "Ganesh Chaturthi",
@@ -156,8 +156,8 @@ export const INDIA_FESTIVALS: FestivalInfo[] = [
     contentIdeas: [
       "Wisdom and new beginnings",
       "Removing obstacles in career/business",
-      "Community service and social responsibility"
-    ]
+      "Community service and social responsibility",
+    ],
   },
   {
     name: "Republic Day",
@@ -167,9 +167,9 @@ export const INDIA_FESTIVALS: FestivalInfo[] = [
     contentIdeas: [
       "Democratic values in organizations",
       "National unity and diversity",
-      "Constitutional principles in business"
-    ]
-  }
+      "Constitutional principles in business",
+    ],
+  },
 ];
 
 // Cultural references for content enhancement
@@ -178,49 +178,49 @@ export const INDIA_CULTURAL_REFERENCES: CulturalReference[] = [
     term: "Jugaad",
     meaning: "Innovative, frugal problem-solving",
     usage: "Emphasize resourcefulness and innovation",
-    region: "National"
+    region: "National",
   },
   {
     term: "Namaste",
     meaning: "Greeting of respect and humility",
     usage: "Cultural greetings and respectful communication",
-    region: "National"
+    region: "National",
   },
   {
     term: "Dharma",
     meaning: "Duty, righteousness, moral order",
     usage: "Ethical business practices and social responsibility",
-    region: "National"
+    region: "National",
   },
   {
     term: "Karma",
     meaning: "Action and consequence",
     usage: "Cause and effect in business decisions",
-    region: "National"
+    region: "National",
   },
   {
     term: "Guru",
     meaning: "Teacher, mentor, expert",
     usage: "Leadership and knowledge sharing",
-    region: "National"
+    region: "National",
   },
   {
     term: "Satsanga",
     meaning: "Company of truth, spiritual gathering",
     usage: "Team alignment and shared values",
-    region: "National"
+    region: "National",
   },
   {
     term: "Puja",
     meaning: "Ritual worship and respect",
     usage: "Showing reverence for traditions and values",
-    region: "National"
-  }
+    region: "National",
+  },
 ];
 
 export function getIndiaTrendsForRegion(region: string): IndiaTrend[] {
   if (region === "National") return INDIA_TRENDS;
-  return INDIA_TRENDS.filter(trend => trend.region === region || trend.region === "National");
+  return INDIA_TRENDS.filter((trend) => trend.region === region || trend.region === "National");
 }
 
 export function getUpcomingFestivals(): FestivalInfo[] {
@@ -233,12 +233,37 @@ export function getCulturalReferences(): CulturalReference[] {
 
 export function isIndiaSpecificTopic(topic: string): boolean {
   const indiaKeywords: string[] = [
-    "india", "indian", "hindu", "bharat", "bharatiya", "desi",
-    "ayushman", "modi", "gandhi", "mahatma", "sardar", "sardarji",
-    "bollywood", "cricket", "ipl", "kohli", "dhoni", "rohit",
-    "taj mahal", "red fort", "india gate", "gateway of india",
-    "diwali", "holi", "durga puja", "ganesh chaturthi",
-    "ramadan", "eid", "christmas", "pongal", "baisakhi"
+    "india",
+    "indian",
+    "hindu",
+    "bharat",
+    "bharatiya",
+    "desi",
+    "ayushman",
+    "modi",
+    "gandhi",
+    "mahatma",
+    "sardar",
+    "sardarji",
+    "bollywood",
+    "cricket",
+    "ipl",
+    "kohli",
+    "dhoni",
+    "rohit",
+    "taj mahal",
+    "red fort",
+    "india gate",
+    "gateway of india",
+    "diwali",
+    "holi",
+    "durga puja",
+    "ganesh chaturthi",
+    "ramadan",
+    "eid",
+    "christmas",
+    "pongal",
+    "baisakhi",
   ];
 
   const lowerTopic = topic.toLowerCase();

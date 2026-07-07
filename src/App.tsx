@@ -34,7 +34,9 @@ const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const MyCalendars = lazyWithRetry(() => import("./pages/MyCalendars"));
 const CalendarDetail = lazyWithRetry(() => import("./pages/CalendarDetail"));
 const Schedule = lazyWithRetry(() => import("./pages/Schedule"));
-const Admin = lazyWithRetry(() => import("./pages/Admin").then(m => ({ default: m.AdminDashboard })));
+const Admin = lazyWithRetry(() =>
+  import("./pages/Admin").then((m) => ({ default: m.AdminDashboard }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,16 +65,63 @@ const App = () => {
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <AuthProvider>
                 <Routes>
-                  <Route path="/auth" element={<Suspense fallback={<RouteFallback title="Sign In" />}><Auth /></Suspense>} />
-                  <Route path="/reset-password" element={<Suspense fallback={<RouteFallback title="Reset Password" />}><ResetPassword /></Suspense>} />
-                  <Route path="/" element={<Suspense fallback={<RouteFallback title={APP_NAME} />}><Landing /></Suspense>} />
-                  <Route path="/privacy" element={<Suspense fallback={<RouteFallback title="Privacy Policy" />}><Privacy /></Suspense>} />
-                  <Route path="/terms" element={<Suspense fallback={<RouteFallback title="Terms of Service" />}><Terms /></Suspense>} />
-                  <Route path="/docs" element={<Suspense fallback={<RouteFallback title="Docs" />}><Docs /></Suspense>} />
-                  <Route path="/.lovable/oauth/consent" element={<Suspense fallback={<RouteFallback title="Authorize" />}><OAuthConsent /></Suspense>} />
-                  {import.meta.env.DEV && (
-                    <Route path="/__e2e/crash" element={<E2ECrashRoute />} />
-                  )}
+                  <Route
+                    path="/auth"
+                    element={
+                      <Suspense fallback={<RouteFallback title="Sign In" />}>
+                        <Auth />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/reset-password"
+                    element={
+                      <Suspense fallback={<RouteFallback title="Reset Password" />}>
+                        <ResetPassword />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/"
+                    element={
+                      <Suspense fallback={<RouteFallback title={APP_NAME} />}>
+                        <Landing />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/privacy"
+                    element={
+                      <Suspense fallback={<RouteFallback title="Privacy Policy" />}>
+                        <Privacy />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/terms"
+                    element={
+                      <Suspense fallback={<RouteFallback title="Terms of Service" />}>
+                        <Terms />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/docs"
+                    element={
+                      <Suspense fallback={<RouteFallback title="Docs" />}>
+                        <Docs />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/.lovable/oauth/consent"
+                    element={
+                      <Suspense fallback={<RouteFallback title="Authorize" />}>
+                        <OAuthConsent />
+                      </Suspense>
+                    }
+                  />
+                  {import.meta.env.DEV && <Route path="/__e2e/crash" element={<E2ECrashRoute />} />}
                   <Route
                     element={
                       <ProtectedRoute>
@@ -85,7 +134,9 @@ const App = () => {
                     <Route
                       path="/app"
                       element={
-                        <Suspense fallback={<RouteFallback title={`${APP_NAME} Workspace`} nested />}>
+                        <Suspense
+                          fallback={<RouteFallback title={`${APP_NAME} Workspace`} nested />}
+                        >
                           <Index />
                         </Suspense>
                       }
@@ -133,7 +184,14 @@ const App = () => {
                       }
                     />
                   </Route>
-                  <Route path="*" element={<Suspense fallback={<RouteFallback title="Not Found" />}><NotFound /></Suspense>} />
+                  <Route
+                    path="*"
+                    element={
+                      <Suspense fallback={<RouteFallback title="Not Found" />}>
+                        <NotFound />
+                      </Suspense>
+                    }
+                  />
                 </Routes>
               </AuthProvider>
             </BrowserRouter>

@@ -6,16 +6,16 @@ import { APP_NAME } from "@/constants/branding";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
-  { label: "Pricing",  href: "#pricing" },
-  { label: "Docs",     href: "#" },
-  { label: "Privacy",  href: "/privacy" },
-  { label: "Terms",    href: "/terms" },
+  { label: "Pricing", href: "#pricing" },
+  { label: "Docs", href: "#" },
+  { label: "Privacy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
 ];
 
 const SOCIALS = [
   { icon: Linkedin, href: "#", label: "ContentForge on LinkedIn" },
-  { icon: Twitter,  href: "#", label: "ContentForge on X (Twitter)" },
-  { icon: Github,   href: "#", label: "ContentForge on GitHub" },
+  { icon: Twitter, href: "#", label: "ContentForge on X (Twitter)" },
+  { icon: Github, href: "#", label: "ContentForge on GitHub" },
 ];
 
 export default function LandingFooter() {
@@ -47,7 +47,7 @@ export default function LandingFooter() {
 
           {/* Nav links */}
           <nav className="ld-w-footer-links" aria-label="Footer navigation">
-            {NAV_LINKS.map(link => (
+            {NAV_LINKS.map((link) => (
               <a key={link.label} href={link.href} className="ld-w-footer-link">
                 {link.label}
               </a>
@@ -55,7 +55,11 @@ export default function LandingFooter() {
           </nav>
 
           {/* Social icons */}
-          <div className="ld-w-footer-socials" role="list" aria-label="ContentForge on social media">
+          <div
+            className="ld-w-footer-socials"
+            role="list"
+            aria-label="ContentForge on social media"
+          >
             {SOCIALS.map(({ icon: Icon, href, label }) => (
               <a
                 key={label}
@@ -75,7 +79,9 @@ export default function LandingFooter() {
         <hr className="ld-w-footer-divider" />
 
         <div className="ld-w-footer-bottom">
-          <span>© {new Date().getFullYear()} {APP_NAME} · Built for content creators</span>
+          <span>
+            © {new Date().getFullYear()} {APP_NAME} · Built for content creators
+          </span>
           <span className="ld-w-footer-made">Crafted with care ♥</span>
         </div>
       </div>

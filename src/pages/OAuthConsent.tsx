@@ -13,9 +13,15 @@ type AuthorizationDetails = {
   redirect_to?: string;
 };
 type OAuthNs = {
-  getAuthorizationDetails: (id: string) => Promise<{ data: AuthorizationDetails | null; error: { message: string } | null }>;
-  approveAuthorization: (id: string) => Promise<{ data: AuthorizationDetails | null; error: { message: string } | null }>;
-  denyAuthorization: (id: string) => Promise<{ data: AuthorizationDetails | null; error: { message: string } | null }>;
+  getAuthorizationDetails: (
+    id: string
+  ) => Promise<{ data: AuthorizationDetails | null; error: { message: string } | null }>;
+  approveAuthorization: (
+    id: string
+  ) => Promise<{ data: AuthorizationDetails | null; error: { message: string } | null }>;
+  denyAuthorization: (
+    id: string
+  ) => Promise<{ data: AuthorizationDetails | null; error: { message: string } | null }>;
 };
 
 export default function OAuthConsent() {
@@ -123,12 +129,26 @@ export default function OAuthConsent() {
 
           {details && (
             <>
-              <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 8px", color: "hsl(var(--foreground))" }}>
+              <h1
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  margin: "0 0 8px",
+                  color: "hsl(var(--foreground))",
+                }}
+              >
                 Connect {details.client?.name ?? "an app"} to your account
               </h1>
-              <p style={{ color: "hsl(var(--muted-foreground))", fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
-                {details.client?.name ?? "This client"} is requesting access to use ContentForge as you. It will be
-                able to read your saved calendars and scheduled posts.
+              <p
+                style={{
+                  color: "hsl(var(--muted-foreground))",
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  marginBottom: 20,
+                }}
+              >
+                {details.client?.name ?? "This client"} is requesting access to use ContentForge as
+                you. It will be able to read your saved calendars and scheduled posts.
               </p>
 
               <div style={{ display: "flex", gap: 10 }}>

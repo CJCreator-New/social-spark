@@ -30,7 +30,7 @@ function getDragImageEl(): HTMLDivElement {
   dragImage.style.position = "absolute";
   dragImage.style.top = "-1000px";
   dragImage.style.background = "var(--primary)";
-  dragImage.style.color = "#fff";
+  dragImage.style.color = "var(--color-surface)";
   dragImage.style.padding = "8px 16px";
   dragImage.style.borderRadius = "6px";
   dragImage.style.fontSize = "12px";

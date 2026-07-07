@@ -45,7 +45,8 @@ export function WelcomeBanner() {
         padding: "16px 18px",
         borderRadius: 14,
         border: "1px solid hsl(var(--primary) / 0.18)",
-        background: "linear-gradient(135deg, hsl(var(--primary) / 0.06), hsl(var(--primary) / 0.015))",
+        background:
+          "linear-gradient(135deg, hsl(var(--primary) / 0.06), hsl(var(--primary) / 0.015))",
       }}
     >
       <button
@@ -67,12 +68,20 @@ export function WelcomeBanner() {
         <X size={16} />
       </button>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }} className="text-primary">
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}
+        className="text-primary"
+      >
         <Sparkles size={16} />
-        <span style={{ fontWeight: 600, fontSize: 15 }} className="text-foreground">Welcome to Social Spark</span>
+        <span style={{ fontWeight: 600, fontSize: 15 }} className="text-foreground">
+          Welcome to Social Spark
+        </span>
       </div>
 
-      <p style={{ fontSize: 13, lineHeight: 1.55, margin: "0 0 12px", maxWidth: 560 }} className="text-muted-foreground">
+      <p
+        style={{ fontSize: 13, lineHeight: 1.55, margin: "0 0 12px", maxWidth: 560 }}
+        className="text-muted-foreground"
+      >
         Generate a full week of platform-native posts — tailored to your niche, voice, and audience.
         Pick your niche and platform below, add a few topics, and let the AI draft your calendar.
       </p>
@@ -99,7 +108,13 @@ export function WelcomeBanner() {
         <Link
           to="/profile?tab=plan"
           className="text-muted-foreground"
-          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, textDecoration: "none" }}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 12,
+            textDecoration: "none",
+          }}
         >
           See plans <ArrowRight size={12} />
         </Link>

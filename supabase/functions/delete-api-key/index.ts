@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Unauthorized access." }, 401);
     }
     const token = authHeader.replace("Bearer ", "");
-    
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -44,7 +44,10 @@ Deno.serve(async (req) => {
       },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError || !user) {
       return jsonResponse({ error: "Unauthorized access." }, 401);
     }
@@ -67,7 +70,7 @@ Deno.serve(async (req) => {
         api_key_enc: null,
         use_own_key: false,
         key_mode: "fallback",
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq("user_id", user.id);
 
@@ -78,15 +81,13 @@ Deno.serve(async (req) => {
 
     // Log the deleted lifecycle event to api_key_audit_log
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
-    const { error: logError } = await adminClient
-      .from("api_key_audit_log")
-      .insert({
-        user_id: user.id,
-        action: "deleted",
-        provider: null,
-        source: null,
-        ip_address: ip,
-      });
+    const { error: logError } = await adminClient.from("api_key_audit_log").insert({
+      user_id: user.id,
+      action: "deleted",
+      provider: null,
+      source: null,
+      ip_address: ip,
+    });
 
     if (logError) {
       console.error("Audit logging failed for delete:", logError);

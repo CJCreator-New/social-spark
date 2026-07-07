@@ -1,0 +1,305 @@
+
+ RUN  v4.1.8 C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity - Google - Projects/social-spark
+
+(node:4092) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Error: [vitest] No "useGeneratePostImageMutation" export is defined on the "@/hooks/useAppQueries" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:62:17)
+    at Object.get (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:324:16)
+    at IndexResults (C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity - Google - Projects/social-spark/src/pages/IndexResults.tsx:174:33)
+    at renderWithHooks (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:15486:18)
+    at updateFunctionComponent (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:19617:20)
+    at mountLazyComponent (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:19988:17)
+    at beginWork (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:21632:16)
+    at HTMLUnknownElement.callCallback (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserObjectsOperation (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\jsdom\lib\generated\idl\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\jsdom\lib\jsdom\living\events\EventTarget-impl.js:360:16)
+Error: [vitest] No "useGeneratePostImageMutation" export is defined on the "@/hooks/useAppQueries" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:62:17)
+    at Object.get (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:324:16)
+    at IndexResults (C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity - Google - Projects/social-spark/src/pages/IndexResults.tsx:174:33)
+    at renderWithHooks (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:15486:18)
+    at updateFunctionComponent (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:19617:20)
+    at mountLazyComponent (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:19988:17)
+    at beginWork (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:21632:16)
+    at HTMLUnknownElement.callCallback (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserObjectsOperation (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\jsdom\lib\generated\idl\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\jsdom\lib\jsdom\living\events\EventTarget-impl.js:360:16)
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+stdout | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > shows a network error when generation fetch fails
+telemetry: {
+  name: 'generate_start',
+  props: { user: undefined, mode: 'week' },
+  timestamp: 1783360070032
+}
+
+stdout | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > shows a network error when generation fetch fails
+telemetry: {
+  name: 'generate_infer_topics',
+  props: { user: undefined, mode: 'week', industry: '', platform: 'LinkedIn' },
+  timestamp: 1783360070161
+}
+[INFO] [Index-Generate] Starting generation (full-week, first attempt)  { mode: 'full-week', platform: 'LinkedIn', industry: '' }
+
+stderr | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > shows a network error when generation fetch fails
+Platform AI call failed (Failed to fetch). Attempting fallback key...
+
+stdout | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > shows a network error when generation fetch fails
+telemetry: {
+  name: 'generate_error',
+  props: { user: undefined, mode: 'week', error: 'Error: AI_UNAVAILABLE' },
+  timestamp: 1783360070169
+}
+
+stderr | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > shows a network error when generation fetch fails
+[WARN] [Index-Generate] Using local fallback generator Error: AI_UNAVAILABLE { mode: 'week', postCount: 7 }
+
+stdout | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > shows a network error when generation fetch fails
+telemetry: {
+  name: 'generate_fallback',
+  props: { user: undefined, mode: 'week', reason: 'AI_UNAVAILABLE' },
+  timestamp: 1783360070636
+}
+
+stderr | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > shows a network error when generation fetch fails
+The above error occurred in the <IndexResults> component:
+
+    at IndexResults (C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity - Google - Projects/social-spark/src/pages/IndexResults.tsx:44:25)
+    at Suspense
+    at div
+    at MotionDOMComponent (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/framer-motion/dist/es/motion/index.mjs:45:16)
+    at PopChildMeasure (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/framer-motion/dist/es/components/AnimatePresence/PopChild.mjs:13:1)
+    at PopChild (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/framer-motion/dist/es/components/AnimatePresence/PopChild.mjs:44:21)
+    at PresenceChild (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/framer-motion/dist/es/components/AnimatePresence/PresenceChild.mjs:9:26)
+    at AnimatePresence (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/framer-motion/dist/es/components/AnimatePresence/index.mjs:44:28)
+    at div
+    at div
+    at div
+    at div
+    at WorkspacePage (C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity - Google - Projects/social-spark/src/components/layout/WorkspacePage.tsx:13:26)
+    at Index (C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity - Google - Projects/social-spark/src/pages/Index.tsx:416:74)
+    at QueryClientProvider (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js:20:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Error: [vitest] No "useGeneratePostImageMutation" export is defined on the "@/hooks/useAppQueries" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:62:17)
+    at Object.get (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:324:16)
+    at IndexResults (C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity - Google - Projects/social-spark/src/pages/IndexResults.tsx:174:33)
+    at renderWithHooks (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:15486:18)
+    at updateFunctionComponent (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:19617:20)
+    at mountLazyComponent (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:19988:17)
+    at beginWork (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:21632:16)
+    at HTMLUnknownElement.callCallback (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserObjectsOperation (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\jsdom\lib\generated\idl\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\jsdom\lib\jsdom\living\events\EventTarget-impl.js:360:16)
+Error: [vitest] No "useGeneratePostImageMutation" export is defined on the "@/hooks/useAppQueries" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:62:17)
+    at Object.get (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:324:16)
+    at IndexResults (C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity - Google - Projects/social-spark/src/pages/IndexResults.tsx:174:33)
+    at renderWithHooks (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:15486:18)
+    at updateFunctionComponent (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:19617:20)
+    at mountLazyComponent (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:19988:17)
+    at beginWork (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:21632:16)
+    at HTMLUnknownElement.callCallback (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\react-dom\cjs\react-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserObjectsOperation (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\jsdom\lib\generated\idl\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Users\HP\OneDrive\Desktop\Projects\AntiGravity - Google - Projects\social-spark\node_modules\jsdom\lib\jsdom\living\events\EventTarget-impl.js:360:16)
+stdout | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > reports AI service unavailable with a descriptive error when 500 is returned
+telemetry: {
+  name: 'generate_start',
+  props: { user: undefined, mode: 'week' },
+  timestamp: 1783360075551
+}
+
+stdout | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > reports AI service unavailable with a descriptive error when 500 is returned
+telemetry: {
+  name: 'generate_infer_topics',
+  props: { user: undefined, mode: 'week', industry: '', platform: 'LinkedIn' },
+  timestamp: 1783360075600
+}
+[INFO] [Index-Generate] Starting generation (full-week, first attempt)  { mode: 'full-week', platform: 'LinkedIn', industry: '' }
+
+stderr | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > reports AI service unavailable with a descriptive error when 500 is returned
+Platform AI call failed (Platform failed with status 500). Attempting fallback key...
+
+stdout | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > reports AI service unavailable with a descriptive error when 500 is returned
+telemetry: {
+  name: 'generate_error',
+  props: { user: undefined, mode: 'week', error: 'Error: AI_UNAVAILABLE' },
+  timestamp: 1783360075629
+}
+
+stderr | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > reports AI service unavailable with a descriptive error when 500 is returned
+[WARN] [Index-Generate] Using local fallback generator Error: AI_UNAVAILABLE { mode: 'week', postCount: 7 }
+
+stdout | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > reports AI service unavailable with a descriptive error when 500 is returned
+telemetry: {
+  name: 'generate_fallback',
+  props: { user: undefined, mode: 'week', reason: 'AI_UNAVAILABLE' },
+  timestamp: 1783360075643
+}
+
+stderr | src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > reports AI service unavailable with a descriptive error when 500 is returned
+The above error occurred in the <IndexResults> component:
+
+    at IndexResults (C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity - Google - Projects/social-spark/src/pages/IndexResults.tsx:44:25)
+    at Suspense
+    at div
+    at MotionDOMComponent (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/framer-motion/dist/es/motion/index.mjs:45:16)
+    at PopChildMeasure (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/framer-motion/dist/es/components/AnimatePresence/PopChild.mjs:13:1)
+    at PopChild (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/framer-motion/dist/es/components/AnimatePresence/PopChild.mjs:44:21)
+    at PresenceChild (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/framer-motion/dist/es/components/AnimatePresence/PresenceChild.mjs:9:26)
+    at AnimatePresence (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/framer-motion/dist/es/components/AnimatePresence/index.mjs:44:28)
+    at div
+    at div
+    at div
+    at div
+    at WorkspacePage (C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity - Google - Projects/social-spark/src/components/layout/WorkspacePage.tsx:13:26)
+    at Index (C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity - Google - Projects/social-spark/src/pages/Index.tsx:416:74)
+    at QueryClientProvider (file:///C:/Users/HP/OneDrive/Desktop/Projects/AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js:20:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+
+ ❯ src/pages/__tests__/Index.offlineGeneration.test.tsx (2 tests | 2 failed) 10057ms
+     × shows a network error when generation fetch fails 5028ms
+     × reports AI service unavailable with a descriptive error when 500 is returned 5020ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > shows a network error when generation fetch fails
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/pages/__tests__/Index.offlineGeneration.test.tsx:92:3
+     90|
+     91| describe("Index — generation offline / network error", () => {
+     92|   it("shows a network error when generation fetch fails", async () => {
+       |   ^
+     93|     mockFetch.mockRejectedValue(new Error("Failed to fetch"));
+     94|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/pages/__tests__/Index.offlineGeneration.test.tsx > Index — generation offline / network error > reports AI service unavailable with a descriptive error when 500 is returned
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/pages/__tests__/Index.offlineGeneration.test.tsx:119:3
+    117|   });
+    118|
+    119|   it("reports AI service unavailable with a descriptive error when 500…
+       |   ^
+    120|     mockFetch.mockResolvedValue({
+    121|       ok: false,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 3 unhandled errors during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: [vitest] No "useGeneratePostImageMutation" export is defined on the "@/hooks/useAppQueries" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+vi.mock(import("@/hooks/useAppQueries"), async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+ ❯ VitestMocker.createError ../../AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:62:17
+ ❯ Object.get ../../AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:324:16
+ ❯ IndexResults src/pages/IndexResults.tsx:174:33
+    172|   const [toneLevel, setToneLevel] = useState(3);
+    173|   const [imagePrompt, setImagePrompt] = useState("");
+    174|   const generateImageMutation = useGeneratePostImageMutation();
+       |                                 ^
+    175|
+    176|   useEffect(() => {
+ ❯ renderWithHooks node_modules/react-dom/cjs/react-dom.development.js:15486:18
+ ❯ updateFunctionComponent node_modules/react-dom/cjs/react-dom.development.js:19617:20
+ ❯ mountLazyComponent node_modules/react-dom/cjs/react-dom.development.js:19988:17
+ ❯ beginWork node_modules/react-dom/cjs/react-dom.development.js:21632:16
+ ❯ beginWork$1 node_modules/react-dom/cjs/react-dom.development.js:27465:14
+ ❯ performUnitOfWork node_modules/react-dom/cjs/react-dom.development.js:26599:12
+ ❯ workLoopSync node_modules/react-dom/cjs/react-dom.development.js:26505:5
+
+This error originated in "src/pages/__tests__/Index.offlineGeneration.test.tsx" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "shows a network error when generation fetch fails". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: [vitest] No "useGeneratePostImageMutation" export is defined on the "@/hooks/useAppQueries" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+vi.mock(import("@/hooks/useAppQueries"), async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+ ❯ VitestMocker.createError ../../AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:62:17
+ ❯ Object.get ../../AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:324:16
+ ❯ IndexResults src/pages/IndexResults.tsx:174:33
+    172|   const [toneLevel, setToneLevel] = useState(3);
+    173|   const [imagePrompt, setImagePrompt] = useState("");
+    174|   const generateImageMutation = useGeneratePostImageMutation();
+       |                                 ^
+    175|
+    176|   useEffect(() => {
+ ❯ renderWithHooks node_modules/react-dom/cjs/react-dom.development.js:15486:18
+ ❯ updateFunctionComponent node_modules/react-dom/cjs/react-dom.development.js:19617:20
+ ❯ mountLazyComponent node_modules/react-dom/cjs/react-dom.development.js:19988:17
+ ❯ beginWork node_modules/react-dom/cjs/react-dom.development.js:21632:16
+ ❯ beginWork$1 node_modules/react-dom/cjs/react-dom.development.js:27465:14
+ ❯ performUnitOfWork node_modules/react-dom/cjs/react-dom.development.js:26599:12
+ ❯ workLoopSync node_modules/react-dom/cjs/react-dom.development.js:26505:5
+
+This error originated in "src/pages/__tests__/Index.offlineGeneration.test.tsx" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "reports AI service unavailable with a descriptive error when 500 is returned". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+Error: [vitest-pool]: Worker forks emitted error.
+ ❯ EventEmitter.<anonymous> ../../AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/cli-api.BfdDOPPI.js:3446:22
+ ❯ EventEmitter.emit node:events:507:28
+ ❯ ChildProcess.emitUnexpectedExit ../../AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/cli-api.BfdDOPPI.js:3013:22
+ ❯ ChildProcess.emit node:events:507:28
+ ❯ Process.ChildProcess._handle.onexit node:internal/child_process:294:12
+
+Caused by: Error: Worker exited unexpectedly
+ ❯ ChildProcess.emitUnexpectedExit ../../AntiGravity%20-%20Google%20-%20Projects/social-spark/node_modules/vitest/dist/chunks/cli-api.BfdDOPPI.js:3012:33
+ ❯ ChildProcess.emit node:events:507:28
+ ❯ Process.ChildProcess._handle.onexit node:internal/child_process:294:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  1 failed | 1 passed (3)
+      Tests  2 failed | 6 passed (11)
+     Errors  3 errors
+   Start at  23:17:27
+   Duration  51.99s (transform 5.85s, setup 0ms, import 17.60s, tests 11.63s, environment 33.77s)
+

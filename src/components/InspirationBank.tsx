@@ -9,8 +9,15 @@ interface InspirationBankProps {
   onTopicClick: (topic: string) => void;
 }
 
-export const InspirationBank: React.FC<InspirationBankProps> = ({ industry, platform, onTopicClick }) => {
-  const staticTopics = useMemo(() => getTrendingTopicsForIndustry(industry, platform), [industry, platform]);
+export const InspirationBank: React.FC<InspirationBankProps> = ({
+  industry,
+  platform,
+  onTopicClick,
+}) => {
+  const staticTopics = useMemo(
+    () => getTrendingTopicsForIndustry(industry, platform),
+    [industry, platform]
+  );
   const staticUpdated = getTrendingTopicsLastUpdated();
 
   const [customTrends, setCustomTrends] = useState<any[] | null>(null);
@@ -21,7 +28,7 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({ industry, plat
     try {
       const result = await generateTrendsMutation.mutateAsync({
         industry,
-        platform: platform || "LinkedIn"
+        platform: platform || "LinkedIn",
       });
       setCustomTrends(result);
       toast.success("AI generated trending topics successfully ✓");
@@ -45,12 +52,32 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({ industry, plat
 
   return (
     <div className="inspiration-bank">
-      <div className="insp-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+      <div
+        className="insp-header"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 12,
+        }}
+      >
         <div>
           <div className="insp-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span>💡 {isAiGenerated ? "AI Generated Trends" : "Curated Trends"}{platform ? ` on ${platform}` : ""}</span>
+            <span>
+              💡 {isAiGenerated ? "AI Generated Trends" : "Curated Trends"}
+              {platform ? ` on ${platform}` : ""}
+            </span>
             {isAiGenerated && (
-              <span style={{ fontSize: 9, padding: "2px 6px", background: "rgba(200,240,154,0.12)", color: "var(--accent)", border: "1px solid rgba(200,240,154,0.2)", borderRadius: 99 }}>
+              <span
+                style={{
+                  fontSize: 9,
+                  padding: "2px 6px",
+                  background: "rgba(200,240,154,0.12)",
+                  color: "var(--accent)",
+                  border: "1px solid rgba(200,240,154,0.2)",
+                  borderRadius: 99,
+                }}
+              >
                 AI Live
               </span>
             )}
@@ -61,13 +88,21 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({ industry, plat
           <button
             type="button"
             className="cpbtn"
-            style={{ padding: "4px 8px", fontSize: 10, display: "inline-flex", alignItems: "center", gap: 4 }}
+            style={{
+              padding: "4px 8px",
+              fontSize: 10,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+            }}
             onClick={loadAiTrending}
             disabled={generateTrendsMutation.isPending}
           >
             {generateTrendsMutation.isPending ? "Generating…" : "🔥 Load AI Trending"}
           </button>
-          <div className="insp-updated" style={{ fontSize: 9 }}>{isAiGenerated ? "Generated just now" : staticUpdated}</div>
+          <div className="insp-updated" style={{ fontSize: 9 }}>
+            {isAiGenerated ? "Generated just now" : staticUpdated}
+          </div>
         </div>
       </div>
 
@@ -96,39 +131,58 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({ industry, plat
       </div>
 
       {reviewingTopic && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.75)",
-          backdropFilter: "blur(4px)",
-          zIndex: 1100,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 20
-        }}>
-          <div style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 12,
-            padding: 20,
-            maxWidth: 400,
-            width: "100%",
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1100,
             display: "flex",
-            flexDirection: "column",
-            gap: 16,
-            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
-            color: "var(--text)"
-          }}>
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              padding: 20,
+              maxWidth: 400,
+              width: "100%",
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
+              color: "var(--text)",
+            }}
+          >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", fontWeight: 600 }}>
+              <span
+                style={{
+                  fontSize: 10,
+                  letterSpacing: ".14em",
+                  textTransform: "uppercase",
+                  color: "var(--accent)",
+                  fontWeight: 600,
+                }}
+              >
                 Trending Topic Review
               </span>
               {reviewingTopic.trending && <span style={{ fontSize: 12 }}>🔥 Live Trend</span>}
             </div>
 
             <div>
-              <h4 style={{ margin: "2px 0 4px 0", fontSize: 18, fontWeight: 500, color: "var(--text)" }}>
+              <h4
+                style={{
+                  margin: "2px 0 4px 0",
+                  fontSize: 18,
+                  fontWeight: 500,
+                  color: "var(--text)",
+                }}
+              >
                 {reviewingTopic.topic}
               </h4>
               <div style={{ fontSize: 11, color: "var(--text3)" }}>
@@ -136,12 +190,33 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({ industry, plat
               </div>
             </div>
 
-            <div style={{ fontSize: 12, color: "var(--text2)", lineHeight: 1.5, display: "flex", flexDirection: "column", gap: 10 }}>
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--text2)",
+                lineHeight: 1.5,
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
               <div>
-                <strong>Weekly Volume:</strong> {(reviewingTopic.posts / 100).toFixed(0)}k posts this week
+                <strong>Weekly Volume:</strong> {(reviewingTopic.posts / 100).toFixed(0)}k posts
+                this week
               </div>
-              <div style={{ padding: 12, background: "rgba(255, 255, 255, 0.02)", borderRadius: 8, border: "1px solid var(--border)", fontSize: 11, color: "var(--text2)" }}>
-                💡 This topic is currently seeing a surge in engagement on {platform || "your selected platform"} among professionals in the {industry} space. Adding this topic will optimize your posts for current feed algorithms.
+              <div
+                style={{
+                  padding: 12,
+                  background: "rgba(255, 255, 255, 0.02)",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  fontSize: 11,
+                  color: "var(--text2)",
+                }}
+              >
+                💡 This topic is currently seeing a surge in engagement on{" "}
+                {platform || "your selected platform"} among professionals in the {industry} space.
+                Adding this topic will optimize your posts for current feed algorithms.
               </div>
             </div>
 

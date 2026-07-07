@@ -14,7 +14,9 @@ describe("storageService", () => {
   it("saves and loads draft envelope", () => {
     const data = { foo: "bar" };
     storageService.saveDraft(key, { version: 1, createdAt: Date.now(), data }, 10000);
-    const got = storageService.loadDraft<{ version: number; createdAt: number; data: typeof data }>(key);
+    const got = storageService.loadDraft<{ version: number; createdAt: number; data: typeof data }>(
+      key
+    );
     expect(got).not.toBeNull();
     expect(got?.data.foo).toBe("bar");
   });

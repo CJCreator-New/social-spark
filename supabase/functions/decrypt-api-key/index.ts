@@ -1,7 +1,11 @@
 // deno-lint-ignore-file
 // @ts-ignore - Deno ESM import resolved at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-declare const Deno: { env: { get(key: string): string | undefined }; serve(handler: (req: Request) => Response | Promise<Response>): void; openKv(): Promise<any> };
+declare const Deno: {
+  env: { get(key: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+  openKv(): Promise<any>;
+};
 import { checkRateLimit, getCorsHeaders } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
@@ -30,7 +34,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Unauthorized access." }, 401);
     }
     const token = authHeader.replace("Bearer ", "");
-    
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -46,7 +50,10 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError || !user) {
       return jsonResponse({ error: "Unauthorized access." }, 401);
     }

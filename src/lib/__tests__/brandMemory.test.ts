@@ -6,7 +6,7 @@ describe("brandMemory library helpers", () => {
     expect(hasBrandMemory(null)).toBe(false);
     expect(hasBrandMemory({})).toBe(false);
     expect(hasBrandMemory({ forbidden_phrases: [] })).toBe(false);
-    
+
     expect(hasBrandMemory({ forbidden_phrases: ["delight"] })).toBe(true);
     expect(hasBrandMemory({ proof_points: ["10k users"] })).toBe(true);
   });
@@ -20,7 +20,7 @@ describe("brandMemory library helpers", () => {
     };
 
     const prompt = buildBrandMemoryPrompt(profile);
-    
+
     expect(prompt).toContain("BRAND MEMORY & IDENTITY CONSTRAINTS");
     expect(prompt).toContain('"synergy"');
     expect(prompt).toContain("Over 99.9% uptime");

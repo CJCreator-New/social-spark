@@ -15,8 +15,8 @@ function renderBootError(err: unknown) {
       <div style="max-width:480px;text-align:center;">
         <h1 style="font-size:22px;font-weight:600;margin:0 0 12px;">Something went wrong loading the app</h1>
         <p style="font-size:14px;color:${WARM_PALETTE.textSecondary};margin:0 0 20px;">We hit an error while starting ContentForge. Please reload — if it keeps happening, clear your browser cache.</p>
-        <button onclick="window.location.reload()" style="background:${WARM_PALETTE.primary};color:#ffffff;border:none;padding:10px 18px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;">Reload</button>
-        <pre style="margin-top:20px;font-size:11px;color:${WARM_PALETTE.textMuted};white-space:pre-wrap;text-align:left;background:${WARM_PALETTE.surfaceMuted};padding:10px;border-radius:6px;border:1px solid ${WARM_PALETTE.border};">${message.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!))}</pre>
+        <button onclick="window.location.reload()" style="background:${WARM_PALETTE.primary};color:${WARM_PALETTE.surface};border:none;padding:10px 18px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;">Reload</button>
+        <pre style="margin-top:20px;font-size:11px;color:${WARM_PALETTE.textMuted};white-space:pre-wrap;text-align:left;background:${WARM_PALETTE.surfaceMuted};padding:10px;border-radius:6px;border:1px solid ${WARM_PALETTE.border};">${message.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c]!)}</pre>
       </div>
     </div>
   `;

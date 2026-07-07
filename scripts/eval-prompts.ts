@@ -1,6 +1,5 @@
-
-import fs from 'fs';
-import path from 'path';
+import fs from "fs";
+import path from "path";
 
 /**
  * Prompt Evals Harness
@@ -18,7 +17,7 @@ const BRIEFS = [
     audiences: ["DevOps Engineers", "CTOs"],
     voice: "Authoritative but accessible",
     style: "Educational & Data-driven",
-    platform: "LinkedIn"
+    platform: "LinkedIn",
   },
   {
     id: "lifestyle-coaching",
@@ -27,7 +26,7 @@ const BRIEFS = [
     audiences: ["Remote Workers", "Busy Parents"],
     voice: "Empathetic & Encouraging",
     style: "Storytelling",
-    platform: "Instagram"
+    platform: "Instagram",
   },
   {
     id: "finance-news",
@@ -36,15 +35,15 @@ const BRIEFS = [
     audiences: ["Retail Investors", "Financial Advisors"],
     voice: "Analytical",
     style: "News Flash",
-    platform: "X / Twitter"
-  }
+    platform: "X / Twitter",
+  },
 ];
 
 async function runEval() {
   console.log("🚀 Starting Prompt Evaluation...");
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const resultsDir = path.join(process.cwd(), "evals");
-  
+
   if (!fs.existsSync(resultsDir)) {
     fs.mkdirSync(resultsDir);
   }
@@ -54,14 +53,14 @@ async function runEval() {
   for (const brief of BRIEFS) {
     for (const quality of ["draft", "polished"] as const) {
       console.log(`  [${brief.id}] Running ${quality} tier...`);
-      
+
       try {
         const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-calendar`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "apikey": SUPABASE_KEY,
-            "Authorization": `Bearer ${SUPABASE_KEY}`
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
           },
           body: JSON.stringify({
             ...brief,
@@ -70,8 +69,8 @@ async function runEval() {
             structure: "mixed",
             topics: [], // Allow model to infer or use pre-call logic
             bannedHashtags: [],
-            requiredHashtags: []
-          })
+            requiredHashtags: [],
+          }),
         });
 
         if (!res.ok) {
@@ -86,7 +85,7 @@ async function runEval() {
           quality,
           timestamp: new Date().toISOString(),
           payload: brief,
-          response: data
+          response: data,
         });
       } catch (e) {
         console.error(`    ❌ Request error:`, e);

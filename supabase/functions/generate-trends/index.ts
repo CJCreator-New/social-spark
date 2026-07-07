@@ -12,7 +12,8 @@ import {
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
+  if (req.method === "OPTIONS")
+    return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -29,7 +30,7 @@ Deno.serve(async (req: Request) => {
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
     const userId = await getVerifiedUserId(token);
     if (!userId) return jsonResponse({ error: "Sign in required." }, 401);
-    
+
     const rateLimitCheck = await checkRateLimit(userId, "generate-trends", {
       maxRequests: 30,
       windowMs: 60 * 1000,
@@ -72,22 +73,31 @@ Platform: ${platform}`;
               items: {
                 type: "object",
                 properties: {
-                  topic: { type: "string", description: "Short topic name or angle (e.g. 'AI Agents in SaaS')" },
+                  topic: {
+                    type: "string",
+                    description: "Short topic name or angle (e.g. 'AI Agents in SaaS')",
+                  },
                   category: { type: "string", description: "Broad subcategory (e.g. 'AI & ML')" },
                   trending: { type: "boolean" },
-                  posts: { type: "number", description: "Approximate post count (e.g. 500 to 1500)" }
+                  posts: {
+                    type: "number",
+                    description: "Approximate post count (e.g. 500 to 1500)",
+                  },
                 },
-                required: ["topic", "category", "trending", "posts"]
-              }
-            }
+                required: ["topic", "category", "trending", "posts"],
+              },
+            },
           },
-          required: ["trends"]
-        }
-      }
+          required: ["trends"],
+        },
+      },
     };
 
     const aiRes = await callAIGateway(
-      [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }],
+      [
+        { role: "system", content: systemMsg },
+        { role: "user", content: userMsg },
+      ],
       tool,
       LOVABLE_API_KEY,
       {

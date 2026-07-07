@@ -1,6 +1,6 @@
 // Adapter stub for News sources (RSS / API)
-import { normalizeText, tokenize } from '../../../src/lib/normalize';
-import { fetchWithRetry, sleep } from '../../../src/lib/http';
+import { normalizeText, tokenize } from "../../../src/lib/normalize";
+import { fetchWithRetry, sleep } from "../../../src/lib/http";
 
 export type TrendSourceItem = {
   source: string;
@@ -18,15 +18,18 @@ export type TrendSourceItem = {
 
 const NEWS_KEY = process.env.NEWSAPI_KEY;
 
-export async function fetchLatest(params: { sources?: string[]; since?: string; maxItems?: number } = {}) {
+export async function fetchLatest(
+  params: { sources?: string[]; since?: string; maxItems?: number } = {}
+) {
   if (!NEWS_KEY) return [];
-  const sources = params.sources || ['technology'];
+  const sources = params.sources || ["technology"];
   const maxItems = params.maxItems || 200;
-  const q = encodeURIComponent(sources.join(' OR '));
+  const q = encodeURIComponent(sources.join(" OR "));
   const items: TrendSourceItem[] = [];
   let page = 1;
   try {
-    while (items.length < maxItems && page < 6) { // NewsAPI limits pages
+    while (items.length < maxItems && page < 6) {
+      // NewsAPI limits pages
       const url = `https://newsapi.org/v2/everything?q=${q}&pageSize=50&page=${page}&apiKey=${NEWS_KEY}`;
       const res = await fetchWithRetry(url, { timeoutMs: 10000 }, 4);
       if (!res.ok) {
@@ -38,15 +41,15 @@ export async function fetchLatest(params: { sources?: string[]; since?: string; 
       const body = await res.json();
       const articles = body?.articles || [];
       for (const a of articles) {
-        const title = a.title || a.description || '';
+        const title = a.title || a.description || "";
         const normalized = normalizeText(title);
         items.push({
-          source: 'newsapi',
+          source: "newsapi",
           source_id: a.url,
           title,
           normalized_terms: tokenize(normalized),
           industry: null,
-          platform: 'news',
+          platform: "news",
           metadata: { source: a.source?.name } as Record<string, unknown>,
           raw_payload: a,
           timestamp: a.publishedAt,
@@ -59,7 +62,7 @@ export async function fetchLatest(params: { sources?: string[]; since?: string; 
     }
     return items;
   } catch (err) {
-    console.error('news adapter error', err);
+    console.error("news adapter error", err);
     return items;
   }
 }

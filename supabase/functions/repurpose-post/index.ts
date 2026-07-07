@@ -17,13 +17,16 @@ import {
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
+  if (req.method === "OPTIONS")
+    return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
   try {
     const body = await req.json();
     const payload = cleanPayload(body);
     const { post, targetPlatform } = body;
-    const sourcePlatform = String(body.platform || payload.platform || post?.platform || "LinkedIn");
+    const sourcePlatform = String(
+      body.platform || payload.platform || post?.platform || "LinkedIn"
+    );
 
     if (!post || !targetPlatform) {
       return jsonResponse({ error: "Missing source post or target platform." }, 400);
@@ -45,11 +48,17 @@ Deno.serve(async (req: Request) => {
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets.");
-      return jsonResponse({
-        error: "AI is not configured.",
-        message: "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets."
-      }, 500);
+      console.error(
+        "LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets."
+      );
+      return jsonResponse(
+        {
+          error: "AI is not configured.",
+          message:
+            "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets.",
+        },
+        500
+      );
     }
 
     // Prepare the payload for the target platform
@@ -102,16 +111,30 @@ Return the result as a single post object using return_post.`;
             image_prompt: { type: "string" },
             body_variants: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 2 },
           },
-          required: ["topic", "format", "title", "hook", "body", "cta", "hashtags", "rationale", "image_prompt"],
+          required: [
+            "topic",
+            "format",
+            "title",
+            "hook",
+            "body",
+            "cta",
+            "hashtags",
+            "rationale",
+            "image_prompt",
+          ],
         },
       },
     };
 
-    const model = targetPayload.quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+    const model =
+      targetPayload.quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
     const temperature = targetPayload.quality === "polished" ? 0.6 : 0.8;
 
     const aiRes = await callAIGateway(
-      [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }],
+      [
+        { role: "system", content: systemMsg },
+        { role: "user", content: userMsg },
+      ],
       tool,
       LOVABLE_API_KEY,
       {
@@ -122,16 +145,20 @@ Return the result as a single post object using return_post.`;
         quality: targetPayload.quality,
         userToken: token || null,
         userIp: ipAddress,
-        max_tokens: 8192
+        max_tokens: 8192,
       }
     );
 
     if (aiRes.status !== 200) {
       if (aiRes.status === 503) {
-        return jsonResponse({
-          error: "PLATFORM_UNAVAILABLE",
-          message: "Our AI providers are temporarily overloaded. Please try again in a moment, or add your own API key in Profile → API Keys to generate without platform limits.",
-        }, 503);
+        return jsonResponse(
+          {
+            error: "PLATFORM_UNAVAILABLE",
+            message:
+              "Our AI providers are temporarily overloaded. Please try again in a moment, or add your own API key in Profile → API Keys to generate without platform limits.",
+          },
+          503
+        );
       }
       return jsonResponse({ error: aiRes.error }, aiRes.status);
     }
@@ -144,7 +171,7 @@ Return the result as a single post object using return_post.`;
     // Variant scoring block
     const candidates = [String(parsed.body || "")];
     if (Array.isArray(parsed.body_variants)) {
-      candidates.push(...parsed.body_variants.map(v => String(v || "")));
+      candidates.push(...parsed.body_variants.map((v) => String(v || "")));
     }
 
     if (candidates.length > 1) {
@@ -162,7 +189,6 @@ Return the result as a single post object using return_post.`;
       normalized.chosen_index = parsed.chosen_index;
     }
     return jsonResponse({ post: normalized });
-
   } catch (e) {
     return errorResponse("repurpose-post", e);
   }

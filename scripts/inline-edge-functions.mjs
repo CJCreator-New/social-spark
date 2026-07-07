@@ -29,6 +29,7 @@ mkdirSync(outDir, { recursive: true });
 function loadShared(name) {
   const src = readFileSync(join(sharedDir, name), "utf8");
   return src
+    .replace(/^\s*declare const Deno:\s*\{[\s\S]*?\n\};\s*$/gm, "")
     .replace(/^\s*declare const Deno:.*$/gm, "")
     .replace(/^export\s+/gm, "")
     .replace(/^export\s+/gm, "");
@@ -50,7 +51,10 @@ function importedSymbols(src) {
   let m;
   while ((m = re.exec(src)) !== null) {
     const mod = m[2];
-    const names = m[1].split(",").map((s) => s.trim()).filter(Boolean);
+    const names = m[1]
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
     (map[mod] ||= []).push(...names);
   }
   return map;
@@ -61,7 +65,7 @@ function importedSymbols(src) {
 function extractSymbol(rawSrc, name) {
   // rawSrc still has `export` keywords. Find the declaration.
   const decl = new RegExp(
-    `export\\s+(?:async\\s+)?(?:function|const|let|interface|type|class)\\s+${name}\\b`,
+    `export\\s+(?:async\\s+)?(?:function|const|let|interface|type|class)\\s+${name}\\b`
   );
   const start = rawSrc.search(decl);
   if (start === -1) return null;
@@ -76,10 +80,16 @@ function extractSymbol(rawSrc, name) {
   // For `const NAME = {...}` or `function NAME(...){...}` or `type NAME = ...;`
   for (; j < rawSrc.length; j++) {
     const c = rawSrc[j];
-    if (c === "{" || c === "(" || c === "[") { depth++; started = true; }
-    else if (c === "}" || c === ")" || c === "]") { depth--; }
-    else if (c === ";" && depth === 0) { j++; break; }
-    if (started && depth === 0 && (rawSrc[j] === "}" )) {
+    if (c === "{" || c === "(" || c === "[") {
+      depth++;
+      started = true;
+    } else if (c === "}" || c === ")" || c === "]") {
+      depth--;
+    } else if (c === ";" && depth === 0) {
+      j++;
+      break;
+    }
+    if (started && depth === 0 && rawSrc[j] === "}") {
       // end of a block-bodied function/class; consume optional trailing ;
       if (rawSrc[j + 1] === ";") j++;
       j++;
@@ -103,7 +113,13 @@ function stripLocalFunction(src, name) {
   let depth = 0;
   for (; i < src.length; i++) {
     if (src[i] === "{") depth++;
-    else if (src[i] === "}") { depth--; if (depth === 0) { i++; break; } }
+    else if (src[i] === "}") {
+      depth--;
+      if (depth === 0) {
+        i++;
+        break;
+      }
+    }
   }
   return src.slice(0, start) + src.slice(i);
 }
@@ -135,7 +151,10 @@ for (const fn of fns) {
   }
 
   // Strip the _shared import lines from the body.
-  body = body.replace(importRe, "").replace(/^\s*declare const Deno:.*$/gm, "");
+  body = body
+    .replace(importRe, "")
+    .replace(/^\s*declare const Deno:\s*\{[\s\S]*?\n\};\s*$/gm, "")
+    .replace(/^\s*declare const Deno:.*$/gm, "");
 
   // promptHelpers must come before plans? They're independent; order them
   // deterministically (promptHelpers first, then plans).

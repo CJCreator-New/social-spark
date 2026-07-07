@@ -1,7 +1,11 @@
-import React from "react";
+import React, { useMemo, useCallback } from "react";
 import { Post } from "./constants";
 import { motion } from "framer-motion";
-import { getEngagementPrediction } from "@/lib/postPerformanceScore";
+import {
+  getEngagementPrediction,
+  ENGAGEMENT_BADGE,
+  type EngagementLevel,
+} from "@/lib/postPerformanceScore";
 import { useWizardStore } from "@/stores/useWizardStore";
 import { parseLocalDate } from "@/lib/calendarSchedule";
 import { Zap } from "lucide-react";
@@ -38,18 +42,53 @@ export const WeekStrip = React.memo(function WeekStrip({
   const formWeekStart = useWizardStore((state) => state.form.weekStart);
   const start = weekStartDate || parseLocalDate(formWeekStart) || new Date();
 
+  const engagementLevels = useMemo(
+    () => posts.map((post) => getEngagementPrediction(post, platform)),
+    [posts, platform]
+  );
+
+  const badgeStyles = useMemo(
+    () =>
+      engagementLevels.map((level) => {
+        const entry = ENGAGEMENT_BADGE[level];
+        return { color: entry.color, background: entry.bg };
+      }),
+    [engagementLevels]
+  );
+
+  const dayNames = useMemo(() => {
+    const base = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    return Array.from({ length: posts.length }, (_, i) => {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()];
+    });
+  }, [posts.length, start]);
+
+  const onClickDay = useCallback((i: number) => () => setActiveDay(i), [setActiveDay]);
+
+  const onDragStartDay = useCallback(
+    (i: number) => (e: React.DragEvent<HTMLElement>) => {
+      handleDragStart(e, i);
+      setDraggedIndex(i);
+    },
+    [handleDragStart, setDraggedIndex]
+  );
+
+  const onDropDay = useCallback(
+    (i: number) => (e: React.DragEvent<HTMLElement>) => {
+      const src = handleDrop(e, i);
+      if (src !== null) handleDayDrop(src, i);
+    },
+    [handleDrop, handleDayDrop]
+  );
+
   return (
     <div className="week-strip" role="tablist" aria-label="Days of the week">
       {posts.map((post, i) => {
-        const engagementLevel = getEngagementPrediction(post, platform);
-        const dayDate = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-        const dayOfWeekName = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dayDate.getDay()];
-
-        const badgeStyle = engagementLevel === "High"
-          ? { color: "#15803d", background: "#dcfce7" }
-          : engagementLevel === "Low"
-          ? { color: "#b91c1c", background: "#fee2e2" }
-          : { color: "#a16207", background: "#fef9c3" };
+        const level = engagementLevels[i];
+        const badgeStyle = badgeStyles[i];
+        const dayOfWeekName = dayNames[i];
 
         return (
           <motion.button
@@ -58,30 +97,21 @@ export const WeekStrip = React.memo(function WeekStrip({
             role="tab"
             aria-selected={i === activeDay}
             className={`dtab ${i === activeDay ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""} ${draggedIndex === i ? "dragging" : ""}`}
-            onClick={() => setActiveDay(i)}
+            onClick={onClickDay(i)}
             draggable
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             transition={{ type: "spring", stiffness: 400, damping: 15 }}
-            onDragStart={(e) => {
-              handleDragStart(e as unknown as React.DragEvent<HTMLElement>, i);
-              setDraggedIndex(i);
-            }}
+            onDragStart={onDragStartDay(i) as any}
             onDragOver={handleDragOver}
-            onDrop={(e) => {
-              const sourcIdx = handleDrop(e, i);
-              if (sourcIdx !== null) {
-                handleDayDrop(sourcIdx, i);
-              }
-            }}
+            onDrop={onDropDay(i) as any}
             onDragEnd={() => setDraggedIndex(null)}
-            title={`Day ${i + 1} · ${dayOfWeekName} · Engagement: ${engagementLevel}. Drag to reorder.`}
+            title={`Day ${i + 1} · ${dayOfWeekName} · Engagement: ${level}. Drag to reorder.`}
           >
             <div className="dtab-dow">{dayOfWeekName}</div>
             <div className="dtab-n tabular-nums">{i + 1}</div>
-            {/* AI engagement prediction badge */}
             <div
-              title={`AI predicted engagement: ${engagementLevel}`}
+              title={`AI predicted engagement: ${level}`}
               style={{
                 marginTop: 4,
                 fontSize: 8,
@@ -101,7 +131,7 @@ export const WeekStrip = React.memo(function WeekStrip({
               }}
             >
               <Zap size={7} style={{ flexShrink: 0 }} />
-              {engagementLevel}
+              {level}
             </div>
           </motion.button>
         );

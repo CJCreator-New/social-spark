@@ -1,6 +1,6 @@
 // Adapter stub for Reddit (Edge Function / Queue Worker usage)
-import { normalizeText, tokenize } from '../../../src/lib/normalize';
-import { fetchWithRetry, sleep } from '../../../src/lib/http';
+import { normalizeText, tokenize } from "../../../src/lib/normalize";
+import { fetchWithRetry, sleep } from "../../../src/lib/http";
 
 export type TrendSourceItem = {
   source: string;
@@ -16,8 +16,10 @@ export type TrendSourceItem = {
   last_seen?: string | null;
 };
 
-export async function fetchLatest(params: { subreddit?: string; since?: string; maxItems?: number } = {}) {
-  const subreddit = params.subreddit || 'all';
+export async function fetchLatest(
+  params: { subreddit?: string; since?: string; maxItems?: number } = {}
+) {
+  const subreddit = params.subreddit || "all";
   const maxItems = params.maxItems || 200;
   const items: TrendSourceItem[] = [];
   let after: string | null = null;
@@ -25,10 +27,14 @@ export async function fetchLatest(params: { subreddit?: string; since?: string; 
   try {
     while (items.length < maxItems && attempts < 10) {
       attempts += 1;
-      const qs = new URLSearchParams({ limit: '100' });
-      if (after) qs.set('after', after);
+      const qs = new URLSearchParams({ limit: "100" });
+      if (after) qs.set("after", after);
       const url = `https://www.reddit.com/r/${encodeURIComponent(subreddit)}/hot.json?${qs.toString()}`;
-      const res = await fetchWithRetry(url, { headers: { 'User-Agent': 'social-spark/1.0 (+https://example.com)' }, timeoutMs: 10000 }, 4);
+      const res = await fetchWithRetry(
+        url,
+        { headers: { "User-Agent": "social-spark/1.0 (+https://example.com)" }, timeoutMs: 10000 },
+        4
+      );
       if (!res.ok) {
         // stop on client errors
         if (res.status >= 400 && res.status < 500) break;
@@ -39,18 +45,18 @@ export async function fetchLatest(params: { subreddit?: string; since?: string; 
       const children = body?.data?.children || [];
       for (const c of children) {
         const post = c.data;
-        const title = post.title || post.link_title || '';
+        const title = post.title || post.link_title || "";
         const normalized = normalizeText(title);
         items.push({
-          source: 'reddit',
+          source: "reddit",
           source_id: post.id,
           title,
           normalized_terms: tokenize(normalized),
           industry: null,
-          platform: 'reddit',
+          platform: "reddit",
           metadata: { subreddit: post.subreddit, score: post.score } as Record<string, unknown>,
           raw_payload: post,
-          timestamp: new Date((post.created_utc || Date.now()/1000) * 1000).toISOString(),
+          timestamp: new Date((post.created_utc || Date.now() / 1000) * 1000).toISOString(),
         });
         if (items.length >= maxItems) break;
       }
@@ -61,7 +67,7 @@ export async function fetchLatest(params: { subreddit?: string; since?: string; 
     }
     return items;
   } catch (err) {
-    console.error('reddit adapter error', err);
+    console.error("reddit adapter error", err);
     return items;
   }
 }

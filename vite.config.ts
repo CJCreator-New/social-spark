@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from 'path'
-import { mcpPlugin } from '@lovable.dev/mcp-js/stacks/supabase/vite'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
 
 const SUPABASE_PROJECT_URL = "https://mbxlvsftyifovbkpsvyw.supabase.co";
 
@@ -28,17 +28,17 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('three')) {
-              return 'three';
+          if (id.includes("node_modules")) {
+            if (id.includes("three")) {
+              return "three";
             }
-            if (id.includes('gsap')) {
-              return 'gsap';
+            if (id.includes("gsap")) {
+              return "gsap";
             }
-            return 'vendor';
+            return "vendor";
           }
-        }
-      }
-    }
-  }
-})
+        },
+      },
+    },
+  },
+});

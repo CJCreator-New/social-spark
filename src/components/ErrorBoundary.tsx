@@ -63,48 +63,47 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-function DefaultErrorFallback({
-  error,
-  reset,
-}: {
-  error: Error;
-  reset: () => void;
-}) {
-  const isAiUnavailable    = error.message === "AI_UNAVAILABLE";
-  const isPlatformOverload = error.message.includes("PLATFORM_UNAVAILABLE") || error.message.includes("All platform AI providers") || error.message.includes("temporarily overloaded");
-  const isNotConfigured    = error.message.includes("AI is not configured");
-  const isAiRelated        = isAiUnavailable || isPlatformOverload || isNotConfigured;
+function DefaultErrorFallback({ error, reset }: { error: Error; reset: () => void }) {
+  const isAiUnavailable = error.message === "AI_UNAVAILABLE";
+  const isPlatformOverload =
+    error.message.includes("PLATFORM_UNAVAILABLE") ||
+    error.message.includes("All platform AI providers") ||
+    error.message.includes("temporarily overloaded");
+  const isNotConfigured = error.message.includes("AI is not configured");
+  const isAiRelated = isAiUnavailable || isPlatformOverload || isNotConfigured;
 
   const message = isAiUnavailable
     ? "AI generation is temporarily unavailable. You can try again shortly, or add your own API key in Profile → API Keys to generate without platform limits."
     : isPlatformOverload
-    ? "Our AI providers are temporarily overloaded. Please try again in a moment — this usually clears within seconds. You can also add your own API key in Profile → API Keys to bypass platform limits."
-    : isNotConfigured
-    ? "The AI service is not configured on the server. Please contact support or try again later."
-    : getUserFriendlyMessage(error);
-  const showDetails = import.meta.env.DEV && typeof window !== 'undefined' && window.localStorage.getItem('ss:show-error-details') === 'true';
+      ? "Our AI providers are temporarily overloaded. Please try again in a moment — this usually clears within seconds. You can also add your own API key in Profile → API Keys to bypass platform limits."
+      : isNotConfigured
+        ? "The AI service is not configured on the server. Please contact support or try again later."
+        : getUserFriendlyMessage(error);
+  const showDetails =
+    import.meta.env.DEV &&
+    typeof window !== "undefined" &&
+    window.localStorage.getItem("ss:show-error-details") === "true";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background text-foreground font-sans p-6">
       <div className="max-w-[500px] w-full bg-card border border-border rounded-2xl p-10 text-center">
         <div className="flex justify-center mb-4">
-          {isAiRelated
-            ? <Zap className="w-10 h-10 text-primary" />
-            : <AlertCircle className="w-10 h-10 text-destructive" />
-          }
+          {isAiRelated ? (
+            <Zap className="w-10 h-10 text-primary" />
+          ) : (
+            <AlertCircle className="w-10 h-10 text-destructive" />
+          )}
         </div>
 
         <h1 className="font-display text-2xl font-normal mb-4">
           {isPlatformOverload
             ? "AI Providers Overloaded"
             : isAiUnavailable
-            ? "AI Generation Unavailable"
-            : "Something Went Wrong"}
+              ? "AI Generation Unavailable"
+              : "Something Went Wrong"}
         </h1>
 
-        <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-          {message}
-        </p>
+        <p className="text-sm text-muted-foreground mb-6 leading-relaxed">{message}</p>
 
         {showDetails && !isAiRelated && (
           <details className="text-xs bg-destructive/10 border border-destructive/30 rounded-lg p-3 mb-6 text-destructive text-left font-mono overflow-auto max-h-[150px]">
@@ -123,7 +122,7 @@ function DefaultErrorFallback({
                 Try Again
               </button>
               <button
-                onClick={() => window.location.assign('/profile?tab=api-keys')}
+                onClick={() => window.location.assign("/profile?tab=api-keys")}
                 className="flex-1 bg-transparent text-foreground border border-border rounded-lg px-4 py-3 text-sm font-medium cursor-pointer transition-colors hover:border-primary/40"
               >
                 Add API Key

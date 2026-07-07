@@ -10,7 +10,14 @@ interface ConfirmProps {
   onCancel: () => void;
 }
 
-export const ConfirmDialog: React.FC<ConfirmProps> = ({ title, message, confirmLabel = "OK", cancelLabel = "Cancel", onConfirm, onCancel }) => {
+export const ConfirmDialog: React.FC<ConfirmProps> = ({
+  title,
+  message,
+  confirmLabel = "OK",
+  cancelLabel = "Cancel",
+  onConfirm,
+  onCancel,
+}) => {
   const [loading, setLoading] = React.useState(false);
   const titleId = React.useId();
   const messageId = React.useId();
@@ -25,17 +32,33 @@ export const ConfirmDialog: React.FC<ConfirmProps> = ({ title, message, confirmL
   };
 
   return (
-    <Modal onClose={onCancel} className="modal-content" ariaLabel={title || "Confirm dialog"} ariaLabelledBy={titleId} ariaDescribedBy={messageId}>
+    <Modal
+      onClose={onCancel}
+      className="modal-content"
+      ariaLabel={title || "Confirm dialog"}
+      ariaLabelledBy={titleId}
+      ariaDescribedBy={messageId}
+    >
       <div className="modal-header">
-        <h1 id={titleId} style={{ fontSize: "1.2rem", margin: 0 }}>{title || "Confirm"}</h1>
-        <button className="modal-close" onClick={onCancel} aria-label="Close dialog">✕</button>
+        <h1 id={titleId} style={{ fontSize: "1.2rem", margin: 0 }}>
+          {title || "Confirm"}
+        </h1>
+        <button className="modal-close" onClick={onCancel} aria-label="Close dialog">
+          ✕
+        </button>
       </div>
       <div className="modal-body">
-        <div id={messageId} style={{ whiteSpace: "pre-wrap", color: "var(--text2)" }}>{message}</div>
+        <div id={messageId} style={{ whiteSpace: "pre-wrap", color: "var(--text2)" }}>
+          {message}
+        </div>
       </div>
       <div className="modal-footer">
-        <button className="btn btn-g" onClick={onCancel} disabled={loading}>{cancelLabel}</button>
-        <button className="btn btn-p" onClick={handleConfirm} disabled={loading}>{loading ? "…" : confirmLabel}</button>
+        <button className="btn btn-g" onClick={onCancel} disabled={loading}>
+          {cancelLabel}
+        </button>
+        <button className="btn btn-p" onClick={handleConfirm} disabled={loading}>
+          {loading ? "…" : confirmLabel}
+        </button>
       </div>
     </Modal>
   );

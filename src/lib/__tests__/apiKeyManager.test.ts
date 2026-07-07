@@ -321,7 +321,15 @@ describe("getUserApiKey", () => {
   it("returns null values when not authenticated (no session)", async () => {
     mockGetSession.mockResolvedValue(NO_SESSION);
     const result = await getUserApiKey();
-    expect(result).toEqual({ apiKey: null, hasKey: false, provider: null, apiModel: null, useOwnKey: false, keyMode: 'fallback', settingsError: false });
+    expect(result).toEqual({
+      apiKey: null,
+      hasKey: false,
+      provider: null,
+      apiModel: null,
+      useOwnKey: false,
+      keyMode: "fallback",
+      settingsError: false,
+    });
   });
 
   it("returns null apiKey when no user_settings row exists", async () => {
@@ -347,8 +355,7 @@ describe("getUserApiKey", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       status: 200,
-      json: () =>
-        Promise.resolve({ hasKey: true, provider: "openai", last4: "abc123" }),
+      json: () => Promise.resolve({ hasKey: true, provider: "openai", last4: "abc123" }),
     } as Response);
 
     const result = await getUserApiKey();
@@ -379,7 +386,7 @@ describe("getUserApiKey", () => {
       provider: null,
       apiModel: null,
       useOwnKey: false,
-      keyMode: 'fallback',
+      keyMode: "fallback",
       settingsError: true,
     });
   });
@@ -391,8 +398,7 @@ describe("getUserApiKey", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       status: 200,
-      json: () =>
-        Promise.resolve({ hasKey: true, provider: "openai", last4: "abc123" }),
+      json: () => Promise.resolve({ hasKey: true, provider: "openai", last4: "abc123" }),
     } as Response);
 
     const result = await getUserApiKey();
@@ -404,7 +410,10 @@ describe("getUserApiKey", () => {
 
   it("surfaces a settings schema warning when the settings row cannot be read", async () => {
     mockGetSession.mockResolvedValue(VALID_SESSION);
-    mockMaybySingle.mockResolvedValue({ data: null, error: new Error("column use_own_key does not exist") });
+    mockMaybySingle.mockResolvedValue({
+      data: null,
+      error: new Error("column use_own_key does not exist"),
+    });
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
@@ -583,11 +592,15 @@ describe("localStorage Fallback", () => {
       } as Response);
 
       // Save should throw error and not save to localStorage
-      await expect(saveUserApiKey(VALID_ANTHROPIC_KEY, "anthropic")).rejects.toThrow("encrypt-api-key' not found (404)");
+      await expect(saveUserApiKey(VALID_ANTHROPIC_KEY, "anthropic")).rejects.toThrow(
+        "encrypt-api-key' not found (404)"
+      );
       expect(localStorage.getItem("social_spark_user_api_key")).toBeNull();
 
       // Toggle should throw error and not save to localStorage
-      await expect(setUseOwnKey(true, "fallback")).rejects.toThrow("encrypt-api-key' not found (404) for toggle");
+      await expect(setUseOwnKey(true, "fallback")).rejects.toThrow(
+        "encrypt-api-key' not found (404) for toggle"
+      );
       expect(localStorage.getItem("social_spark_use_own_key")).toBeNull();
 
       // Retrieve should return null/default settings and not pull from localStorage
@@ -618,12 +631,12 @@ describe("localStorage Fallback", () => {
     });
 
     it("throws errors and does not fall back to localStorage", async () => {
-      vi.spyOn(globalThis, "fetch").mockRejectedValue(
-        new TypeError("Failed to fetch")
-      );
+      vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
 
       // Save should throw network error
-      await expect(saveUserApiKey(VALID_OPENROUTER_KEY, "openrouter")).rejects.toThrow("Failed to fetch");
+      await expect(saveUserApiKey(VALID_OPENROUTER_KEY, "openrouter")).rejects.toThrow(
+        "Failed to fetch"
+      );
       expect(localStorage.getItem("social_spark_user_api_key")).toBeNull();
 
       // Toggle should throw network error
@@ -710,7 +723,8 @@ describe("validateUserApiKey", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ valid: false, reason: "Key was rejected (invalid or revoked)." }),
+      json: () =>
+        Promise.resolve({ valid: false, reason: "Key was rejected (invalid or revoked)." }),
     } as Response);
 
     const result = await validateUserApiKey(VALID_KEY, "openai");

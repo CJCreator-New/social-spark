@@ -1,8 +1,17 @@
 // deno-lint-ignore-file
 // @ts-ignore - Deno ESM import resolved at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-declare const Deno: { env: { get(key: string): string | undefined }; serve(handler: (req: Request) => Response | Promise<Response>): void; openKv(): Promise<any> };
-import { checkRateLimit, getCorsHeaders, callAI, getProviderModel } from "../_shared/promptHelpers.ts";
+declare const Deno: {
+  env: { get(key: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+  openKv(): Promise<any>;
+};
+import {
+  checkRateLimit,
+  getCorsHeaders,
+  callAI,
+  getProviderModel,
+} from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req.headers.get("origin"));
@@ -30,7 +39,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Unauthorized access." }, 401);
     }
     const token = authHeader.replace("Bearer ", "");
-    
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -47,7 +56,10 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError || !user) {
       return jsonResponse({ error: "Unauthorized access." }, 401);
     }
@@ -81,19 +93,15 @@ Deno.serve(async (req: Request) => {
         return jsonResponse({ valid: false, reason: "Invalid provider." }, 400);
       }
 
-      const provider = candidateProvider as "openai" | "anthropic" | "openrouter" | "gemini" | "kimi" | "glm";
+      const provider = candidateProvider as
+        "openai" | "anthropic" | "openrouter" | "gemini" | "kimi" | "glm";
       const candidateModel = String(body.model || "").trim() || getProviderModel(provider, "draft");
-      const pingRes = await callAI(
-        [{ role: "user", content: "ping" }],
-        null,
-        candidateKey,
-        {
-          provider,
-          model: candidateModel,
-          temperature: 0,
-          max_tokens: 5,
-        }
-      );
+      const pingRes = await callAI([{ role: "user", content: "ping" }], null, candidateKey, {
+        provider,
+        model: candidateModel,
+        temperature: 0,
+        max_tokens: 5,
+      });
 
       if (pingRes.status === 200) {
         return jsonResponse({ valid: true });
@@ -111,7 +119,8 @@ Deno.serve(async (req: Request) => {
       } else if (pingRes.status >= 500) {
         reason = "Couldn't reach the provider right now. Please try again.";
       } else if (pingRes.status === 404) {
-        reason = "The test model isn't available for this key. The key may still work for generation.";
+        reason =
+          "The test model isn't available for this key. The key may still work for generation.";
       }
 
       return jsonResponse({ valid: false, status: pingRes.status, reason });
@@ -127,12 +136,15 @@ Deno.serve(async (req: Request) => {
       const keyMode = rawKeyMode === "always" ? "always" : "fallback";
 
       // Upsert the toggle configuration in user_settings table
-      const { error: dbError } = await adminClient
-        .from("user_settings")
-        .upsert(
-          { user_id: user.id, use_own_key: useOwnKey, key_mode: keyMode, updated_at: new Date().toISOString() },
-          { onConflict: "user_id" }
-        );
+      const { error: dbError } = await adminClient.from("user_settings").upsert(
+        {
+          user_id: user.id,
+          use_own_key: useOwnKey,
+          key_mode: keyMode,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      );
 
       if (dbError) {
         console.error("Database error during toggle upsert:", dbError);
@@ -141,15 +153,13 @@ Deno.serve(async (req: Request) => {
 
       // Insert audit log using service role
       const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
-      const { error: logError } = await adminClient
-        .from("api_key_audit_log")
-        .insert({
-          user_id: user.id,
-          action: "toggled",
-          provider: null,
-          source: null,
-          ip_address: ip,
-        });
+      const { error: logError } = await adminClient.from("api_key_audit_log").insert({
+        user_id: user.id,
+        action: "toggled",
+        provider: null,
+        source: null,
+        ip_address: ip,
+      });
 
       if (logError) {
         console.error("Audit logging failed for toggle:", logError);
@@ -188,7 +198,10 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Invalid request parameters." }, 400);
     }
 
-    if (!provider || !["openai", "anthropic", "openrouter", "gemini", "kimi", "glm"].includes(provider)) {
+    if (
+      !provider ||
+      !["openai", "anthropic", "openrouter", "gemini", "kimi", "glm"].includes(provider)
+    ) {
       return jsonResponse({ error: "Invalid request parameters." }, 400);
     }
 
@@ -206,15 +219,13 @@ Deno.serve(async (req: Request) => {
 
     // Log the save lifecycle event to api_key_audit_log
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
-    const { error: logError } = await adminClient
-      .from("api_key_audit_log")
-      .insert({
-        user_id: user.id,
-        action: "saved",
-        provider,
-        source: null,
-        ip_address: ip,
-      });
+    const { error: logError } = await adminClient.from("api_key_audit_log").insert({
+      user_id: user.id,
+      action: "saved",
+      provider,
+      source: null,
+      ip_address: ip,
+    });
 
     if (logError) {
       console.error("Audit logging failed for save:", logError);

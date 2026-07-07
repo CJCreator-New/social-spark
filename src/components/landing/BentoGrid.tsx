@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import {
-  Wand2, Save, Repeat, Users,
-  Zap, CheckCircle2,
-} from "lucide-react";
+import { Wand2, Save, Repeat, Users, Zap, CheckCircle2 } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -77,7 +74,7 @@ function ToneDemo() {
   const [active, setActive] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setActive(i => (i + 1) % TONE_PILLS.length), 2200);
+    const id = setInterval(() => setActive((i) => (i + 1) % TONE_PILLS.length), 2200);
     return () => clearInterval(id);
   }, []);
 
@@ -124,7 +121,9 @@ export default function BentoGrid() {
       );
     });
 
-    return () => { ScrollTrigger.getAll().forEach(t => t.kill()); };
+    return () => {
+      ScrollTrigger.getAll().forEach((t) => t.kill());
+    };
   }, []);
 
   return (
@@ -143,7 +142,7 @@ export default function BentoGrid() {
         </div>
 
         <div className="ld-w-bento-grid" role="list">
-          {CARDS.map(card => {
+          {CARDS.map((card) => {
             const Icon = card.icon;
             return (
               <article

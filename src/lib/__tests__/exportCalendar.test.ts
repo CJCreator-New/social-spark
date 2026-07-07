@@ -67,6 +67,8 @@ describe("exportCalendar", () => {
     expect(text).toContain(applyStyle("Open strong", FontStyle.BoldSerif));
     expect(text).toContain(applyStyle("Reply now", FontStyle.BoldSerif));
     expect(text).toContain(applyStyle("#AI #Growth", FontStyle.BoldSerif));
-    expect(text).toContain(applyStyle("Cinematic key art of a founder at dusk.", FontStyle.BoldSerif));
+    expect(text).toContain(
+      applyStyle("Cinematic key art of a founder at dusk.", FontStyle.BoldSerif)
+    );
   });
 });

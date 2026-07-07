@@ -43,7 +43,10 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const payload = cleanPayload(body);
     if (!payload.topics || payload.topics.length === 0) {
-      console.info("generate-calendar: no topics provided; AI should infer topics from core idea or industry.", { industry: payload.industry, industryLabel: payload.industryLabel });
+      console.info(
+        "generate-calendar: no topics provided; AI should infer topics from core idea or industry.",
+        { industry: payload.industry, industryLabel: payload.industryLabel }
+      );
     }
 
     // Validate required fields (topics are optional; if omitted, AI may infer sensible topics)
@@ -72,20 +75,29 @@ Deno.serve(async (req: Request) => {
 
     const usingSharedKey = !payload.userApiKey && !(quota.useOwnKey && quota.keyMode === "always");
     if (usingSharedKey && !quota.allowed) {
-      return jsonResponse({
-        error: "QUOTA_EXCEEDED",
-        message: quotaExceededMessage(quota.tier),
-        quota: { used: quota.used, limit: quota.limit },
-      }, 402);
+      return jsonResponse(
+        {
+          error: "QUOTA_EXCEEDED",
+          message: quotaExceededMessage(quota.tier),
+          quota: { used: quota.used, limit: quota.limit },
+        },
+        402
+      );
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets.");
-      return jsonResponse({
-        error: "AI is not configured.",
-        message: "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets."
-      }, 500);
+      console.error(
+        "LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets."
+      );
+      return jsonResponse(
+        {
+          error: "AI is not configured.",
+          message:
+            "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets.",
+        },
+        500
+      );
     }
 
     // Trend-aware generation: fetch top trending topics for this industry/platform
@@ -102,9 +114,15 @@ Deno.serve(async (req: Request) => {
 
     const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
-    const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: true });
+    const hashtagInstr = buildHashtagInstr(
+      payload.platform,
+      payload.bannedHashtags,
+      payload.requiredHashtags,
+      { every: true }
+    );
 
-    const includeTopics = Array.isArray(enrichedPayload.topics) && enrichedPayload.topics.length > 0;
+    const includeTopics =
+      Array.isArray(enrichedPayload.topics) && enrichedPayload.topics.length > 0;
     const contextLines = buildPromptContext(enrichedPayload, { includeTopics });
 
     const systemMsg = buildSystemMessage(enrichedPayload, { includeTopics });
@@ -133,12 +151,22 @@ Deno.serve(async (req: Request) => {
                   topic: { type: "string" },
                   format: { type: "string" },
                   title: { type: "string" },
-                    hook: { type: "string" },
-                    hook_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
+                  hook: { type: "string" },
+                  hook_options: {
+                    type: "array",
+                    items: { type: "string" },
+                    minItems: 1,
+                    maxItems: 5,
+                  },
                   body: { type: "string" },
-                    cta: { type: "string" },
-                    cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
-                    image_prompt: { type: "string" },
+                  cta: { type: "string" },
+                  cta_options: {
+                    type: "array",
+                    items: { type: "string" },
+                    minItems: 1,
+                    maxItems: 5,
+                  },
+                  image_prompt: { type: "string" },
                   // NOTE: plan/body_variants/self_check/etc. were removed from the
                   // 7-post calendar schema. Combined with the large per-post schema,
                   // they made Gemini's forced tool-call fail with an upstream 400
@@ -152,7 +180,19 @@ Deno.serve(async (req: Request) => {
                   },
                   rationale: { type: "string" },
                 },
-                  required: ["day", "dow", "topic", "format", "title", "hook", "body", "cta", "hashtags", "rationale", "image_prompt"],
+                required: [
+                  "day",
+                  "dow",
+                  "topic",
+                  "format",
+                  "title",
+                  "hook",
+                  "body",
+                  "cta",
+                  "hashtags",
+                  "rationale",
+                  "image_prompt",
+                ],
                 additionalProperties: false,
               },
             },
@@ -163,28 +203,38 @@ Deno.serve(async (req: Request) => {
       },
     };
 
-    const model = payload.quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+    const model =
+      payload.quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
     const temperature = payload.quality === "polished" ? 0.55 : 0.7;
 
-    const aiRes = await callAIGateway([
-      { role: "system", content: systemMsg },
-      { role: "user", content: userMsg },
-    ], tool, LOVABLE_API_KEY, {
-      model,
-      temperature,
-      userApiKey: payload.userApiKey,
-      userApiProvider: payload.userApiProvider,
-      quality: payload.quality,
-      userToken: token || null,
-      userIp: ipAddress,
-      max_tokens: 8000
-    });
+    const aiRes = await callAIGateway(
+      [
+        { role: "system", content: systemMsg },
+        { role: "user", content: userMsg },
+      ],
+      tool,
+      LOVABLE_API_KEY,
+      {
+        model,
+        temperature,
+        userApiKey: payload.userApiKey,
+        userApiProvider: payload.userApiProvider,
+        quality: payload.quality,
+        userToken: token || null,
+        userIp: ipAddress,
+        max_tokens: 8000,
+      }
+    );
     if (aiRes.status !== 200) {
       if (aiRes.status === 503) {
-        return jsonResponse({
-          error: "PLATFORM_UNAVAILABLE",
-          message: "Our AI providers are temporarily overloaded. Please try again in a moment, or add your own API key in Profile → API Keys to generate without platform limits.",
-        }, 503);
+        return jsonResponse(
+          {
+            error: "PLATFORM_UNAVAILABLE",
+            message:
+              "Our AI providers are temporarily overloaded. Please try again in a moment, or add your own API key in Profile → API Keys to generate without platform limits.",
+          },
+          503
+        );
       }
       return jsonResponse({ error: aiRes.error }, aiRes.status);
     }
@@ -202,25 +252,27 @@ Deno.serve(async (req: Request) => {
     let initialPosts = Array.isArray(parsed.posts) ? parsed.posts : [];
 
     // Task 4: LLM-as-judge scoring for each post in the calendar
-    const scoredPosts = await Promise.all(initialPosts.map(async (p: any) => {
-      const candidates = [String(p.body || "")];
-      if (Array.isArray(p.body_variants)) {
-        candidates.push(...p.body_variants.map((v: any) => String(v || "")));
-      }
-
-      if (candidates.length > 1) {
-        const judgeRes = await scoreVariants(candidates, payload, LOVABLE_API_KEY || "");
-        p.variant_scores = judgeRes.scores;
-        p.chosen_index = judgeRes.winner_index;
-        // Auto-pick the winner
-        if (judgeRes.winner_index > 0 && judgeRes.winner_index < candidates.length) {
-          p.body = candidates[judgeRes.winner_index];
+    const scoredPosts = await Promise.all(
+      initialPosts.map(async (p: any) => {
+        const candidates = [String(p.body || "")];
+        if (Array.isArray(p.body_variants)) {
+          candidates.push(...p.body_variants.map((v: any) => String(v || "")));
         }
-      }
 
-      const normalized = normalizePost(p, p.dow, payload);
-      return normalized || p;
-    }));
+        if (candidates.length > 1) {
+          const judgeRes = await scoreVariants(candidates, payload, LOVABLE_API_KEY || "");
+          p.variant_scores = judgeRes.scores;
+          p.chosen_index = judgeRes.winner_index;
+          // Auto-pick the winner
+          if (judgeRes.winner_index > 0 && judgeRes.winner_index < candidates.length) {
+            p.body = candidates[judgeRes.winner_index];
+          }
+        }
+
+        const normalized = normalizePost(p, p.dow, payload);
+        return normalized || p;
+      })
+    );
 
     let posts = scoredPosts;
     if (posts.length === 0) {
@@ -230,22 +282,29 @@ Deno.serve(async (req: Request) => {
     // If polished quality requested, run a second pass to polish the whole calendar into a publication-ready week
     if (payload.quality === "polished") {
       try {
-        const polishSystem = systemMsg + "\n\nPOLISHING RUBRIC:\n- Ensure each post opens with a strong, specific hook.\n- Tighten and clarify language; remove vague phrases.\n- Improve CTAs for clarity and action.\n- Preserve angles and avoid introducing new topics.\n- Apply consistent platform-native formatting across the week.";
+        const polishSystem =
+          systemMsg +
+          "\n\nPOLISHING RUBRIC:\n- Ensure each post opens with a strong, specific hook.\n- Tighten and clarify language; remove vague phrases.\n- Improve CTAs for clarity and action.\n- Preserve angles and avoid introducing new topics.\n- Apply consistent platform-native formatting across the week.";
         const polishUser = `Polish the following calendar JSON to a higher-quality, publication-ready week using the rubric above. Return using the same 'return_calendar' function schema.\n\nCURRENT_CALENDAR_JSON:\n${JSON.stringify({ posts }, null, 2)}`;
 
-        const polishRes = await callAIGateway([
-          { role: "system", content: polishSystem },
-          { role: "user", content: polishUser },
-        ], tool, LOVABLE_API_KEY, {
-          model: "google/gemini-2.5-pro",
-          temperature: 0.45,
-          userApiKey: payload.userApiKey,
-          userApiProvider: payload.userApiProvider,
-          quality: payload.quality,
-          userToken: token || null,
-          userIp: ipAddress,
-          max_tokens: 8000
-        });
+        const polishRes = await callAIGateway(
+          [
+            { role: "system", content: polishSystem },
+            { role: "user", content: polishUser },
+          ],
+          tool,
+          LOVABLE_API_KEY,
+          {
+            model: "google/gemini-2.5-pro",
+            temperature: 0.45,
+            userApiKey: payload.userApiKey,
+            userApiProvider: payload.userApiProvider,
+            quality: payload.quality,
+            userToken: token || null,
+            userIp: ipAddress,
+            max_tokens: 8000,
+          }
+        );
 
         if (polishRes.status === 200) {
           const polishParse = parseAIResponse(polishRes.data || {}, "return_calendar");
@@ -253,7 +312,7 @@ Deno.serve(async (req: Request) => {
             const polishedParsed = polishParse.parsed as Record<string, unknown>;
             const polishedPosts = Array.isArray(polishedParsed.posts) ? polishedParsed.posts : null;
             if (polishedPosts) {
-              posts = polishedPosts.map(p => normalizePost(p, (p as any).dow, payload) || p);
+              posts = polishedPosts.map((p) => normalizePost(p, (p as any).dow, payload) || p);
             }
           }
         }

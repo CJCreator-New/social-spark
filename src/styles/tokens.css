@@ -4,6 +4,7 @@
   --color-primary-hover: #9a3412;
   --color-primary-light: #fef3c7;
   --color-primary-xlight: #ffedd5;
+  --color-primary-tint: #fff7ed;
   --color-accent: #c2410c;
 
   /* Surface and background */
@@ -19,6 +20,7 @@
   --color-text-secondary: #57534e;
   --color-text-muted: #78716c;
   --color-text-disabled: #a8a29e;
+  --color-text-tertiary: #5a5753;
   --color-body: #292524;
   --color-text-2: var(--color-text-secondary);
   --color-text-3: var(--color-text-muted);
@@ -41,16 +43,45 @@
   --color-error: #ef4444;
   --color-error-bg: #fee2e2;
   --color-error-text: #b91c1c;
+  --color-error-border: #fca5a5;
   --color-error-dk: var(--color-error-text);
+  --color-success-border: #86efac;
+  --color-warning-border: #fcd34d;
+  --color-overlay-border: rgba(255, 255, 255, 0.3);
+
+  /* Platform badge colors */
+  --color-platform-linkedin-bg: #dbeafe;
+  --color-platform-linkedin-text: #1d4ed8;
+  --color-platform-linkedin-border: #bfdbfe;
+  --color-platform-twitter-bg: #e0f2fe;
+  --color-platform-twitter-text: #0369a1;
+  --color-platform-twitter-border: #bae6fd;
+  --color-platform-instagram-bg: #fce7f3;
+  --color-platform-instagram-text: #be185d;
+  --color-platform-instagram-border: #fbcfe8;
+  --color-platform-facebook-bg: #eff6ff;
+  --color-platform-facebook-text: #1d4ed8;
+  --color-platform-facebook-border: #bfdbfe;
+  --color-platform-generic-bg: #fef3c7;
+  --color-platform-generic-text: #d97706;
+  --color-platform-generic-border: #fde68a;
+  --color-status-approved: #2563eb;
+  --color-score-gold: #ffd700;
+
+  /* Hashtag guidance chip colors (per-platform, warm-editorial one-offs) */
+  --color-chip-amber: #92400e;
+  --color-chip-twitter: #78350f;
+  --color-chip-neutral: #a16207;
+  --color-highlight-lime: #d4f7aa;
 
   /* Focus ring */
   --focus-ring-color: rgba(194, 65, 12, 0.25);
   --focus-ring: 0 0 0 3px var(--focus-ring-color);
 
   /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-display: 'Lora', 'Fraunces', Georgia, serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-display: "Lora", "Fraunces", Georgia, serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
 
   --text-xs: 11px;
   --text-sm: 13px;
@@ -82,7 +113,7 @@
 
   /* Shadows: warm neutral */
   --shadow-card: 0 10px 30px rgba(120, 113, 108, 0.06), 0 1px 3px rgba(120, 113, 108, 0.02);
-  --shadow-card-hover: 0 12px 30px rgba(120, 113, 108, 0.10);
+  --shadow-card-hover: 0 12px 30px rgba(120, 113, 108, 0.1);
   --shadow-stat: 0 4px 20px rgba(120, 113, 108, 0.04);
   --shadow-btn: 0 4px 12px rgba(194, 65, 12, 0.15);
   --shadow-btn-hover: 0 6px 16px rgba(194, 65, 12, 0.25);

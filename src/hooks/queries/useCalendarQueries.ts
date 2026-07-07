@@ -1,4 +1,10 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import {
@@ -23,6 +29,7 @@ export function useProfileQuery(userId?: string) {
     queryKey: ["profile", userId],
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     queryFn: async () => {
       if (!userId) return null;
       if (isE2EMode()) {
@@ -46,7 +53,9 @@ export function useProfileQuery(userId?: string) {
       }
       const { data, error } = await supabase
         .from("profiles")
-        .select("display_name, avatar_url, default_voice, default_style, default_audiences, default_goals, banned_hashtags, required_hashtags, default_timezone, brand_examples, default_framework, forbidden_phrases, proof_points, cta_preferences, preferred_structures")
+        .select(
+          "display_name, avatar_url, default_voice, default_style, default_audiences, default_goals, banned_hashtags, required_hashtags, default_timezone, brand_examples, default_framework, forbidden_phrases, proof_points, cta_preferences, preferred_structures"
+        )
         .eq("user_id", userId)
         .maybeSingle();
       if (error) throw error;
@@ -68,7 +77,10 @@ export function useProfileUpdateMutation(userId?: string) {
       if (!userId) return;
       await qc.cancelQueries({ queryKey: ["profile", userId] });
       const previous = qc.getQueryData(["profile", userId]);
-      qc.setQueryData(["profile", userId], (old: ProfileRow | null | undefined) => ({ ...(old || {}), ...updates }));
+      qc.setQueryData(["profile", userId], (old: ProfileRow | null | undefined) => ({
+        ...(old || {}),
+        ...updates,
+      }));
       return { previous };
     },
     onError: (_err, _updates, ctx) => {
@@ -85,13 +97,18 @@ export function useCalendarQuery(id?: string) {
     queryKey: ["calendar", id],
     enabled: !!id,
     staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     queryFn: async () => {
       if (!id) throw new Error("No calendar ID");
       if (isE2EMode()) {
         const e2eCalendar = findE2ECalendar(id);
         if (e2eCalendar) return e2eCalendar;
       }
-      const { data, error } = await supabase.from("saved_calendars").select("*").eq("id", id).maybeSingle();
+      const { data, error } = await supabase
+        .from("saved_calendars")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("Calendar not found");
       return data;
@@ -104,8 +121,12 @@ export function useSavedCalendarsInfiniteQuery(userId?: string, pageSize = 20) {
     queryKey: ["saved-calendars", userId, pageSize],
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     initialPageParam: null as SavedCalendarsCursor,
-    getNextPageParam: (lastPage: { items: SavedCalendarListItem[]; nextCursor: SavedCalendarsCursor }) => lastPage.nextCursor,
+    getNextPageParam: (lastPage: {
+      items: SavedCalendarListItem[];
+      nextCursor: SavedCalendarsCursor;
+    }) => lastPage.nextCursor,
     queryFn: async ({ pageParam }) => {
       if (!userId) return { items: [], nextCursor: null as SavedCalendarsCursor };
       if (isE2EMode()) {
@@ -121,16 +142,19 @@ export function useSavedCalendarsInfiniteQuery(userId?: string, pageSize = 20) {
 
       if (pageParam) {
         const { created_at, id } = pageParam;
-        query = query.or(`created_at.lt.${created_at},and(created_at.eq.${created_at},id.lt.${id})`);
+        query = query.or(
+          `created_at.lt.${created_at},and(created_at.eq.${created_at},id.lt.${id})`
+        );
       }
 
       const { data, error } = await query;
       if (error) throw error;
       const items = (data as SavedCalendarListItem[] | null) || [];
       const last = items[items.length - 1] as { created_at?: string; id?: string } | undefined;
-      const nextCursor = items.length === pageSize && last?.created_at && last?.id
-        ? { created_at: last.created_at, id: last.id }
-        : null;
+      const nextCursor =
+        items.length === pageSize && last?.created_at && last?.id
+          ? { created_at: last.created_at, id: last.id }
+          : null;
       return { items, nextCursor };
     },
   });
@@ -144,7 +168,11 @@ export function useCreateCalendarMutation() {
         const created = insertE2ECalendar(payload);
         return { id: created.id };
       }
-      const { data, error } = await supabase.from("saved_calendars").insert([payload]).select("id").single();
+      const { data, error } = await supabase
+        .from("saved_calendars")
+        .insert([payload])
+        .select("id")
+        .single();
       if (error) throw error;
       return data;
     },
@@ -163,7 +191,10 @@ export function useToggleCalendarFavoriteMutation(userId?: string) {
         updateE2ECalendar(id, { is_favorite: isFavorite });
         return { id, isFavorite };
       }
-      const { error } = await supabase.from("saved_calendars").update({ is_favorite: isFavorite }).eq("id", id);
+      const { error } = await supabase
+        .from("saved_calendars")
+        .update({ is_favorite: isFavorite })
+        .eq("id", id);
       if (error) throw error;
       return { id, isFavorite };
     },
@@ -177,7 +208,11 @@ export function useToggleCalendarFavoriteMutation(userId?: string) {
 
       qc.setQueryData(
         ["saved-calendars", userId],
-        (old: InfiniteData<{ items: SavedCalendarListItem[]; nextCursor: SavedCalendarsCursor }> | undefined) => {
+        (
+          old:
+            | InfiniteData<{ items: SavedCalendarListItem[]; nextCursor: SavedCalendarsCursor }>
+            | undefined
+        ) => {
           if (!old) return old;
           return {
             ...old,
@@ -193,9 +228,7 @@ export function useToggleCalendarFavoriteMutation(userId?: string) {
 
       qc.setQueryData(["recent-calendars", userId], (old: RecentCalendarItem[] | undefined) => {
         if (!old) return old;
-        return old.map((item) =>
-          item.id === id ? { ...item, is_favorite: isFavorite } : item
-        );
+        return old.map((item) => (item.id === id ? { ...item, is_favorite: isFavorite } : item));
       });
 
       return { previousSaved, previousRecent };
@@ -276,15 +309,17 @@ export function useRenameCalendarMutation(userId?: string) {
 
       qc.setQueryData(
         ["saved-calendars", userId],
-        (old: InfiniteData<{ items: SavedCalendarListItem[]; nextCursor: SavedCalendarsCursor }> | undefined) => {
+        (
+          old:
+            | InfiniteData<{ items: SavedCalendarListItem[]; nextCursor: SavedCalendarsCursor }>
+            | undefined
+        ) => {
           if (!old) return old;
           return {
             ...old,
             pages: old.pages.map((page) => ({
               ...page,
-              items: page.items.map((item) =>
-                item.id === id ? { ...item, title } : item
-              ),
+              items: page.items.map((item) => (item.id === id ? { ...item, title } : item)),
             })),
           };
         }
@@ -292,9 +327,7 @@ export function useRenameCalendarMutation(userId?: string) {
 
       qc.setQueryData(["recent-calendars", userId], (old: RecentCalendarItem[] | undefined) => {
         if (!old) return old;
-        return old.map((item) =>
-          item.id === id ? { ...item, title } : item
-        );
+        return old.map((item) => (item.id === id ? { ...item, title } : item));
       });
 
       return { previousSaved, previousRecent };
@@ -356,12 +389,17 @@ export function useTemplatesQuery(userId?: string) {
     queryKey: ["templates", userId],
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     queryFn: async () => {
       if (!userId) return [];
       if (isE2EMode()) {
         return [];
       }
-      const { data, error } = await supabase.from("templates").select("id, name, description, config, created_at").eq("user_id", userId).order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("templates")
+        .select("id, name, description, config, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];
     },

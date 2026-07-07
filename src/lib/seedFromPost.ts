@@ -12,12 +12,10 @@ export interface WizardFormSeed {
  */
 export function createSeedFromPost(post: Post, platform?: string): WizardFormSeed {
   // Clean hook to make a readable prompt prefix
-  const cleanHook = (post.hook || "")
-    .replace(/^[^a-zA-Z0-9]+/, "")
-    .trim();
+  const cleanHook = (post.hook || "").replace(/^[^a-zA-Z0-9]+/, "").trim();
   const truncated = cleanHook.length > 80 ? cleanHook.slice(0, 80) + "..." : cleanHook;
   const coreIdea = truncated ? `Build on this: "${truncated}"` : `Build on topic: ${post.topic}`;
-  
+
   const postPlatform = typeof post.platform === "string" ? post.platform : "LinkedIn";
 
   return {

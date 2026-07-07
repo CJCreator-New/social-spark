@@ -16,11 +16,11 @@ describe("seedFromPost library helpers", () => {
       cta: "What do you think?",
       hashtags: "#leadership",
       rationale: "Rationale",
-      platform: "LinkedIn"
+      platform: "LinkedIn",
     };
 
     const seed = createSeedFromPost(post, "Twitter");
-    
+
     expect(seed.topic).toBe("Tech Leadership");
     expect(seed.platform).toBe("Twitter");
     expect(seed.coreIdea).toContain("In the fast-paced world of technology");

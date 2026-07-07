@@ -1,12 +1,12 @@
-import crypto from 'crypto';
+import crypto from "crypto";
 
 export function normalizeText(s: string) {
   return s
     .toLowerCase()
-    .replace(/https?:\/\/[^\s]+/g, '')
+    .replace(/https?:\/\/[^\s]+/g, "")
     .replace(/[’'`]/g, "'")
-    .replace(/[^\p{L}\p{N}\s#@-]/gu, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[^\p{L}\p{N}\s#@-]/gu, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -18,6 +18,6 @@ export function tokenize(s: string) {
 }
 
 export function computeDedupeHash(title: string, terms: string[]) {
-  const canonical = `${title}|${terms.join(',')}`;
-  return crypto.createHash('sha256').update(canonical).digest('hex');
+  const canonical = `${title}|${terms.join(",")}`;
+  return crypto.createHash("sha256").update(canonical).digest("hex");
 }

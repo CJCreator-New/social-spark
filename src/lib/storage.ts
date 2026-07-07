@@ -2,10 +2,10 @@
  * StorageService - Abstraction layer for localStorage with validation and versioning
  */
 
-import { logger, createScopedLogger } from './logger';
-import { StorageError } from './errors';
+import { logger, createScopedLogger } from "./logger";
+import { StorageError } from "./errors";
 
-const log = createScopedLogger('StorageService');
+const log = createScopedLogger("StorageService");
 
 export interface StorageOptions {
   version?: number;
@@ -44,8 +44,8 @@ export const StorageService = {
       localStorage.setItem(key, JSON.stringify(payload));
       log.debug(`Stored ${key} (v${version})`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      if (message.includes('QuotaExceededError')) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      if (message.includes("QuotaExceededError")) {
         log.warn(`localStorage quota exceeded`, error, { key });
         // Try to cleanup old items
         StorageService.cleanup();
@@ -60,13 +60,13 @@ export const StorageService = {
           localStorage.setItem(key, JSON.stringify(payload));
         } catch (retryError) {
           throw new StorageError(
-            'Failed to store data even after cleanup',
-            'STORAGE_QUOTA_EXCEEDED',
+            "Failed to store data even after cleanup",
+            "STORAGE_QUOTA_EXCEEDED",
             { key, originalError: message }
           );
         }
       } else {
-        throw new StorageError(`Failed to store ${key}`, 'STORAGE_SET_ERROR', {
+        throw new StorageError(`Failed to store ${key}`, "STORAGE_SET_ERROR", {
           error: message,
         });
       }
@@ -106,7 +106,7 @@ export const StorageService = {
       log.debug(`Retrieved ${key} (v${payload.version})`);
       return payload.data;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = error instanceof Error ? error.message : "Unknown error";
       log.warn(`Failed to retrieve ${key}`, error, { key });
       // On corruption, remove the item
       try {
@@ -181,9 +181,9 @@ export const StorageService = {
   clearAll(): void {
     try {
       localStorage.clear();
-      log.info('Cleared all localStorage');
+      log.info("Cleared all localStorage");
     } catch (error) {
-      log.warn('Failed to clear localStorage', error);
+      log.warn("Failed to clear localStorage", error);
     }
   },
 
@@ -222,7 +222,7 @@ export const StorageService = {
         log.debug(`Cleaned up ${removedCount} expired items`);
       }
     } catch (error) {
-      log.warn('Error during cleanup', error);
+      log.warn("Error during cleanup", error);
     }
   },
 
@@ -264,13 +264,13 @@ export const StorageService = {
         totalSizeMB: (totalSize / 1024 / 1024).toFixed(2),
       };
     } catch (error) {
-      log.warn('Error getting storage stats', error);
+      log.warn("Error getting storage stats", error);
       return {
         totalItems: 0,
         validItems: 0,
         expiredItems: 0,
         totalSizeBytes: 0,
-        totalSizeMB: '0',
+        totalSizeMB: "0",
       };
     }
   },
@@ -280,16 +280,16 @@ export const StorageService = {
  * Auto-cleanup on app start (every 24 hours)
  */
 export function initStorageCleanup() {
-  const lastCleanup = localStorage.getItem('_lastStorageCleanup');
+  const lastCleanup = localStorage.getItem("_lastStorageCleanup");
   const now = Date.now();
 
   if (!lastCleanup || now - parseInt(lastCleanup) > 24 * 60 * 60 * 1000) {
     StorageService.cleanup(30);
-    localStorage.setItem('_lastStorageCleanup', String(now));
+    localStorage.setItem("_lastStorageCleanup", String(now));
   }
 }
 
 // Initialize cleanup on import
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   initStorageCleanup();
 }

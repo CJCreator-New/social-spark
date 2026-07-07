@@ -20,7 +20,10 @@ function computeWordDiff(before: string, after: string): { removed: number; adde
   return { removed, added };
 }
 
-function highlightDiff(before: string, after: string): { before: React.ReactNode; after: React.ReactNode } {
+function highlightDiff(
+  before: string,
+  after: string
+): { before: React.ReactNode; after: React.ReactNode } {
   const dmp = new diff_match_patch();
   const diffs = dmp.diff_main(before, after);
   dmp.diff_cleanupSemantic(diffs);
@@ -29,37 +32,52 @@ function highlightDiff(before: string, after: string): { before: React.ReactNode
     const result: React.ReactNode[] = [];
 
     diffs.forEach(([op, diffText], idx) => {
-      if (op === 0) { // EQUAL
+      if (op === 0) {
+        // EQUAL
         result.push(<span key={idx}>{diffText}</span>);
-      } else if (op === -1 && isBefore) { // DELETE in before
-        result.push(<span key={idx} className="diff-removed">{diffText}</span>);
-      } else if (op === 1 && !isBefore) { // INSERT in after
-        result.push(<span key={idx} className="diff-added">{diffText}</span>);
+      } else if (op === -1 && isBefore) {
+        // DELETE in before
+        result.push(
+          <span key={idx} className="diff-removed">
+            {diffText}
+          </span>
+        );
+      } else if (op === 1 && !isBefore) {
+        // INSERT in after
+        result.push(
+          <span key={idx} className="diff-added">
+            {diffText}
+          </span>
+        );
       }
     });
 
     return result;
   };
 
-  const beforeDiffs: [number, string][] = diffs.filter(([op]) => op === -1 || op === 0) as [number, string][];
-  const afterDiffs: [number, string][] = diffs.filter(([op]) => op === 1 || op === 0) as [number, string][];
+  const beforeDiffs: [number, string][] = diffs.filter(([op]) => op === -1 || op === 0) as [
+    number,
+    string,
+  ][];
+  const afterDiffs: [number, string][] = diffs.filter(([op]) => op === 1 || op === 0) as [
+    number,
+    string,
+  ][];
 
-  const beforeEl = (
-    <div className="diff-side diff-before">
-      {renderDiff(beforeDiffs, true)}
-    </div>
-  );
+  const beforeEl = <div className="diff-side diff-before">{renderDiff(beforeDiffs, true)}</div>;
 
-  const afterEl = (
-    <div className="diff-side diff-after">
-      {renderDiff(afterDiffs, false)}
-    </div>
-  );
+  const afterEl = <div className="diff-side diff-after">{renderDiff(afterDiffs, false)}</div>;
 
   return { before: beforeEl, after: afterEl };
 }
 
-export const DiffView: React.FC<DiffViewProps> = ({ before, after, onAccept, onReject, title = "Review changes" }) => {
+export const DiffView: React.FC<DiffViewProps> = ({
+  before,
+  after,
+  onAccept,
+  onReject,
+  title = "Review changes",
+}) => {
   const { removed, added } = computeWordDiff(before, after);
   const { before: beforeEl, after: afterEl } = highlightDiff(before, after);
   const beforeChars = before.length;
@@ -71,7 +89,9 @@ export const DiffView: React.FC<DiffViewProps> = ({ before, after, onAccept, onR
       <div className="diff-header">
         <h2>{title}</h2>
         <div className="diff-stats">
-          <span className={charDelta < 0 ? "stat positive" : charDelta > 0 ? "stat negative" : "stat"}>
+          <span
+            className={charDelta < 0 ? "stat positive" : charDelta > 0 ? "stat negative" : "stat"}
+          >
             {charDelta < 0 ? `−${Math.abs(charDelta)}` : `+${charDelta}`} chars
           </span>
           {removed > 0 && <span className="stat removed">−{removed} words</span>}
@@ -93,7 +113,15 @@ export const DiffView: React.FC<DiffViewProps> = ({ before, after, onAccept, onR
       </div>
 
       <div className="diff-actions">
-        <button className="btn btn-s" style={{ background: "transparent", borderColor: "var(--border2)", color: "var(--text2)" }} onClick={onReject}>
+        <button
+          className="btn btn-s"
+          style={{
+            background: "transparent",
+            borderColor: "var(--border2)",
+            color: "var(--text2)",
+          }}
+          onClick={onReject}
+        >
           Keep original
         </button>
         <button className="btn btn-p" onClick={onAccept}>

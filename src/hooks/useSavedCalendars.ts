@@ -9,7 +9,11 @@ export function useCreateCalendar() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: SavedCalendarInsert) => {
-      const { data, error } = await supabase.from("saved_calendars").insert([payload]).select("id").single();
+      const { data, error } = await supabase
+        .from("saved_calendars")
+        .insert([payload])
+        .select("id")
+        .single();
       if (error) throw error;
       return data;
     },

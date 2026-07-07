@@ -25,7 +25,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    const e2eEnabled = import.meta.env.DEV && window.localStorage.getItem(getE2EAuthFlag()) === "true";
+    const e2eEnabled =
+      import.meta.env.DEV && window.localStorage.getItem(getE2EAuthFlag()) === "true";
     if (e2eEnabled) {
       const mockUser = {
         id: E2E_USER_ID,
@@ -56,7 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const convertAuthError = (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
-      return new Error(message.includes("SUPABASE_NOT_CONFIGURED") ? message : `AUTH_SESSION_ERROR: ${message}`);
+      return new Error(
+        message.includes("SUPABASE_NOT_CONFIGURED") ? message : `AUTH_SESSION_ERROR: ${message}`
+      );
     };
 
     try {
@@ -76,7 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession()
+    supabase.auth
+      .getSession()
       .then(({ data: { session: s } }) => {
         if (!active) return;
         setSession(s);

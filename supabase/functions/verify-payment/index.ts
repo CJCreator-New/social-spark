@@ -26,7 +26,7 @@ async function hmacSha256Hex(message: string, secret: string): Promise<string> {
     new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["sign"],
+    ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
   return toHex(sig);
@@ -65,7 +65,13 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const razorpayKeyId = Deno.env.get("RAZORPAY_KEY_ID");
     const razorpayKeySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey || !razorpayKeyId || !razorpayKeySecret) {
+    if (
+      !supabaseUrl ||
+      !supabaseAnonKey ||
+      !supabaseServiceKey ||
+      !razorpayKeyId ||
+      !razorpayKeySecret
+    ) {
       console.error("verify-payment: missing required environment configuration");
       return jsonResponse({ error: "Payment is not configured." }, 500);
     }
@@ -74,7 +80,10 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError || !user) {
       return jsonResponse({ error: "Unauthorized access." }, 401);
     }
@@ -103,7 +112,10 @@ Deno.serve(async (req) => {
 
     if (!timingSafeEqual(expected, signature)) {
       console.warn("verify-payment: signature mismatch", { user_id: user.id, order_id: orderId });
-      return jsonResponse({ verified: false, error: "Payment signature verification failed." }, 400);
+      return jsonResponse(
+        { verified: false, error: "Payment signature verification failed." },
+        400
+      );
     }
 
     console.info("verify-payment: signature verified", {
@@ -115,15 +127,18 @@ Deno.serve(async (req) => {
     // ── Fetch the order from Razorpay to re-derive plan + amount server-side ──
     // We trust the ORDER (created server-side with our notes), never the client.
     const basicAuth = btoa(`${razorpayKeyId}:${razorpayKeySecret}`);
-    const orderRes = await fetch(`https://api.razorpay.com/v1/orders/${encodeURIComponent(orderId)}`, {
-      headers: { Authorization: `Basic ${basicAuth}` },
-    });
+    const orderRes = await fetch(
+      `https://api.razorpay.com/v1/orders/${encodeURIComponent(orderId)}`,
+      {
+        headers: { Authorization: `Basic ${basicAuth}` },
+      }
+    );
     if (!orderRes.ok) {
       const errText = await orderRes.text().catch(() => "");
       console.error("verify-payment: failed to fetch order", orderRes.status, errText);
       return jsonResponse({ verified: false, error: "Could not confirm the order." }, 502);
     }
-    const order = await orderRes.json() as {
+    const order = (await orderRes.json()) as {
       amount: number;
       status: string;
       notes?: { user_id?: string; plan?: string };
@@ -143,11 +158,16 @@ Deno.serve(async (req) => {
     // key, or a create-order regression) would let anyone claim it.
     if (order.notes?.user_id !== user.id) {
       console.warn("verify-payment: order user mismatch", { order_id: orderId, user_id: user.id });
-      return jsonResponse({ verified: false, error: "Order does not belong to this account." }, 403);
+      return jsonResponse(
+        { verified: false, error: "Order does not belong to this account." },
+        403
+      );
     }
     if (order.amount !== plan.amount) {
       console.error("verify-payment: amount mismatch", {
-        order_id: orderId, order_amount: order.amount, expected: plan.amount,
+        order_id: orderId,
+        order_amount: order.amount,
+        expected: plan.amount,
       });
       return jsonResponse({ verified: false, error: "Payment amount mismatch." }, 400);
     }
@@ -155,20 +175,33 @@ Deno.serve(async (req) => {
     // ── Grant the tier (idempotent on order_id) via service role ─────────────
     const periodEnd = computePeriodEnd();
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: grantData, error: grantError } = await adminClient.rpc("grant_tier_from_payment", {
-      p_user_id: user.id,
-      p_tier: plan.tier,
-      p_quota_limit: plan.quotaLimit,
-      p_period_end: periodEnd,
-      p_order_id: orderId,
-      p_payment_id: paymentId,
-      p_amount: plan.amount,
-      p_currency: plan.currency,
-    });
+    const { data: grantData, error: grantError } = await adminClient.rpc(
+      "grant_tier_from_payment",
+      {
+        p_user_id: user.id,
+        p_tier: plan.tier,
+        p_quota_limit: plan.quotaLimit,
+        p_period_end: periodEnd,
+        p_order_id: orderId,
+        p_payment_id: paymentId,
+        p_amount: plan.amount,
+        p_currency: plan.currency,
+      }
+    );
 
     if (grantError) {
-      console.error("verify-payment: grant_tier_from_payment failed:", grantError?.code || grantError?.message);
-      return jsonResponse({ verified: true, granted: false, error: "Payment verified but access could not be granted. Contact support." }, 500);
+      console.error(
+        "verify-payment: grant_tier_from_payment failed:",
+        grantError?.code || grantError?.message
+      );
+      return jsonResponse(
+        {
+          verified: true,
+          granted: false,
+          error: "Payment verified but access could not be granted. Contact support.",
+        },
+        500
+      );
     }
 
     const granted = Array.isArray(grantData) ? grantData[0] : grantData;

@@ -111,7 +111,9 @@ function renderProfile() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockStorageUpload.mockResolvedValue({ error: null });
-  mockStorageGetPublicUrl.mockReturnValue({ data: { publicUrl: "https://cdn.example.com/avatars/user-1/avatar.png" } });
+  mockStorageGetPublicUrl.mockReturnValue({
+    data: { publicUrl: "https://cdn.example.com/avatars/user-1/avatar.png" },
+  });
   mockStorageRemove.mockResolvedValue({ error: null });
   mockTableUpdateEq.mockResolvedValue({ error: null });
   mockTableUpsert.mockResolvedValue({ error: null });

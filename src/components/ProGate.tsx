@@ -31,12 +31,30 @@ export function ProGate({ requires = "pro", children, fallback, featureName }: P
 
   const label = requires === "pro" ? "Pro" : "Starter";
   return (
-    <div role="note" className="pf-notice" style={{ flexDirection: "column", alignItems: "flex-start", gap: 10, borderColor: "hsl(var(--primary) / 0.2)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600 }} className="text-foreground">
+    <div
+      role="note"
+      className="pf-notice"
+      style={{
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: 10,
+        borderColor: "hsl(var(--primary) / 0.2)",
+      }}
+    >
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600 }}
+        className="text-foreground"
+      >
         <Lock size={14} className="text-primary" />
-        <span>{featureName ? `${featureName} is a ${label} feature` : `This is a ${label} feature`}</span>
+        <span>
+          {featureName ? `${featureName} is a ${label} feature` : `This is a ${label} feature`}
+        </span>
       </div>
-      <Link to="/profile?tab=plan" className="pf-btn" style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
+      <Link
+        to="/profile?tab=plan"
+        className="pf-btn"
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}
+      >
         <Crown size={14} />
         <span>Upgrade to {label}</span>
       </Link>

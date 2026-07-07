@@ -23,7 +23,11 @@ const PLANS: Array<{
     price: "₹0",
     cadence: "",
     icon: Sparkles,
-    features: ["50 platform generations / month", "BYOK (use your own API key)", "Calendar + single posts"],
+    features: [
+      "50 platform generations / month",
+      "BYOK (use your own API key)",
+      "Calendar + single posts",
+    ],
     purchasable: false,
   },
   {
@@ -32,7 +36,11 @@ const PLANS: Array<{
     price: "₹199",
     cadence: "/ month",
     icon: Zap,
-    features: ["100 platform generations / month", "BYOK — you control AI costs", "Priority support"],
+    features: [
+      "100 platform generations / month",
+      "BYOK — you control AI costs",
+      "Priority support",
+    ],
     purchasable: true,
   },
   {
@@ -41,7 +49,11 @@ const PLANS: Array<{
     price: "₹499",
     cadence: "/ month",
     icon: Crown,
-    features: ["500 platform generations / month", "BYOK for unlimited generations", "Premium features"],
+    features: [
+      "500 platform generations / month",
+      "BYOK for unlimited generations",
+      "Premium features",
+    ],
     purchasable: true,
   },
 ];
@@ -54,7 +66,7 @@ export function PlanSettings() {
   return (
     <div className="pf-card" style={{ marginTop: 14 }}>
       <h2 className="pf-section-h" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Sparkles size={18} style={{ color: "#c2410c" }} />
+        <Sparkles size={18} style={{ color: "var(--color-primary)" }} />
         <span>Plan &amp; Billing</span>
       </h2>
 
@@ -71,10 +83,13 @@ export function PlanSettings() {
             gap: 10,
           }}
         >
-          <AlertCircle size={16} style={{ color: "#b91c1c", flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: "#1c1917" }}>
-            Your subscription will expire in <strong style={{ color: "#b91c1c" }}>{remaining} day{remaining === 1 ? "" : "s"}</strong>.
-            Renew now to prevent any service interruption.
+          <AlertCircle size={16} style={{ color: "var(--color-error-text)", flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: "var(--color-text)" }}>
+            Your subscription will expire in{" "}
+            <strong style={{ color: "var(--color-error-text)" }}>
+              {remaining} day{remaining === 1 ? "" : "s"}
+            </strong>
+            . Renew now to prevent any service interruption.
           </span>
         </div>
       )}
@@ -87,7 +102,10 @@ export function PlanSettings() {
           "You're on the Free plan. Upgrade to get more monthly platform generations."
         ) : (
           <>
-            You're on <strong style={{ color: "#c2410c", textTransform: "capitalize" }}>{current}</strong>
+            You're on{" "}
+            <strong style={{ color: "var(--color-primary)", textTransform: "capitalize" }}>
+              {current}
+            </strong>
             {status.active && remaining !== null
               ? ` — ${remaining} day${remaining === 1 ? "" : "s"} remaining.`
               : " — your plan window has ended; renew to keep access."}
@@ -103,35 +121,81 @@ export function PlanSettings() {
             <div
               key={plan.id}
               style={{
-                border: isCurrent ? "1.5px solid #c2410c" : "1px solid #e7e5e4",
+                border: isCurrent
+                  ? "1.5px solid var(--color-primary)"
+                  : "1px solid var(--color-border)",
                 borderRadius: 12,
                 padding: 16,
-                background: isCurrent ? "#faf8f4" : "#ffffff",
-                boxShadow: isCurrent ? "0 8px 24px rgba(194,65,12,0.06)" : "0 2px 8px rgba(120,113,108,0.04)",
+                background: isCurrent ? "var(--color-bg)" : "var(--color-surface)",
+                boxShadow: isCurrent
+                  ? "0 8px 24px rgba(194,65,12,0.06)"
+                  : "0 2px 8px rgba(120,113,108,0.04)",
                 display: "flex",
                 flexDirection: "column",
                 gap: 10,
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Icon size={16} style={{ color: "#c2410c" }} />
-                <span style={{ fontWeight: 600, color: "#1c1917" }}>{plan.name}</span>
+                <Icon size={16} style={{ color: "var(--color-primary)" }} />
+                <span style={{ fontWeight: 600, color: "var(--color-text)" }}>{plan.name}</span>
                 {isCurrent && (
-                  <span style={{ marginLeft: "auto", fontSize: 10, padding: "2px 8px", borderRadius: 99, background: "#ffedd5", color: "#c2410c", fontWeight: 600 }}>
+                  <span
+                    style={{
+                      marginLeft: "auto",
+                      fontSize: 10,
+                      padding: "2px 8px",
+                      borderRadius: 99,
+                      background: "var(--color-primary-xlight)",
+                      color: "var(--color-primary)",
+                      fontWeight: 600,
+                    }}
+                  >
                     Current
                   </span>
                 )}
               </div>
 
               <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                <span style={{ fontSize: 22, fontWeight: 700, color: "#c2410c", fontFamily: "var(--font-display,'Lora',Georgia,serif)" }}>{plan.price}</span>
-                <span style={{ fontSize: 12, color: "#5a5753" }}>{plan.cadence}</span>
+                <span
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 700,
+                    color: "var(--color-primary)",
+                    fontFamily: "var(--font-display,'Lora',Georgia,serif)",
+                  }}
+                >
+                  {plan.price}
+                </span>
+                <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                  {plan.cadence}
+                </span>
               </div>
 
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+              <ul
+                style={{
+                  listStyle: "none",
+                  padding: 0,
+                  margin: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                }}
+              >
                 {plan.features.map((f) => (
-                  <li key={f} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, color: "#57534e" }}>
-                    <CheckCircle2 size={13} style={{ color: "#c2410c", flexShrink: 0, marginTop: 1 }} />
+                  <li
+                    key={f}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 6,
+                      fontSize: 12,
+                      color: "var(--color-text-secondary)",
+                    }}
+                  >
+                    <CheckCircle2
+                      size={13}
+                      style={{ color: "var(--color-primary)", flexShrink: 0, marginTop: 1 }}
+                    />
                     <span>{f}</span>
                   </li>
                 ))}
@@ -142,7 +206,9 @@ export function PlanSettings() {
                   plan={plan.id as "starter" | "pro"}
                   label={current === "free" ? `Upgrade to ${plan.name}` : `Switch to ${plan.name}`}
                   description={`${plan.name} — ${plan.price}`}
-                  onSuccess={() => { void refresh(); }}
+                  onSuccess={() => {
+                    void refresh();
+                  }}
                 />
               )}
               {plan.purchasable && isCurrent && status.active && (
@@ -151,7 +217,9 @@ export function PlanSettings() {
                   label="Renew"
                   className="pf-btn ghost"
                   description={`Renew ${plan.name}`}
-                  onSuccess={() => { void refresh(); }}
+                  onSuccess={() => {
+                    void refresh();
+                  }}
                 />
               )}
             </div>

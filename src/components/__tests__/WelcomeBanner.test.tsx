@@ -30,7 +30,10 @@ describe("WelcomeBanner", () => {
   });
 
   it("does not render for paid (pro) users", () => {
-    mockUseSubscription.mockReturnValue({ status: { ...FREE, effectiveTier: "pro" }, loading: false });
+    mockUseSubscription.mockReturnValue({
+      status: { ...FREE, effectiveTier: "pro" },
+      loading: false,
+    });
     const { container } = render(<WelcomeBanner />);
     expect(container).toBeEmptyDOMElement();
   });
@@ -55,7 +58,10 @@ describe("WelcomeBanner", () => {
   });
 
   it("singularizes the count when one generation remains", () => {
-    mockUseSubscription.mockReturnValue({ status: { ...FREE, limit: 10, used: 9 }, loading: false });
+    mockUseSubscription.mockReturnValue({
+      status: { ...FREE, limit: 10, used: 9 },
+      loading: false,
+    });
     render(<WelcomeBanner />);
     expect(screen.getByText(/1 free generation left/i)).toBeInTheDocument();
   });

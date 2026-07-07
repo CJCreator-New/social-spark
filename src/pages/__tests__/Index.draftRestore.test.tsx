@@ -5,7 +5,14 @@ import "@testing-library/jest-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import storageService from "@/lib/storageService";
 import { useWizardStore } from "@/stores/useWizardStore";
-import { EMPTY_POST, INITIAL_FORM, WIZARD_DRAFT_PREFIX, DRAFT_VERSION, DRAFT_MAX_AGE_MS, type WizardDraftSnapshot } from "@/components/wizard/constants";
+import {
+  EMPTY_POST,
+  INITIAL_FORM,
+  WIZARD_DRAFT_PREFIX,
+  DRAFT_VERSION,
+  DRAFT_MAX_AGE_MS,
+  type WizardDraftSnapshot,
+} from "@/components/wizard/constants";
 
 // ---------------------------------------------------------------------------
 // Mock supabase client — guest (no user) mode means nearly all queries are
@@ -79,11 +86,17 @@ import Index from "../Index";
 
 function seedLocalDraft(snapshot: WizardDraftSnapshot) {
   const key = `${WIZARD_DRAFT_PREFIX}guest`;
-  storageService.saveDraft(key, { version: DRAFT_VERSION, savedAt: Date.now(), data: snapshot }, DRAFT_MAX_AGE_MS);
+  storageService.saveDraft(
+    key,
+    { version: DRAFT_VERSION, savedAt: Date.now(), data: snapshot },
+    DRAFT_MAX_AGE_MS
+  );
 }
 
 function renderIndex() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={qc}>
       <Index />
@@ -98,7 +111,10 @@ beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
   useWizardStore.getState().reset();
-  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }))
+  );
 });
 
 afterEach(() => {

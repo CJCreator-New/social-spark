@@ -16,6 +16,7 @@ export const WARM_PALETTE = {
   textMuted: "#78716c",
   border: "#e7e5e4",
   scoreHigh: "#15803d",
+  scoreGold: "#ffd700",
   scoreMed: "#b45309",
   scoreLow: "#b91c1c",
   checkout: "#c2410c",

@@ -67,7 +67,7 @@ const corsHeaders = {
 function getCorsHeaders(requestOrigin?: string | null): Record<string, string> {
   const origin = resolveAllowedOrigin(requestOrigin);
   return {
-    ...(origin ? { "Access-Control-Allow-Origin": origin, "Vary": "Origin" } : {}),
+    ...(origin ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {}),
     "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
   };
@@ -88,22 +88,26 @@ const ALLOWED_AI_ENDPOINTS = new Set([
 ]);
 
 function sanitizeLogValue(value: unknown, maxLength = LOG_VALUE_MAX_LENGTH): string {
-  const raw = value instanceof Error
-    ? value.stack || value.message
-    : typeof value === "string"
-      ? value
-      : (() => {
-          try {
-            return JSON.stringify(value);
-          } catch {
-            return String(value);
-          }
-        })();
+  const raw =
+    value instanceof Error
+      ? value.stack || value.message
+      : typeof value === "string"
+        ? value
+        : (() => {
+            try {
+              return JSON.stringify(value);
+            } catch {
+              return String(value);
+            }
+          })();
 
-  return String(raw)
-    .replace(/[\r\n\t]/g, " ")
-    .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
-    .slice(0, maxLength);
+  return (
+    String(raw)
+      .replace(/[\r\n\t]/g, " ")
+      // eslint-disable-next-line no-control-regex -- intentionally strips control characters from AI output
+      .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
+      .slice(0, maxLength)
+  );
 }
 
 /**
@@ -131,15 +135,6 @@ function stripMarkdownFormatting(value: unknown): string {
   return text;
 }
 
-function sanitizeHtmlText(value: unknown): string {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function getAllowedAiEndpoint(url: string): string | null {
   try {
     const normalized = new URL(url);
@@ -164,7 +159,7 @@ interface ProviderEntry {
   name: string;
   envKey: string;
   provider: "openai" | "anthropic" | "openrouter" | "lovable";
-  endpoint?: string;   // only used for lovable (custom gateway URL)
+  endpoint?: string; // only used for lovable (custom gateway URL)
   model: (quality: string) => string;
 }
 
@@ -174,25 +169,25 @@ const PLATFORM_PROVIDER_CHAIN: ProviderEntry[] = [
     envKey: "LOVABLE_API_KEY",
     provider: "lovable",
     endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
-    model: (q) => q === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash",
+    model: (q) => (q === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash"),
   },
   {
     name: "openrouter",
     envKey: "PLATFORM_OPENROUTER_KEY",
     provider: "openrouter",
-    model: (q) => q === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash",
+    model: (q) => (q === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash"),
   },
   {
     name: "openai",
     envKey: "PLATFORM_OPENAI_KEY",
     provider: "openai",
-    model: (q) => q === "polished" ? "gpt-4o" : "gpt-4o-mini",
+    model: (q) => (q === "polished" ? "gpt-4o" : "gpt-4o-mini"),
   },
   {
     name: "anthropic",
     envKey: "PLATFORM_ANTHROPIC_KEY",
     provider: "anthropic",
-    model: (q) => q === "polished" ? "claude-3-5-sonnet-latest" : "claude-3-5-haiku-latest",
+    model: (q) => (q === "polished" ? "claude-3-5-sonnet-latest" : "claude-3-5-haiku-latest"),
   },
 ];
 
@@ -203,7 +198,7 @@ const PLATFORM_PROVIDER_CHAIN: ProviderEntry[] = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CIRCUIT_THRESHOLD = 3;
-const CIRCUIT_RESET_MS  = 60_000; // 60 seconds
+const CIRCUIT_RESET_MS = 60_000; // 60 seconds
 
 const _circuitState = new Map<string, { failures: number; openUntil: number }>();
 
@@ -225,7 +220,9 @@ function recordProviderFailure(name: string): void {
   s.failures++;
   if (s.failures >= CIRCUIT_THRESHOLD) {
     s.openUntil = Date.now() + CIRCUIT_RESET_MS;
-    console.warn(`[circuit-breaker] ${sanitizeLogValue(name)} tripped after ${s.failures} failures - cooling ${CIRCUIT_RESET_MS / 1000}s`);
+    console.warn(
+      `[circuit-breaker] ${sanitizeLogValue(name)} tripped after ${s.failures} failures - cooling ${CIRCUIT_RESET_MS / 1000}s`
+    );
   }
   _circuitState.set(name, s);
 }
@@ -257,7 +254,8 @@ const LENGTH_GUIDE_WEEK: Record<string, string> = {
   short: "80–120 words per post (tight, punchy)",
   medium: "160–230 words per post (balanced depth)",
   long: "280–380 words per post (deep, substantive)",
-  mixed: "VARY length across the week — at least 2 short (80–120w), 3 medium (160–230w), and 2 long (280–380w) posts. Distribute deliberately.",
+  mixed:
+    "VARY length across the week — at least 2 short (80–120w), 3 medium (160–230w), and 2 long (280–380w) posts. Distribute deliberately.",
 };
 
 const LENGTH_GUIDE_SINGLE: Record<string, string> = {
@@ -269,24 +267,38 @@ const LENGTH_GUIDE_SINGLE: Record<string, string> = {
 
 const STRUCTURE_GUIDE: Record<string, string> = {
   paragraphs: "Use flowing paragraphs only. No bullet points or numbered lists in the body.",
-  bullets: "Structure the body primarily as bullet points or short numbered items. Minimal prose connective tissue.",
-  mixed: "MIX paragraphs and bullet points — paragraph hook, bullets for the meat, paragraph close. Use '→' or '•' markers.",
+  bullets:
+    "Structure the body primarily as bullet points or short numbered items. Minimal prose connective tissue.",
+  mixed:
+    "MIX paragraphs and bullet points — paragraph hook, bullets for the meat, paragraph close. Use '→' or '•' markers.",
   perPost: "Pick the best structure per post based on its topic and format — vary deliberately.",
 };
 
 const STYLE_GUIDE: Record<string, string> = {
-  "Short punchy lines": "STYLE: Keep every sentence short. Use crisp line breaks, strong verbs, and a fast cadence. One thought per line.",
-  "Long-form narrative": "STYLE: Write like a thoughtful essay. Build tension, explain the arc, and land on a reflective takeaway.",
-  "Lists & frameworks": "STYLE: Organize the body around steps, principles, or frameworks. Use numbered sections or bullet points that feel immediately usable.",
-  "Thread-style breakdown": "STYLE: Make the post feel like a clean thread. Open with the thesis, then break the idea into compact, sequenced beats.",
-  "Stats-led": "STYLE: Lead with a concrete number, percentage, or metric. Use evidence first, then interpret what it means.",
-  "Case study format": "STYLE: Frame the post as a mini case study — situation, friction, action, result, lesson.",
-  "Question-led": "STYLE: Open with a sharp question that creates curiosity. Use the rest of the post to answer it clearly.",
-  "First-person story": "STYLE: Write in first person with a personal moment, lesson, or observation. Keep it grounded and human.",
-  "Industry insight": "STYLE: Sound like an expert sharing a field note. Be specific, signal lived experience, and connect the insight to a broader trend.",
-  "Myth-busting": "STYLE: Start by challenging a common assumption, then explain the reality with concise evidence or logic.",
-  "How-to guide": "STYLE: Teach something directly. Use ordered steps, practical advice, and a clear outcome.",
-  "Behind-the-scenes": "STYLE: Reveal the process, the messy middle, and the decision points. Make it feel candid and specific.",
+  "Short punchy lines":
+    "STYLE: Keep every sentence short. Use crisp line breaks, strong verbs, and a fast cadence. One thought per line.",
+  "Long-form narrative":
+    "STYLE: Write like a thoughtful essay. Build tension, explain the arc, and land on a reflective takeaway.",
+  "Lists & frameworks":
+    "STYLE: Organize the body around steps, principles, or frameworks. Use numbered sections or bullet points that feel immediately usable.",
+  "Thread-style breakdown":
+    "STYLE: Make the post feel like a clean thread. Open with the thesis, then break the idea into compact, sequenced beats.",
+  "Stats-led":
+    "STYLE: Lead with a concrete number, percentage, or metric. Use evidence first, then interpret what it means.",
+  "Case study format":
+    "STYLE: Frame the post as a mini case study — situation, friction, action, result, lesson.",
+  "Question-led":
+    "STYLE: Open with a sharp question that creates curiosity. Use the rest of the post to answer it clearly.",
+  "First-person story":
+    "STYLE: Write in first person with a personal moment, lesson, or observation. Keep it grounded and human.",
+  "Industry insight":
+    "STYLE: Sound like an expert sharing a field note. Be specific, signal lived experience, and connect the insight to a broader trend.",
+  "Myth-busting":
+    "STYLE: Start by challenging a common assumption, then explain the reality with concise evidence or logic.",
+  "How-to guide":
+    "STYLE: Teach something directly. Use ordered steps, practical advice, and a clear outcome.",
+  "Behind-the-scenes":
+    "STYLE: Reveal the process, the messy middle, and the decision points. Make it feel candid and specific.",
 };
 
 const BANNED_PHRASES = [
@@ -306,12 +318,12 @@ const BANNED_PHRASES = [
 ];
 
 function bannedPhrasesBlock(): string {
-  return `BANNED PHRASES — do NOT use any of these or close variants:\n${BANNED_PHRASES.map(p => `- "${p}"`).join("\n")}\nAvoid empty hype openers. Open with a specific observation, number, or contrarian claim instead.`;
+  return `BANNED PHRASES — do NOT use any of these or close variants:\n${BANNED_PHRASES.map((p) => `- "${p}"`).join("\n")}\nAvoid empty hype openers. Open with a specific observation, number, or contrarian claim instead.`;
 }
 
 function buildRequiredWordsBlock(requiredWords?: string[]): string {
   if (!requiredWords || requiredWords.length === 0) return "";
-  return `REQUIRED WORDS — you MUST include all of the following words/phrases in the generated post body:\n${requiredWords.map(w => `- "${w}"`).join("\n")}`;
+  return `REQUIRED WORDS — you MUST include all of the following words/phrases in the generated post body:\n${requiredWords.map((w) => `- "${w}"`).join("\n")}`;
 }
 
 function buildEngagementRules(platform: string): string {
@@ -354,23 +366,31 @@ function getPlatformPreset(platform: string): string {
 
 function getStylePreset(style?: string): string {
   const selectedStyle = String(style || "").trim();
-  if (!selectedStyle) return "\nSTYLE PRESCRIPT: Use the most natural style for the topic and audience.";
+  if (!selectedStyle)
+    return "\nSTYLE PRESCRIPT: Use the most natural style for the topic and audience.";
   return `\nSTYLE PRESCRIPT: ${STYLE_GUIDE[selectedStyle] || `Use ${selectedStyle} faithfully and keep the structure consistent with that style.`}`;
 }
 
 function normTag(s: string): string {
-  return `#${String(s || "").trim().replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase()}`;
+  return `#${String(s || "")
+    .trim()
+    .replace(/^#+/, "")
+    .replace(/[^\w]/g, "")
+    .toLowerCase()}`;
 }
 
 function cleanList(arr: unknown, max: number): string[] {
   return ((arr as unknown[]) || [])
-    .map(s => String(s || "").trim())
+    .map((s) => String(s || "").trim())
     .filter(Boolean)
     .slice(0, max);
 }
 
 function cleanTagList(arr: unknown, max: number): string[] {
-  return ((arr as unknown[]) || []).map(s => normTag(String(s || ""))).filter(t => t.length > 1).slice(0, max);
+  return ((arr as unknown[]) || [])
+    .map((s) => normTag(String(s || "")))
+    .filter((t) => t.length > 1)
+    .slice(0, max);
 }
 
 function isLongFormPlatform(platform: string): boolean {
@@ -392,18 +412,20 @@ function buildHashtagInstr(
   platform: string,
   cleanBannedTags: string[],
   cleanRequiredTags: string[],
-  opts: { every?: boolean } = {},
+  opts: { every?: boolean } = {}
 ): string {
   const longForm = isLongFormPlatform(platform);
   const base = longForm
     ? `HASHTAGS: This is a ${platform} post — return an EMPTY string ("") for the hashtags field. Do NOT invent hashtags.`
     : `HASHTAGS: Provide 3–6 platform-native hashtags as a single space-separated string (e.g. "#AI #ProductOps #SaaS"). Mix one broad, two niche, and one trending where relevant.`;
-  const banned = !longForm && cleanBannedTags.length
-    ? `\n  HASHTAG BAN — NEVER use these hashtags or close variants in any post: ${cleanBannedTags.join(" ")}`
-    : "";
-  const required = !longForm && cleanRequiredTags.length
-    ? `\n  HASHTAG REQUIREMENT — INCLUDE at least one of these brand hashtags${opts.every === false ? "" : " in EVERY post"}: ${cleanRequiredTags.join(" ")}`
-    : "";
+  const banned =
+    !longForm && cleanBannedTags.length
+      ? `\n  HASHTAG BAN — NEVER use these hashtags or close variants in any post: ${cleanBannedTags.join(" ")}`
+      : "";
+  const required =
+    !longForm && cleanRequiredTags.length
+      ? `\n  HASHTAG REQUIREMENT — INCLUDE at least one of these brand hashtags${opts.every === false ? "" : " in EVERY post"}: ${cleanRequiredTags.join(" ")}`
+      : "";
   return base + banned + required;
 }
 
@@ -412,12 +434,12 @@ function applyHashtagPolicy(
   platform: string,
   cleanBannedTags: string[],
   cleanRequiredTags: string[],
-  max = 6,
+  max = 6
 ): string {
   if (isLongFormPlatform(platform)) return "";
 
-  const banned = new Set(cleanBannedTags.map(t => normTag(t).toLowerCase()));
-  const required = cleanRequiredTags.map(t => normTag(t)).filter(t => t.length > 1);
+  const banned = new Set(cleanBannedTags.map((t) => normTag(t).toLowerCase()));
+  const required = cleanRequiredTags.map((t) => normTag(t)).filter((t) => t.length > 1);
   const source = Array.isArray(rawHashtags) ? rawHashtags.join(" ") : String(rawHashtags || "");
   const out: string[] = [];
   const seen = new Set<string>();
@@ -456,7 +478,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 function errorResponse(context: string, e: unknown, status = 500): Response {
   const requestId = crypto.randomUUID();
   console.error(`[${requestId}] ${sanitizeLogValue(context)} error:`, sanitizeLogValue(e));
-  return jsonResponse({ error: "An unexpected error occurred. Please try again.", requestId }, status);
+  return jsonResponse(
+    { error: "An unexpected error occurred. Please try again.", requestId },
+    status
+  );
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -491,7 +516,10 @@ const MAX_REQUEST_BODY_BYTES = 256 * 1024; // 256 KB
  * Checks the Content-Length header before reading the request body.
  * Returns a 413 response if the declared size exceeds the limit, or null if OK.
  */
-function checkContentLength(req: Request, maxBytes: number = MAX_REQUEST_BODY_BYTES): Response | null {
+function checkContentLength(
+  req: Request,
+  maxBytes: number = MAX_REQUEST_BODY_BYTES
+): Response | null {
   const contentLength = req.headers.get("content-length");
   if (contentLength && Number(contentLength) > maxBytes) {
     return jsonResponse({ error: "Request body too large." }, 413);
@@ -502,7 +530,7 @@ function checkContentLength(req: Request, maxBytes: number = MAX_REQUEST_BODY_BY
 async function recordServerTelemetryEvent(
   eventName: string,
   props: Record<string, unknown> = {},
-  userId: string | null = null,
+  userId: string | null = null
 ): Promise<boolean> {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -545,18 +573,64 @@ async function recordServerTelemetryEvent(
 // ─── BRAND MEMORY: RELEVANT EXEMPLAR SELECTION ────────────────────────────
 
 const STOPWORDS = new Set([
-  "the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "for", "with",
-  "is", "are", "was", "were", "be", "been", "being", "this", "that", "these",
-  "those", "it", "its", "as", "at", "by", "from", "your", "you", "we", "our",
-  "i", "my", "they", "their", "not", "no", "do", "does", "did", "have", "has",
-  "had", "will", "would", "can", "could", "should", "about", "into", "than",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "of",
+  "to",
+  "in",
+  "on",
+  "for",
+  "with",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "this",
+  "that",
+  "these",
+  "those",
+  "it",
+  "its",
+  "as",
+  "at",
+  "by",
+  "from",
+  "your",
+  "you",
+  "we",
+  "our",
+  "i",
+  "my",
+  "they",
+  "their",
+  "not",
+  "no",
+  "do",
+  "does",
+  "did",
+  "have",
+  "has",
+  "had",
+  "will",
+  "would",
+  "can",
+  "could",
+  "should",
+  "about",
+  "into",
+  "than",
 ]);
 
 function tokenize(text: string): Set<string> {
   return new Set(
-    (text.toLowerCase().match(/[a-z0-9]+/g) || []).filter(
-      (w) => w.length > 2 && !STOPWORDS.has(w)
-    )
+    (text.toLowerCase().match(/[a-z0-9]+/g) || []).filter((w) => w.length > 2 && !STOPWORDS.has(w))
   );
 }
 
@@ -573,13 +647,12 @@ function selectRelevantExamples(
   limit = 3
 ): string[] {
   try {
-    const examples = (allExamples || []).filter((e) => typeof e === "string" && e.trim().length > 0);
+    const examples = (allExamples || []).filter(
+      (e) => typeof e === "string" && e.trim().length > 0
+    );
     if (examples.length <= limit) return examples;
 
-    const queryTokens = new Set<string>([
-      ...tokenize(topic || ""),
-      ...tokenize(coreIdea || ""),
-    ]);
+    const queryTokens = new Set<string>([...tokenize(topic || ""), ...tokenize(coreIdea || "")]);
 
     if (queryTokens.size === 0) {
       // No topic context to match against — use the most recently saved examples.
@@ -652,11 +725,15 @@ async function getTrendingTopics(
 // ─── RATE LIMITING ────────────────────────────────────────────────────────
 
 interface RateLimitConfig {
-  maxRequests: number;  // Max requests allowed
-  windowMs: number;     // Time window in milliseconds
+  maxRequests: number; // Max requests allowed
+  windowMs: number; // Time window in milliseconds
 }
 
-async function checkRateLimit(userId: string, endpoint: string, config: RateLimitConfig): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+async function checkRateLimit(
+  userId: string,
+  endpoint: string,
+  config: RateLimitConfig
+): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
   const MAX_CAS_ATTEMPTS = 5;
   try {
     const kv = await Deno.openKv();
@@ -677,7 +754,8 @@ async function checkRateLimit(userId: string, endpoint: string, config: RateLimi
         }
 
         requests.push(now);
-        const res = await kv.atomic()
+        const res = await kv
+          .atomic()
           .check(entry)
           .set(key, requests, { expireIn: config.windowMs })
           .commit();
@@ -710,8 +788,22 @@ async function checkRateLimit(userId: string, endpoint: string, config: RateLimi
 
 type EffectiveTier = "free" | "starter" | "pro";
 
-async function checkQuota(userId: string): Promise<{ allowed: boolean; used: number; limit: number; useOwnKey: boolean; keyMode: string; tier: EffectiveTier }> {
-  const DEFAULT = { allowed: true, used: 0, limit: 50, useOwnKey: false, keyMode: "fallback", tier: "free" as EffectiveTier };
+async function checkQuota(userId: string): Promise<{
+  allowed: boolean;
+  used: number;
+  limit: number;
+  useOwnKey: boolean;
+  keyMode: string;
+  tier: EffectiveTier;
+}> {
+  const DEFAULT = {
+    allowed: true,
+    used: 0,
+    limit: 50,
+    useOwnKey: false,
+    keyMode: "fallback",
+    tier: "free" as EffectiveTier,
+  };
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SUPABASE_URL || !SUPABASE_KEY) return DEFAULT;
@@ -752,14 +844,14 @@ async function checkQuota(userId: string): Promise<{ allowed: boolean; used: num
     nowMonthStart.setUTCHours(0, 0, 0, 0);
     const effectiveCount = periodStart < nowMonthStart ? 0 : (row.generation_count ?? 0);
 
-    const used  = effectiveCount;
+    const used = effectiveCount;
     const limit = row.quota_limit ?? 50;
 
     // Effective tier: a paid tier whose window has lapsed is treated as free.
-    const storedTier = (row.tier === "starter" || row.tier === "pro") ? row.tier : "free";
+    const storedTier = row.tier === "starter" || row.tier === "pro" ? row.tier : "free";
     const periodEnd = row.plan_period_end ? Date.parse(row.plan_period_end) : NaN;
     const windowActive = Number.isFinite(periodEnd) && periodEnd > Date.now();
-    const tier: EffectiveTier = storedTier === "free" ? "free" : (windowActive ? storedTier : "free");
+    const tier: EffectiveTier = storedTier === "free" ? "free" : windowActive ? storedTier : "free";
 
     const allowed = (useOwnKey && keyMode === "always") || used < limit;
 
@@ -775,10 +867,7 @@ async function checkQuota(userId: string): Promise<{ allowed: boolean; used: num
  * so existing callers don't need to be updated immediately.
  * @deprecated Remove call sites; BYOK is no longer gated behind a paid tier.
  */
-function rejectFreeTierByok(
-  _useOwnKey: boolean,
-  _tier: EffectiveTier,
-): Response | null {
+function rejectFreeTierByok(_useOwnKey: boolean, _tier: EffectiveTier): Response | null {
   return null;
 }
 
@@ -834,10 +923,10 @@ interface GenerationPayload {
   voice: string;
   style: string;
   goals: string[];
-  topic: string;           // Single-post only
-  topics: string[];         // Calendar only
-  dow: string;              // Single-post only
-  date: string;             // Single-post only
+  topic: string; // Single-post only
+  topics: string[]; // Calendar only
+  dow: string; // Single-post only
+  date: string; // Single-post only
   format: string;
   cta: string;
   length: string;
@@ -903,27 +992,36 @@ function fixSpelling(text: string): string {
   return result;
 }
 function buildContentRules(platform: string, language?: string): string {
-  const normalizedLanguage = String(language || "English").trim().toLowerCase();
-  const spellingRule = normalizedLanguage === "tamil" || normalizedLanguage === "தமிழ்"
-    ? "- Keep the output fully in Tamil script and avoid mixing in English unless a product name or platform term needs it."
-    : "- Use American English spelling: optimizing, organizing, recognizing, analyzing, utilizing, emphasizing.\n- Avoid British spellings such as organising, optimising, recognising, analysing, utilising, emphasising.";
+  const normalizedLanguage = String(language || "English")
+    .trim()
+    .toLowerCase();
+  const spellingRule =
+    normalizedLanguage === "tamil" || normalizedLanguage === "தமிழ்"
+      ? "- Keep the output fully in Tamil script and avoid mixing in English unless a product name or platform term needs it."
+      : "- Use American English spelling: optimizing, organizing, recognizing, analyzing, utilizing, emphasizing.\n- Avoid British spellings such as organising, optimising, recognising, analysing, utilising, emphasising.";
 
-  const globalConstraints = "- Never fabricate statistics or named studies — use qualifying language ('roughly', 'studies suggest').";
+  const globalConstraints =
+    "- Never fabricate statistics or named studies — use qualifying language ('roughly', 'studies suggest').";
 
   let platformGuidance = "";
   if (platform === "LinkedIn") {
-    platformGuidance = "\n- Use paragraph-chunking: write in short blocks of 1-3 sentences with blank lines in between to reward dwell time.";
+    platformGuidance =
+      "\n- Use paragraph-chunking: write in short blocks of 1-3 sentences with blank lines in between to reward dwell time.";
   } else if (platform === "X" || platform === "Twitter") {
-    platformGuidance = "\n- Strictly enforce the 280-character limit instruction. Never use standalone hashtag blocks at the end of the post; weave hashtags naturally if used, or omit them.";
+    platformGuidance =
+      "\n- Strictly enforce the 280-character limit instruction. Never use standalone hashtag blocks at the end of the post; weave hashtags naturally if used, or omit them.";
   } else if (platform === "Instagram") {
-    platformGuidance = "\n- Use double-newline visual spacing for clean paragraph division. Cap hashtags to 3 to 8 (modern post-2024 algorithm best practice).";
+    platformGuidance =
+      "\n- Use double-newline visual spacing for clean paragraph division. Cap hashtags to 3 to 8 (modern post-2024 algorithm best practice).";
   }
 
   return `\nCONTENT RULES:\n- Do not use markdown syntax in post text: no **bold**, *italic*, headings, or inline code.\n- Use plain-text bullets only (• or →). Do not combine bullets with markdown formatting.\n- Rotate CTA verbs across the week; do not repeat the same CTA verb on every post.\n- Stay tightly within the user's stated topic angle; do not introduce tangential sub-topics unless requested.\n- Keep the post platform-native: LinkedIn = insight-led, Instagram = visual/story-driven, X = concise/opinionated, Facebook = warm/community-first, TikTok = script-based/high-energy.\n- If the topic is India-specific, incorporate current Indian trends (Digital India, EV adoption, startup ecosystem), regional contexts (South/North/East/West differences), and cultural references (jugaad innovation, dharma/responsibility themes) where relevant.\n- Reference upcoming festivals (Diwali, Holi, Durga Puja) and national events (Republic Day) in seasonal content.\n${globalConstraints}${platformGuidance}\n${spellingRule}${buildEngagementRules(platform)}`;
 }
 
 function buildLanguageRules(language?: string): string {
-  const normalized = String(language || "English").trim().toLowerCase();
+  const normalized = String(language || "English")
+    .trim()
+    .toLowerCase();
   if (normalized === "tamil" || normalized === "தமிழ்") {
     return `\nLANGUAGE RULES:\n- Write the output in natural Tamil script.\n- Do not transliterate Tamil into English letters.\n- Keep English out of the body unless a brand name, product name, or platform term truly needs it.\n- Use clear, everyday Tamil that sounds native and readable, not machine-translated.\n- Keep hashtags platform-native; if Tamil hashtags are used, make them short and natural.`;
   }
@@ -968,9 +1066,13 @@ function cleanPayload(body: unknown): GenerationPayload {
     bannedHashtags: cleanTagList(payload.bannedHashtags, 30),
     requiredHashtags: cleanTagList(payload.requiredHashtags, 10),
     userApiKey: payload.userApiKey ? String(payload.userApiKey).trim() : undefined,
-    userApiProvider: (payload.userApiProvider && ["openai", "anthropic", "openrouter", "gemini", "kimi", "glm"].includes(String(payload.userApiProvider).trim()))
-      ? (String(payload.userApiProvider).trim() as any)
-      : undefined,
+    userApiProvider:
+      payload.userApiProvider &&
+      ["openai", "anthropic", "openrouter", "gemini", "kimi", "glm"].includes(
+        String(payload.userApiProvider).trim()
+      )
+        ? (String(payload.userApiProvider).trim() as any)
+        : undefined,
   };
 }
 
@@ -1081,14 +1183,17 @@ function buildPromptContext(
 ): string {
   const label = payload.industryLabel || payload.industry;
   const niche = payload.niche || label;
-  const audiences = payload.audiences.length ? payload.audiences.join(", ") : "industry professionals";
+  const audiences = payload.audiences.length
+    ? payload.audiences.join(", ")
+    : "industry professionals";
   const voice = payload.voice || "conversational and professional";
   const style = payload.style || "balanced";
   const goals = payload.goals.length ? payload.goals.join(", ") : "Awareness, Engagement";
 
   let topicLine = "";
   if (opts.isSinglePost) {
-    const singleTopic = payload.topic || payload.coreIdea || payload.industryLabel || payload.industry || "the topic";
+    const singleTopic =
+      payload.topic || payload.coreIdea || payload.industryLabel || payload.industry || "the topic";
     topicLine = `- Topic for this post: ${singleTopic}\n`;
   } else if (opts.includeTopics && payload.topics.length) {
     topicLine = `- Topics to cover (use every selected topic at least once across the week; cluster related topics together if needed rather than dropping any): ${payload.topics.join(", ")}\n`;
@@ -1122,9 +1227,14 @@ function buildSystemMessage(
 ): string {
   const now = new Date();
   const dateStr = now.toISOString().split("T")[0];
-  const season = now.getMonth() >= 2 && now.getMonth() <= 4 ? "Spring" : 
-                 now.getMonth() >= 5 && now.getMonth() <= 7 ? "Summer" :
-                 now.getMonth() >= 8 && now.getMonth() <= 10 ? "Autumn" : "Winter";
+  const season =
+    now.getMonth() >= 2 && now.getMonth() <= 4
+      ? "Spring"
+      : now.getMonth() >= 5 && now.getMonth() <= 7
+        ? "Summer"
+        : now.getMonth() >= 8 && now.getMonth() <= 10
+          ? "Autumn"
+          : "Winter";
 
   const framework = buildStrategicPromptFramework(payload);
   const contentRules = buildContentRules(payload.platform, payload.language);
@@ -1132,28 +1242,38 @@ function buildSystemMessage(
   const stylePreset = getStylePreset(payload.style);
   const banned = bannedPhrasesBlock();
   const requiredWordsBlock = buildRequiredWordsBlock(payload.requiredWords);
-  
-  const antiMimicry = payload.brand_examples && payload.brand_examples.length > 0
-    ? "\nANTI-MIMICRY RULE: Match the cadence, vocabulary, and sentence structure of the brand examples provided, but do NOT copy phrases or specific hooks verbatim. Freshness is key."
-    : "";
+
+  const antiMimicry =
+    payload.brand_examples && payload.brand_examples.length > 0
+      ? "\nANTI-MIMICRY RULE: Match the cadence, vocabulary, and sentence structure of the brand examples provided, but do NOT copy phrases or specific hooks verbatim. Freshness is key."
+      : "";
 
   const exemplars = getExemplars(payload.platform, payload.style);
   const topicForMatching = opts.isSinglePost ? payload.topic : (payload.topics || []).join(" ");
-  const userExamples = selectRelevantExamples(payload.brand_examples, topicForMatching, payload.coreIdea, 3);
-  const exemplarBlock = exemplars.length || userExamples.length
-    ? `\nEXEMPLARS (Model-provided + User Brand):
-${exemplars.map(e => `- ${e}`).join("\n")}
-${userExamples.length ? `- USER BRAND EXAMPLES:\n${userExamples.map(e => `  - ${e}`).join("\n")}` : ""}
+  const userExamples = selectRelevantExamples(
+    payload.brand_examples,
+    topicForMatching,
+    payload.coreIdea,
+    3
+  );
+  const exemplarBlock =
+    exemplars.length || userExamples.length
+      ? `\nEXEMPLARS (Model-provided + User Brand):
+${exemplars.map((e) => `- ${e}`).join("\n")}
+${userExamples.length ? `- USER BRAND EXAMPLES:\n${userExamples.map((e) => `  - ${e}`).join("\n")}` : ""}
 
 CONTRASTIVE GUIDANCE:
 - STRONG HOOK: Specific, creates curiosity gap, starts with high-impact word, or uses a concrete number.
 - WEAK HOOK: "In today's fast-paced world...", "Have you ever wondered...", or generic statements. Avoid these at all costs.`
-    : "";
+      : "";
 
-  const frameworkNote = payload.framework && payload.framework !== "Auto" ? `FRAMEWORK: Use ${payload.framework} for the post structure.` : "FRAMEWORK: Auto — choose the best framework if unsure.";
+  const frameworkNote =
+    payload.framework && payload.framework !== "Auto"
+      ? `FRAMEWORK: Use ${payload.framework} for the post structure.`
+      : "FRAMEWORK: Auto — choose the best framework if unsure.";
 
   return `[ROLE]
-You are a senior ${payload.platform} content strategist for ${payload.industryLabel || payload.industry || 'the industry'} who writes for ${payload.audiences.length ? payload.audiences.join(', ') : 'the target audience'}.
+You are a senior ${payload.platform} content strategist for ${payload.industryLabel || payload.industry || "the industry"} who writes for ${payload.audiences.length ? payload.audiences.join(", ") : "the target audience"}.
 
 [CONTEXT]
 - Today's Date: ${dateStr}
@@ -1213,10 +1333,12 @@ function buildUserMessage(
   opts: { includeTopics?: boolean; isSinglePost?: boolean; leanOutput?: boolean } = {}
 ): string {
   const topicLine = opts.isSinglePost
-    ? `Topic: ${payload.topic || payload.coreIdea || '(not specified)'}`
-    : (opts.includeTopics && payload.topics && payload.topics.length) ? `Topics: ${payload.topics.join(', ')}` : `Core idea: ${payload.coreIdea || '(not specified)'} `;
+    ? `Topic: ${payload.topic || payload.coreIdea || "(not specified)"}`
+    : opts.includeTopics && payload.topics && payload.topics.length
+      ? `Topics: ${payload.topics.join(", ")}`
+      : `Core idea: ${payload.coreIdea || "(not specified)"} `;
 
-  const brief = `BRIEF:\n- Industry: ${payload.industryLabel || payload.industry || '(not specified)'}\n- ${topicLine}\n- Audience: ${payload.audiences.length ? payload.audiences.join(', ') : '(not specified)'}\n- Voice: ${payload.voice || '(not specified)'}\n- Style: ${payload.style || '(not specified)'}\n- Goals: ${payload.goals.length ? payload.goals.join(', ') : '(not specified)'}\n- Length target: ${payload.length || 'medium'}\n- Structure target: ${payload.structure || 'mixed'}\n${payload.extra ? `- Extra: ${payload.extra}` : ''}\n`;
+  const brief = `BRIEF:\n- Industry: ${payload.industryLabel || payload.industry || "(not specified)"}\n- ${topicLine}\n- Audience: ${payload.audiences.length ? payload.audiences.join(", ") : "(not specified)"}\n- Voice: ${payload.voice || "(not specified)"}\n- Style: ${payload.style || "(not specified)"}\n- Goals: ${payload.goals.length ? payload.goals.join(", ") : "(not specified)"}\n- Length target: ${payload.length || "medium"}\n- Structure target: ${payload.structure || "mixed"}\n${payload.extra ? `- Extra: ${payload.extra}` : ""}\n`;
 
   // Lean mode (7-post calendars): the full "plan + variants + self_check" ask combined
   // with a large tool schema makes Gemini's forced tool-call fail with an upstream 400.
@@ -1229,7 +1351,7 @@ function buildUserMessage(
 }
 
 /**
- * Perform a cheap pre-call to gemini-2.5-flash-lite to turn coreIdea + topics[] 
+ * Perform a cheap pre-call to gemini-2.5-flash-lite to turn coreIdea + topics[]
  * into 7 differentiated angles for a calendar.
  */
 function getProviderModel(provider: string, quality: string): string {
@@ -1262,7 +1384,11 @@ function shouldFallbackToUserKey(status: number): boolean {
   return status === 429 || status === 402 || status === 503;
 }
 
-function clampMaxTokensForProvider(provider: string, model: string, maxTokens?: number): number | undefined {
+function clampMaxTokensForProvider(
+  provider: string,
+  model: string,
+  maxTokens?: number
+): number | undefined {
   if (typeof maxTokens !== "number") return undefined;
 
   const normalizedModel = model.toLowerCase();
@@ -1270,7 +1396,10 @@ function clampMaxTokensForProvider(provider: string, model: string, maxTokens?: 
   // tool-calling completions up to ~8k output tokens; higher requests
   // intermittently return upstream 400s with 0 output tokens generated.
   // Cap to a safe ceiling.
-  if (provider === "gemini" || ((provider === "lovable" || provider === "openrouter") && normalizedModel.includes("gemini"))) {
+  if (
+    provider === "gemini" ||
+    ((provider === "lovable" || provider === "openrouter") && normalizedModel.includes("gemini"))
+  ) {
     return Math.min(maxTokens, 8000);
   }
 
@@ -1293,7 +1422,7 @@ async function callOpenAiCompatibleDirect(
     console.error("Blocked AI call to unapproved endpoint:", sanitizeLogValue(url));
     return { status: 400, error: "Unsupported AI provider endpoint." };
   }
-  
+
   try {
     const res = await fetch(endpoint, {
       method: "POST",
@@ -1310,17 +1439,23 @@ async function callOpenAiCompatibleDirect(
         max_tokens,
       }),
     });
-    
+
     if (!res.ok) {
       const text = await res.text();
-      console.error(`Direct call to ${sanitizeLogValue(endpoint)} failed ${res.status}:`, sanitizeLogValue(text));
+      console.error(
+        `Direct call to ${sanitizeLogValue(endpoint)} failed ${res.status}:`,
+        sanitizeLogValue(text)
+      );
       return { status: res.status, error: `API error: ${res.status}` };
     }
-    
+
     const data = await res.json();
     return { status: 200, data };
   } catch (e) {
-    console.error(`Direct call to ${sanitizeLogValue(endpoint)} encountered network error:`, sanitizeLogValue(e));
+    console.error(
+      `Direct call to ${sanitizeLogValue(endpoint)} encountered network error:`,
+      sanitizeLogValue(e)
+    );
     return { status: 500, error: e instanceof Error ? e.message : "Network error" };
   }
 }
@@ -1333,30 +1468,32 @@ async function callAnthropicDirect(
   temperature: number,
   max_tokens?: number
 ): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
-  const systemMessage = messages.find(m => m.role === "system")?.content || "";
-  const regularMessages = messages.filter(m => m.role !== "system");
-  
+  const systemMessage = messages.find((m) => m.role === "system")?.content || "";
+  const regularMessages = messages.filter((m) => m.role !== "system");
+
   const hasTool = tool && Object.keys(tool).length > 0;
   let anthropicTools: any[] | undefined = undefined;
   let toolChoice: any = undefined;
-  
+
   if (hasTool) {
     const oaiFunction = ((tool as any).function || {}) as any;
-    anthropicTools = [{
-      name: oaiFunction.name,
-      description: oaiFunction.description,
-      input_schema: oaiFunction.parameters
-    }];
+    anthropicTools = [
+      {
+        name: oaiFunction.name,
+        description: oaiFunction.description,
+        input_schema: oaiFunction.parameters,
+      },
+    ];
     toolChoice = { type: "tool", name: oaiFunction.name };
   }
-  
+
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
-        "content-type": "application/json"
+        "content-type": "application/json",
       },
       body: JSON.stringify({
         model,
@@ -1365,24 +1502,24 @@ async function callAnthropicDirect(
         tools: anthropicTools,
         tool_choice: toolChoice,
         temperature,
-        max_tokens: max_tokens || 4000
-      })
+        max_tokens: max_tokens || 4000,
+      }),
     });
-    
+
     if (!res.ok) {
       const text = await res.text();
       console.error("Anthropic direct API call failed:", sanitizeLogValue(text));
       return { status: res.status, error: `Anthropic error: ${res.status}` };
     }
-    
+
     const data = await res.json();
-    
+
     if (hasTool) {
       const toolUseContent = data.content?.find((c: any) => c.type === "tool_use");
       if (!toolUseContent) {
         return { status: 500, error: "Anthropic did not invoke the requested tool" };
       }
-      
+
       const mappedData = {
         choices: [
           {
@@ -1391,15 +1528,18 @@ async function callAnthropicDirect(
                 {
                   function: {
                     name: toolUseContent.name,
-                    arguments: typeof toolUseContent.input === "string" ? toolUseContent.input : JSON.stringify(toolUseContent.input)
-                  }
-                }
-              ]
-            }
-          }
-        ]
+                    arguments:
+                      typeof toolUseContent.input === "string"
+                        ? toolUseContent.input
+                        : JSON.stringify(toolUseContent.input),
+                  },
+                },
+              ],
+            },
+          },
+        ],
       };
-      
+
       return { status: 200, data: mappedData };
     } else {
       const textContent = data.content?.find((c: any) => c.type === "text")?.text || "";
@@ -1407,10 +1547,10 @@ async function callAnthropicDirect(
         choices: [
           {
             message: {
-              content: textContent
-            }
-          }
-        ]
+              content: textContent,
+            },
+          },
+        ],
       };
       return { status: 200, data: mappedData };
     }
@@ -1439,27 +1579,77 @@ async function callAI(
   const model = opts.model || getProviderModel(provider, quality);
   const maxTokens = clampMaxTokensForProvider(provider, model, opts.max_tokens);
   if (typeof opts.max_tokens === "number" && maxTokens !== opts.max_tokens) {
-    console.warn(`[ai] clamped max_tokens for ${sanitizeLogValue(provider)}/${sanitizeLogValue(model)}: ${opts.max_tokens} -> ${maxTokens}`);
+    console.warn(
+      `[ai] clamped max_tokens for ${sanitizeLogValue(provider)}/${sanitizeLogValue(model)}: ${opts.max_tokens} -> ${maxTokens}`
+    );
   }
 
   if (provider === "openai") {
-    return callOpenAiCompatibleDirect("https://api.openai.com/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
+    return callOpenAiCompatibleDirect(
+      "https://api.openai.com/v1/chat/completions",
+      messages,
+      tool,
+      apiKey,
+      model,
+      temperature,
+      maxTokens
+    );
   } else if (provider === "openrouter") {
-    return callOpenAiCompatibleDirect("https://openrouter.ai/api/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
+    return callOpenAiCompatibleDirect(
+      "https://openrouter.ai/api/v1/chat/completions",
+      messages,
+      tool,
+      apiKey,
+      model,
+      temperature,
+      maxTokens
+    );
   } else if (provider === "anthropic") {
     return callAnthropicDirect(messages, tool, apiKey, model, temperature, maxTokens);
   } else if (provider === "lovable") {
     // Lovable AI Gateway speaks the OpenAI-compatible wire protocol
-    return callOpenAiCompatibleDirect("https://ai.gateway.lovable.dev/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
+    return callOpenAiCompatibleDirect(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      messages,
+      tool,
+      apiKey,
+      model,
+      temperature,
+      maxTokens
+    );
   } else if (provider === "gemini") {
     // Gemini's OpenAI-compatible endpoint
-    return callOpenAiCompatibleDirect("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
+    return callOpenAiCompatibleDirect(
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      messages,
+      tool,
+      apiKey,
+      model,
+      temperature,
+      maxTokens
+    );
   } else if (provider === "kimi") {
     // Moonshot Kimi — OpenAI-compatible chat completions
-    return callOpenAiCompatibleDirect("https://api.moonshot.ai/v1/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
+    return callOpenAiCompatibleDirect(
+      "https://api.moonshot.ai/v1/chat/completions",
+      messages,
+      tool,
+      apiKey,
+      model,
+      temperature,
+      maxTokens
+    );
   } else if (provider === "glm") {
     // Zhipu GLM — OpenAI-compatible chat completions
-    return callOpenAiCompatibleDirect("https://open.bigmodel.cn/api/paas/v4/chat/completions", messages, tool, apiKey, model, temperature, maxTokens);
+    return callOpenAiCompatibleDirect(
+      "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      messages,
+      tool,
+      apiKey,
+      model,
+      temperature,
+      maxTokens
+    );
   }
 
   return { status: 400, error: `Unsupported API provider: ${provider}` };
@@ -1468,7 +1658,7 @@ async function callAI(
 function padTopics(topics: string[], coreIdea: string): string[] {
   const result = [...topics];
   if (result.length >= 7) return result.slice(0, 7);
-  
+
   if (result.length === 0) {
     result.push(coreIdea || "General update");
   }
@@ -1493,11 +1683,10 @@ function padTopics(topics: string[], coreIdea: string): string[] {
   return result;
 }
 
-async function enrichTopics(
-  payload: GenerationPayload,
-  apiKey: string
-): Promise<string[]> {
-  const model = payload.userApiProvider ? getProviderModel(payload.userApiProvider, "draft") : ENRICHMENT_MODEL;
+async function enrichTopics(payload: GenerationPayload, apiKey: string): Promise<string[]> {
+  const model = payload.userApiProvider
+    ? getProviderModel(payload.userApiProvider, "draft")
+    : ENRICHMENT_MODEL;
   const system = `You are a senior content strategist. Given a core idea and a list of topics, return exactly 7 unique, highly differentiated post angles for a 7-day calendar. Each angle should be one sentence, focusing on a specific fact, story, or contrarian point. Do not repeat themes. Return as a simple JSON array of strings.`;
   const user = `Core Idea: ${payload.coreIdea}\nTopics: ${payload.topics.join(", ")}\nIndustry: ${payload.industryLabel || payload.industry}`;
 
@@ -1542,8 +1731,11 @@ async function enrichTopics(
     if (m) {
       try {
         const enriched = JSON.parse(m[0]);
-        if (Array.isArray(enriched) && enriched.length > 0) return padTopics(enriched, payload.coreIdea);
-      } catch (e) { /* fallback */ }
+        if (Array.isArray(enriched) && enriched.length > 0)
+          return padTopics(enriched, payload.coreIdea);
+      } catch (e) {
+        /* fallback */
+      }
     }
   } catch (e) {
     console.warn("Topic enrichment failed:", e);
@@ -1553,39 +1745,40 @@ async function enrichTopics(
 }
 
 function extractBalancedJSON(str: string): string | null {
-  const firstBrace = str.indexOf('{');
-  const firstBracket = str.indexOf('[');
-  
+  const firstBrace = str.indexOf("{");
+  const firstBracket = str.indexOf("[");
+
   if (firstBrace === -1 && firstBracket === -1) {
     return null;
   }
-  
-  const startChar = (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) ? '{' : '[';
-  const endChar = startChar === '{' ? '}' : ']';
-  const startIdx = startChar === '{' ? firstBrace : firstBracket;
-  
+
+  const startChar =
+    firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket) ? "{" : "[";
+  const endChar = startChar === "{" ? "}" : "]";
+  const startIdx = startChar === "{" ? firstBrace : firstBracket;
+
   let count = 0;
   let inString = false;
   let escape = false;
-  
+
   for (let i = startIdx; i < str.length; i++) {
     const char = str[i];
-    
+
     if (escape) {
       escape = false;
       continue;
     }
-    
-    if (char === '\\') {
+
+    if (char === "\\") {
       escape = true;
       continue;
     }
-    
+
     if (char === '"') {
       inString = !inString;
       continue;
     }
-    
+
     if (!inString) {
       if (char === startChar) {
         count++;
@@ -1597,13 +1790,13 @@ function extractBalancedJSON(str: string): string | null {
       }
     }
   }
-  
+
   return null;
 }
 
 function extractJSONFromString(content: string): any {
   const trimmed = content.trim();
-  
+
   // 1. Direct parse
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
     try {
@@ -1638,12 +1831,22 @@ function extractJSONFromString(content: string): any {
 
 async function scoreVariants(
   variants: string[],
-  brief: { coreIdea?: string; topic?: string; platform: string; industry?: string; goals?: string[]; userApiKey?: string; userApiProvider?: string },
+  brief: {
+    coreIdea?: string;
+    topic?: string;
+    platform: string;
+    industry?: string;
+    goals?: string[];
+    userApiKey?: string;
+    userApiProvider?: string;
+  },
   apiKey: string
-): Promise<{ scores: Record<string, number>[], winner_index: number }> {
+): Promise<{ scores: Record<string, number>[]; winner_index: number }> {
   if (!variants.length) return { scores: [], winner_index: 0 };
-  
-  const model = brief.userApiProvider ? getProviderModel(brief.userApiProvider, "draft") : "google/gemini-2.5-flash-lite";
+
+  const model = brief.userApiProvider
+    ? getProviderModel(brief.userApiProvider, "draft")
+    : "google/gemini-2.5-flash-lite";
   const system = `You are a critical content editor. Score the following ${variants.length} post variants on 5 criteria (0-5 scale): 
 1. hook_strength (creates curiosity/impact)
 2. specificity (avoiding fluff)
@@ -1657,7 +1860,10 @@ Return a JSON object with a "results" array containing the scores for each varia
 VARIANTS:
 ${variants.map((v, i) => `[Variant ${i}]: ${v.slice(0, 1000)}`).join("\n\n")}`;
 
-  const messages = [{ role: "system", content: system }, { role: "user", content: user }];
+  const messages = [
+    { role: "system", content: system },
+    { role: "user", content: user },
+  ];
 
   try {
     let data: any;
@@ -1701,7 +1907,7 @@ ${variants.map((v, i) => `[Variant ${i}]: ${v.slice(0, 1000)}`).join("\n\n")}`;
       if (parsed && parsed.results && Array.isArray(parsed.results)) {
         return {
           scores: parsed.results,
-          winner_index: typeof parsed.winner_index === "number" ? parsed.winner_index : 0
+          winner_index: typeof parsed.winner_index === "number" ? parsed.winner_index : 0,
         };
       }
     }
@@ -1711,8 +1917,14 @@ ${variants.map((v, i) => `[Variant ${i}]: ${v.slice(0, 1000)}`).join("\n\n")}`;
 
   // Fallback: simple uniform scores
   return {
-    scores: variants.map(() => ({ hook_strength: 3, specificity: 3, on_brief: 3, platform_fit: 3, cta_clarity: 3 })),
-    winner_index: 0
+    scores: variants.map(() => ({
+      hook_strength: 3,
+      specificity: 3,
+      on_brief: 3,
+      platform_fit: 3,
+      cta_clarity: 3,
+    })),
+    winner_index: 0,
   };
 }
 
@@ -1745,13 +1957,17 @@ async function callAIGateway(
     lastResult = await callAIGatewayOnce(messages, tool, apiKey, opts);
 
     // 503 = entire waterfall exhausted — no point retrying at this level
-    const isRetryable = (lastResult.status >= 500 && lastResult.status !== 503) || lastResult.error === "AI request timeout";
+    const isRetryable =
+      (lastResult.status >= 500 && lastResult.status !== 503) ||
+      lastResult.error === "AI request timeout";
     if (!isRetryable || attempt === maxRetries) {
       return lastResult;
     }
 
     const delayMs = 500 * 2 ** attempt + Math.floor(Math.random() * 200);
-    console.warn(`AI gateway call failed (status ${lastResult.status}), retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+    console.warn(
+      `AI gateway call failed (status ${lastResult.status}), retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`
+    );
     await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 
@@ -1761,7 +1977,7 @@ async function callAIGateway(
 async function callAIGatewayOnce(
   messages: Array<{ role: string; content: string }>,
   tool: Record<string, unknown>,
-  _apiKey: string,   // kept for signature compat — waterfall reads keys from Deno.env directly
+  _apiKey: string, // kept for signature compat — waterfall reads keys from Deno.env directly
   opts: {
     timeoutMs?: number;
     model?: string;
@@ -1784,7 +2000,8 @@ async function callAIGatewayOnce(
   if (opts.userToken) {
     try {
       const supabaseUrl = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_URL") : null;
-      const supabaseAnonKey = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_ANON_KEY") : null;
+      const supabaseAnonKey =
+        typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_ANON_KEY") : null;
       if (supabaseUrl && supabaseAnonKey) {
         // @ts-ignore: Deno dynamic import
         const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
@@ -1823,13 +2040,14 @@ async function callAIGatewayOnce(
 
     // Asynchronously log the fallback usage to the audit log
     const supabaseUrl = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_URL") : null;
-    const supabaseServiceKey = typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") : null;
-    
+    const supabaseServiceKey =
+      typeof Deno !== "undefined" ? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") : null;
+
     if (supabaseUrl && supabaseServiceKey && opts.userToken) {
       try {
-        const parts = opts.userToken.split('.');
+        const parts = opts.userToken.split(".");
         if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
           const userId = payload.sub;
           if (userId) {
             // Asynchronous logging so it doesn't block the AI response
@@ -1847,7 +2065,10 @@ async function callAIGatewayOnce(
                 });
                 if (logErr) {
                   // Only log the error code/hint, never the full error object which may contain query metadata
-                  console.error("Failed to insert used audit log:", logErr?.code || logErr?.message || "db_error");
+                  console.error(
+                    "Failed to insert used audit log:",
+                    logErr?.code || logErr?.message || "db_error"
+                  );
                 }
               } catch (err) {
                 console.error("Failed to dynamically create admin client or log event:", err);
@@ -1864,7 +2085,8 @@ async function callAIGatewayOnce(
     // back to a model that matches their provider — never carry a platform
     // (Google/Gemini) model id into an OpenAI/Anthropic endpoint or the
     // provider will 400 on an unknown model.
-    const userModelAlways = userApiModel || getProviderModel(userApiProvider as string, opts.quality || "draft");
+    const userModelAlways =
+      userApiModel || getProviderModel(userApiProvider as string, opts.quality || "draft");
     return callAI(messages, tool, userApiKey, {
       provider: userApiProvider as any,
       quality: opts.quality,
@@ -1884,8 +2106,8 @@ async function callAIGatewayOnce(
   const quality = opts.quality || "draft";
 
   for (const entry of PLATFORM_PROVIDER_CHAIN) {
-    const providerKey = (typeof Deno !== "undefined" ? Deno.env.get(entry.envKey) : undefined);
-    if (!providerKey) continue;              // secret not configured → skip
+    const providerKey = typeof Deno !== "undefined" ? Deno.env.get(entry.envKey) : undefined;
+    if (!providerKey) continue; // secret not configured → skip
 
     if (isCircuitOpen(entry.name)) {
       console.info(`[waterfall] ${sanitizeLogValue(entry.name)} circuit open - skipping`);
@@ -1893,7 +2115,9 @@ async function callAIGatewayOnce(
     }
 
     const providerModel = opts.model || entry.model(quality);
-    console.info(`[waterfall] trying ${sanitizeLogValue(entry.name)} (model: ${sanitizeLogValue(providerModel)})`);
+    console.info(
+      `[waterfall] trying ${sanitizeLogValue(entry.name)} (model: ${sanitizeLogValue(providerModel)})`
+    );
 
     const result = await callAI(messages, tool, providerKey, {
       provider: entry.provider,
@@ -1910,21 +2134,31 @@ async function callAIGatewayOnce(
     }
 
     recordProviderFailure(entry.name);
-    console.warn(`[waterfall] ${sanitizeLogValue(entry.name)} returned ${result.status}: ${sanitizeLogValue(result.error)}`);
+    console.warn(
+      `[waterfall] ${sanitizeLogValue(entry.name)} returned ${result.status}: ${sanitizeLogValue(result.error)}`
+    );
 
     // Hard 4xx (not 429/402) = request is malformed; retrying other providers won't help
-    if (result.status >= 400 && result.status < 500
-        && result.status !== 429 && result.status !== 402) {
+    if (
+      result.status >= 400 &&
+      result.status < 500 &&
+      result.status !== 429 &&
+      result.status !== 402
+    ) {
       console.error(`[waterfall] hard client error ${result.status} - aborting waterfall`);
       return result;
     }
     // 5xx / 429 / 402 / timeout → try next provider in chain
   }
 
-  const platformResult = { status: 503, error: "All platform AI providers are currently unavailable." };
+  const platformResult = {
+    status: 503,
+    error: "All platform AI providers are currently unavailable.",
+  };
 
   if (shouldFallbackToUserKey(platformResult.status) && canUseUserKey) {
-    const userModelFallback = userApiModel || getProviderModel(userApiProvider as string, opts.quality || "draft");
+    const userModelFallback =
+      userApiModel || getProviderModel(userApiProvider as string, opts.quality || "draft");
     return callAI(messages, tool, userApiKey as string, {
       provider: userApiProvider as any,
       quality: opts.quality,
@@ -1948,36 +2182,48 @@ function parseAIResponse(
   toolName: string
 ): { success: boolean; parsed?: Record<string, unknown>; error?: string } {
   try {
-    const choice = (data?.choices && Array.isArray(data.choices) && data.choices[0] && typeof data.choices[0] === "object")
-      ? (data.choices[0] as Record<string, unknown>)
-      : undefined;
-    const message = choice?.message && typeof choice.message === "object"
-      ? (choice.message as Record<string, unknown>)
-      : undefined;
+    const choice =
+      data?.choices &&
+      Array.isArray(data.choices) &&
+      data.choices[0] &&
+      typeof data.choices[0] === "object"
+        ? (data.choices[0] as Record<string, unknown>)
+        : undefined;
+    const message =
+      choice?.message && typeof choice.message === "object"
+        ? (choice.message as Record<string, unknown>)
+        : undefined;
 
     // Try several shapes where the model might place a function/tool call or structured JSON
     const toolCall =
-      (message?.tool_calls && Array.isArray(message.tool_calls) && message.tool_calls[0] && typeof message.tool_calls[0] === "object" && message.tool_calls[0]) ||
+      (message?.tool_calls &&
+        Array.isArray(message.tool_calls) &&
+        message.tool_calls[0] &&
+        typeof message.tool_calls[0] === "object" &&
+        message.tool_calls[0]) ||
       message?.tool_call ||
       message?.function_call ||
       choice?.function_call ||
       choice?.tool_call;
 
-    const toolCallRecord = toolCall && typeof toolCall === "object" ? (toolCall as Record<string, unknown>) : undefined;
-    const toolFunction = toolCallRecord?.function && typeof toolCallRecord.function === "object"
-      ? (toolCallRecord.function as Record<string, unknown>)
-      : undefined;
-    const nestedFunctionCall = toolCallRecord?.function_call && typeof toolCallRecord.function_call === "object"
-      ? (toolCallRecord.function_call as Record<string, unknown>)
-      : undefined;
+    const toolCallRecord =
+      toolCall && typeof toolCall === "object" ? (toolCall as Record<string, unknown>) : undefined;
+    const toolFunction =
+      toolCallRecord?.function && typeof toolCallRecord.function === "object"
+        ? (toolCallRecord.function as Record<string, unknown>)
+        : undefined;
+    const nestedFunctionCall =
+      toolCallRecord?.function_call && typeof toolCallRecord.function_call === "object"
+        ? (toolCallRecord.function_call as Record<string, unknown>)
+        : undefined;
 
     // function arguments may be under different keys
-    const funcArgs: unknown | undefined = toolCallRecord && (
-      toolFunction?.arguments ||
-      toolCallRecord.arguments ||
-      nestedFunctionCall?.arguments ||
-      toolCallRecord.function_args
-    );
+    const funcArgs: unknown | undefined =
+      toolCallRecord &&
+      (toolFunction?.arguments ||
+        toolCallRecord.arguments ||
+        nestedFunctionCall?.arguments ||
+        toolCallRecord.function_args);
 
     // Fallback: some responses embed JSON in the message.content string
     if (!funcArgs && typeof message?.content === "string") {
@@ -2026,20 +2272,35 @@ function parseAIResponse(
 function normalizePost(
   post: unknown,
   overrideDow?: string,
-  payload?: Pick<GenerationPayload, "platform" | "bannedHashtags" | "requiredHashtags" | "length" | "requiredWords">,
+  payload?: Pick<
+    GenerationPayload,
+    "platform" | "bannedHashtags" | "requiredHashtags" | "length" | "requiredWords"
+  >
 ): Record<string, unknown> | null {
   if (!post || typeof post !== "object") {
     return null;
   }
 
   const p = post as Record<string, unknown>;
-  const rawHookOptions = Array.isArray(p.hook_options) ? (p.hook_options as unknown[]).map(h => String(h || "")) : undefined;
-  const rawCtaOptions = Array.isArray(p.cta_options) ? (p.cta_options as unknown[]).map(c => String(c || "")) : undefined;
+  const rawHookOptions = Array.isArray(p.hook_options)
+    ? (p.hook_options as unknown[]).map((h) => String(h || ""))
+    : undefined;
+  const rawCtaOptions = Array.isArray(p.cta_options)
+    ? (p.cta_options as unknown[]).map((c) => String(c || ""))
+    : undefined;
 
-  const hookOptions = rawHookOptions ? rawHookOptions.map(h => sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(h)))) : (p.hook ? [sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(String(p.hook || ""))))] : []);
-  const ctaOptions = rawCtaOptions ? rawCtaOptions.map(c => sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(c)))) : (p.cta ? [sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(String(p.cta || ""))))] : []);
+  const hookOptions = rawHookOptions
+    ? rawHookOptions.map((h) => fixSpelling(stripMarkdownFormatting(h)))
+    : p.hook
+      ? [fixSpelling(stripMarkdownFormatting(String(p.hook || "")))]
+      : [];
+  const ctaOptions = rawCtaOptions
+    ? rawCtaOptions.map((c) => fixSpelling(stripMarkdownFormatting(c)))
+    : p.cta
+      ? [fixSpelling(stripMarkdownFormatting(String(p.cta || "")))]
+      : [];
 
-  const body = sanitizeHtmlText(fixSpelling(stripMarkdownFormatting(String(p.body || ""))));
+  const body = fixSpelling(stripMarkdownFormatting(String(p.body || "")));
   const actualWordCount = body.split(/\s+/).filter(Boolean).length;
   const reportedWordCount = Number(p.word_count) || actualWordCount;
 
@@ -2056,7 +2317,9 @@ function normalizePost(
       const min = range[0] * 0.75;
       const max = range[1] * 1.25;
       if (actualWordCount < min || actualWordCount > max) {
-        console.warn(`Word count drift detected: ${actualWordCount} vs target range ${range[0]}-${range[1]}. Allowing but flagging.`);
+        console.warn(
+          `Word count drift detected: ${actualWordCount} vs target range ${range[0]}-${range[1]}. Allowing but flagging.`
+        );
         // For now, we flag it in self_check rather than hard rejection to avoid UX loops
       }
     }
@@ -2064,18 +2327,26 @@ function normalizePost(
 
   // Post-generation presence check for required words
   if (payload?.requiredWords && payload.requiredWords.length > 0) {
-    const missing = payload.requiredWords.filter(word => {
-      const regex = new RegExp(word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i');
+    const missing = payload.requiredWords.filter((word) => {
+      const regex = new RegExp(word.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"), "i");
       return !regex.test(body);
     });
     if (missing.length > 0) {
-      console.warn(`Post generation missing required words: ${missing.map(word => sanitizeLogValue(word)).join(", ")}`);
-      const selfCheckBase = p.self_check && typeof p.self_check === "object"
-        ? { ...p.self_check as Record<string, unknown> }
-        : { forbidden_violations: [] as string[], checks_passed: true, notes: "" };
-      const selfCheck = selfCheckBase as Record<string, unknown> & { forbidden_violations: string[]; checks_passed: boolean };
-      const violations: string[] = Array.isArray(selfCheck.forbidden_violations) ? [...selfCheck.forbidden_violations as string[]] : [];
-      missing.forEach(w => violations.push(`Missing required word: "${w}"`));
+      console.warn(
+        `Post generation missing required words: ${missing.map((word) => sanitizeLogValue(word)).join(", ")}`
+      );
+      const selfCheckBase =
+        p.self_check && typeof p.self_check === "object"
+          ? { ...(p.self_check as Record<string, unknown>) }
+          : { forbidden_violations: [] as string[], checks_passed: true, notes: "" };
+      const selfCheck = selfCheckBase as Record<string, unknown> & {
+        forbidden_violations: string[];
+        checks_passed: boolean;
+      };
+      const violations: string[] = Array.isArray(selfCheck.forbidden_violations)
+        ? [...(selfCheck.forbidden_violations as string[])]
+        : [];
+      missing.forEach((w) => violations.push(`Missing required word: "${w}"`));
       selfCheck.forbidden_violations = violations;
       selfCheck.checks_passed = false;
       p.self_check = selfCheck;
@@ -2084,10 +2355,10 @@ function normalizePost(
 
   return {
     day: 1,
-    dow: sanitizeHtmlText(overrideDow || p.dow || "Mon"),
-    topic: sanitizeHtmlText(p.topic || ""),
-    format: sanitizeHtmlText(p.format || ""),
-    title: sanitizeHtmlText(fixSpelling(String(p.title || ""))),
+    dow: String(overrideDow || p.dow || "Mon"),
+    topic: String(p.topic || ""),
+    format: String(p.format || ""),
+    title: fixSpelling(String(p.title || "")),
     // primary hook (first option) and full variants
     hook: hookOptions.length ? hookOptions[0] : "",
     hook_options: hookOptions,
@@ -2098,10 +2369,15 @@ function normalizePost(
     cta: ctaOptions.length ? ctaOptions[0] : "",
     cta_options: ctaOptions,
     hashtags: payload
-      ? sanitizeHtmlText(applyHashtagPolicy(p.hashtags, payload.platform, payload.bannedHashtags, payload.requiredHashtags))
-      : sanitizeHtmlText(p.hashtags || ""),
-    rationale: sanitizeHtmlText(fixSpelling(String(p.rationale || ""))),
-    image_prompt: sanitizeHtmlText(fixSpelling(String(p.image_prompt || ""))),
+      ? applyHashtagPolicy(
+          p.hashtags,
+          payload.platform,
+          payload.bannedHashtags,
+          payload.requiredHashtags
+        )
+      : String(p.hashtags || ""),
+    rationale: fixSpelling(String(p.rationale || "")),
+    image_prompt: fixSpelling(String(p.image_prompt || "")),
     // Maintain Phase A/C/D fields if present
     plan: p.plan,
     body_variants: p.body_variants,
@@ -2198,7 +2474,7 @@ async function hmacSha256Hex(message: string, secret: string): Promise<string> {
     new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["sign"],
+    ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
   return toHex(sig);
@@ -2225,7 +2501,13 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const razorpayKeyId = Deno.env.get("RAZORPAY_KEY_ID");
     const razorpayKeySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey || !razorpayKeyId || !razorpayKeySecret) {
+    if (
+      !supabaseUrl ||
+      !supabaseAnonKey ||
+      !supabaseServiceKey ||
+      !razorpayKeyId ||
+      !razorpayKeySecret
+    ) {
       console.error("verify-payment: missing required environment configuration");
       return jsonResponse({ error: "Payment is not configured." }, 500);
     }
@@ -2234,7 +2516,10 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError || !user) {
       return jsonResponse({ error: "Unauthorized access." }, 401);
     }
@@ -2263,7 +2548,10 @@ Deno.serve(async (req) => {
 
     if (!timingSafeEqual(expected, signature)) {
       console.warn("verify-payment: signature mismatch", { user_id: user.id, order_id: orderId });
-      return jsonResponse({ verified: false, error: "Payment signature verification failed." }, 400);
+      return jsonResponse(
+        { verified: false, error: "Payment signature verification failed." },
+        400
+      );
     }
 
     console.info("verify-payment: signature verified", {
@@ -2275,15 +2563,18 @@ Deno.serve(async (req) => {
     // ── Fetch the order from Razorpay to re-derive plan + amount server-side ──
     // We trust the ORDER (created server-side with our notes), never the client.
     const basicAuth = btoa(`${razorpayKeyId}:${razorpayKeySecret}`);
-    const orderRes = await fetch(`https://api.razorpay.com/v1/orders/${encodeURIComponent(orderId)}`, {
-      headers: { Authorization: `Basic ${basicAuth}` },
-    });
+    const orderRes = await fetch(
+      `https://api.razorpay.com/v1/orders/${encodeURIComponent(orderId)}`,
+      {
+        headers: { Authorization: `Basic ${basicAuth}` },
+      }
+    );
     if (!orderRes.ok) {
       const errText = await orderRes.text().catch(() => "");
       console.error("verify-payment: failed to fetch order", orderRes.status, errText);
       return jsonResponse({ verified: false, error: "Could not confirm the order." }, 502);
     }
-    const order = await orderRes.json() as {
+    const order = (await orderRes.json()) as {
       amount: number;
       status: string;
       notes?: { user_id?: string; plan?: string };
@@ -2303,11 +2594,16 @@ Deno.serve(async (req) => {
     // key, or a create-order regression) would let anyone claim it.
     if (order.notes?.user_id !== user.id) {
       console.warn("verify-payment: order user mismatch", { order_id: orderId, user_id: user.id });
-      return jsonResponse({ verified: false, error: "Order does not belong to this account." }, 403);
+      return jsonResponse(
+        { verified: false, error: "Order does not belong to this account." },
+        403
+      );
     }
     if (order.amount !== plan.amount) {
       console.error("verify-payment: amount mismatch", {
-        order_id: orderId, order_amount: order.amount, expected: plan.amount,
+        order_id: orderId,
+        order_amount: order.amount,
+        expected: plan.amount,
       });
       return jsonResponse({ verified: false, error: "Payment amount mismatch." }, 400);
     }
@@ -2315,20 +2611,33 @@ Deno.serve(async (req) => {
     // ── Grant the tier (idempotent on order_id) via service role ─────────────
     const periodEnd = computePeriodEnd();
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: grantData, error: grantError } = await adminClient.rpc("grant_tier_from_payment", {
-      p_user_id: user.id,
-      p_tier: plan.tier,
-      p_quota_limit: plan.quotaLimit,
-      p_period_end: periodEnd,
-      p_order_id: orderId,
-      p_payment_id: paymentId,
-      p_amount: plan.amount,
-      p_currency: plan.currency,
-    });
+    const { data: grantData, error: grantError } = await adminClient.rpc(
+      "grant_tier_from_payment",
+      {
+        p_user_id: user.id,
+        p_tier: plan.tier,
+        p_quota_limit: plan.quotaLimit,
+        p_period_end: periodEnd,
+        p_order_id: orderId,
+        p_payment_id: paymentId,
+        p_amount: plan.amount,
+        p_currency: plan.currency,
+      }
+    );
 
     if (grantError) {
-      console.error("verify-payment: grant_tier_from_payment failed:", grantError?.code || grantError?.message);
-      return jsonResponse({ verified: true, granted: false, error: "Payment verified but access could not be granted. Contact support." }, 500);
+      console.error(
+        "verify-payment: grant_tier_from_payment failed:",
+        grantError?.code || grantError?.message
+      );
+      return jsonResponse(
+        {
+          verified: true,
+          granted: false,
+          error: "Payment verified but access could not be granted. Contact support.",
+        },
+        500
+      );
     }
 
     const granted = Array.isArray(grantData) ? grantData[0] : grantData;

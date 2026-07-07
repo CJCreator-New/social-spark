@@ -13,7 +13,10 @@ export function ScheduleSkeleton({ rows = 5 }: ScheduleSkeletonProps) {
   return (
     <div className="flex flex-col gap-2">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-border p-4 flex gap-4 items-start flex-wrap">
+        <div
+          key={i}
+          className="rounded-xl border border-border p-4 flex gap-4 items-start flex-wrap"
+        >
           {/* Time column */}
           <div className="flex flex-col gap-1 min-w-[88px]">
             <Skeleton className="h-5 w-16" />

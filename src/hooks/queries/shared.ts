@@ -2,7 +2,11 @@ import { getE2EAuthFlag } from "@/lib/e2eFixtures";
 import type { Database } from "@/integrations/supabase/types";
 
 export function isE2EMode() {
-  return import.meta.env.DEV && typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true";
+  return (
+    import.meta.env.DEV &&
+    typeof window !== "undefined" &&
+    window.localStorage.getItem(getE2EAuthFlag()) === "true"
+  );
 }
 
 type Tables = Database["public"]["Tables"];
@@ -10,8 +14,25 @@ export type SavedCalendarRow = Tables["saved_calendars"]["Row"];
 export type SavedCalendarInsert = Tables["saved_calendars"]["Insert"];
 export type SavedCalendarUpdate = Tables["saved_calendars"]["Update"];
 export type ProfileRow = Tables["profiles"]["Row"];
-export type SavedCalendarListItem = Pick<SavedCalendarRow, "id" | "title" | "industry_label" | "platform" | "core_idea" | "created_at" | "is_favorite" | "posts">;
-export type RecentCalendarItem = { id: string; title: string; platform: string | null; industry_label: string | null; created_at: string; is_favorite?: boolean };
+export type SavedCalendarListItem = Pick<
+  SavedCalendarRow,
+  | "id"
+  | "title"
+  | "industry_label"
+  | "platform"
+  | "core_idea"
+  | "created_at"
+  | "is_favorite"
+  | "posts"
+>;
+export type RecentCalendarItem = {
+  id: string;
+  title: string;
+  platform: string | null;
+  industry_label: string | null;
+  created_at: string;
+  is_favorite?: boolean;
+};
 export type SavedCalendarsCursor = { created_at: string; id: string } | null;
 
 export type GeneratedPostPayload = {

@@ -47,7 +47,10 @@ const COMMON_TZ_FALLBACK = [
  */
 export function listTimezones(): string[] {
   // @ts-expect-error supportedValuesOf is widely supported now (ES2023)
-  const native = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") as string[] : null;
+  const native =
+    typeof Intl.supportedValuesOf === "function"
+      ? (Intl.supportedValuesOf("timeZone") as string[])
+      : null;
   return native && native.length ? native : COMMON_TZ_FALLBACK;
 }
 
@@ -79,7 +82,7 @@ export function tzOffsetString(tz: string, at: Date = new Date()): string {
       timeZoneName: "shortOffset",
     });
     const parts = dtf.formatToParts(at);
-    const tzn = parts.find(p => p.type === "timeZoneName")?.value || "";
+    const tzn = parts.find((p) => p.type === "timeZoneName")?.value || "";
 
     // Parse "GMT+05:30" or "GMT-04:00" or similar
     const m = /GMT([+-]\d{1,2})(?::(\d{2}))?/.exec(tzn);
@@ -108,14 +111,14 @@ export function isValidTimezone(tz: string): boolean {
 /**
  * Build a UTC ISO timestamp from a wall-clock date/time in a target timezone.
  * Handles DST by using a trial-and-error refinement with Intl offset detection.
- * 
+ *
  * Use this when a user picks a date/time in their local TZ and you need UTC for storage.
- * 
+ *
  * @param dateStr ISO date string (YYYY-MM-DD)
  * @param time Wall-clock time (HH:MM or HH:MM:SS)
  * @param tz IANA timezone identifier
  * @returns ISO 8601 UTC timestamp string
- * 
+ *
  * @example
  * // User in NY picks 9:00 AM on Jan 15, 2025
  * zonedToUtcIso("2025-01-15", "09:00", "America/New_York")
@@ -140,7 +143,10 @@ export function zonedToUtcIso(dateStr: string, time: string, tz: string): string
   // Get the actual offset at this wall time in the target tz
   const offsetStr = tzOffsetString(tz, new Date(trial));
   const sign = offsetStr.startsWith("-") ? -1 : 1;
-  const [oh, om] = offsetStr.slice(1).split(":").map(n => parseInt(n, 10));
+  const [oh, om] = offsetStr
+    .slice(1)
+    .split(":")
+    .map((n) => parseInt(n, 10));
   const offsetMin = sign * ((oh || 0) * 60 + (om || 0));
 
   // Wall time in tz = UTC time + offset, so UTC = wall - offset

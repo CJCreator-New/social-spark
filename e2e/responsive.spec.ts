@@ -35,7 +35,9 @@ for (const viewport of viewports) {
         // previous route's async chunk/font fetches are still in flight at goto().
         await page.goto(path, { waitUntil: "domcontentloaded" });
         await expect(page.locator("body")).toBeVisible();
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+        );
         expect(overflow).toBeLessThanOrEqual(2);
       }
     });
@@ -44,9 +46,13 @@ for (const viewport of viewports) {
       await enableE2EAuth(page);
 
       await page.goto(`/calendar/${E2E_CALENDAR.id}`);
-      await expect(page.getByRole("heading", { name: /workspace controls/i })).toBeVisible({ timeout: 30000 });
+      await expect(page.getByRole("heading", { name: /workspace controls/i })).toBeVisible({
+        timeout: 30000,
+      });
       await expect(page.getByRole("heading", { name: /reformat and export/i })).toBeVisible();
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
       expect(overflow).toBeLessThanOrEqual(2);
     });
   });

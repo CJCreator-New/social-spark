@@ -41,15 +41,29 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
   if (isMockEnv()) {
     const tier = (localStorage.getItem("social_spark_tier") as Tier) || "free";
     const periodEnd = localStorage.getItem("social_spark_plan_period_end");
-    return computeStatus(tier, periodEnd, Number(localStorage.getItem("social_spark_generation_count") || "0"), 50);
+    return computeStatus(
+      tier,
+      periodEnd,
+      Number(localStorage.getItem("social_spark_generation_count") || "0"),
+      50
+    );
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (!session) return FREE_STATUS;
 
-  const settings = (supabase.from as unknown as (t: string) => ReturnType<typeof supabase.from>)("user_settings");
+  const settings = (supabase.from as unknown as (t: string) => ReturnType<typeof supabase.from>)(
+    "user_settings"
+  );
 
-  type Row = { tier?: string; plan_period_end?: string | null; generation_count?: number; quota_limit?: number } | null;
+  type Row = {
+    tier?: string;
+    plan_period_end?: string | null;
+    generation_count?: number;
+    quota_limit?: number;
+  } | null;
 
   try {
     const { data, error } = await settings
@@ -59,8 +73,13 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
     const row = data as unknown as Row;
     if (!row) return FREE_STATUS;
 
-    const tier = (row.tier === "starter" || row.tier === "pro") ? row.tier : "free";
-    return computeStatus(tier, row.plan_period_end ?? null, row.generation_count ?? 0, row.quota_limit ?? 50);
+    const tier = row.tier === "starter" || row.tier === "pro" ? row.tier : "free";
+    return computeStatus(
+      tier,
+      row.plan_period_end ?? null,
+      row.generation_count ?? 0,
+      row.quota_limit ?? 50
+    );
   } catch (err) {
     // Schema may predate the tier migration (PostgREST 404 on unknown columns).
     // Degrade gracefully: read only the always-present quota columns and treat
@@ -68,9 +87,7 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
     // ahead of the 20260616 migration.
     if (isMissingColumnError(err)) {
       try {
-        const { data } = await settings
-          .select("generation_count, quota_limit")
-          .maybeSingle();
+        const { data } = await settings.select("generation_count, quota_limit").maybeSingle();
         const row = data as unknown as Row;
         return computeStatus("free", null, row?.generation_count ?? 0, row?.quota_limit ?? 50);
       } catch {
@@ -91,14 +108,20 @@ function isMissingColumnError(err: unknown): boolean {
     e.code === "42703" ||
     e.code === "PGRST204" ||
     e.status === 404 ||
-    (typeof e.message === "string" && /column .* does not exist|tier|plan_period_end/i.test(e.message))
+    (typeof e.message === "string" &&
+      /column .* does not exist|tier|plan_period_end/i.test(e.message))
   );
 }
 
-function computeStatus(tier: Tier, planPeriodEnd: string | null, used: number, limit: number): SubscriptionStatus {
+function computeStatus(
+  tier: Tier,
+  planPeriodEnd: string | null,
+  used: number,
+  limit: number
+): SubscriptionStatus {
   const endMs = planPeriodEnd ? Date.parse(planPeriodEnd) : NaN;
   const active = tier !== "free" && Number.isFinite(endMs) && endMs > Date.now();
-  const effectiveTier: Tier = tier === "free" ? "free" : (active ? tier : "free");
+  const effectiveTier: Tier = tier === "free" ? "free" : active ? tier : "free";
   return {
     tier,
     effectiveTier,

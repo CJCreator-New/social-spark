@@ -48,7 +48,9 @@ function loadRazorpayScript(): Promise<boolean> {
     if (typeof window === "undefined") return resolve(false);
     if (window.Razorpay) return resolve(true);
 
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${RAZORPAY_SCRIPT_SRC}"]`);
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${RAZORPAY_SCRIPT_SRC}"]`
+    );
     if (existing) {
       existing.addEventListener("load", () => resolve(true));
       existing.addEventListener("error", () => resolve(false));
@@ -65,7 +67,9 @@ function loadRazorpayScript(): Promise<boolean> {
 }
 
 async function getAccessToken(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   return session?.access_token ?? null;
 }
 
@@ -132,7 +136,12 @@ export async function startRazorpayCheckout(params: CheckoutParams): Promise<Che
     const data = await orderRes.json().catch(() => ({}));
     throw new Error(data?.error || `Failed to create order (${orderRes.status})`);
   }
-  const order = await orderRes.json() as { order_id: string; amount: number; currency: string; label?: string };
+  const order = (await orderRes.json()) as {
+    order_id: string;
+    amount: number;
+    currency: string;
+    label?: string;
+  };
 
   // 2) Open the Razorpay modal and await the user outcome
   return new Promise<CheckoutResult>((resolve, reject) => {
@@ -165,7 +174,10 @@ export async function startRazorpayCheckout(params: CheckoutParams): Promise<Che
               periodEnd: verifyData.period_end ?? null,
             });
           } else {
-            resolve({ status: "failed", error: verifyData?.error || "Payment verification failed." });
+            resolve({
+              status: "failed",
+              error: verifyData?.error || "Payment verification failed.",
+            });
           }
         } catch (err) {
           reject(err instanceof Error ? err : new Error("Payment verification failed."));

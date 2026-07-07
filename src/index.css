@@ -1,10 +1,10 @@
-@import './styles/tokens.css';
-@import '@fontsource/inter/400.css';
-@import '@fontsource/inter/500.css';
-@import '@fontsource/inter/600.css';
-@import '@fontsource/inter/700.css';
-@import '@fontsource/fraunces/400.css';
-@import '@fontsource/fraunces/600.css';
+@import "./styles/tokens.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/fraunces/400.css";
+@import "@fontsource/fraunces/600.css";
 
 @tailwind base;
 @tailwind components;
@@ -47,14 +47,18 @@
 
     /* Custom design tokens */
     --gradient-primary: linear-gradient(135deg, hsl(18 89% 40%) 0%, hsl(30 90% 50%) 100%);
-    --gradient-secondary: linear-gradient(135deg, hsl(18 89% 40% / 0.1) 0%, hsl(30 90% 50% / 0.1) 100%);
+    --gradient-secondary: linear-gradient(
+      135deg,
+      hsl(18 89% 40% / 0.1) 0%,
+      hsl(30 90% 50% / 0.1) 100%
+    );
     --gradient-card: none;
     --gradient-glow: radial-gradient(ellipse at center, hsl(18 89% 40% / 0.04) 0%, transparent 70%);
-    
+
     --shadow-glow: 0 0 40px hsl(18 89% 40% / 0.05);
     --shadow-card: 0 10px 30px rgba(120, 113, 108, 0.06), 0 1px 3px rgba(120, 113, 108, 0.02);
     --shadow-button: var(--shadow-btn);
-    
+
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
     /* Chart palette */
@@ -119,7 +123,12 @@
       hsl(var(--background));
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-display);
     letter-spacing: -0.04em;
   }
@@ -129,8 +138,13 @@
   input,
   textarea,
   select,
-  [role='button'] {
-    transition: box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease, color 160ms ease, transform 160ms ease;
+  [role="button"] {
+    transition:
+      box-shadow 160ms ease,
+      border-color 160ms ease,
+      background-color 160ms ease,
+      color 160ms ease,
+      transform 160ms ease;
   }
 
   button:focus-visible,
@@ -138,7 +152,7 @@
   input:focus-visible,
   textarea:focus-visible,
   select:focus-visible,
-  [role='button']:focus-visible {
+  [role="button"]:focus-visible {
     outline: 2px solid hsl(var(--primary) / 0.75);
     outline-offset: 2px;
   }
@@ -165,7 +179,9 @@
   .glass-card {
     @apply bg-card border border-border rounded-xl;
     box-shadow: var(--shadow-card);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    transition:
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
   }
 
   .glass-card:hover {
@@ -178,7 +194,10 @@
     color: hsl(var(--primary-foreground));
     box-shadow: var(--shadow-btn);
     border-radius: var(--radius-xl);
-    transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+    transition:
+      background-color 0.2s ease,
+      box-shadow 0.2s ease,
+      transform 0.15s ease;
   }
 
   .glass-button:hover {
@@ -219,7 +238,10 @@
     @apply inline-flex items-center justify-center rounded-full border-0 px-5 py-2.5 text-sm font-semibold text-primary-foreground;
     background-color: hsl(var(--primary));
     box-shadow: var(--shadow-btn);
-    transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+    transition:
+      background-color 0.2s ease,
+      box-shadow 0.2s ease,
+      transform 0.15s ease;
   }
 
   .control-button:hover {
@@ -245,7 +267,7 @@
   }
 
   .glow-effect::after {
-    content: '';
+    content: "";
     @apply absolute -inset-1 rounded-xl opacity-0 transition-opacity duration-300 -z-10;
     background: radial-gradient(ellipse at center, hsl(var(--primary) / 0.15), transparent 70%);
     filter: blur(8px);
@@ -266,7 +288,6 @@
     box-shadow: var(--focus-ring);
     outline: none;
   }
-
 }
 
 /* During dev/test runs Vite may inject an error overlay element that
@@ -283,8 +304,13 @@ vite-error-overlay {
   }
 
   @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
   }
 
   .animate-pulse-glow {
@@ -292,8 +318,13 @@ vite-error-overlay {
   }
 
   @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 20px hsl(199 89% 48% / 0.2); }
-    50% { box-shadow: 0 0 40px hsl(199 89% 48% / 0.4); }
+    0%,
+    100% {
+      box-shadow: 0 0 20px hsl(199 89% 48% / 0.2);
+    }
+    50% {
+      box-shadow: 0 0 40px hsl(199 89% 48% / 0.4);
+    }
   }
 
   .animate-gradient {
@@ -302,9 +333,15 @@ vite-error-overlay {
   }
 
   @keyframes gradient-shift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
   }
 
   .text-balance {
@@ -326,14 +363,16 @@ vite-error-overlay {
   }
 
   .glass-refraction::before {
-    content: '';
+    content: "";
     position: absolute;
     inset: 0;
     pointer-events: none;
     border-radius: inherit;
     padding: 1px;
     background: linear-gradient(to bottom, rgba(255, 255, 255, 0.08), transparent);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask:
+      linear-gradient(var(--color-surface) 0 0) content-box,
+      linear-gradient(var(--color-surface) 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
   }

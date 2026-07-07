@@ -15,7 +15,9 @@ async function checkRoute(page: Page, path: string, settleMs = 0) {
   // RouteFallback (the lazy-load skeleton) renders its own <h1>, so a bare
   // heading wait can resolve against the skeleton instead of the real page.
   // Wait for the skeleton's loading copy to clear before scanning.
-  await expect(page.getByText(/loading the workspace and restoring/i)).toBeHidden({ timeout: 45000 });
+  await expect(page.getByText(/loading the workspace and restoring/i)).toBeHidden({
+    timeout: 45000,
+  });
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 45000 });
   // Lazy routes inject their CSS chunk alongside their JS chunk — the heading
   // being visible doesn't guarantee that chunk's stylesheet has finished
@@ -65,7 +67,9 @@ test.describe("Accessibility smoke checks", () => {
   test("authenticated app shell has no serious axe violations", async ({ page }) => {
     await enableE2EAuth(page);
     await checkRoute(page, "/app");
-    await expect(page.getByRole("radiogroup", { name: /industry or niche/i })).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("radiogroup", { name: /industry or niche/i })).toBeVisible({
+      timeout: 30000,
+    });
     await expect(page.getByText(/AI content studio/i)).toBeVisible({ timeout: 30000 });
     await expect(page.getByText(/platform:/i)).toBeVisible({ timeout: 30000 });
   });
@@ -73,21 +77,34 @@ test.describe("Accessibility smoke checks", () => {
   test("saved calendars and schedule have no serious axe violations", async ({ page }) => {
     await enableE2EAuth(page);
     await checkRoute(page, "/my-calendars");
-    await expect(page.getByRole("heading", { name: /my calendars/i })).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { name: /my calendars/i })).toBeVisible({
+      timeout: 30000,
+    });
 
     await checkRoute(page, "/schedule");
-    await expect(page.getByRole("heading", { name: /my schedule/i })).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { name: /my schedule/i })).toBeVisible({
+      timeout: 30000,
+    });
   });
 
   test("calendar detail and delete modal have no serious axe violations", async ({ page }) => {
     await enableE2EAuth(page);
     await checkRoute(page, `/calendar/${E2E_CALENDAR.id}`);
-    await expect(page.getByRole("heading", { name: E2E_CALENDAR.title })).toBeVisible({ timeout: 30000 });
-    await expect(page.getByRole("heading", { name: /workspace controls/i })).toBeVisible({ timeout: 30000 });
-    await expect(page.getByRole("heading", { name: /reformat and export/i })).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { name: E2E_CALENDAR.title })).toBeVisible({
+      timeout: 30000,
+    });
+    await expect(page.getByRole("heading", { name: /workspace controls/i })).toBeVisible({
+      timeout: 30000,
+    });
+    await expect(page.getByRole("heading", { name: /reformat and export/i })).toBeVisible({
+      timeout: 30000,
+    });
 
     await page.goto("/my-calendars", { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: /calendar actions/i }).first().click();
+    await page
+      .getByRole("button", { name: /calendar actions/i })
+      .first()
+      .click();
     await page.getByRole("button", { name: /^delete$/i }).click();
     await injectAxe(page);
     await checkA11y(page, AXE_CONTEXT, {

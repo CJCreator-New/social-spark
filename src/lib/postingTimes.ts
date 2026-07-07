@@ -20,9 +20,21 @@ export const suggestedPostingTimes: PostingTimeSuggestion[] = [
 const PLATFORM_POSTING_TIMES: Record<string, PostingTimeSuggestion[]> = {
   LinkedIn: [
     { day: 1, time: "08:00", reason: "LinkedIn: Monday morning catch-up scrolling" },
-    { day: 2, time: "09:00", reason: "LinkedIn: Tue-Thu mid-morning is peak professional engagement" },
-    { day: 3, time: "09:00", reason: "LinkedIn: Tue-Thu mid-morning is peak professional engagement" },
-    { day: 4, time: "09:00", reason: "LinkedIn: Tue-Thu mid-morning is peak professional engagement" },
+    {
+      day: 2,
+      time: "09:00",
+      reason: "LinkedIn: Tue-Thu mid-morning is peak professional engagement",
+    },
+    {
+      day: 3,
+      time: "09:00",
+      reason: "LinkedIn: Tue-Thu mid-morning is peak professional engagement",
+    },
+    {
+      day: 4,
+      time: "09:00",
+      reason: "LinkedIn: Tue-Thu mid-morning is peak professional engagement",
+    },
     { day: 5, time: "08:30", reason: "LinkedIn: Friday wrap-up content before weekend drop-off" },
     { day: 6, time: "10:00", reason: "LinkedIn: weekend traffic is low; late-morning is safest" },
     { day: 7, time: "10:00", reason: "LinkedIn: weekend traffic is low; late-morning is safest" },
@@ -68,11 +80,17 @@ const PLATFORM_POSTING_TIMES: Record<string, PostingTimeSuggestion[]> = {
 /** Returns just the suggested time string. Defaults to 09:00 if day not found. */
 export function suggestedTimeForDay(day: number, platform?: string): string {
   const table = (platform && PLATFORM_POSTING_TIMES[platform]) || suggestedPostingTimes;
-  return table.find(item => item.day === day)?.time || "09:00";
+  return table.find((item) => item.day === day)?.time || "09:00";
 }
 
 /** Returns the time + a short human-readable reason, for tooltips/badges. */
 export function suggestedPostingTimeInfo(day: number, platform?: string): PostingTimeSuggestion {
   const table = (platform && PLATFORM_POSTING_TIMES[platform]) || suggestedPostingTimes;
-  return table.find(item => item.day === day) || { day, time: "09:00", reason: "Default mid-morning posting window" };
+  return (
+    table.find((item) => item.day === day) || {
+      day,
+      time: "09:00",
+      reason: "Default mid-morning posting window",
+    }
+  );
 }

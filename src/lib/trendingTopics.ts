@@ -25,15 +25,116 @@ const PLATFORM_ALIASES: Record<string, string> = {
 };
 
 const PLATFORM_FIT_KEYWORDS: Record<string, string[]> = {
-  LinkedIn: ["strategy", "leadership", "business", "metrics", "funding", "policy", "compliance", "devops", "data", "analytics", "career", "education"],
-  "Twitter/X": ["ai", "trend", "news", "update", "launch", "crypto", "security", "metrics", "regulation", "product", "startup", "opinion"],
-  Instagram: ["creator", "visual", "story", "wellness", "fashion", "content", "community", "behind-the-scenes", "lifestyle", "brand"],
-  Facebook: ["community", "wellbeing", "family", "education", "retention", "story", "tips", "local", "support", "work culture"],
-  Newsletter: ["guide", "framework", "analysis", "deep dive", "research", "case", "strategy", "insight", "metrics", "lesson"],
-  Blog: ["seo", "guide", "how-to", "framework", "analysis", "research", "tutorial", "case", "opinion", "strategy"],
-  TikTok: ["creator", "visual", "story", "how-to", "tutorial", "content", "brand", "lifestyle", "product", "community"],
-  Threads: ["opinion", "insight", "discussion", "trend", "tech", "startup", "community", "hot take", "strategy"],
-  Bluesky: ["tech", "startup", "analysis", "open source", "policy", "dev", "community", "research", "trend"],
+  LinkedIn: [
+    "strategy",
+    "leadership",
+    "business",
+    "metrics",
+    "funding",
+    "policy",
+    "compliance",
+    "devops",
+    "data",
+    "analytics",
+    "career",
+    "education",
+  ],
+  "Twitter/X": [
+    "ai",
+    "trend",
+    "news",
+    "update",
+    "launch",
+    "crypto",
+    "security",
+    "metrics",
+    "regulation",
+    "product",
+    "startup",
+    "opinion",
+  ],
+  Instagram: [
+    "creator",
+    "visual",
+    "story",
+    "wellness",
+    "fashion",
+    "content",
+    "community",
+    "behind-the-scenes",
+    "lifestyle",
+    "brand",
+  ],
+  Facebook: [
+    "community",
+    "wellbeing",
+    "family",
+    "education",
+    "retention",
+    "story",
+    "tips",
+    "local",
+    "support",
+    "work culture",
+  ],
+  Newsletter: [
+    "guide",
+    "framework",
+    "analysis",
+    "deep dive",
+    "research",
+    "case",
+    "strategy",
+    "insight",
+    "metrics",
+    "lesson",
+  ],
+  Blog: [
+    "seo",
+    "guide",
+    "how-to",
+    "framework",
+    "analysis",
+    "research",
+    "tutorial",
+    "case",
+    "opinion",
+    "strategy",
+  ],
+  TikTok: [
+    "creator",
+    "visual",
+    "story",
+    "how-to",
+    "tutorial",
+    "content",
+    "brand",
+    "lifestyle",
+    "product",
+    "community",
+  ],
+  Threads: [
+    "opinion",
+    "insight",
+    "discussion",
+    "trend",
+    "tech",
+    "startup",
+    "community",
+    "hot take",
+    "strategy",
+  ],
+  Bluesky: [
+    "tech",
+    "startup",
+    "analysis",
+    "open source",
+    "policy",
+    "dev",
+    "community",
+    "research",
+    "trend",
+  ],
 };
 
 const PLATFORM_DEFAULT_WEIGHTS: Record<string, number> = {
@@ -49,7 +150,9 @@ const PLATFORM_DEFAULT_WEIGHTS: Record<string, number> = {
 };
 
 function normalizeKey(value: string): string {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function normalizePlatform(platform?: string): string | undefined {
@@ -64,7 +167,10 @@ function computePlatformFit(topic: TrendingTopic, platform?: string): number {
 
   const keywords = PLATFORM_FIT_KEYWORDS[normalizedPlatform] || [];
   const haystack = normalizeKey(`${topic.topic} ${topic.category}`);
-  const directMatch = keywords.reduce((score, keyword) => (haystack.includes(keyword) ? score + 1 : score), 0);
+  const directMatch = keywords.reduce(
+    (score, keyword) => (haystack.includes(keyword) ? score + 1 : score),
+    0
+  );
   const trendingBoost = topic.trending ? 1.25 : 0;
   const popularityBoost = Math.min(topic.posts / 1000, 1.5);
   const platformWeight = PLATFORM_DEFAULT_WEIGHTS[normalizedPlatform] || 1;
@@ -106,7 +212,12 @@ const TRENDING_BY_INDUSTRY: Record<string, TrendingTopic[]> = {
     { topic: "Crypto market recovery", category: "Crypto", trending: true, posts: 1100 },
     { topic: "Index fund strategy", category: "Investing", trending: false, posts: 480 },
     { topic: "Real estate investing", category: "Investing", trending: true, posts: 920 },
-    { topic: "Personal finance automation", category: "Personal Finance", trending: false, posts: 620 },
+    {
+      topic: "Personal finance automation",
+      category: "Personal Finance",
+      trending: false,
+      posts: 620,
+    },
     { topic: "Startup financial modeling", category: "Startups", trending: true, posts: 580 },
     { topic: "Financial literacy for Gen Z", category: "Education", trending: true, posts: 750 },
   ],
@@ -117,12 +228,22 @@ const TRENDING_BY_INDUSTRY: Record<string, TrendingTopic[]> = {
     { topic: "Career transitions", category: "Career", trending: true, posts: 1050 },
     { topic: "Skill-building frameworks", category: "Learning", trending: false, posts: 690 },
     { topic: "Coding bootcamps", category: "Tech Education", trending: true, posts: 740 },
-    { topic: "Remote learning best practices", category: "Online Learning", trending: false, posts: 450 },
+    {
+      topic: "Remote learning best practices",
+      category: "Online Learning",
+      trending: false,
+      posts: 450,
+    },
   ],
   ecommerce: [
     { topic: "DTC brand building", category: "Business", trending: true, posts: 1100 },
     { topic: "Shopify app strategies", category: "Platforms", trending: false, posts: 620 },
-    { topic: "Customer retention tactics", category: "Customer Success", trending: true, posts: 980 },
+    {
+      topic: "Customer retention tactics",
+      category: "Customer Success",
+      trending: true,
+      posts: 980,
+    },
     { topic: "Influencer partnerships", category: "Marketing", trending: true, posts: 850 },
     { topic: "Supply chain optimization", category: "Operations", trending: false, posts: 540 },
     { topic: "Product photography tips", category: "Content", trending: true, posts: 710 },
@@ -159,7 +280,12 @@ const TRENDING_BY_INDUSTRY: Record<string, TrendingTopic[]> = {
     { topic: "Remote work trends 2024", category: "Work Culture", trending: true, posts: 1500 },
     { topic: "Quiet quitting reality", category: "Trends", trending: true, posts: 1200 },
     { topic: "DEI initiatives", category: "Inclusion", trending: false, posts: 850 },
-    { topic: "Employee retention strategies", category: "HR Strategy", trending: true, posts: 1050 },
+    {
+      topic: "Employee retention strategies",
+      category: "HR Strategy",
+      trending: true,
+      posts: 1050,
+    },
     { topic: "Compensation benchmarking", category: "Compensation", trending: false, posts: 680 },
     { topic: "Leadership development", category: "Leadership", trending: true, posts: 920 },
     { topic: "Workplace mental health", category: "Wellbeing", trending: true, posts: 1100 },
@@ -177,7 +303,12 @@ const TRENDING_BY_INDUSTRY: Record<string, TrendingTopic[]> = {
     { topic: "YouTube Shorts monetization", category: "Platforms", trending: true, posts: 1400 },
     { topic: "Newsletter growth hacks", category: "Email", trending: true, posts: 1100 },
     { topic: "Creator tax tips", category: "Business", trending: true, posts: 950 },
-    { topic: "Patreon alternative platforms", category: "Monetization", trending: true, posts: 780 },
+    {
+      topic: "Patreon alternative platforms",
+      category: "Monetization",
+      trending: true,
+      posts: 780,
+    },
     { topic: "Content repurposing", category: "Strategy", trending: false, posts: 870 },
     { topic: "Audience engagement tactics", category: "Community", trending: true, posts: 1050 },
     { topic: "Creator burnout", category: "Wellbeing", trending: true, posts: 920 },
@@ -198,7 +329,10 @@ export function getTrendingTopicsForIndustry(industry: string, platform?: string
   return rankTopics(topics, platform);
 }
 
-export function getTrendingTopicsCount(industry: string, platform?: string): { trending: number; total: number } {
+export function getTrendingTopicsCount(
+  industry: string,
+  platform?: string
+): { trending: number; total: number } {
   const topics = getTrendingTopicsForIndustry(industry, platform);
   const trending = topics.filter((t) => t.trending).length;
   return { trending, total: topics.length };

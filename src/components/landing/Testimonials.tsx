@@ -32,18 +32,22 @@ function QuoteCard({ q }: { q: (typeof QUOTES)[number] }) {
     <article className="ld-w-quote-card">
       <div className="ld-w-stars" role="img" aria-label="5 out of 5 stars">
         {["★", "★", "★", "★", "★"].map((star, i) => (
-          <span key={i} aria-hidden="true">{star}</span>
+          <span key={i} aria-hidden="true">
+            {star}
+          </span>
         ))}
       </div>
 
-      <blockquote className="ld-w-quote-text">
-        {q.text}
-      </blockquote>
+      <blockquote className="ld-w-quote-text">{q.text}</blockquote>
 
       <footer className="ld-w-quote-footer">
-        <div className="ld-w-avatar" aria-hidden="true">{q.initials}</div>
+        <div className="ld-w-avatar" aria-hidden="true">
+          {q.initials}
+        </div>
         <div>
-          <cite className="ld-w-quote-name" style={{ fontStyle: "normal" }}>{q.name}</cite>
+          <cite className="ld-w-quote-name" style={{ fontStyle: "normal" }}>
+            {q.name}
+          </cite>
           <div className="ld-w-quote-role">{q.role}</div>
         </div>
       </footer>
@@ -78,7 +82,9 @@ export default function Testimonials() {
       }
     );
 
-    return () => { ScrollTrigger.getAll().forEach(t => t.kill()); };
+    return () => {
+      ScrollTrigger.getAll().forEach((t) => t.kill());
+    };
   }, []);
 
   useEffect(() => {
@@ -93,7 +99,9 @@ export default function Testimonials() {
       repeat: -1,
     });
 
-    return () => { tweenRef.current?.kill(); };
+    return () => {
+      tweenRef.current?.kill();
+    };
   }, [isDesktop]);
 
   const pauseTicker = () => tweenRef.current?.pause();
@@ -117,7 +125,9 @@ export default function Testimonials() {
       {/* Screen-reader accessible list; visual track below is a decorative duplicate */}
       <ul className="sr-only" aria-label="Customer testimonials">
         {QUOTES.map((q) => (
-          <li key={q.name}>{q.text} — {q.name}, {q.role}</li>
+          <li key={q.name}>
+            {q.text} — {q.name}, {q.role}
+          </li>
         ))}
       </ul>
 

@@ -1,7 +1,13 @@
 // Per-post health insights: char usage, hashtag density, within-limit status.
 // Pure client-side, computed from a post + its target platform.
 
-import { formatForPlatform, resolvePlatform, niceLabelFor, PlatformKey, PostLike } from "./platformCopy";
+import {
+  formatForPlatform,
+  resolvePlatform,
+  niceLabelFor,
+  PlatformKey,
+  PostLike,
+} from "./platformCopy";
 
 export type LimitState = "ok" | "warn" | "over";
 export type DensityState = "sweet" | "sparse" | "dense" | "na";
@@ -40,8 +46,8 @@ function countTags(input: string | string[] | undefined | null): number {
   const raw = Array.isArray(input) ? input.join(" ") : input;
   return raw
     .split(/[\s,]+/)
-    .map(t => t.trim().replace(/^#+/, ""))
-    .filter(t => t.length > 1).length;
+    .map((t) => t.trim().replace(/^#+/, ""))
+    .filter((t) => t.length > 1).length;
 }
 
 export function insightFor(post: PostLike, platformInput?: string | null): PostInsights {
@@ -50,8 +56,7 @@ export function insightFor(post: PostLike, platformInput?: string | null): PostI
   const platformLabel = niceLabelFor(platformInput);
 
   const ratio = f.charCount / f.limit;
-  const limitState: LimitState =
-    f.charCount > f.limit ? "over" : ratio >= 0.9 ? "warn" : "ok";
+  const limitState: LimitState = f.charCount > f.limit ? "over" : ratio >= 0.9 ? "warn" : "ok";
 
   const longForm = isLongForm(platformInput);
   const hashtagCount = countTags(post.hashtags);
@@ -84,7 +89,7 @@ export function insightFor(post: PostLike, platformInput?: string | null): PostI
   const isTwitter = platform === "twitter";
   const minLen = isTwitter ? 20 : 35;
   const maxLen = isTwitter ? 100 : 180;
-  
+
   const hookScore = Math.min(
     1,
     [
@@ -96,11 +101,16 @@ export function insightFor(post: PostLike, platformInput?: string | null): PostI
   );
 
   const recommendations: string[] = [];
-  if (limitState === "over") recommendations.push(`Trim for ${platformLabel}; this version exceeds the platform limit.`);
-  else if (limitState === "warn") recommendations.push("Consider tightening the copy before publishing.");
-  if (hashtagState === "sparse") recommendations.push(`Add a few relevant hashtags for ${platformLabel}.`);
-  if (hashtagState === "dense") recommendations.push("Reduce hashtags so the post feels less crowded.");
-  if (hookScore < 0.5) recommendations.push("Strengthen the hook with a sharper claim, question, or concrete number.");
+  if (limitState === "over")
+    recommendations.push(`Trim for ${platformLabel}; this version exceeds the platform limit.`);
+  else if (limitState === "warn")
+    recommendations.push("Consider tightening the copy before publishing.");
+  if (hashtagState === "sparse")
+    recommendations.push(`Add a few relevant hashtags for ${platformLabel}.`);
+  if (hashtagState === "dense")
+    recommendations.push("Reduce hashtags so the post feels less crowded.");
+  if (hookScore < 0.5)
+    recommendations.push("Strengthen the hook with a sharper claim, question, or concrete number.");
 
   return {
     charCount: f.charCount,

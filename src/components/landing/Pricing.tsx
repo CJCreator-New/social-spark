@@ -12,11 +12,7 @@ const TIERS = [
     monthly: "Free",
     annual: "Free",
     desc: "Perfect for solo creators exploring AI content generation.",
-    features: [
-      "3 posts per week",
-      "2 social platforms",
-      "Basic brand voice",
-    ],
+    features: ["3 posts per week", "2 social platforms", "Basic brand voice"],
     cta: "Get started",
     ctaTo: "/auth",
     recommended: false,
@@ -65,7 +61,7 @@ const TIERS = [
 ];
 
 export default function Pricing() {
-  const sectionRef   = useRef<HTMLElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
   const [annual, setAnnual] = useState(false);
 
   useEffect(() => {
@@ -109,16 +105,22 @@ export default function Pricing() {
       }
     );
 
-    return () => { ScrollTrigger.getAll().forEach(t => t.kill()); };
+    return () => {
+      ScrollTrigger.getAll().forEach((t) => t.kill());
+    };
   }, []);
 
   const toggleBilling = () => {
     const noMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!noMotion) {
       const amounts = document.querySelectorAll(".ld-w-price-big");
-      gsap.fromTo(amounts, { opacity: 0, y: 4 }, { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" });
+      gsap.fromTo(
+        amounts,
+        { opacity: 0, y: 4 },
+        { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" }
+      );
     }
-    setAnnual(prev => !prev);
+    setAnnual((prev) => !prev);
   };
 
   return (
@@ -141,7 +143,9 @@ export default function Pricing() {
             className={`ld-w-billing-toggle${annual ? " annual" : ""}`}
             onClick={toggleBilling}
             aria-pressed={annual}
-            aria-label={annual ? "Switch to monthly billing" : "Switch to annual billing (save 20%)"}
+            aria-label={
+              annual ? "Switch to monthly billing" : "Switch to annual billing (save 20%)"
+            }
           >
             <span>Monthly</span>
             <div className="ld-w-toggle-track" aria-hidden="true" />
@@ -151,7 +155,7 @@ export default function Pricing() {
         </div>
 
         <div className="ld-w-pricing-grid" role="list">
-          {TIERS.map(tier => (
+          {TIERS.map((tier) => (
             <div
               key={tier.id}
               className={`ld-w-price-card${tier.recommended ? " recommended" : ""}`}
@@ -161,7 +165,9 @@ export default function Pricing() {
               {tier.recommended && (
                 <>
                   <div className="ld-w-price-conic-border" aria-hidden="true" />
-                  <span className="ld-w-recommended-badge" aria-hidden="true">Most popular</span>
+                  <span className="ld-w-recommended-badge" aria-hidden="true">
+                    Most popular
+                  </span>
                 </>
               )}
 
@@ -169,11 +175,9 @@ export default function Pricing() {
 
               <div className="ld-w-price-amount">
                 <span className="ld-w-price-big">
-                  {tier.id === "free" ? "Free" : (annual ? tier.annual : tier.monthly)}
+                  {tier.id === "free" ? "Free" : annual ? tier.annual : tier.monthly}
                 </span>
-                {tier.id !== "free" && (
-                  <span className="ld-w-price-period">/ month</span>
-                )}
+                {tier.id !== "free" && <span className="ld-w-price-period">/ month</span>}
               </div>
 
               <p className="ld-w-price-desc">{tier.desc}</p>
@@ -181,9 +185,11 @@ export default function Pricing() {
               <hr className="ld-w-price-divider" />
 
               <ul className="ld-w-price-features" role="list">
-                {tier.features.map(f => (
+                {tier.features.map((f) => (
                   <li key={f} role="listitem">
-                    <span className="check" aria-hidden="true">✓</span>
+                    <span className="check" aria-hidden="true">
+                      ✓
+                    </span>
                     {f}
                   </li>
                 ))}

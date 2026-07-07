@@ -26,7 +26,10 @@ export default function ResetPassword() {
     });
     // Also check if a session already exists (link already processed)
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) { resolved = true; setReady(true); }
+      if (data.session) {
+        resolved = true;
+        setReady(true);
+      }
     });
 
     // Timeout: if neither event nor session resolves the link in 20s, treat as invalid/expired.
@@ -34,7 +37,10 @@ export default function ResetPassword() {
       if (!resolved) setLinkExpired(true);
     }, 20000);
 
-    return () => { sub.subscription.unsubscribe(); clearTimeout(timer); };
+    return () => {
+      sub.subscription.unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -55,7 +61,10 @@ export default function ResetPassword() {
     <>
       <Helmet>
         <title>Reset your password — ContentForge</title>
-        <meta name="description" content="Set a new password for your ContentForge account to recover your workspace access." />
+        <meta
+          name="description"
+          content="Set a new password for your ContentForge account to recover your workspace access."
+        />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <div className="rp-app">
@@ -71,25 +80,65 @@ export default function ResetPassword() {
           </p>
           <div className="rp-state">
             <div className="rp-state-box">
-              <strong>{ready ? "Recovery link verified" : linkExpired ? "Recovery link unavailable" : "Checking link"}</strong>
-              <span>{ready ? "You're authenticated for recovery. Set a new password and continue into the app." : linkExpired ? "Request a fresh reset email from sign in." : "Please wait while we confirm the recovery session."}</span>
+              <strong>
+                {ready
+                  ? "Recovery link verified"
+                  : linkExpired
+                    ? "Recovery link unavailable"
+                    : "Checking link"}
+              </strong>
+              <span>
+                {ready
+                  ? "You're authenticated for recovery. Set a new password and continue into the app."
+                  : linkExpired
+                    ? "Request a fresh reset email from sign in."
+                    : "Please wait while we confirm the recovery session."}
+              </span>
             </div>
           </div>
           {linkExpired && (
             <div className="rp-link-row">
-              <button className="rp-btn" onClick={() => navigate("/auth")}>Back to sign in</button>
+              <button className="rp-btn" onClick={() => navigate("/auth")}>
+                Back to sign in
+              </button>
             </div>
           )}
           {ready && !linkExpired && (
             <form onSubmit={handleSubmit}>
-              <label className="rp-label" htmlFor="rp-password">New password</label>
-              <input id="rp-password" className="rp-input" type="password" required minLength={PASSWORD_MIN_LENGTH} value={password} onChange={e => setPassword(e.target.value)} placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`} />
-              <label className="rp-label" htmlFor="rp-confirm">Confirm password</label>
-              <input id="rp-confirm" className="rp-input" type="password" required minLength={PASSWORD_MIN_LENGTH} value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat it" />
+              <label className="rp-label" htmlFor="rp-password">
+                New password
+              </label>
+              <input
+                id="rp-password"
+                className="rp-input"
+                type="password"
+                required
+                minLength={PASSWORD_MIN_LENGTH}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`}
+              />
+              <label className="rp-label" htmlFor="rp-confirm">
+                Confirm password
+              </label>
+              <input
+                id="rp-confirm"
+                className="rp-input"
+                type="password"
+                required
+                minLength={PASSWORD_MIN_LENGTH}
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="Repeat it"
+              />
               {error && <div className="rp-err">{error}</div>}
-              <button className="rp-btn" type="submit" disabled={loading}>{loading ? "Saving…" : "Update password"}</button>
+              <button className="rp-btn" type="submit" disabled={loading}>
+                {loading ? "Saving…" : "Update password"}
+              </button>
               <div className="rp-link-row">
-                <button type="button" className="rp-link" onClick={() => navigate("/auth")}>Back to sign in</button>
+                <button type="button" className="rp-link" onClick={() => navigate("/auth")}>
+                  Back to sign in
+                </button>
               </div>
             </form>
           )}

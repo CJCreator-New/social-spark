@@ -3,7 +3,12 @@ import tailwindcssAnimate from "tailwindcss-animate";
 
 export default {
   darkMode: ["class"],
-  content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  content: [
+    "./pages/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./app/**/*.{ts,tsx}",
+    "./src/**/*.{ts,tsx}",
+  ],
   prefix: "",
   theme: {
     container: {
@@ -15,9 +20,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
-        display: ['Lora', 'Fraunces', 'Georgia', 'serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
+        display: ["Lora", "Fraunces", "Georgia", "serif"],
+        mono: ["JetBrains Mono", "Fira Code", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -92,6 +97,19 @@ export default {
           "text-secondary": "var(--color-text-secondary)",
           "text-muted": "var(--color-text-muted)",
           border: "var(--color-border)",
+          "border-strong": "var(--color-border-strong)",
+          success: "var(--color-success)",
+          "success-bg": "var(--color-success-bg)",
+          "success-text": "var(--color-success-text)",
+          "success-border": "var(--color-success-border)",
+          warning: "var(--color-warning)",
+          "warning-bg": "var(--color-warning-bg)",
+          "warning-text": "var(--color-warning-text)",
+          "warning-border": "var(--color-warning-border)",
+          error: "var(--color-error)",
+          "error-bg": "var(--color-error-bg)",
+          "error-text": "var(--color-error-text)",
+          "error-border": "var(--color-error-border)",
         },
       },
       borderRadius: {
@@ -119,8 +137,8 @@ export default {
         shimmer: "shimmer 2s linear infinite",
       },
       backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+        "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
+        "gradient-conic": "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
       },
     },
   },

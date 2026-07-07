@@ -3,9 +3,27 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { WARM_PALETTE } from "@/lib/theme";
 
 const CONFIG = {
-  free: { label: "Free", icon: Sparkles, color: WARM_PALETTE.textMuted, bg: "hsl(var(--muted))", border: "hsl(var(--border))" },
-  starter: { label: "Starter", icon: Zap, color: WARM_PALETTE.primary, bg: "hsl(var(--accent))", border: "hsl(var(--primary) / 0.25)" },
-  pro: { label: "Pro", icon: Crown, color: WARM_PALETTE.primary, bg: "hsl(var(--accent))", border: "hsl(var(--primary) / 0.25)" },
+  free: {
+    label: "Free",
+    icon: Sparkles,
+    color: WARM_PALETTE.textMuted,
+    bg: "hsl(var(--muted))",
+    border: "hsl(var(--border))",
+  },
+  starter: {
+    label: "Starter",
+    icon: Zap,
+    color: WARM_PALETTE.primary,
+    bg: "hsl(var(--accent))",
+    border: "hsl(var(--primary) / 0.25)",
+  },
+  pro: {
+    label: "Pro",
+    icon: Crown,
+    color: WARM_PALETTE.primary,
+    bg: "hsl(var(--accent))",
+    border: "hsl(var(--primary) / 0.25)",
+  },
 } as const;
 
 /** Small pill showing the user's current effective tier. */

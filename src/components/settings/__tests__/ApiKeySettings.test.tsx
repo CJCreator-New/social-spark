@@ -55,7 +55,13 @@ type ResolvedKeyState = {
 };
 
 // Default resolved state: no key saved
-const NO_KEY_STATE: ResolvedKeyState = { apiKey: null, hasKey: false, provider: null, useOwnKey: false, settingsError: false };
+const NO_KEY_STATE: ResolvedKeyState = {
+  apiKey: null,
+  hasKey: false,
+  provider: null,
+  useOwnKey: false,
+  settingsError: false,
+};
 
 // State with a saved key
 const SAVED_KEY_STATE: ResolvedKeyState = {
@@ -82,7 +88,12 @@ beforeEach(() => {
   mockSetUseOwnKey.mockResolvedValue(undefined);
   mockDeleteUserApiKey.mockResolvedValue(undefined);
   mockUpdateUserApiModel.mockResolvedValue(undefined);
-  mockGetQuotaStatus.mockResolvedValue({ used: 0, limit: 10, useOwnKey: false, keyMode: "fallback" });
+  mockGetQuotaStatus.mockResolvedValue({
+    used: 0,
+    limit: 10,
+    useOwnKey: false,
+    keyMode: "fallback",
+  });
   // Default: a freshly entered key passes the live validation gate before save.
   mockValidateUserApiKey.mockResolvedValue({ valid: true });
   // Default: entitled user so the key form renders.
@@ -160,7 +171,13 @@ describe("ApiKeySettings — BYOK access", () => {
 describe("ApiKeySettings — settings row warning", () => {
   it("shows a badge when the user_settings row cannot be read", async () => {
     mockGetUserApiKey.mockResolvedValue({ ...NO_KEY_STATE, settingsError: true });
-    mockGetQuotaStatus.mockResolvedValue({ used: 0, limit: 10, useOwnKey: false, keyMode: "fallback", planPeriodEnd: new Date().toISOString() });
+    mockGetQuotaStatus.mockResolvedValue({
+      used: 0,
+      limit: 10,
+      useOwnKey: false,
+      keyMode: "fallback",
+      planPeriodEnd: new Date().toISOString(),
+    });
     render(<ApiKeySettings />);
 
     await waitFor(() => {
@@ -335,7 +352,10 @@ describe("ApiKeySettings — live key validation", () => {
   });
 
   it("shows the failure reason when the key is rejected", async () => {
-    mockValidateUserApiKey.mockResolvedValue({ valid: false, reason: "Key was rejected (invalid or revoked)." });
+    mockValidateUserApiKey.mockResolvedValue({
+      valid: false,
+      reason: "Key was rejected (invalid or revoked).",
+    });
     await renderAndWait();
     const input = screen.getByLabelText("API Key") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "sk-" + "a".repeat(32) } });
@@ -348,7 +368,10 @@ describe("ApiKeySettings — live key validation", () => {
   });
 
   it("does NOT save when the new key fails validation", async () => {
-    mockValidateUserApiKey.mockResolvedValue({ valid: false, reason: "Key was rejected (invalid or revoked)." });
+    mockValidateUserApiKey.mockResolvedValue({
+      valid: false,
+      reason: "Key was rejected (invalid or revoked).",
+    });
     await renderAndWait();
     const input = screen.getByLabelText("API Key") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "sk-" + "a".repeat(32) } });
@@ -407,7 +430,7 @@ describe("ApiKeySettings — enable as fallback checkbox", () => {
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(mockSetUseOwnKey).toHaveBeenCalledWith(true, 'fallback');
+      expect(mockSetUseOwnKey).toHaveBeenCalledWith(true, "fallback");
     });
   });
 });
@@ -504,7 +527,11 @@ describe("ApiKeySettings — model picker", () => {
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(mockSaveUserApiKey).toHaveBeenCalledWith("sk-" + "a".repeat(32), "openai", "gpt-5-mini");
+      expect(mockSaveUserApiKey).toHaveBeenCalledWith(
+        "sk-" + "a".repeat(32),
+        "openai",
+        "gpt-5-mini"
+      );
     });
   });
 

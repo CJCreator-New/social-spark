@@ -16,23 +16,47 @@ export default function FinalCTA() {
     const noMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (noMotion) return;
 
-    const copy   = sectionRef.current.querySelector(".ld-w-final-copy");
+    const copy = sectionRef.current.querySelector(".ld-w-final-copy");
     const canvas = sectionRef.current.querySelector(".ld-w-final-canvas");
 
     if (copy) {
-      gsap.fromTo(copy, { y: 32, opacity: 0 }, {
-        y: 0, opacity: 1, duration: 0.9, ease: "power3.out",
-        scrollTrigger: { trigger: sectionRef.current, start: "top 80%", toggleActions: "play none none none" },
-      });
+      gsap.fromTo(
+        copy,
+        { y: 32, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.9,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 80%",
+            toggleActions: "play none none none",
+          },
+        }
+      );
     }
     if (canvas) {
-      gsap.fromTo(canvas, { opacity: 0 }, {
-        opacity: 1, duration: 0.8, delay: 0.3, ease: "power2.out",
-        scrollTrigger: { trigger: sectionRef.current, start: "top 80%", toggleActions: "play none none none" },
-      });
+      gsap.fromTo(
+        canvas,
+        { opacity: 0 },
+        {
+          opacity: 1,
+          duration: 0.8,
+          delay: 0.3,
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 80%",
+            toggleActions: "play none none none",
+          },
+        }
+      );
     }
 
-    return () => { ScrollTrigger.getAll().forEach(t => t.kill()); };
+    return () => {
+      ScrollTrigger.getAll().forEach((t) => t.kill());
+    };
   }, []);
 
   return (
@@ -51,7 +75,8 @@ export default function FinalCTA() {
                 Start creating <em>brilliant</em> content today.
               </h2>
               <p className="ld-w-final-sub">
-                Join thousands of content creators who ship a full week of posts in under a minute. Free to start, no credit card required.
+                Join thousands of content creators who ship a full week of posts in under a minute.
+                Free to start, no credit card required.
               </p>
               <div className="ld-w-final-actions">
                 <Link
@@ -64,7 +89,11 @@ export default function FinalCTA() {
                   <span className="ld-w-sparkle ld-w-sparkle-2" aria-hidden="true" />
                   <span className="ld-w-sparkle ld-w-sparkle-3" aria-hidden="true" />
                 </Link>
-                <a href="#how-it-works" className="ld-w-final-link" aria-label="See how ContentForge works">
+                <a
+                  href="#how-it-works"
+                  className="ld-w-final-link"
+                  aria-label="See how ContentForge works"
+                >
                   See a demo <ArrowRight size={14} aria-hidden="true" />
                 </a>
               </div>

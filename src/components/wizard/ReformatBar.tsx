@@ -37,8 +37,10 @@ export function ReformatBar({
         aria-label="Choose another platform to reformat for"
       >
         <option value="">Another platform…</option>
-        {PLATFORM_OPTIONS.filter(po => po.id !== platform).map(po => (
-          <option key={po.id} value={po.id}>{po.label}</option>
+        {PLATFORM_OPTIONS.filter((po) => po.id !== platform).map((po) => (
+          <option key={po.id} value={po.id}>
+            {po.label}
+          </option>
         ))}
       </select>
       <button
@@ -46,9 +48,15 @@ export function ReformatBar({
         className="reformat-btn"
         disabled={!reformatTarget || reformatting || regenIdx !== null || !userExists}
         onClick={() => reformatAllForPlatform(reformatTarget)}
-        title={!userExists ? "Sign in — saved as a new calendar" : "Re-runs all posts; saved as a new calendar"}
+        title={
+          !userExists
+            ? "Sign in — saved as a new calendar"
+            : "Re-runs all posts; saved as a new calendar"
+        }
       >
-        {reformatting ? `Reformatting… ${regenIdx !== null ? `(${regenIdx + 1}/${postsLength})` : ""}` : `Reformat all ${postsLength} →`}
+        {reformatting
+          ? `Reformatting… ${regenIdx !== null ? `(${regenIdx + 1}/${postsLength})` : ""}`
+          : `Reformat all ${postsLength} →`}
       </button>
       <span style={{ flex: 1 }} />
       <button

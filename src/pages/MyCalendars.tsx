@@ -73,7 +73,8 @@ export default function MyCalendars() {
   const renameCalendarMutation = useRenameCalendarMutation(user?.id);
   const duplicateCalendarMutation = useDuplicateCalendarMutation(user?.id);
 
-  const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useSavedCalendarsInfiniteQuery(user?.id, PAGE_SIZE);
+  const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useSavedCalendarsInfiniteQuery(user?.id, PAGE_SIZE);
 
   useEffect(() => {
     if (error instanceof Error) toast.error(error.message);
@@ -112,12 +113,17 @@ export default function MyCalendars() {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         }
         if (sortBy === "title") return a.title.localeCompare(b.title);
-        if (sortBy === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        if (sortBy === "oldest")
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
   }, [items, favOnly, debouncedSearch, sortBy]);
   const favoriteCount = useMemo(() => items.filter((item) => item.is_favorite).length, [items]);
-  const totalPosts = useMemo(() => items.reduce((count, item) => count + (Array.isArray(item.posts) ? item.posts.length : 0), 0), [items]);
+  const totalPosts = useMemo(
+    () =>
+      items.reduce((count, item) => count + (Array.isArray(item.posts) ? item.posts.length : 0), 0),
+    [items]
+  );
   const visibleCount = filteredItems.length;
 
   const visibleSubtitle = useMemo(() => {
@@ -129,23 +135,30 @@ export default function MyCalendars() {
     return "All saved calendars";
   }, [favOnly, debouncedSearch, isFiltering, isFetchingNextPage]);
 
-  const toggleFavorite = useCallback(async (it: SavedCalendar) => {
-    const next = !it.is_favorite;
-    try {
-      await toggleFavoriteMutation.mutateAsync({ id: it.id, isFavorite: next });
-      log.info("Calendar favorite updated", { calendarId: it.id, isFavorite: next });
-      await refetch();
-    } catch (error) {
-      log.error("Failed to toggle favorite", error, { calendarId: it.id });
-      toast.error(error instanceof Error ? error.message : "Toggle favorite failed");
-    }
-  }, [toggleFavoriteMutation, refetch, log]);
+  const toggleFavorite = useCallback(
+    async (it: SavedCalendar) => {
+      const next = !it.is_favorite;
+      try {
+        await toggleFavoriteMutation.mutateAsync({ id: it.id, isFavorite: next });
+        log.info("Calendar favorite updated", { calendarId: it.id, isFavorite: next });
+        await refetch();
+      } catch (error) {
+        log.error("Failed to toggle favorite", error, { calendarId: it.id });
+        toast.error(error instanceof Error ? error.message : "Toggle favorite failed");
+      }
+    },
+    [toggleFavoriteMutation, refetch, log]
+  );
 
   async function confirmDelete() {
     if (!pendingDelete) return;
     setDeleting(true);
     // Try to fetch full record so we can offer an undo (re-insert) if deletion succeeds
-    const { data: full, error: fetchErr } = await supabase.from("saved_calendars").select("*").eq("id", pendingDelete.id).maybeSingle();
+    const { data: full, error: fetchErr } = await supabase
+      .from("saved_calendars")
+      .select("*")
+      .eq("id", pendingDelete.id)
+      .maybeSingle();
     try {
       await deleteCalendarMutation.mutateAsync(pendingDelete.id);
     } catch (error) {
@@ -241,71 +254,119 @@ export default function MyCalendars() {
     toast.success("Renamed");
   }, [renamingId, renameValue, renameCalendarMutation, refetch, log]);
 
-  const duplicate = useCallback(async (it: SavedCalendar) => {
-    if (!user || duplicatingId) return;
-    setDuplicatingId(it.id);
+  const duplicate = useCallback(
+    async (it: SavedCalendar) => {
+      if (!user || duplicatingId) return;
+      setDuplicatingId(it.id);
 
-    const { data: full, error: fetchErr } = await supabase.from("saved_calendars").select("*").eq("id", it.id).maybeSingle();
-    if (fetchErr || !full) {
+      const { data: full, error: fetchErr } = await supabase
+        .from("saved_calendars")
+        .select("*")
+        .eq("id", it.id)
+        .maybeSingle();
+      if (fetchErr || !full) {
+        setDuplicatingId(null);
+        toast.error(fetchErr?.message || "Failed to load source");
+        return;
+      }
+
+      const newTitle = `${full.title} (copy)`.slice(0, 80);
+      try {
+        await duplicateCalendarMutation.mutateAsync({
+          user_id: user.id,
+          title: newTitle,
+          industry: full.industry,
+          industry_label: full.industry_label,
+          platform: full.platform,
+          core_idea: full.core_idea,
+          form_payload: full.form_payload as never,
+          posts: full.posts as never,
+          is_favorite: false,
+        });
+      } catch (error) {
+        setDuplicatingId(null);
+        toast.error(error instanceof Error ? error.message : "Duplicate failed");
+        return;
+      }
       setDuplicatingId(null);
-      toast.error(fetchErr?.message || "Failed to load source");
-      return;
-    }
 
-    const newTitle = `${full.title} (copy)`.slice(0, 80);
-    try {
-      await duplicateCalendarMutation.mutateAsync({
-        user_id: user.id,
-        title: newTitle,
-        industry: full.industry,
-        industry_label: full.industry_label,
-        platform: full.platform,
-        core_idea: full.core_idea,
-        form_payload: full.form_payload as never,
-        posts: full.posts as never,
-        is_favorite: false,
-      });
-    } catch (error) {
-      setDuplicatingId(null);
-      toast.error(error instanceof Error ? error.message : "Duplicate failed");
-      return;
-    }
-    setDuplicatingId(null);
+      log.info("Calendar duplicated", { sourceCalendarId: it.id });
+      await refetch();
+      toast.success("Duplicated");
+    },
+    [user, duplicatingId, duplicateCalendarMutation, refetch, log]
+  );
 
-    log.info("Calendar duplicated", { sourceCalendarId: it.id });
-    await refetch();
-    toast.success("Duplicated");
-  }, [user, duplicatingId, duplicateCalendarMutation, refetch, log]);
-
-  const renderCalendarItem = useCallback((it: SavedCalendar, index: number) => {
-    return (
-      <CalendarItem
-        it={it}
-        renamingId={renamingId}
-        renameValue={renameValue}
-        renameSaving={renameSaving}
-        setRenameValue={setRenameValue}
-        saveRename={saveRename}
-        setRenamingId={setRenamingId}
-        startRename={startRename}
-        duplicate={duplicate}
-        duplicatingId={duplicatingId}
-        setPendingDelete={setPendingDelete}
-        toggleFavorite={toggleFavorite}
-      />
-    );
-  }, [renamingId, renameValue, renameSaving, saveRename, startRename, duplicate, duplicatingId, toggleFavorite]);
+  const renderCalendarItem = useCallback(
+    (it: SavedCalendar, index: number) => {
+      return (
+        <CalendarItem
+          it={it}
+          renamingId={renamingId}
+          renameValue={renameValue}
+          renameSaving={renameSaving}
+          setRenameValue={setRenameValue}
+          saveRename={saveRename}
+          setRenamingId={setRenamingId}
+          startRename={startRename}
+          duplicate={duplicate}
+          duplicatingId={duplicatingId}
+          setPendingDelete={setPendingDelete}
+          toggleFavorite={toggleFavorite}
+        />
+      );
+    },
+    [
+      renamingId,
+      renameValue,
+      renameSaving,
+      saveRename,
+      startRename,
+      duplicate,
+      duplicatingId,
+      toggleFavorite,
+    ]
+  );
 
   return (
     <>
       <Helmet>
         <title>My content calendars — ContentForge</title>
-        <meta name="description" content="View and manage your saved AI content calendars. Search, star, rename, duplicate, or delete your content archives." />
+        <meta
+          name="description"
+          content="View and manage your saved AI content calendars. Search, star, rename, duplicate, or delete your content archives."
+        />
       </Helmet>
       {lastDeleted && (
-        <div style={{ maxWidth: 760, margin: '0 auto 12px', padding: 12, background: '#ffffff', border: '1px solid #e7e5e4', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 20px rgba(120,113,108,0.08)' }}>
-          <div style={{ color: '#1c1917' }}>
-            Deleted "{lastDeleted.title}" — <button onClick={undoDelete} style={{ color: '#c2410c', marginLeft: 8, background: 'transparent', border: '1px solid #e7e5e4', padding: '6px 10px', borderRadius: 6 }}>Undo</button>
+        <div
+          style={{
+            maxWidth: 760,
+            margin: "0 auto 12px",
+            padding: 12,
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            boxShadow: "0 4px 20px color-mix(in srgb, var(--color-text-muted) 8%, transparent)",
+          }}
+        >
+          <div style={{ color: "var(--color-text)" }}>
+            Deleted "{lastDeleted.title}" —{" "}
+            <button
+              onClick={undoDelete}
+              style={{
+                color: "var(--color-primary)",
+                marginLeft: 8,
+                background: "transparent",
+                border: "1px solid var(--color-border)",
+                padding: "6px 10px",
+                borderRadius: 6,
+              }}
+            >
+              Undo
+            </button>
           </div>
         </div>
       )}
@@ -313,7 +374,7 @@ export default function MyCalendars() {
         <div className="mb-8 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-display font-normal">
-              My <em className="text-[#c2410c]">calendars</em>
+              My <em className="text-[var(--color-primary)]">calendars</em>
             </h1>
             <p className="text-muted-foreground text-xs mt-1.5">
               Manage your saved calendar blueprints and scheduled queue items.
@@ -367,7 +428,8 @@ export default function MyCalendars() {
               onClick={() => setFavOnly((f) => !f)}
               aria-pressed={favOnly}
             >
-              <Star size={14} fill={favOnly ? "currentColor" : "none"} aria-hidden="true" /> Starred only
+              <Star size={14} fill={favOnly ? "currentColor" : "none"} aria-hidden="true" /> Starred
+              only
             </button>
             <select
               className="mc-sort"
@@ -388,7 +450,11 @@ export default function MyCalendars() {
         ) : error ? (
           <ErrorState
             title="Couldn't load your calendars"
-            description={error instanceof Error ? error.message : "Something went wrong while fetching your saved calendars."}
+            description={
+              error instanceof Error
+                ? error.message
+                : "Something went wrong while fetching your saved calendars."
+            }
             onRetry={() => refetch()}
           />
         ) : items.length === 0 ? (
@@ -400,7 +466,8 @@ export default function MyCalendars() {
               No <em>calendars</em> yet
             </h2>
             <p className="mc-empty-sub">
-              Generate a full week of platform-native posts tailored to your niche, voice, and audience — saved here for quick access.
+              Generate a full week of platform-native posts tailored to your niche, voice, and
+              audience — saved here for quick access.
             </p>
             <Link to="/app" className="mc-empty-cta">
               Generate your first calendar →
@@ -408,30 +475,35 @@ export default function MyCalendars() {
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="mc-empty">
-            <div className="mc-empty-illus" aria-hidden="true"><Search size={34} strokeWidth={1.6} /></div>
-            <div className="mc-empty-title">No <em>matches</em></div>
-            <p className="mc-empty-sub">Try a different search term or switch off the starred-only filter to see more calendars.</p>
+            <div className="mc-empty-illus" aria-hidden="true">
+              <Search size={34} strokeWidth={1.6} />
+            </div>
+            <div className="mc-empty-title">
+              No <em>matches</em>
+            </div>
+            <p className="mc-empty-sub">
+              Try a different search term or switch off the starred-only filter to see more
+              calendars.
+            </p>
           </div>
         ) : (
           <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-            {filteredItems.map((it, idx) => (
-              <div key={it.id}>
-                {renderCalendarItem(it, idx)}
-              </div>
-            ))}
-          </div>
-          {hasNextPage && (
-            <div style={{ display: "flex", justifyContent: "center", marginTop: 24 }}>
-              <button
-                className="mc-act"
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-              >
-                {isFetchingNextPage ? "Loading more…" : "Load more"}
-              </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+              {filteredItems.map((it, idx) => (
+                <div key={it.id}>{renderCalendarItem(it, idx)}</div>
+              ))}
             </div>
-          )}
+            {hasNextPage && (
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 24 }}>
+                <button
+                  className="mc-act"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                >
+                  {isFetchingNextPage ? "Loading more…" : "Load more"}
+                </button>
+              </div>
+            )}
           </>
         )}
       </WorkspacePage>
@@ -440,8 +512,12 @@ export default function MyCalendars() {
         <ConfirmDialog
           title="Delete this calendar?"
           message={`“${pendingDelete.title}” will be permanently removed. This cannot be undone.`}
-          onCancel={() => { if (!deleting) setPendingDelete(null); }}
-          onConfirm={async () => { await confirmDelete(); }}
+          onCancel={() => {
+            if (!deleting) setPendingDelete(null);
+          }}
+          onConfirm={async () => {
+            await confirmDelete();
+          }}
         />
       )}
     </>

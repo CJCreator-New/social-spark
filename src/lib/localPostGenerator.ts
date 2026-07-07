@@ -51,7 +51,7 @@ const DAY_ANGLES = [
 ];
 
 function uniq(values: string[]): string[] {
-  return Array.from(new Set(values.map(v => String(v || "").trim()).filter(Boolean)));
+  return Array.from(new Set(values.map((v) => String(v || "").trim()).filter(Boolean)));
 }
 
 function distributeTopicsAcrossWeek(topics: string[]): string[] {
@@ -61,7 +61,11 @@ function distributeTopicsAcrossWeek(topics: string[]): string[] {
   }
 
   if (uniqueTopics.length <= 7) {
-    return Array.from({ length: 7 }, (_, index) => uniqueTopics[index] || uniqueTopics[index % uniqueTopics.length] || uniqueTopics[0]);
+    return Array.from(
+      { length: 7 },
+      (_, index) =>
+        uniqueTopics[index] || uniqueTopics[index % uniqueTopics.length] || uniqueTopics[0]
+    );
   }
 
   const buckets = Array.from({ length: 7 }, () => [] as string[]);
@@ -69,11 +73,14 @@ function distributeTopicsAcrossWeek(topics: string[]): string[] {
     buckets[index % 7].push(topic);
   });
 
-  return buckets.map(bucket => bucket.join(" + "));
+  return buckets.map((bucket) => bucket.join(" + "));
 }
 
 function toTag(value: string): string {
-  const clean = String(value || "").replace(/^#+/, "").replace(/[^\w]/g, "").toLowerCase();
+  const clean = String(value || "")
+    .replace(/^#+/, "")
+    .replace(/[^\w]/g, "")
+    .toLowerCase();
   return clean ? `#${clean}` : "";
 }
 
@@ -88,39 +95,54 @@ function platformHashtags(input: LocalGenerationInput, topic: string): string {
     input.industry,
     input.industryLabel || input.industry,
     ...topic.split(/\s+/),
-    ...input.requiredHashtags || [],
+    ...(input.requiredHashtags || []),
   ])
     .map(toTag)
     .filter(Boolean);
-  const banned = new Set((input.bannedHashtags || []).map(t => toTag(t).toLowerCase()));
+  const banned = new Set((input.bannedHashtags || []).map((t) => toTag(t).toLowerCase()));
   const out: string[] = [];
   for (const tag of base) {
     const key = tag.toLowerCase();
     if (out.length >= 4) break;
-    if (!tag || banned.has(key) || out.some(v => v.toLowerCase() === key)) continue;
+    if (!tag || banned.has(key) || out.some((v) => v.toLowerCase() === key)) continue;
     out.push(tag);
   }
   return out.join(" ");
 }
 
 function titleFor(topic: string, angle: string, platform: string): string {
-  const suffix = platform === "LinkedIn" ? "for professionals" : platform === "Twitter/X" ? "in 60 seconds" : "that lands";
+  const suffix =
+    platform === "LinkedIn"
+      ? "for professionals"
+      : platform === "Twitter/X"
+        ? "in 60 seconds"
+        : "that lands";
   return `${topic} — ${angle} ${suffix}`;
 }
 
 function hookFor(topic: string, angle: string, voice: string): string {
-  if (/question/i.test(voice)) return `Why does ${topic} keep tripping people up? Because most teams skip ${angle}.`;
-  if (/data|analytical|technical/i.test(voice)) return `${topic} gets misread when teams ignore ${angle}. The result is slower growth and noisier decisions.`;
+  if (/question/i.test(voice))
+    return `Why does ${topic} keep tripping people up? Because most teams skip ${angle}.`;
+  if (/data|analytical|technical/i.test(voice))
+    return `${topic} gets misread when teams ignore ${angle}. The result is slower growth and noisier decisions.`;
   return `${topic} works best when you focus on ${angle} instead of the hype.`;
 }
 
-function bodyFor(input: LocalGenerationInput, topic: string, angle: string, length: string, structure: string): string {
+function bodyFor(
+  input: LocalGenerationInput,
+  topic: string,
+  angle: string,
+  length: string,
+  structure: string
+): string {
   const audience = input.audiences[0] || "the audience";
   const idea = input.coreIdea || input.industryLabel || input.industry || "this topic";
   const baseParagraphs = [
     `For ${audience}, ${topic} is less about theory and more about making a clear decision around ${angle}.`,
     `When you connect it back to ${idea}, the practical win is easier to see: fewer guesses, clearer next steps, and better follow-through.`,
-    input.extra ? input.extra : `A simple way to start is to pick one metric, one action, and one audience signal to test this week.`,
+    input.extra
+      ? input.extra
+      : `A simple way to start is to pick one metric, one action, and one audience signal to test this week.`,
   ];
 
   if (/bullet/i.test(structure)) {
@@ -134,7 +156,10 @@ function bodyFor(input: LocalGenerationInput, topic: string, angle: string, leng
   }
 
   if (length === "long") {
-    return baseParagraphs.join("\n\n") + `\n\nThe point is not to sound clever. The point is to make the next step obvious.`;
+    return (
+      baseParagraphs.join("\n\n") +
+      `\n\nThe point is not to sound clever. The point is to make the next step obvious.`
+    );
   }
 
   if (length === "short") {
@@ -160,8 +185,14 @@ function imagePromptFor(input: LocalGenerationInput, topic: string, angle: strin
   const audience = input.audiences[0] || "the audience";
   const idea = input.coreIdea || input.industryLabel || input.industry || topic;
   const platform = input.platform || "social";
-  const aspectRatio = /x|twitter/i.test(platform) ? "16:9" : /story|reel|tiktok/i.test(platform) ? "9:16" : "4:5";
-  const mood = /data|analytical|technical/i.test(String(input.voice || "") + " " + String(input.style || ""))
+  const aspectRatio = /x|twitter/i.test(platform)
+    ? "16:9"
+    : /story|reel|tiktok/i.test(platform)
+      ? "9:16"
+      : "4:5";
+  const mood = /data|analytical|technical/i.test(
+    String(input.voice || "") + " " + String(input.style || "")
+  )
     ? "sharp, high-contrast, precise"
     : /warm|friendly|human/i.test(String(input.voice || "") + " " + String(input.style || ""))
       ? "warm, cinematic, emotionally grounded"
@@ -185,7 +216,15 @@ function normalizeTopic(value: string, fallback: string): string {
 }
 
 export function generateLocalPosts(input: LocalGenerationInput): GeneratedPost[] {
-  const baseTopics = input.topics.length ? input.topics : [input.targetTopic || input.coreIdea || input.industryLabel || input.industry || "your topic"];
+  const baseTopics = input.topics.length
+    ? input.topics
+    : [
+        input.targetTopic ||
+          input.coreIdea ||
+          input.industryLabel ||
+          input.industry ||
+          "your topic",
+      ];
   const effectiveTopics = distributeTopicsAcrossWeek(baseTopics);
 
   return effectiveTopics.map((rawTopic, index) => {

@@ -339,9 +339,7 @@ export function validateConfig(): Config {
   const result = ConfigSchema.safeParse(config);
   if (!result.success) {
     console.error("Config validation failed:", result.error);
-    throw new Error(
-      `Invalid configuration: ${result.error.message}`
-    );
+    throw new Error(`Invalid configuration: ${result.error.message}`);
   }
 
   return result.data;
@@ -351,10 +349,7 @@ export function validateConfig(): Config {
  * Helper: Get platform character limit
  */
 export function getPlatformLimit(platform: string): number {
-  return (
-    PLATFORM_LIMITS[platform as keyof typeof PLATFORM_LIMITS] ||
-    PLATFORM_LIMITS.linkedin
-  );
+  return PLATFORM_LIMITS[platform as keyof typeof PLATFORM_LIMITS] || PLATFORM_LIMITS.linkedin;
 }
 
 /**

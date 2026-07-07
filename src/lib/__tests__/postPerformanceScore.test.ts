@@ -88,7 +88,10 @@ describe("postPerformanceScore tests", () => {
 
     it("scores a CTA with no actionable verb lower than a specific, action-oriented CTA", () => {
       const noVerbCta: Post = { ...samplePost, cta: "Thanks for reading." };
-      const actionCta: Post = { ...samplePost, cta: "Comment below with your favorite AI Engineering tool!" };
+      const actionCta: Post = {
+        ...samplePost,
+        cta: "Comment below with your favorite AI Engineering tool!",
+      };
       const weakScore = calculatePerformanceScore(noVerbCta, "AI Engineering");
       const strongScore = calculatePerformanceScore(actionCta, "AI Engineering");
       expect(weakScore.ctaEffectiveness).toBeLessThan(strongScore.ctaEffectiveness);

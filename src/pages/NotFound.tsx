@@ -13,7 +13,10 @@ const NotFound = () => {
     <>
       <Helmet>
         <title>Page not found — ContentForge</title>
-        <meta name="description" content="The page you're looking for doesn't exist. Head back to ContentForge to keep generating on-brand content calendars." />
+        <meta
+          name="description"
+          content="The page you're looking for doesn't exist. Head back to ContentForge to keep generating on-brand content calendars."
+        />
         <meta name="robots" content="noindex, follow" />
         <link rel="canonical" href="https://contentforged.lovable.app/" />
       </Helmet>
@@ -29,7 +32,7 @@ const NotFound = () => {
           .nf-sub { font-size:var(--text-base); line-height:1.75; color:var(--color-text-secondary); margin:0 0 18px; max-width:52ch; }
           .nf-actions { display:flex; gap:10px; flex-wrap:wrap; }
           .nf-link, .nf-primary { display:inline-flex; align-items:center; justify-content:center; padding:12px 16px; border-radius:var(--radius-pill); text-decoration:none; font-weight:700; font-size:13px; transition:var(--transition-fast); }
-          .nf-primary { background:var(--color-primary); color:#ffffff; box-shadow:var(--shadow-btn); }
+          .nf-primary { background:var(--color-primary); color:var(--color-surface); box-shadow:var(--shadow-btn); }
           .nf-primary:hover { background:var(--color-primary-hover); box-shadow:var(--shadow-btn-hover); }
           .nf-link { border:1px solid var(--color-border); color:var(--color-text); background:var(--color-surface); }
           .nf-link:hover { border-color:var(--color-primary); background:var(--color-primary-xlight); }
@@ -49,20 +52,40 @@ const NotFound = () => {
           <div className="nf-eyebrow">ContentForge</div>
           <div className="nf-grid">
             <div>
-              <h1 className="nf-title">This page drifted <em>off brief</em>.</h1>
-              <p className="nf-sub">The route you opened does not exist. Jump back into the product, or go to the public landing page if you need to start from the top.</p>
+              <h1 className="nf-title">
+                This page drifted <em>off brief</em>.
+              </h1>
+              <p className="nf-sub">
+                The route you opened does not exist. Jump back into the product, or go to the public
+                landing page if you need to start from the top.
+              </p>
               <div className="nf-actions">
-                <a href="/app" className="nf-primary">Go to app</a>
-                <a href="/" className="nf-link">Landing page</a>
-                <a href="/auth" className="nf-link">Sign in</a>
+                <a href="/app" className="nf-primary">
+                  Go to app
+                </a>
+                <a href="/" className="nf-link">
+                  Landing page
+                </a>
+                <a href="/auth" className="nf-link">
+                  Sign in
+                </a>
               </div>
             </div>
             <aside className="nf-panel">
               <div className="nf-number">404</div>
-              <div className="nf-caption">If you were looking for a calendar, schedule, or profile page, the links above will get you back on track.</div>
+              <div className="nf-caption">
+                If you were looking for a calendar, schedule, or profile page, the links above will
+                get you back on track.
+              </div>
               <div className="nf-list">
-                <div className="nf-item"><strong>Tip:</strong> if you hit this from a bookmarked page, refresh the app entry after signing in.</div>
-                <div className="nf-item"><strong>Need help?</strong> return to the landing page and start again from the main CTA.</div>
+                <div className="nf-item">
+                  <strong>Tip:</strong> if you hit this from a bookmarked page, refresh the app
+                  entry after signing in.
+                </div>
+                <div className="nf-item">
+                  <strong>Need help?</strong> return to the landing page and start again from the
+                  main CTA.
+                </div>
               </div>
             </aside>
           </div>

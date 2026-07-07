@@ -24,11 +24,11 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     if (timedOut) {
-      return <RouteFallback title="Permission check timed out" ariaLabel="Permission check timed out" />;
+      return (
+        <RouteFallback title="Permission check timed out" ariaLabel="Permission check timed out" />
+      );
     }
-    return (
-      <RouteFallback title="Checking permissions" ariaLabel="Checking admin permissions" />
-    );
+    return <RouteFallback title="Checking permissions" ariaLabel="Checking admin permissions" />;
   }
   if (!isAdmin) {
     return <Navigate to="/app" replace />;

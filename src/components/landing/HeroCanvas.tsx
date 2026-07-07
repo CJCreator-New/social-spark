@@ -173,9 +173,9 @@ export default function HeroCanvas() {
 
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(width, height),
-      0.8,  // Strength
-      0.4,  // Radius
-      0.3   // Threshold
+      0.8, // Strength
+      0.4, // Radius
+      0.3 // Threshold
     );
     composer.addPass(bloomPass);
 
@@ -242,7 +242,7 @@ export default function HeroCanvas() {
       resizeObserver.disconnect();
       io.disconnect();
       cancelAnimationFrame(animationFrameId);
-      
+
       geometry.dispose();
       material.dispose();
       renderer.dispose();
@@ -253,8 +253,8 @@ export default function HeroCanvas() {
   }, []);
 
   return (
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className="w-full h-full min-h-[450px] relative pointer-events-none"
       style={{ mixBlendMode: "multiply", opacity: 0.4 }}
     />

@@ -6,23 +6,24 @@ import { PageLoader } from "@/components/ui/PageLoader";
 import "@/styles/pages.css";
 
 // Section components (eager — no Three.js inside them)
-import LandingNav        from "@/components/landing/LandingNav";
-import LandingHero       from "@/components/landing/LandingHero";
-import SocialProofBar    from "@/components/landing/SocialProofBar";
-import FeatureShowcase   from "@/components/landing/FeatureShowcase";
-import BentoGrid         from "@/components/landing/BentoGrid";
-import HowItWorks        from "@/components/landing/HowItWorks";
-import Testimonials      from "@/components/landing/Testimonials";
-import Pricing           from "@/components/landing/Pricing";
-import FinalCTA          from "@/components/landing/FinalCTA";
-import LandingFooter     from "@/components/landing/LandingFooter";
+import LandingNav from "@/components/landing/LandingNav";
+import LandingHero from "@/components/landing/LandingHero";
+import SocialProofBar from "@/components/landing/SocialProofBar";
+import FeatureShowcase from "@/components/landing/FeatureShowcase";
+import BentoGrid from "@/components/landing/BentoGrid";
+import HowItWorks from "@/components/landing/HowItWorks";
+import Testimonials from "@/components/landing/Testimonials";
+import Pricing from "@/components/landing/Pricing";
+import FinalCTA from "@/components/landing/FinalCTA";
+import LandingFooter from "@/components/landing/LandingFooter";
 
 // Heavy Lenis + GSAP smooth scroll (lazy — initialises on first render)
 const SmoothScroll = lazy(() => import("@/components/landing/SmoothScroll"));
 
 const PAGE_TITLE = "ContentForge — AI-powered weekly content calendars";
-const PAGE_DESC  = "Turn one brief into a week of on-brand posts for LinkedIn, X, Instagram, and more. Schedule, refine, and publish — all in one place.";
-const CANONICAL  = "https://contentforged.lovable.app/";
+const PAGE_DESC =
+  "Turn one brief into a week of on-brand posts for LinkedIn, X, Instagram, and more. Schedule, refine, and publish — all in one place.";
+const CANONICAL = "https://contentforged.lovable.app/";
 
 const JSON_LD = JSON.stringify({
   "@context": "https://schema.org",
@@ -51,12 +52,12 @@ export default function Landing() {
         <title>{PAGE_TITLE}</title>
         <meta name="description" content={PAGE_DESC} />
         <link rel="canonical" href={CANONICAL} />
-        <meta property="og:title"       content={PAGE_TITLE} />
+        <meta property="og:title" content={PAGE_TITLE} />
         <meta property="og:description" content={PAGE_DESC} />
-        <meta property="og:type"        content="website" />
-        <meta property="og:url"         content={CANONICAL} />
-        <meta name="twitter:card"        content="summary_large_image" />
-        <meta name="twitter:title"       content={PAGE_TITLE} />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={CANONICAL} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={PAGE_TITLE} />
         <meta name="twitter:description" content={PAGE_DESC} />
         <script type="application/ld+json">{JSON_LD}</script>
       </Helmet>

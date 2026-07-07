@@ -29,14 +29,14 @@ export default function AuthPage() {
   // the OAuth consent flow returns the user to the consent screen after login.
   const rawNext = new URLSearchParams(routerLocation.search).get("next");
   const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
-  const from = nextPath
-    || (routerLocation.state as { from?: { pathname: string } } | null)?.from?.pathname
-    || "/app";
+  const from =
+    nextPath ||
+    (routerLocation.state as { from?: { pathname: string } } | null)?.from?.pathname ||
+    "/app";
 
   useEffect(() => {
     if (user) navigate(from, { replace: true });
   }, [user, navigate, from]);
-
 
   async function handleEmailAuth(e: React.FormEvent) {
     e.preventDefault();
@@ -49,7 +49,8 @@ export default function AuthPage() {
     try {
       if (tab === "signup") {
         const { data, error: err } = await supabase.auth.signUp({
-          email, password,
+          email,
+          password,
           options: {
             emailRedirectTo: `${window.location.origin}${nextPath ?? "/"}`,
             data: { display_name: name || email.split("@")[0] },
@@ -71,7 +72,10 @@ export default function AuthPage() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
-      if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("user already")) {
+      if (
+        msg.toLowerCase().includes("already registered") ||
+        msg.toLowerCase().includes("user already")
+      ) {
         setError("This email is already registered. Try signing in instead.");
       } else if (msg.includes("Invalid login")) {
         setError("Invalid email or password.");
@@ -89,7 +93,9 @@ export default function AuthPage() {
     setError("");
     setGoogleLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: `${window.location.origin}${nextPath ?? ""}` });
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: `${window.location.origin}${nextPath ?? ""}`,
+      });
       if (result.error) setError(result.error.message || "Google sign-in failed.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed.");
@@ -100,7 +106,9 @@ export default function AuthPage() {
 
   async function handleForgot(e: React.FormEvent) {
     e.preventDefault();
-    setError(""); setInfo(""); setLoading(true);
+    setError("");
+    setInfo("");
+    setLoading(true);
     const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
@@ -110,17 +118,25 @@ export default function AuthPage() {
   }
 
   function switchTab(t: "signin" | "signup" | "forgot") {
-    setTab(t); setError(""); setInfo("");
+    setTab(t);
+    setError("");
+    setInfo("");
   }
 
   return (
     <>
       <Helmet>
         <title>Sign in or create an account — {APP_NAME}</title>
-        <meta name="description" content={`Sign in to ${APP_NAME} or create a free account to generate AI-powered weekly content calendars for LinkedIn, X, Instagram, and more.`} />
+        <meta
+          name="description"
+          content={`Sign in to ${APP_NAME} or create a free account to generate AI-powered weekly content calendars for LinkedIn, X, Instagram, and more.`}
+        />
         <link rel="canonical" href="https://contentforged.lovable.app/auth" />
         <meta property="og:title" content={`Sign in to ${APP_NAME}`} />
-        <meta property="og:description" content="Access your AI-powered content calendar workspace." />
+        <meta
+          property="og:description"
+          content="Access your AI-powered content calendar workspace."
+        />
         <meta property="og:url" content="https://contentforged.lovable.app/auth" />
         <meta name="robots" content="noindex, follow" />
       </Helmet>
@@ -132,16 +148,25 @@ export default function AuthPage() {
                 <LogoMark size="xl" />
                 <div className="auth-brand-text">
                   <div className="auth-eyebrow">AI content studio</div>
-                  <h1 className="auth-title">Content<em>Forge</em></h1>
+                  <h1 className="auth-title">
+                    Content<em>Forge</em>
+                  </h1>
                 </div>
               </div>
               <p className="auth-sub">
-                Sign in to generate, refine, and schedule a full week of content without losing brand context.
+                Sign in to generate, refine, and schedule a full week of content without losing
+                brand context.
               </p>
               <div className="auth-badges">
-                <span className="auth-badge"><strong>Autosave</strong> enabled</span>
-                <span className="auth-badge"><strong>Templates</strong> ready</span>
-                <span className="auth-badge"><strong>Recovery</strong> built in</span>
+                <span className="auth-badge">
+                  <strong>Autosave</strong> enabled
+                </span>
+                <span className="auth-badge">
+                  <strong>Templates</strong> ready
+                </span>
+                <span className="auth-badge">
+                  <strong>Recovery</strong> built in
+                </span>
               </div>
             </div>
 
@@ -150,49 +175,129 @@ export default function AuthPage() {
                 <span className="auth-point-bullet" />
                 <div>
                   <h2>One brief, one calendar</h2>
-                  <p>Turn a single input into a complete weekly plan for LinkedIn, X, Instagram, Facebook, newsletters, and blogs.</p>
+                  <p>
+                    Turn a single input into a complete weekly plan for LinkedIn, X, Instagram,
+                    Facebook, newsletters, and blogs.
+                  </p>
                 </div>
               </div>
               <div className="auth-point">
                 <span className="auth-point-bullet" />
                 <div>
                   <h2>Fast, but not loose</h2>
-                  <p>Brand defaults, hashtag rules, and draft recovery keep the output steady even when the workflow moves quickly.</p>
+                  <p>
+                    Brand defaults, hashtag rules, and draft recovery keep the output steady even
+                    when the workflow moves quickly.
+                  </p>
                 </div>
               </div>
             </div>
           </section>
 
           <div className="auth-card">
-            <p className="auth-inline-note">{tab === "signin" ? "Welcome back. Pick up where you left off." : tab === "signup" ? "Create your workspace and start with a clean first brief." : "We’ll send a reset link to your inbox."}</p>
+            <p className="auth-inline-note">
+              {tab === "signin"
+                ? "Welcome back. Pick up where you left off."
+                : tab === "signup"
+                  ? "Create your workspace and start with a clean first brief."
+                  : "We’ll send a reset link to your inbox."}
+            </p>
 
             {tab !== "forgot" && (
               <div className="auth-tabs" role="tablist" aria-label="Authentication modes">
-                <button id="auth-tab-signin" role="tab" aria-selected={tab === "signin"} aria-controls="auth-panel-signin" className={`auth-tab ${tab === "signin" ? "on" : ""}`} onClick={() => switchTab("signin")} type="button" aria-label="Switch to sign in mode">Sign in</button>
-                <button id="auth-tab-signup" role="tab" aria-selected={tab === "signup"} aria-controls="auth-panel-signup" className={`auth-tab ${tab === "signup" ? "on" : ""}`} onClick={() => switchTab("signup")} type="button" aria-label="Switch to sign up mode">Sign up</button>
+                <button
+                  id="auth-tab-signin"
+                  role="tab"
+                  aria-selected={tab === "signin"}
+                  aria-controls="auth-panel-signin"
+                  className={`auth-tab ${tab === "signin" ? "on" : ""}`}
+                  onClick={() => switchTab("signin")}
+                  type="button"
+                  aria-label="Switch to sign in mode"
+                >
+                  Sign in
+                </button>
+                <button
+                  id="auth-tab-signup"
+                  role="tab"
+                  aria-selected={tab === "signup"}
+                  aria-controls="auth-panel-signup"
+                  className={`auth-tab ${tab === "signup" ? "on" : ""}`}
+                  onClick={() => switchTab("signup")}
+                  type="button"
+                  aria-label="Switch to sign up mode"
+                >
+                  Sign up
+                </button>
               </div>
             )}
 
             {tab === "forgot" ? (
               <form onSubmit={handleForgot}>
                 <div className="auth-field">
-                  <label className="auth-label" htmlFor="forgot-email">Email</label>
-                  <input id="forgot-email" className="auth-input" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" />
+                  <label className="auth-label" htmlFor="forgot-email">
+                    Email
+                  </label>
+                  <input
+                    id="forgot-email"
+                    className="auth-input"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@company.com"
+                  />
                 </div>
-                {error && <div className="auth-err" role="alert" aria-live="assertive">{error}</div>}
-                {info && <div className="auth-ok" role="status" aria-live="polite">{info}</div>}
+                {error && (
+                  <div className="auth-err" role="alert" aria-live="assertive">
+                    {error}
+                  </div>
+                )}
+                {info && (
+                  <div className="auth-ok" role="status" aria-live="polite">
+                    {info}
+                  </div>
+                )}
                 <button className="auth-btn" type="submit" disabled={loading} aria-busy={loading}>
                   {loading ? (
-                    <span style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ animation: "spin 0.8s linear infinite" }}>
-                        <circle cx="7" cy="7" r="5.5" stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
-                        <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        justifyContent: "center",
+                      }}
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        style={{ animation: "spin 0.8s linear infinite" }}
+                      >
+                        <circle
+                          cx="7"
+                          cy="7"
+                          r="5.5"
+                          stroke="rgba(255,255,255,0.35)"
+                          strokeWidth="2"
+                        />
+                        <path
+                          d="M7 1.5A5.5 5.5 0 0 1 12.5 7"
+                          stroke="var(--color-surface)"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
                       </svg>
                       Sending…
                     </span>
-                  ) : "Send reset link"}
+                  ) : (
+                    "Send reset link"
+                  )}
                 </button>
-                <button type="button" className="auth-forgot" onClick={() => switchTab("signin")}>← Back to sign in</button>
+                <button type="button" className="auth-forgot" onClick={() => switchTab("signin")}>
+                  ← Back to sign in
+                </button>
               </form>
             ) : (
               <form
@@ -203,91 +308,245 @@ export default function AuthPage() {
               >
                 {tab === "signup" && (
                   <div className="auth-field">
-                    <label className="auth-label" htmlFor="auth-name">Display name</label>
-                    <input id="auth-name" className="auth-input" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" />
+                    <label className="auth-label" htmlFor="auth-name">
+                      Display name
+                    </label>
+                    <input
+                      id="auth-name"
+                      className="auth-input"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your name"
+                    />
                   </div>
                 )}
                 <div className="auth-field">
-                  <label className="auth-label" htmlFor="auth-email">Email</label>
-                  <input id="auth-email" className="auth-input" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" />
+                  <label className="auth-label" htmlFor="auth-email">
+                    Email
+                  </label>
+                  <input
+                    id="auth-email"
+                    className="auth-input"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@company.com"
+                  />
                 </div>
                 <div className="auth-field">
-                  <label className="auth-label" htmlFor="auth-password">Password</label>
-                  <input id="auth-password" className="auth-input" type="password" required minLength={PASSWORD_MIN_LENGTH} value={password} onChange={e => setPassword(e.target.value)} placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`} aria-describedby={tab === "signup" ? "pw-strength" : undefined} />
+                  <label className="auth-label" htmlFor="auth-password">
+                    Password
+                  </label>
+                  <input
+                    id="auth-password"
+                    className="auth-input"
+                    type="password"
+                    required
+                    minLength={PASSWORD_MIN_LENGTH}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`}
+                    aria-describedby={tab === "signup" ? "pw-strength" : undefined}
+                  />
                   {tab === "signup" && password.length > 0 && (
-                    <div id="pw-strength" style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                    <div
+                      id="pw-strength"
+                      style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}
+                    >
                       <div style={{ display: "flex", gap: 3 }}>
-                        {[0, 1, 2].map(i => (
+                        {[0, 1, 2].map((i) => (
                           <div
                             key={i}
                             className={cn(
                               "h-[3px] w-8 rounded-full transition-colors duration-200",
-                              password.length >= [PASSWORD_MIN_LENGTH, PASSWORD_MIN_LENGTH + 4, PASSWORD_MIN_LENGTH + 8][i]
-                                ? (password.length >= PASSWORD_MIN_LENGTH + 8 ? "bg-primary" : password.length >= PASSWORD_MIN_LENGTH + 4 ? "bg-yellow-400" : "bg-destructive")
+                              password.length >=
+                                [
+                                  PASSWORD_MIN_LENGTH,
+                                  PASSWORD_MIN_LENGTH + 4,
+                                  PASSWORD_MIN_LENGTH + 8,
+                                ][i]
+                                ? password.length >= PASSWORD_MIN_LENGTH + 8
+                                  ? "bg-primary"
+                                  : password.length >= PASSWORD_MIN_LENGTH + 4
+                                    ? "bg-yellow-400"
+                                    : "bg-destructive"
                                 : "bg-border"
                             )}
                           />
                         ))}
                       </div>
-                      <span className={cn(
-                        "text-[10px]",
-                        password.length >= PASSWORD_MIN_LENGTH + 8 ? "text-primary" : password.length >= PASSWORD_MIN_LENGTH + 4 ? "text-yellow-400" : "text-destructive"
-                      )}>
-                        {password.length < PASSWORD_MIN_LENGTH ? "Too short" : password.length < PASSWORD_MIN_LENGTH + 4 ? "Weak" : password.length < PASSWORD_MIN_LENGTH + 8 ? "Good" : "Strong"}
+                      <span
+                        className={cn(
+                          "text-[10px]",
+                          password.length >= PASSWORD_MIN_LENGTH + 8
+                            ? "text-primary"
+                            : password.length >= PASSWORD_MIN_LENGTH + 4
+                              ? "text-yellow-400"
+                              : "text-destructive"
+                        )}
+                      >
+                        {password.length < PASSWORD_MIN_LENGTH
+                          ? "Too short"
+                          : password.length < PASSWORD_MIN_LENGTH + 4
+                            ? "Weak"
+                            : password.length < PASSWORD_MIN_LENGTH + 8
+                              ? "Good"
+                              : "Strong"}
                       </span>
                     </div>
                   )}
                 </div>
-                {tab === "signup" && <div className="auth-inline-note">Use a password you can keep handy, then save a brief template after your first successful calendar.</div>}
-                {error && <div className="auth-err" role="alert" aria-live="assertive">{error}</div>}
-                {info && <div className="auth-ok" role="status" aria-live="polite">{info}</div>}
+                {tab === "signup" && (
+                  <div className="auth-inline-note">
+                    Use a password you can keep handy, then save a brief template after your first
+                    successful calendar.
+                  </div>
+                )}
+                {error && (
+                  <div className="auth-err" role="alert" aria-live="assertive">
+                    {error}
+                  </div>
+                )}
+                {info && (
+                  <div className="auth-ok" role="status" aria-live="polite">
+                    {info}
+                  </div>
+                )}
                 <button className="auth-btn" type="submit" disabled={loading} aria-busy={loading}>
                   {loading ? (
-                    <span style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ animation: "spin 0.8s linear infinite" }}>
-                        <circle cx="7" cy="7" r="5.5" stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
-                        <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        justifyContent: "center",
+                      }}
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        style={{ animation: "spin 0.8s linear infinite" }}
+                      >
+                        <circle
+                          cx="7"
+                          cy="7"
+                          r="5.5"
+                          stroke="rgba(255,255,255,0.35)"
+                          strokeWidth="2"
+                        />
+                        <path
+                          d="M7 1.5A5.5 5.5 0 0 1 12.5 7"
+                          stroke="var(--color-surface)"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
                       </svg>
                       {tab === "signin" ? "Signing in…" : "Creating account…"}
                     </span>
-                  ) : (tab === "signin" ? "Sign in" : "Create account")}
+                  ) : tab === "signin" ? (
+                    "Sign in"
+                  ) : (
+                    "Create account"
+                  )}
                 </button>
                 {tab === "signin" && (
-                  <button type="button" className="auth-forgot" onClick={() => switchTab("forgot")}>Forgot password?</button>
+                  <button type="button" className="auth-forgot" onClick={() => switchTab("forgot")}>
+                    Forgot password?
+                  </button>
                 )}
                 {tab === "signup" && (
                   <p className="auth-inline-note" style={{ marginTop: 10, fontSize: 11 }}>
                     By creating an account, you agree to our{" "}
-                    <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a> and{" "}
-                    <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+                    <a href="/terms" target="_blank" rel="noopener noreferrer">
+                      Terms
+                    </a>{" "}
+                    and{" "}
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                      Privacy Policy
+                    </a>
+                    .
                   </p>
                 )}
               </form>
             )}
 
             <div className="auth-divider">or</div>
-            <button className="auth-google" onClick={handleGoogle} type="button" disabled={googleLoading} aria-busy={googleLoading}>
+            <button
+              className="auth-google"
+              onClick={handleGoogle}
+              type="button"
+              disabled={googleLoading}
+              aria-busy={googleLoading}
+            >
               {googleLoading ? (
-                <span style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ animation: "spin 0.8s linear infinite" }}>
+                <span
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    justifyContent: "center",
+                  }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    style={{ animation: "spin 0.8s linear infinite" }}
+                  >
                     <circle cx="7" cy="7" r="5.5" stroke="rgba(0,0,0,0.15)" strokeWidth="2" />
-                    <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path
+                      d="M7 1.5A5.5 5.5 0 0 1 12.5 7"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
                   </svg>
                   Connecting…
                 </span>
               ) : (
                 <>
-                  <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    />
+                  </svg>
                   Continue with Google
                 </>
               )}
             </button>
             {import.meta.env.DEV && (
               <div style={{ marginTop: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0", color: "#5a5753", fontSize: 11 }}>
-                  <div style={{ flex: 1, height: 1, background: "#e7e5e4" }} />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    margin: "16px 0",
+                    color: "var(--color-text-secondary)",
+                    fontSize: 11,
+                  }}
+                >
+                  <div style={{ flex: 1, height: 1, background: "var(--color-border)" }} />
                   <span>Developer Sandbox</span>
-                  <div style={{ flex: 1, height: 1, background: "#e7e5e4" }} />
+                  <div style={{ flex: 1, height: 1, background: "var(--color-border)" }} />
                 </div>
                 <button
                   onClick={() => {
@@ -307,7 +566,7 @@ export default function AuthPage() {
                     cursor: "pointer",
                     background: "rgba(194,65,12,0.04)",
                     border: "1px dashed rgba(194,65,12,0.25)",
-                    color: "#c2410c",
+                    color: "var(--color-primary)",
                     transition: "all .15s",
                     display: "flex",
                     alignItems: "center",

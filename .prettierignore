@@ -1,0 +1,34 @@
+# Build & dependency output
+dist
+node_modules
+coverage
+playwright-report
+test-results
+dashboard-deploy
+
+# Auto-generated / non-source content not part of this codebase's app code
+.agents
+.claude
+.github
+.kilo
+.lovable
+.playwright-mcp
+.reports
+.scratch
+.tmp
+docs
+memory
+migrations
+public
+
+# Lockfiles and env files
+package-lock.json
+pnpm-lock.yaml
+.env
+.env.*
+
+# Markdown is not part of the Phase 8 formatting scope
+**/*.md
+
+# Ad-hoc report artifacts
+*.report.html

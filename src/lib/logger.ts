@@ -3,9 +3,9 @@
  * Integrates with error tracking services (Sentry, LogRocket)
  */
 
-import { isAppError, getDeveloperMessage } from './errors';
+import { isAppError, getDeveloperMessage } from "./errors";
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface LogContext {
   userId?: string;
@@ -24,7 +24,7 @@ interface LogEntry {
 
 interface SentryLike {
   captureException: (error: unknown, options?: { contexts?: { app?: LogContext } }) => void;
-  captureMessage: (message: string, level?: 'warning' | 'info') => void;
+  captureMessage: (message: string, level?: "warning" | "info") => void;
 }
 
 type WindowWithSentry = Window & {
@@ -40,31 +40,36 @@ class Logger {
    */
   private isErrorTrackingConfigured(): boolean {
     // Check for Sentry or similar
-    return typeof window !== 'undefined' && !!(window as WindowWithSentry).Sentry;
+    return typeof window !== "undefined" && !!(window as WindowWithSentry).Sentry;
   }
 
   /**
    * Send to external error tracking service
    */
-  private sendToExternalService(level: LogLevel, message: string, error?: unknown, context?: LogContext) {
+  private sendToExternalService(
+    level: LogLevel,
+    message: string,
+    error?: unknown,
+    context?: LogContext
+  ) {
     try {
       const Sentry = (window as WindowWithSentry).Sentry;
       if (!Sentry) return;
 
-      const messageStr = `${message}${error ? ` - ${getDeveloperMessage(error)}` : ''}`;
+      const messageStr = `${message}${error ? ` - ${getDeveloperMessage(error)}` : ""}`;
 
-      if (level === 'error') {
+      if (level === "error") {
         Sentry.captureException(error || new Error(messageStr), {
           contexts: { app: context },
         });
-      } else if (level === 'warn') {
-        Sentry.captureMessage(messageStr, 'warning');
-      } else if (level === 'info') {
-        Sentry.captureMessage(messageStr, 'info');
+      } else if (level === "warn") {
+        Sentry.captureMessage(messageStr, "warning");
+      } else if (level === "info") {
+        Sentry.captureMessage(messageStr, "info");
       }
     } catch (e) {
       // Prevent logger errors from breaking the app
-      console.warn('Failed to send log to external service', e);
+      console.warn("Failed to send log to external service", e);
     }
   }
 
@@ -72,28 +77,28 @@ class Logger {
    * Log debug message
    */
   debug(message: string, context?: LogContext) {
-    this.log('debug', message, undefined, context);
+    this.log("debug", message, undefined, context);
   }
 
   /**
    * Log info message
    */
   info(message: string, context?: LogContext) {
-    this.log('info', message, undefined, context);
+    this.log("info", message, undefined, context);
   }
 
   /**
    * Log warning
    */
   warn(message: string, error?: unknown, context?: LogContext) {
-    this.log('warn', message, error, context);
+    this.log("warn", message, error, context);
   }
 
   /**
    * Log error
    */
   error(message: string, error?: unknown, context?: LogContext) {
-    this.log('error', message, error, context);
+    this.log("error", message, error, context);
   }
 
   /**
@@ -110,16 +115,18 @@ class Logger {
     }
 
     // Console output (always)
-    const consoleMethod = level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log';
-    const consoleFn = (console[consoleMethod as 'log' | 'warn' | 'error'] as (...args: unknown[]) => void).bind(console);
+    const consoleMethod = level === "error" ? "error" : level === "warn" ? "warn" : "log";
+    const consoleFn = (
+      console[consoleMethod as "log" | "warn" | "error"] as (...args: unknown[]) => void
+    ).bind(console);
     consoleFn(
       `[${level.toUpperCase()}] ${message}`,
-      error ? getDeveloperMessage(error) : '',
-      context || ''
+      error ? getDeveloperMessage(error) : "",
+      context || ""
     );
 
     // Send to external service
-    if (['error', 'warn'].includes(level)) {
+    if (["error", "warn"].includes(level)) {
       this.sendToExternalService(level, message, error, context);
     }
   }
@@ -154,8 +161,8 @@ export const logger = new Logger();
  */
 export function setupGlobalErrorHandlers() {
   // Handle uncaught errors
-  window.addEventListener('error', (event: ErrorEvent) => {
-    logger.error('Uncaught error', event.error, {
+  window.addEventListener("error", (event: ErrorEvent) => {
+    logger.error("Uncaught error", event.error, {
       filename: event.filename,
       lineno: event.lineno,
       colno: event.colno,
@@ -163,8 +170,8 @@ export function setupGlobalErrorHandlers() {
   });
 
   // Handle unhandled promise rejections
-  window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
-    logger.error('Unhandled promise rejection', event.reason);
+  window.addEventListener("unhandledrejection", (event: PromiseRejectionEvent) => {
+    logger.error("Unhandled promise rejection", event.reason);
   });
 }
 

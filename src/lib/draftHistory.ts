@@ -155,7 +155,11 @@ class DraftHistoryService {
    * @param activeDay Active day index
    * @throws Error if save fails
    */
-  async saveDraft(formData: DraftVersion["formData"], posts: unknown[] = [], activeDay: number = 0): Promise<DraftVersion> {
+  async saveDraft(
+    formData: DraftVersion["formData"],
+    posts: unknown[] = [],
+    activeDay: number = 0
+  ): Promise<DraftVersion> {
     await this.init();
 
     if (!this.db) throw new Error("IndexedDB not initialized");
@@ -230,7 +234,7 @@ class DraftHistoryService {
       request.onsuccess = () => {
         const versions = (request.result as DraftVersion[])
           .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-          .map(v => ({
+          .map((v) => ({
             id: v.id,
             timestamp: v.timestamp,
             label: v.label,
@@ -438,7 +442,13 @@ export function formatTimestamp(timestamp: Date): string {
   if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
   if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-  if (diffDays === 1) return `Yesterday at ${timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  if (diffDays === 1)
+    return `Yesterday at ${timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 
-  return timestamp.toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return timestamp.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

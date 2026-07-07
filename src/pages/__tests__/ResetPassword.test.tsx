@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 const mockUpdateUser = vi.fn();
@@ -44,7 +44,9 @@ async function renderReady() {
   const utils = render(<ResetPassword />);
   // Simulate Supabase parsing the recovery link and emitting PASSWORD_RECOVERY.
   await waitFor(() => expect(authStateCallback).not.toBeNull());
-  authStateCallback!("PASSWORD_RECOVERY");
+  act(() => {
+    authStateCallback!("PASSWORD_RECOVERY");
+  });
   await waitFor(() => {
     expect(screen.getByLabelText(/new password/i)).toBeInTheDocument();
   });
@@ -86,8 +88,12 @@ describe("ResetPassword", () => {
 
   it("rejects mismatched passwords without calling updateUser", async () => {
     await renderReady();
-    fireEvent.change(screen.getByLabelText(/new password/i), { target: { value: "longenoughpassword" } });
-    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: "differentpassword" } });
+    fireEvent.change(screen.getByLabelText(/new password/i), {
+      target: { value: "longenoughpassword" },
+    });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: "differentpassword" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /update password/i }));
 
     await waitFor(() => {
@@ -98,8 +104,12 @@ describe("ResetPassword", () => {
 
   it("submits successfully with a valid matching password and redirects", async () => {
     await renderReady();
-    fireEvent.change(screen.getByLabelText(/new password/i), { target: { value: "longenoughpassword" } });
-    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: "longenoughpassword" } });
+    fireEvent.change(screen.getByLabelText(/new password/i), {
+      target: { value: "longenoughpassword" },
+    });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: "longenoughpassword" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /update password/i }));
 
     await waitFor(() => {
@@ -112,10 +122,16 @@ describe("ResetPassword", () => {
   });
 
   it("shows the server error message when updateUser fails", async () => {
-    mockUpdateUser.mockResolvedValue({ error: { message: "New password should be different from the old password." } });
+    mockUpdateUser.mockResolvedValue({
+      error: { message: "New password should be different from the old password." },
+    });
     await renderReady();
-    fireEvent.change(screen.getByLabelText(/new password/i), { target: { value: "longenoughpassword" } });
-    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: "longenoughpassword" } });
+    fireEvent.change(screen.getByLabelText(/new password/i), {
+      target: { value: "longenoughpassword" },
+    });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: "longenoughpassword" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /update password/i }));
 
     await waitFor(() => {

@@ -1,6 +1,13 @@
 import { getUserApiKey, type ApiProvider } from "./apiKeyManager";
 
-const VALID_PROVIDERS: readonly ApiProvider[] = ['openai', 'anthropic', 'openrouter', 'gemini', 'kimi', 'glm'];
+const VALID_PROVIDERS: readonly ApiProvider[] = [
+  "openai",
+  "anthropic",
+  "openrouter",
+  "gemini",
+  "kimi",
+  "glm",
+];
 
 function isApiProvider(value: string): value is ApiProvider {
   return (VALID_PROVIDERS as readonly string[]).includes(value);
@@ -13,7 +20,7 @@ function isApiProvider(value: string): value is ApiProvider {
 // functions, which is why every current call site passes platformAvailable=false.
 export async function resolveAiClient(
   platformAvailable: boolean
-): Promise<{ apiKey: string; provider: ApiProvider; source: 'platform' | 'user' }> {
+): Promise<{ apiKey: string; provider: ApiProvider; source: "platform" | "user" }> {
   // Platform path (used when platformAvailable=true or keyMode='fallback')
   if (platformAvailable) {
     const platformKey = (import.meta.env.VITE_PLATFORM_AI_KEY as string) || "";
@@ -36,7 +43,12 @@ export async function resolveAiClient(
   const userKeyInfo = await getUserApiKey();
 
   // If the user has configured "always use my key", bypass the platform entirely
-  if (userKeyInfo.useOwnKey && userKeyInfo.keyMode === 'always' && userKeyInfo.hasKey && userKeyInfo.provider) {
+  if (
+    userKeyInfo.useOwnKey &&
+    userKeyInfo.keyMode === "always" &&
+    userKeyInfo.hasKey &&
+    userKeyInfo.provider
+  ) {
     return {
       apiKey: userKeyInfo.apiKey || "USER_KEY_STORED_SERVERSIDE",
       provider: userKeyInfo.provider,

@@ -1,5 +1,19 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { buildEngagementRules, buildPromptContext, buildCinematicImagePromptRules, cleanPayload, buildSystemMessage, buildUserMessage, shouldFallbackToUserKey, shouldUseUserKeyOnly, getProviderModel, clampMaxTokensForProvider, callAI, sanitizeLogValue, stripMarkdownFormatting } from "./promptHelpers.ts";
+import {
+  buildEngagementRules,
+  buildPromptContext,
+  buildCinematicImagePromptRules,
+  cleanPayload,
+  buildSystemMessage,
+  buildUserMessage,
+  shouldFallbackToUserKey,
+  shouldUseUserKeyOnly,
+  getProviderModel,
+  clampMaxTokensForProvider,
+  callAI,
+  sanitizeLogValue,
+  stripMarkdownFormatting,
+} from "./promptHelpers.ts";
 
 describe("stripMarkdownFormatting", () => {
   it("strips bold and italic emphasis without losing the wrapped text", () => {
@@ -21,7 +35,9 @@ describe("stripMarkdownFormatting", () => {
   });
 
   it("strips inline and fenced code", () => {
-    expect(stripMarkdownFormatting("Use `npm install` to set up.")).toBe("Use npm install to set up.");
+    expect(stripMarkdownFormatting("Use `npm install` to set up.")).toBe(
+      "Use npm install to set up."
+    );
     expect(stripMarkdownFormatting("```\nconst x = 1;\n```")).toBe("\nconst x = 1;\n");
   });
 
@@ -32,7 +48,9 @@ describe("stripMarkdownFormatting", () => {
   });
 
   it("leaves plain text and mid-word underscores/asterisks used as punctuation untouched", () => {
-    expect(stripMarkdownFormatting("Plain text with no formatting.")).toBe("Plain text with no formatting.");
+    expect(stripMarkdownFormatting("Plain text with no formatting.")).toBe(
+      "Plain text with no formatting."
+    );
     expect(stripMarkdownFormatting("snake_case_variable and 5 * 3 = 15")).toBe(
       "snake_case_variable and 5 * 3 = 15"
     );
@@ -65,7 +83,9 @@ describe("promptHelpers engagement guidance", () => {
     expect(context).toContain("PROMPT FRAMEWORK");
     expect(context).toContain("CORE IDEA LOCK");
     expect(context).toContain("Core idea / central angle: Better onboarding");
-    expect(context).toContain("Niche: narrow the frame to Customer onboarding without widening the topic");
+    expect(context).toContain(
+      "Niche: narrow the frame to Customer onboarding without widening the topic"
+    );
     expect(context).toContain("If a variable conflicts with the core idea, the core idea wins");
     expect(context).toContain("Reject any draft that feels broad, generic, or off-angle");
   });
@@ -152,13 +172,20 @@ describe("promptHelpers engagement guidance", () => {
     const guidance = buildCinematicImagePromptRules(payload);
 
     expect(guidance).toContain("image_prompt");
-    expect(guidance).toContain("artistic style, lighting, composition, color palette, textures, depth, and atmospheric details");
+    expect(guidance).toContain(
+      "artistic style, lighting, composition, color palette, textures, depth, and atmospheric details"
+    );
     expect(guidance).toContain("film still, key art, dramatic framing");
     expect(guidance).toContain("Avoid text overlays, watermarks, UI mockups");
   });
 
   it("builds system and user messages for calls", () => {
-    const payload = cleanPayload({ industry: "SaaS", coreIdea: "Better onboarding", platform: "LinkedIn", audiences: ["Founders"] });
+    const payload = cleanPayload({
+      industry: "SaaS",
+      coreIdea: "Better onboarding",
+      platform: "LinkedIn",
+      audiences: ["Founders"],
+    });
     const sys = buildSystemMessage(payload, { isSinglePost: true });
     const usr = buildUserMessage(payload, { isSinglePost: true });
 
@@ -185,7 +212,8 @@ describe("promptHelpers engagement guidance", () => {
       // A signature-verified lookup must not simply echo back a forged `sub`
       // claim without checking Supabase Auth (outside a Deno runtime this
       // resolves to null since there is no SUPABASE_URL/anon key).
-      const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMy1hYmMiLCJleHAiOjE3MTgyOTI4Mzd9.signature";
+      const token =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMy1hYmMiLCJleHAiOjE3MTgyOTI4Mzd9.signature";
       const { getVerifiedUserId } = require("./promptHelpers.ts");
       expect(await getVerifiedUserId(token)).toBeNull();
     });
@@ -200,8 +228,8 @@ describe("promptHelpers engagement guidance", () => {
       const { buildRequiredWordsBlock } = require("./promptHelpers.ts");
       const block = buildRequiredWordsBlock(["growth", "startup"]);
       expect(block).toContain("REQUIRED WORDS");
-      expect(block).toContain("- \"growth\"");
-      expect(block).toContain("- \"startup\"");
+      expect(block).toContain('- "growth"');
+      expect(block).toContain('- "startup"');
     });
 
     it("flags missing required words in normalizePost", () => {
@@ -213,21 +241,23 @@ describe("promptHelpers engagement guidance", () => {
         cta: "Comment",
         hashtags: "#startup",
         dow: "Mon",
-        day: 1
+        day: 1,
       };
-      
+
       const payload = {
         platform: "LinkedIn",
         bannedHashtags: [],
         requiredHashtags: [],
         length: "medium",
-        requiredWords: ["scaleup", "retention"]
+        requiredWords: ["scaleup", "retention"],
       };
 
       const result = normalizePost(post, "Mon", payload);
       expect(result.self_check.checks_passed).toBe(false);
       expect(result.self_check.forbidden_violations).toContain('Missing required word: "scaleup"');
-      expect(result.self_check.forbidden_violations).toContain('Missing required word: "retention"');
+      expect(result.self_check.forbidden_violations).toContain(
+        'Missing required word: "retention"'
+      );
     });
 
     it("does not HTML-entity-encode normalized AI-generated post fields (plain-text output only)", () => {
@@ -236,14 +266,17 @@ describe("promptHelpers engagement guidance", () => {
       // as raw HTML — so it must NOT be HTML-entity-encoded. Encoding here would
       // leak literal "&#39;", "&amp;", etc. into copy-pasted and exported text.
       const { normalizePost } = require("./promptHelpers.ts");
-      const result = normalizePost({
-        title: "India's <startup> ecosystem",
-        hook: "They're not just flagging issues",
-        body: "This isn't future-gazing; it's happening now. R&D matters.",
-        cta: "Click here",
-        hashtags: "#safe",
-        dow: "Mon",
-      }, "Mon");
+      const result = normalizePost(
+        {
+          title: "India's <startup> ecosystem",
+          hook: "They're not just flagging issues",
+          body: "This isn't future-gazing; it's happening now. R&D matters.",
+          cta: "Click here",
+          hashtags: "#safe",
+          dow: "Mon",
+        },
+        "Mon"
+      );
 
       expect(result.title).toBe("India's <startup> ecosystem");
       expect(result.hook).toContain("They're");
@@ -301,9 +334,13 @@ describe("promptHelpers engagement guidance", () => {
 
       it("routes gemini to the Gemini OpenAI-compatible endpoint", async () => {
         const fetchSpy = mockFetchOk();
-        await callAI([{ role: "user", content: "hi" }], null, "AIzafakekey", { provider: "gemini" });
+        await callAI([{ role: "user", content: "hi" }], null, "AIzafakekey", {
+          provider: "gemini",
+        });
         const [url] = fetchSpy.mock.calls[0] as [string];
-        expect(url).toBe("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
+        expect(url).toBe(
+          "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        );
       });
 
       it("routes kimi to the Moonshot endpoint", async () => {

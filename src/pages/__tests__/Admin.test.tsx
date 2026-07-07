@@ -94,7 +94,13 @@ describe("AdminDashboard", () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === "admin_user_key_status") {
         return mockChain([
-          { user_id: "11111111-aaaa-bbbb-cccc-000000000000", api_provider: "openai", use_own_key: true, has_own_key: true, updated_at: new Date().toISOString() },
+          {
+            user_id: "11111111-aaaa-bbbb-cccc-000000000000",
+            api_provider: "openai",
+            use_own_key: true,
+            has_own_key: true,
+            updated_at: new Date().toISOString(),
+          },
         ]);
       }
       if (table === "api_key_audit_log") {

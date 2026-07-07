@@ -50,10 +50,15 @@ function generateMapFor(style: FontStyle): Record<string, string> {
   return out;
 }
 
-const STYLE_MAPS: Record<FontStyle, Record<string, string>> = (Object.keys(RANGES) as FontStyle[]).reduce((acc, s) => {
-  acc[s] = generateMapFor(s);
-  return acc;
-}, {} as Record<FontStyle, Record<string, string>>);
+const STYLE_MAPS: Record<FontStyle, Record<string, string>> = (
+  Object.keys(RANGES) as FontStyle[]
+).reduce(
+  (acc, s) => {
+    acc[s] = generateMapFor(s);
+    return acc;
+  },
+  {} as Record<FontStyle, Record<string, string>>
+);
 
 export function applyStyle(text: string, style: FontStyle): string {
   if (!text || style === FontStyle.None) return text;

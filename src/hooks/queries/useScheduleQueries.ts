@@ -4,6 +4,34 @@ import type { Database } from "@/integrations/supabase/types";
 import { isE2EMode } from "./shared";
 import { getE2ECalendars, getE2EScheduleRows, updateE2EScheduleRow } from "./e2eFixtureStore";
 
+export interface ScheduledRow {
+  id: string;
+  calendar_id: string;
+  post_day: number;
+  platform: string | null;
+  scheduled_at: string;
+  status: string;
+  workflow_status: string;
+  copy_text: string | null;
+  post_snapshot: { title?: string; topic?: string; hashtags?: string } | null;
+  published_at: string | null;
+  failure_reason: string | null;
+}
+
+export interface CalendarMeta {
+  id: string;
+  title: string;
+  timezone: string | null;
+  tracking_url: string | null;
+}
+
+export interface SchedulePage {
+  rows: ScheduledRow[];
+  calendars: Record<string, CalendarMeta>;
+  profileTz: string;
+  nextCursor: { scheduled_at: string; id: string } | null;
+}
+
 export function useScheduledPostsQuery(calendarId?: string) {
   return useQuery({
     queryKey: ["scheduled-posts-status", calendarId],
@@ -36,39 +64,49 @@ export function useScheduleInfiniteQuery(userId?: string, pageSize = 25) {
     queryKey: ["schedule", userId, pageSize],
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     initialPageParam: null as { scheduled_at: string; id: string } | null,
-    getNextPageParam: (lastPage: { nextCursor: { scheduled_at: string; id: string } | null; rows: unknown[]; calendars: Record<string, { id: string; title: string; timezone: string | null; tracking_url: string | null }>; profileTz: string }) => lastPage.nextCursor,
-    queryFn: async ({ pageParam }) => {
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    queryFn: async ({ pageParam }: { pageParam: { scheduled_at: string; id: string } | null }) => {
       if (!userId) {
-        return { rows: [], calendars: {}, profileTz: "", nextCursor: null };
+        return { rows: [], calendars: {}, profileTz: "", nextCursor: null } as SchedulePage;
       }
 
       if (isE2EMode()) {
-        const rows = getE2EScheduleRows();
-        const calendars: Record<string, { id: string; title: string; timezone: string | null; tracking_url: string | null }> = {};
+        const rows = getE2EScheduleRows() as ScheduledRow[];
+        const calendars: Record<string, CalendarMeta> = {};
         for (const calendar of getE2ECalendars()) {
-          (calendars as Record<string, unknown>)[calendar.id] = calendar;
+          calendars[calendar.id] = calendar;
         }
         return {
           rows,
           calendars,
           profileTz: "UTC",
           nextCursor: null,
-        };
+        } as SchedulePage;
       }
 
-      let scheduleQuery = supabase.from("scheduled_posts")
-        .select("id, calendar_id, post_day, platform, scheduled_at, status, workflow_status, copy_text, post_snapshot, published_at, failure_reason")
+      let scheduleQuery = supabase
+        .from("scheduled_posts")
+        .select(
+          "id, calendar_id, post_day, platform, scheduled_at, status, workflow_status, copy_text, post_snapshot, published_at, failure_reason"
+        )
         .neq("status", "cancelled")
         .order("scheduled_at", { ascending: true })
         .order("id", { ascending: true })
         .limit(pageSize);
 
       if (pageParam) {
-        scheduleQuery = scheduleQuery.or(`scheduled_at.gt.${pageParam.scheduled_at},and(scheduled_at.eq.${pageParam.scheduled_at},id.gt.${pageParam.id})`);
+        scheduleQuery = scheduleQuery.or(
+          `scheduled_at.gt.${pageParam.scheduled_at},and(scheduled_at.eq.${pageParam.scheduled_at},id.gt.${pageParam.id})`
+        );
       }
 
-      const [{ data: pr, error: profileError }, { data: schedData, error: scheduleError }, { data: calData, error: calendarsError }] = await Promise.all([
+      const [
+        { data: pr, error: profileError },
+        { data: schedData, error: scheduleError },
+        { data: calData, error: calendarsError },
+      ] = await Promise.all([
         supabase.from("profiles").select("default_timezone").eq("user_id", userId).maybeSingle(),
         scheduleQuery,
         supabase.from("saved_calendars").select("id, title, timezone, tracking_url"),
@@ -78,20 +116,18 @@ export function useScheduleInfiniteQuery(userId?: string, pageSize = 25) {
       if (scheduleError) throw scheduleError;
       if (calendarsError) throw calendarsError;
 
-      const profTz = (pr as { default_timezone?: string | null } | null)?.default_timezone || "";
-      const map: Record<string, { id: string; title: string; timezone: string | null; tracking_url: string | null }> = {};
-      for (const c of (calData as Array<{ id: string; title: string; timezone: string | null; tracking_url: string | null }>) || []) map[c.id] = c;
+      const profTz = pr?.default_timezone || "";
+      const map: Record<string, CalendarMeta> = {};
+      for (const c of (calData ?? []) as CalendarMeta[]) map[c.id] = c;
 
-      const items = (schedData as unknown[] | null) || [];
-      const lastItem = items[items.length - 1] as { scheduled_at?: string; id?: string } | undefined;
-      const nextCursor = items.length === pageSize && lastItem?.scheduled_at && lastItem?.id ? { scheduled_at: lastItem.scheduled_at, id: lastItem.id } : null;
+      const items = (schedData ?? []) as ScheduledRow[];
+      const lastItem = items[items.length - 1];
+      const nextCursor =
+        items.length === pageSize && lastItem?.scheduled_at && lastItem?.id
+          ? { scheduled_at: lastItem.scheduled_at, id: lastItem.id }
+          : null;
 
-      return {
-        rows: items,
-        calendars: map,
-        profileTz: profTz,
-        nextCursor,
-      };
+      return { rows: items, calendars: map, profileTz: profTz, nextCursor } as SchedulePage;
     },
   });
 }
@@ -99,7 +135,13 @@ export function useScheduleInfiniteQuery(userId?: string, pageSize = 25) {
 export function useUpdateScheduledPostStatusMutation(calendarId?: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: Database["public"]["Tables"]["scheduled_posts"]["Update"] }) => {
+    mutationFn: async ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: Database["public"]["Tables"]["scheduled_posts"]["Update"];
+    }) => {
       if (isE2EMode()) {
         updateE2EScheduleRow(id, patch);
         return { id, patch };
@@ -123,7 +165,10 @@ export function useCancelScheduledPostMutation(calendarId?: string) {
         updateE2EScheduleRow(id, { status: "cancelled" });
         return id;
       }
-      const { error } = await supabase.from("scheduled_posts").update({ status: "cancelled" }).eq("id", id);
+      const { error } = await supabase
+        .from("scheduled_posts")
+        .update({ status: "cancelled" })
+        .eq("id", id);
       if (error) throw error;
       return id;
     },
@@ -142,7 +187,10 @@ export function useUpdateScheduledPostTimeMutation(calendarId?: string) {
         updateE2EScheduleRow(id, { scheduled_at: scheduledAt });
         return { id, scheduledAt };
       }
-      const { error } = await supabase.from("scheduled_posts").update({ scheduled_at: scheduledAt }).eq("id", id);
+      const { error } = await supabase
+        .from("scheduled_posts")
+        .update({ scheduled_at: scheduledAt })
+        .eq("id", id);
       if (error) throw error;
       return { id, scheduledAt };
     },

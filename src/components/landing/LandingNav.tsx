@@ -9,12 +9,12 @@ gsap.registerPlugin(ScrollTrigger);
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
-  { label: "Pricing",  href: "#pricing" },
-  { label: "Docs",     href: "#" },
+  { label: "Pricing", href: "#pricing" },
+  { label: "Docs", href: "#" },
 ];
 
 export default function LandingNav() {
-  const navRef   = useRef<HTMLElement>(null);
+  const navRef = useRef<HTMLElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const firstDrawerLinkRef = useRef<HTMLAnchorElement>(null);
@@ -23,16 +23,22 @@ export default function LandingNav() {
     if (!navRef.current) return;
     const noMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!noMotion) {
-      gsap.fromTo(navRef.current, { y: -64, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8, ease: "power3.out" });
+      gsap.fromTo(
+        navRef.current,
+        { y: -64, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.8, ease: "power3.out" }
+      );
     }
 
     ScrollTrigger.create({
       start: "top+=80 top",
-      onEnter:     () => navRef.current?.classList.add("scrolled"),
+      onEnter: () => navRef.current?.classList.add("scrolled"),
       onLeaveBack: () => navRef.current?.classList.remove("scrolled"),
     });
 
-    return () => { ScrollTrigger.getAll().forEach(t => t.kill()); };
+    return () => {
+      ScrollTrigger.getAll().forEach((t) => t.kill());
+    };
   }, []);
 
   // Focus management for drawer
@@ -44,7 +50,9 @@ export default function LandingNav() {
       document.body.style.overflow = "";
       hamburgerRef.current?.focus();
     }
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [drawerOpen]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -60,17 +68,26 @@ export default function LandingNav() {
 
           {/* Desktop nav links */}
           <ul className="ld-w-nav-links" role="list">
-            {NAV_LINKS.map(link => (
+            {NAV_LINKS.map((link) => (
               <li key={link.label}>
-                <a href={link.href} className="ld-w-nav-link">{link.label}</a>
+                <a href={link.href} className="ld-w-nav-link">
+                  {link.label}
+                </a>
               </li>
             ))}
           </ul>
 
           {/* CTA */}
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <Link to="/auth" className="ld-w-nav-cta" aria-label="Start your free trial with ContentForge">
-              Start free <span className="arrow" aria-hidden="true">→</span>
+            <Link
+              to="/auth"
+              className="ld-w-nav-cta"
+              aria-label="Start your free trial with ContentForge"
+            >
+              Start free{" "}
+              <span className="arrow" aria-hidden="true">
+                →
+              </span>
             </Link>
             {/* Hamburger */}
             <button
@@ -81,7 +98,7 @@ export default function LandingNav() {
               aria-controls="nav-drawer"
               aria-label="Open navigation menu"
             >
-              <Menu size={20} color="#57534e" aria-hidden="true" />
+              <Menu size={20} color="var(--color-text-secondary)" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -121,7 +138,7 @@ export default function LandingNav() {
             cursor: "pointer",
             padding: "8px",
             borderRadius: "8px",
-            color: "#57534e",
+            color: "var(--color-text-secondary)",
             zIndex: 1,
           }}
         >
@@ -141,7 +158,7 @@ export default function LandingNav() {
         <Link
           to="/auth"
           onClick={() => setDrawerOpen(false)}
-          style={{ color: "#c2410c" }}
+          style={{ color: "var(--color-primary)" }}
         >
           Start free →
         </Link>

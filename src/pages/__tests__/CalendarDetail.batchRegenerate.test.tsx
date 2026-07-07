@@ -87,7 +87,12 @@ const mockRegenerateMutateAsync = vi.fn();
 const mockUpdateCalendarMutateAsync = vi.fn();
 
 vi.mock("@/hooks/useAppQueries", () => ({
-  useCalendarQuery: () => ({ data: mockCalendarData, isLoading: false, error: null, refetch: vi.fn() }),
+  useCalendarQuery: () => ({
+    data: mockCalendarData,
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
   useProfileQuery: () => ({ data: null }),
   useProfileUpdateMutation: () => ({ mutateAsync: vi.fn() }),
   useScheduledPostsQuery: () => ({ data: [] }),
@@ -103,7 +108,9 @@ import { toast } from "sonner";
 import CalendarDetail from "../CalendarDetail";
 
 function renderCalendarDetail() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={qc}>
       <CalendarDetail />
@@ -117,7 +124,10 @@ let confirmSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   vi.clearAllMocks();
   confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }))
+  );
   mockUpdateCalendarMutateAsync.mockResolvedValue(undefined);
 });
 
@@ -134,7 +144,9 @@ describe("CalendarDetail — bulk regenerate (regenerate all unlocked)", () => {
       if (day === 2) {
         return Promise.reject(new Error("AI service unavailable"));
       }
-      return Promise.resolve({ post: { ...payload.post, title: `${payload.post.title} (regenerated)` } });
+      return Promise.resolve({
+        post: { ...payload.post, title: `${payload.post.title} (regenerated)` },
+      });
     });
 
     renderCalendarDetail();

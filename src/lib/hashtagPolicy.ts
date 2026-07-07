@@ -5,7 +5,7 @@
 import { resolvePlatform, PlatformKey } from "./platformCopy";
 
 export interface HashtagPolicy {
-  banned: string[];   // stored lowercase, no leading #
+  banned: string[]; // stored lowercase, no leading #
   required: string[]; // stored lowercase, no leading #
 }
 
@@ -63,7 +63,7 @@ export function applyPolicy(
   rawHashtags: string | string[] | null | undefined,
   platformInput: string | null | undefined,
   policy: HashtagPolicy,
-  lockedTags: string[] = [],
+  lockedTags: string[] = []
 ): string {
   if (isLongForm(platformInput)) return "";
 
@@ -86,9 +86,7 @@ export function applyPolicy(
   }
 
   // 2) Existing AI-generated tags, dropping banned + already-locked.
-  const sourceParts = Array.isArray(rawHashtags)
-    ? rawHashtags.join(" ")
-    : (rawHashtags || "");
+  const sourceParts = Array.isArray(rawHashtags) ? rawHashtags.join(" ") : rawHashtags || "";
   for (const part of sourceParts.split(/[\s,]+/)) {
     if (out.length >= max) break;
     const tag = normalizeTag(part);
@@ -112,4 +110,3 @@ export function applyPolicy(
 export function parseHashtagsString(input: string | null | undefined): string[] {
   return parsePolicyList(input);
 }
-

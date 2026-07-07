@@ -32,7 +32,10 @@ describe("useIsAdmin", () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.isAdmin).toBe(false);
-    expect(mockRpc).toHaveBeenCalledWith("has_role", { _user_id: "user-with-forged-claim", _role: "admin" });
+    expect(mockRpc).toHaveBeenCalledWith("has_role", {
+      _user_id: "user-with-forged-claim",
+      _role: "admin",
+    });
   });
 
   it("grants admin only when has_role RPC returns true", async () => {

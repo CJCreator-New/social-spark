@@ -8,11 +8,13 @@ type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
  */
 export function hasBrandMemory(profile?: Partial<ProfileRow> | null): boolean {
   if (!profile) return false;
-  
-  const hasForbidden = Array.isArray(profile.forbidden_phrases) && profile.forbidden_phrases.length > 0;
+
+  const hasForbidden =
+    Array.isArray(profile.forbidden_phrases) && profile.forbidden_phrases.length > 0;
   const hasProof = Array.isArray(profile.proof_points) && profile.proof_points.length > 0;
   const hasCta = Array.isArray(profile.cta_preferences) && profile.cta_preferences.length > 0;
-  const hasStructures = Array.isArray(profile.preferred_structures) && profile.preferred_structures.length > 0;
+  const hasStructures =
+    Array.isArray(profile.preferred_structures) && profile.preferred_structures.length > 0;
 
   return hasForbidden || hasProof || hasCta || hasStructures;
 }
@@ -26,22 +28,28 @@ export function buildBrandMemoryPrompt(profile?: Partial<ProfileRow> | null): st
   const sections: string[] = ["### BRAND MEMORY & IDENTITY CONSTRAINTS"];
 
   if (Array.isArray(profile.forbidden_phrases) && profile.forbidden_phrases.length > 0) {
-    sections.push(`- FORBIDDEN PHRASES (NEVER USE): ${profile.forbidden_phrases.map(p => `"${p}"`).join(", ")}`);
+    sections.push(
+      `- FORBIDDEN PHRASES (NEVER USE): ${profile.forbidden_phrases.map((p) => `"${p}"`).join(", ")}`
+    );
   }
 
   if (Array.isArray(profile.proof_points) && profile.proof_points.length > 0) {
     sections.push("- PROOF POINTS & KEY DATA (WEAVE THESE IN WHERE NATURAL):");
-    profile.proof_points.forEach(point => {
+    profile.proof_points.forEach((point) => {
       sections.push(`  * ${point}`);
     });
   }
 
   if (Array.isArray(profile.cta_preferences) && profile.cta_preferences.length > 0) {
-    sections.push(`- PREFERRED CTA PATTERNS: Use call-to-action styles matching: ${profile.cta_preferences.join(", ")}`);
+    sections.push(
+      `- PREFERRED CTA PATTERNS: Use call-to-action styles matching: ${profile.cta_preferences.join(", ")}`
+    );
   }
 
   if (Array.isArray(profile.preferred_structures) && profile.preferred_structures.length > 0) {
-    sections.push(`- PREFERRED WRITING STRUCTURES: Align content formats to: ${profile.preferred_structures.join(", ")}`);
+    sections.push(
+      `- PREFERRED WRITING STRUCTURES: Align content formats to: ${profile.preferred_structures.join(", ")}`
+    );
   }
 
   return sections.join("\n");
@@ -74,13 +82,15 @@ const NON_FALLBACK_ERRORS = [
   "Rate limit exceeded",
   "Request body too large",
   "Invalid request",
-  "AI is not configured",        // server-side platform key missing
-  "PLATFORM_UNAVAILABLE",        // entire provider waterfall exhausted — surface directly
-  "All platform AI providers",   // same error, string-prefix match
+  "AI is not configured", // server-side platform key missing
+  "PLATFORM_UNAVAILABLE", // entire provider waterfall exhausted — surface directly
+  "All platform AI providers", // same error, string-prefix match
 ];
 
 function isNonFallbackError(message: string): boolean {
-  return NON_FALLBACK_ERRORS.some((prefix) => message.startsWith(prefix) || message.includes(prefix));
+  return NON_FALLBACK_ERRORS.some(
+    (prefix) => message.startsWith(prefix) || message.includes(prefix)
+  );
 }
 
 export async function generateWithFallback<T = unknown>(
@@ -93,11 +103,13 @@ export async function generateWithFallback<T = unknown>(
   if (!SUPABASE_KEY) {
     console.error(
       "generateWithFallback: VITE_SUPABASE_PUBLISHABLE_KEY is missing or empty. " +
-      "Requests to Supabase Edge Functions will fail with 401 Unauthorized. " +
-      "Check your .env configuration."
+        "Requests to Supabase Edge Functions will fail with 401 Unauthorized. " +
+        "Check your .env configuration."
     );
   }
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -113,7 +125,8 @@ export async function generateWithFallback<T = unknown>(
   if (userKeyInfo && userKeyInfo.source === "user") {
     const alwaysBody = {
       ...body,
-      userApiKey: userKeyInfo.apiKey === "USER_KEY_STORED_SERVERSIDE" ? undefined : userKeyInfo.apiKey,
+      userApiKey:
+        userKeyInfo.apiKey === "USER_KEY_STORED_SERVERSIDE" ? undefined : userKeyInfo.apiKey,
       userApiProvider: userKeyInfo.provider,
     };
     const res = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
@@ -189,7 +202,8 @@ export async function generateWithFallback<T = unknown>(
 
     const fallbackBody = {
       ...body,
-      userApiKey: fallbackClient.apiKey === "USER_KEY_STORED_SERVERSIDE" ? undefined : fallbackClient.apiKey,
+      userApiKey:
+        fallbackClient.apiKey === "USER_KEY_STORED_SERVERSIDE" ? undefined : fallbackClient.apiKey,
       userApiProvider: fallbackClient.provider,
     };
 
@@ -213,4 +227,3 @@ export async function generateWithFallback<T = unknown>(
     return { data, usedFallback: true, keyMode: "fallback" };
   }
 }
-

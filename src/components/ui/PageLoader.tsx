@@ -11,7 +11,12 @@ interface PageLoaderProps {
 }
 
 /** Shared warm-editorial loading spinner for full-page and section-level loading states. */
-export function PageLoader({ label = "Loading…", size = 28, fullScreen = true, className = "" }: PageLoaderProps) {
+export function PageLoader({
+  label = "Loading…",
+  size = 28,
+  fullScreen = true,
+  className = "",
+}: PageLoaderProps) {
   return (
     <div
       className={`flex items-center justify-center bg-background ${fullScreen ? "min-h-screen" : "min-h-[200px]"} ${className}`}

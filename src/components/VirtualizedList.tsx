@@ -52,9 +52,10 @@ export function VirtualizedList<T>({
 
     updateHeight();
 
-    const resizeObserver = typeof ResizeObserver !== "undefined" && containerRef.current
-      ? new ResizeObserver(updateHeight)
-      : null;
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" && containerRef.current
+        ? new ResizeObserver(updateHeight)
+        : null;
 
     if (resizeObserver && containerRef.current) {
       resizeObserver.observe(containerRef.current);

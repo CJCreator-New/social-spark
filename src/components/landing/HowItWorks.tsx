@@ -49,7 +49,9 @@ function GenerateIllustration() {
       <div className="ld-w-day-list">
         {posts.map((p) => (
           <div key={p.day} className="ld-w-day-row">
-            <div className="ld-w-day-num" aria-hidden="true">{p.day}</div>
+            <div className="ld-w-day-num" aria-hidden="true">
+              {p.day}
+            </div>
             <div className="ld-w-day-title">{p.title}</div>
           </div>
         ))}
@@ -66,7 +68,9 @@ function PublishIllustration() {
       <ul className="ld-w-price-features">
         {items.map((it) => (
           <li key={it}>
-            <span className="check" aria-hidden="true">✓</span>
+            <span className="check" aria-hidden="true">
+              ✓
+            </span>
             {it}
           </li>
         ))}
@@ -75,7 +79,11 @@ function PublishIllustration() {
   );
 }
 
-const ILLUSTRATIONS = [<BriefIllustration key="0" />, <GenerateIllustration key="1" />, <PublishIllustration key="2" />];
+const ILLUSTRATIONS = [
+  <BriefIllustration key="0" />,
+  <GenerateIllustration key="1" />,
+  <PublishIllustration key="2" />,
+];
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>
@@ -93,7 +101,10 @@ function useIsDesktop() {
 function StickyHowItWorks() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
-  const { scrollYProgress } = useScroll({ target: containerRef, offset: ["start start", "end end"] });
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end end"],
+  });
 
   useEffect(() => {
     return scrollYProgress.on("change", (v) => {
@@ -184,11 +195,18 @@ function StackedHowItWorks() {
       onEnter: () => gridRef.current?.classList.add("animated"),
     });
 
-    return () => { ScrollTrigger.getAll().forEach(t => t.kill()); };
+    return () => {
+      ScrollTrigger.getAll().forEach((t) => t.kill());
+    };
   }, []);
 
   return (
-    <section id="how-it-works" aria-labelledby="hiw-heading" ref={sectionRef} className="ld-w-hiw-section ld-w-section">
+    <section
+      id="how-it-works"
+      aria-labelledby="hiw-heading"
+      ref={sectionRef}
+      className="ld-w-hiw-section ld-w-section"
+    >
       <div className="ld-w-wrap">
         <div className="ld-w-hiw-head">
           <span className="ld-w-eyebrow">How It Works</span>
@@ -200,7 +218,9 @@ function StackedHowItWorks() {
         <div ref={gridRef} className="ld-w-hiw-grid" role="list">
           {STEPS.map((step) => (
             <div key={step.num} className="ld-w-step-card" role="listitem">
-              <span className="ld-w-step-num-ghost" aria-hidden="true">{step.num}</span>
+              <span className="ld-w-step-num-ghost" aria-hidden="true">
+                {step.num}
+              </span>
               <div className="ld-w-step-badge">Step {step.num}</div>
               <h3 className="ld-w-step-h">{step.title}</h3>
               <p className="ld-w-step-p">{step.desc}</p>

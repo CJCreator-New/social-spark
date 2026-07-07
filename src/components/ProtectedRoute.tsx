@@ -22,9 +22,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     if (timedOut) {
       return <RouteFallback title="Session check timed out" ariaLabel="Session check timed out" />;
     }
-    return (
-      <RouteFallback title="Loading workspace" ariaLabel="Loading protected route" />
-    );
+    return <RouteFallback title="Loading workspace" ariaLabel="Loading protected route" />;
   }
   if (!user) return <Navigate to="/auth" state={{ from: location }} replace />;
   return <>{children}</>;

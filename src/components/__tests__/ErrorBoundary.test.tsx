@@ -53,9 +53,7 @@ describe("ErrorBoundary", () => {
     );
 
     expect(screen.getByText(/AI Generation Unavailable/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/add your own API key in Profile/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/add your own API key in Profile/i)).toBeInTheDocument();
   });
 
   it("renders 'Try Again' and 'Add API Key' buttons for AI_UNAVAILABLE error", () => {
@@ -102,7 +100,8 @@ describe("ErrorBoundary", () => {
 
   it("does NOT render a raw stack trace to the user in production mode", () => {
     const errorWithStack = new Error("Some network error");
-    errorWithStack.stack = "Error: Some network error\n  at foo (bar.js:1:1)\n  at baz (qux.js:2:2)";
+    errorWithStack.stack =
+      "Error: Some network error\n  at foo (bar.js:1:1)\n  at baz (qux.js:2:2)";
 
     render(
       <ErrorBoundary>

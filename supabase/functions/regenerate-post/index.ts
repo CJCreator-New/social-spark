@@ -40,19 +40,29 @@ interface ExistingPost {
 }
 
 const TWEAK_INSTRUCTIONS: Record<string, string> = {
-  "shorter": "TWEAK: Keep the same angle, hook, and CTA, but cut the body length by ~35%. Tighten every sentence. Remove anything not load-bearing.",
-  "punchier": "TWEAK: Keep the same angle, but rewrite for more impact — shorter sentences, stronger verbs, sharper opener. No fluff.",
-  "add-stat": "TWEAK: Keep the same angle, but weave in 1–2 specific, plausible statistics or concrete numbers (e.g. percentages, dollar figures, time spans). Cite them as 'roughly' or 'around' if you can't be sure.",
-  "remove-emoji": "TWEAK: Keep the same angle and structure, but remove ALL emojis from the title, hook, body, and CTA. Replace with plain punctuation.",
-  "more-personal": "TWEAK: Keep the same angle, but rewrite in first-person with a small, specific personal anecdote or observation in the hook. Make it feel like a human wrote it, not a brand.",
-  "enhance": "TWEAK: Improve this post for engagement based on performance metrics — strengthen the hook (make it shorter, punchier, and curiosity-driving), sharpen the CTA to invite replies, increase hashtag relevance (add 1–2 targeted tags), and simplify any long sentences to improve readability. Preserve the core angle and avoid introducing new topics.",
+  shorter:
+    "TWEAK: Keep the same angle, hook, and CTA, but cut the body length by ~35%. Tighten every sentence. Remove anything not load-bearing.",
+  punchier:
+    "TWEAK: Keep the same angle, but rewrite for more impact — shorter sentences, stronger verbs, sharper opener. No fluff.",
+  "add-stat":
+    "TWEAK: Keep the same angle, but weave in 1–2 specific, plausible statistics or concrete numbers (e.g. percentages, dollar figures, time spans). Cite them as 'roughly' or 'around' if you can't be sure.",
+  "remove-emoji":
+    "TWEAK: Keep the same angle and structure, but remove ALL emojis from the title, hook, body, and CTA. Replace with plain punctuation.",
+  "more-personal":
+    "TWEAK: Keep the same angle, but rewrite in first-person with a small, specific personal anecdote or observation in the hook. Make it feel like a human wrote it, not a brand.",
+  enhance:
+    "TWEAK: Improve this post for engagement based on performance metrics — strengthen the hook (make it shorter, punchier, and curiosity-driving), sharpen the CTA to invite replies, increase hashtag relevance (add 1–2 targeted tags), and simplify any long sentences to improve readability. Preserve the core angle and avoid introducing new topics.",
 };
 
 const ENHANCE_FOCUS_INSTRUCTIONS: Record<string, string> = {
-  hookStrength: "FOCUS: The hook is the weakest area. Rebuild the opening line to create curiosity faster, preferably with a specific claim, question, or sharp contrast.",
-  ctaEffectiveness: "FOCUS: The CTA is the weakest area. Make the call to action more specific, easier to answer, and more clearly connected to the topic.",
-  hashtagRelevance: "FOCUS: Hashtag relevance is weakest. Replace generic tags with fewer, more specific platform-native tags tied to the topic and audience.",
-  readability: "FOCUS: Readability is weakest. Shorten long sentences, reduce complexity, and make the post easier to scan without losing substance.",
+  hookStrength:
+    "FOCUS: The hook is the weakest area. Rebuild the opening line to create curiosity faster, preferably with a specific claim, question, or sharp contrast.",
+  ctaEffectiveness:
+    "FOCUS: The CTA is the weakest area. Make the call to action more specific, easier to answer, and more clearly connected to the topic.",
+  hashtagRelevance:
+    "FOCUS: Hashtag relevance is weakest. Replace generic tags with fewer, more specific platform-native tags tied to the topic and audience.",
+  readability:
+    "FOCUS: Readability is weakest. Shorten long sentences, reduce complexity, and make the post easier to scan without losing substance.",
 };
 
 function buildEnhanceTweakInstruction(focusMetric?: string): string {
@@ -73,7 +83,14 @@ Deno.serve(async (req: Request) => {
     const post = body.post as ExistingPost | undefined;
     const siblings = (body.siblings as ExistingPost[] | undefined) || [];
     const newTopic = body.newTopic as string | undefined;
-    const tweak = body.tweak as "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "enhance" | undefined;
+    const tweak = body.tweak as
+      | "shorter"
+      | "punchier"
+      | "add-stat"
+      | "remove-emoji"
+      | "more-personal"
+      | "enhance"
+      | undefined;
     const focusMetric = typeof body.focusMetric === "string" ? body.focusMetric : "";
 
     if (!post || typeof post.day !== "number" || !post.dow) {
@@ -102,33 +119,51 @@ Deno.serve(async (req: Request) => {
 
     const usingSharedKey = !payload.userApiKey && !(quota.useOwnKey && quota.keyMode === "always");
     if (usingSharedKey && !quota.allowed) {
-      return jsonResponse({
-        error: "QUOTA_EXCEEDED",
-        message: quotaExceededMessage(quota.tier),
-        quota: { used: quota.used, limit: quota.limit },
-      }, 402);
+      return jsonResponse(
+        {
+          error: "QUOTA_EXCEEDED",
+          message: quotaExceededMessage(quota.tier),
+          quota: { used: quota.used, limit: quota.limit },
+        },
+        402
+      );
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets.");
-      return jsonResponse({
-        error: "AI is not configured.",
-        message: "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets."
-      }, 500);
+      console.error(
+        "LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets."
+      );
+      return jsonResponse(
+        {
+          error: "AI is not configured.",
+          message:
+            "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets.",
+        },
+        500
+      );
     }
 
     const targetTopic = (newTopic && newTopic.trim()) || post.topic || "general topic";
     const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
-    const tweakInstr = tweak === "enhance"
-      ? buildEnhanceTweakInstruction(focusMetric)
-      : (tweak && TWEAK_INSTRUCTIONS[tweak]) || "";
-    const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: false });
+    const tweakInstr =
+      tweak === "enhance"
+        ? buildEnhanceTweakInstruction(focusMetric)
+        : (tweak && TWEAK_INSTRUCTIONS[tweak]) || "";
+    const hashtagInstr = buildHashtagInstr(
+      payload.platform,
+      payload.bannedHashtags,
+      payload.requiredHashtags,
+      { every: false }
+    );
 
     const siblingSummary = siblings
-      .filter(s => s && s.day !== post.day)
-      .map(s => `- Day ${s.day} (${s.dow}) · "${s.topic}" — opener: "${(s.hook || s.title || "").slice(0, 100)}"`)
+      .filter((s) => s && s.day !== post.day)
+      .map(
+        (s) =>
+          `- Day ${s.day} (${s.dow}) · "${s.topic}" — opener: "${(s.hook || s.title || "").slice(0, 100)}"`
+      )
       .join("\n");
 
     const systemMsg = buildSystemMessage(payload, { isSinglePost: true });
@@ -145,13 +180,14 @@ CRITIQUE & REWRITE GUIDANCE:
 `;
     }
 
-    const userMsg = buildUserMessage(payload, { isSinglePost: true }) +
+    const userMsg =
+      buildUserMessage(payload, { isSinglePost: true }) +
       `\n\nREWRITE CONTEXT:\n- Day: ${post.day} (${post.dow})\n- Topic: ${targetTopic}` +
       (post.title ? `\n- Previous Title Ref: "${post.title}"` : "") +
-      `\n\nCURRENT VERSION:\n- Title: "${post.title || ''}"\n- Hook: "${post.hook || ''}"\n- Body: "${(post.body || '').slice(0, 800)}"\n- CTA: "${post.cta || ''}"\n` +
+      `\n\nCURRENT VERSION:\n- Title: "${post.title || ""}"\n- Hook: "${post.hook || ""}"\n- Body: "${(post.body || "").slice(0, 800)}"\n- CTA: "${post.cta || ""}"\n` +
       `\nUSER INSTRUCTION / TWEAK:\n${tweakInstr || "General variety improvement"}\n` +
       diffContext +
-      `\nOTHER POSTS IN THIS WEEK (For context/variety reference):\n${siblingSummary || '(none provided)'}\n\n` +
+      `\nOTHER POSTS IN THIS WEEK (For context/variety reference):\n${siblingSummary || "(none provided)"}\n\n` +
       `HARD RULES: Return the full post object. Fix exactly what was requested. If a tweak is provided, prioritize it over generic platform rules.`;
 
     const tool = {
@@ -167,11 +203,11 @@ CRITIQUE & REWRITE GUIDANCE:
             topic: { type: "string" },
             format: { type: "string" },
             title: { type: "string" },
-              hook: { type: "string" },
-              hook_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
+            hook: { type: "string" },
+            hook_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
             body: { type: "string" },
-              cta: { type: "string" },
-              cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
+            cta: { type: "string" },
+            cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
             // Phase A additions: plan + variants + self-check
             plan: {
               type: "object",
@@ -204,17 +240,32 @@ CRITIQUE & REWRITE GUIDANCE:
             },
             rationale: { type: "string" },
           },
-          required: ["day", "dow", "topic", "format", "title", "hook", "body", "cta", "hashtags", "rationale"],
+          required: [
+            "day",
+            "dow",
+            "topic",
+            "format",
+            "title",
+            "hook",
+            "body",
+            "cta",
+            "hashtags",
+            "rationale",
+          ],
           additionalProperties: false,
         },
       },
     };
 
-    const model = payload.quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+    const model =
+      payload.quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
     const temperature = payload.quality === "polished" ? 0.45 : 0.5;
 
     const aiRes = await callAIGateway(
-      [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }],
+      [
+        { role: "system", content: systemMsg },
+        { role: "user", content: userMsg },
+      ],
       tool,
       LOVABLE_API_KEY,
       {
@@ -225,15 +276,19 @@ CRITIQUE & REWRITE GUIDANCE:
         quality: payload.quality,
         userToken: token || null,
         userIp: ipAddress,
-        max_tokens: 8192
+        max_tokens: 8192,
       }
     );
     if (aiRes.status !== 200) {
       if (aiRes.status === 503) {
-        return jsonResponse({
-          error: "PLATFORM_UNAVAILABLE",
-          message: "Our AI providers are temporarily overloaded. Please try again in a moment, or add your own API key in Profile → API Keys to generate without platform limits.",
-        }, 503);
+        return jsonResponse(
+          {
+            error: "PLATFORM_UNAVAILABLE",
+            message:
+              "Our AI providers are temporarily overloaded. Please try again in a moment, or add your own API key in Profile → API Keys to generate without platform limits.",
+          },
+          503
+        );
       }
       return jsonResponse({ error: aiRes.error }, aiRes.status);
     }
@@ -253,7 +308,7 @@ CRITIQUE & REWRITE GUIDANCE:
     // Task 4: LLM-as-judge scoring
     const candidates = [String(parsed.body || "")];
     if (Array.isArray(parsed.body_variants)) {
-      candidates.push(...parsed.body_variants.map(v => String(v || "")));
+      candidates.push(...parsed.body_variants.map((v) => String(v || "")));
     }
 
     if (candidates.length > 1) {
@@ -279,22 +334,29 @@ CRITIQUE & REWRITE GUIDANCE:
     // If polished quality requested, run a focused polish pass (critique + rewrite)
     if (payload.quality === "polished") {
       try {
-        const polishSystem = systemMsg + "\n\nPOLISHING RUBRIC:\n- Improve hook specificity and curiosity.\n- Tighten body language and remove vague claims.\n- Strengthen CTA clarity and actionability.\n- Preserve angle and do not introduce new topics.";
+        const polishSystem =
+          systemMsg +
+          "\n\nPOLISHING RUBRIC:\n- Improve hook specificity and curiosity.\n- Tighten body language and remove vague claims.\n- Strengthen CTA clarity and actionability.\n- Preserve angle and do not introduce new topics.";
         const polishUser = `Polish the following post JSON to a publication-ready version using the rubric above. Return using the same 'return_post' function schema.\n\nCURRENT_POST_JSON:\n${JSON.stringify(parsed, null, 2)}`;
 
-        const polishRes = await callAIGateway([
-          { role: "system", content: polishSystem },
-          { role: "user", content: polishUser },
-        ], tool, LOVABLE_API_KEY, {
-          model: "google/gemini-2.5-pro",
-          temperature: 0.4,
-          userApiKey: payload.userApiKey,
-          userApiProvider: payload.userApiProvider,
-          quality: payload.quality,
-          userToken: token || null,
-          userIp: ipAddress,
-          max_tokens: 8192
-        });
+        const polishRes = await callAIGateway(
+          [
+            { role: "system", content: polishSystem },
+            { role: "user", content: polishUser },
+          ],
+          tool,
+          LOVABLE_API_KEY,
+          {
+            model: "google/gemini-2.5-pro",
+            temperature: 0.4,
+            userApiKey: payload.userApiKey,
+            userApiProvider: payload.userApiProvider,
+            quality: payload.quality,
+            userToken: token || null,
+            userIp: ipAddress,
+            max_tokens: 8192,
+          }
+        );
 
         if (polishRes.status === 200) {
           const polishParse = parseAIResponse(polishRes.data || {}, "return_post");
@@ -340,7 +402,7 @@ CRITIQUE & REWRITE GUIDANCE:
               Prefer: "return=representation",
             },
             body: JSON.stringify(row),
-          }).catch(e => console.warn("Failed to record regenerate feedback", e));
+          }).catch((e) => console.warn("Failed to record regenerate feedback", e));
         }
       }
     } catch (e) {

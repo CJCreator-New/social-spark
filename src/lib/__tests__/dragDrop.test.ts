@@ -1,11 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import {
-  swapItems,
-  handleDragStart,
-  handleDragOver,
-  handleDrop,
-  isDragOver,
-} from "../dragDrop";
+import { swapItems, handleDragStart, handleDragOver, handleDrop, isDragOver } from "../dragDrop";
 
 /** Minimal DataTransfer-like mock for jsdom (which lacks a full implementation). */
 function createDataTransfer(initial?: Record<string, string>) {

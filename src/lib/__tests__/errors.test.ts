@@ -57,7 +57,9 @@ describe("errors helper and class tests", () => {
 
     it("should map network standard errors to a safe user message", () => {
       const err = new Error("Failed to fetch data from network");
-      expect(getUserFriendlyMessage(err)).toBe("Connection error. Please check your internet and try again.");
+      expect(getUserFriendlyMessage(err)).toBe(
+        "Connection error. Please check your internet and try again."
+      );
     });
 
     it("should map timeout standard errors to a safe user message", () => {

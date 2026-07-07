@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { loadScheduleTimezone, resolveScheduleTimezone, saveScheduleTimezone } from "@/lib/schedulePreferences";
+import {
+  loadScheduleTimezone,
+  resolveScheduleTimezone,
+  saveScheduleTimezone,
+} from "@/lib/schedulePreferences";
 
 describe("schedulePreferences", () => {
   beforeEach(() => {

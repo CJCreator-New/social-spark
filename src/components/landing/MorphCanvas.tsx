@@ -128,7 +128,7 @@ export default function MorphCanvas() {
       transparent: true,
       opacity: 0.12,
     });
-    
+
     // Create a custom wireframe shader to match morphing
     const wireframeShaderMaterial = new THREE.ShaderMaterial({
       vertexShader: material.vertexShader,
@@ -150,7 +150,7 @@ export default function MorphCanvas() {
 
     // 6. GSAP ScrollTrigger Integration
     const scrollObj = { progress: 0.0 };
-    
+
     const triggerInstance = ScrollTrigger.create({
       trigger: triggerRef.current,
       start: "top bottom",
@@ -164,9 +164,9 @@ export default function MorphCanvas() {
           overwrite: "auto",
           onUpdate: () => {
             material.uniforms.uMorphProgress.value = scrollObj.progress;
-          }
+          },
         });
-      }
+      },
     });
 
     // 7. Responsive Resizing
@@ -219,7 +219,7 @@ export default function MorphCanvas() {
       resizeObserver.disconnect();
       io.disconnect();
       cancelAnimationFrame(animationFrameId);
-      
+
       geometry.dispose();
       material.dispose();
       wireframeShaderMaterial.dispose();
@@ -232,8 +232,8 @@ export default function MorphCanvas() {
 
   return (
     <div ref={triggerRef} className="w-full h-full relative flex items-center justify-center py-12">
-      <div 
-        ref={containerRef} 
+      <div
+        ref={containerRef}
         className="w-80 h-80 md:w-96 md:h-96 relative pointer-events-none"
         style={{ mixBlendMode: "screen" }}
       />

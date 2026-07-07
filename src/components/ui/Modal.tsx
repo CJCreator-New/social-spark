@@ -12,7 +12,14 @@ interface ModalProps {
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export const Modal: React.FC<ModalProps> = ({ children, onClose, className = "modal-content", ariaLabel, ariaLabelledBy, ariaDescribedBy }) => {
+export const Modal: React.FC<ModalProps> = ({
+  children,
+  onClose,
+  className = "modal-content",
+  ariaLabel,
+  ariaLabelledBy,
+  ariaDescribedBy,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
@@ -45,9 +52,9 @@ export const Modal: React.FC<ModalProps> = ({ children, onClose, className = "mo
     const container = containerRef.current;
     if (!container) return;
 
-    const focusable = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-      (el) => el.offsetParent !== null
-    );
+    const focusable = Array.from(
+      container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+    ).filter((el) => el.offsetParent !== null);
     if (focusable.length === 0) {
       e.preventDefault();
       return;

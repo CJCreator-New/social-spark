@@ -50,7 +50,9 @@ function bytesFromBase64(input: string): { bytes: Uint8Array; contentType: strin
 
 function normalizeCalendarId(value: unknown): string | null {
   const calendarId = String(value || "").trim();
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(calendarId)) {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(calendarId)
+  ) {
     return null;
   }
   return calendarId.toLowerCase();
@@ -103,27 +105,30 @@ async function upsertMediaReference(params: {
   publicUrl: string;
   referenceKey: string;
 }) {
-  const res = await fetch(`${params.supabaseUrl}/rest/v1/media_references?on_conflict=bucket,storage_path`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${params.serviceRoleKey}`,
-      apikey: params.serviceRoleKey,
-      "content-type": "application/json",
-      prefer: "resolution=merge-duplicates,return=minimal",
-    },
-    body: JSON.stringify({
-      user_id: params.userId,
-      bucket: params.bucket,
-      storage_path: params.storagePath,
-      public_url: params.publicUrl,
-      reference_kind: "calendar",
-      reference_key: params.referenceKey,
-      reference_count: 1,
-      last_referenced_at: new Date().toISOString(),
-      orphaned_at: null,
-      deleted_at: null,
-    }),
-  });
+  const res = await fetch(
+    `${params.supabaseUrl}/rest/v1/media_references?on_conflict=bucket,storage_path`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${params.serviceRoleKey}`,
+        apikey: params.serviceRoleKey,
+        "content-type": "application/json",
+        prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({
+        user_id: params.userId,
+        bucket: params.bucket,
+        storage_path: params.storagePath,
+        public_url: params.publicUrl,
+        reference_kind: "calendar",
+        reference_key: params.referenceKey,
+        reference_count: 1,
+        last_referenced_at: new Date().toISOString(),
+        orphaned_at: null,
+        deleted_at: null,
+      }),
+    }
+  );
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -132,7 +137,8 @@ async function upsertMediaReference(params: {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
+  if (req.method === "OPTIONS")
+    return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -143,11 +149,17 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Storage is not configured." }, 500);
     }
     if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets.");
-      return jsonResponse({
-        error: "AI is not configured.",
-        message: "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets."
-      }, 500);
+      console.error(
+        "LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets."
+      );
+      return jsonResponse(
+        {
+          error: "AI is not configured.",
+          message:
+            "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets.",
+        },
+        500
+      );
     }
 
     const authHeader = req.headers.get("authorization") || "";
@@ -155,7 +167,7 @@ Deno.serve(async (req: Request) => {
     const userId = await getVerifiedUserId(token);
     if (!userId) return jsonResponse({ error: "Sign in required." }, 401);
 
-    const body = await req.json().catch(() => ({})) as ImageRequest;
+    const body = (await req.json().catch(() => ({}))) as ImageRequest;
     const calendarId = normalizeCalendarId(body.calendarId);
     const postDay = normalizePostDay(body.postDay);
     const prompt = String(body.prompt || body.post?.image_prompt || "").trim();
@@ -174,11 +186,14 @@ Deno.serve(async (req: Request) => {
 
     let platformStyle = "";
     if (platform === "LinkedIn") {
-      platformStyle = "Style: Professional, clean, corporate-editorial, minimalist flat illustrations or clean office/workspace photography. Muted executive colors.";
+      platformStyle =
+        "Style: Professional, clean, corporate-editorial, minimalist flat illustrations or clean office/workspace photography. Muted executive colors.";
     } else if (platform === "Instagram" || platform === "TikTok") {
-      platformStyle = "Style: Lifestyle photography, vibrant, authentic, high-contrast, modern aesthetic suitable for lifestyle grids or video thumbnails.";
+      platformStyle =
+        "Style: Lifestyle photography, vibrant, authentic, high-contrast, modern aesthetic suitable for lifestyle grids or video thumbnails.";
     } else if (platform === "X" || platform === "Facebook") {
-      platformStyle = "Style: Engaging, news-editorial or concept-graphic illustration, sharp contrast, clear central subject.";
+      platformStyle =
+        "Style: Engaging, news-editorial or concept-graphic illustration, sharp contrast, clear central subject.";
     }
 
     const finalPrompt = [
@@ -186,7 +201,9 @@ Deno.serve(async (req: Request) => {
       `Platform: ${platform}. Aspect ratio: ${aspectRatio}.`,
       platformStyle,
       "Create a polished editorial social-media visual. No logos, no UI mockups, no readable text, no captions, no watermarks.",
-    ].filter(Boolean).join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
@@ -221,7 +238,10 @@ Deno.serve(async (req: Request) => {
     if (!imageRes.ok) {
       const text = await imageRes.text().catch(() => "");
       console.error(`Image gateway error ${imageRes.status}. Response body:`, text);
-      return jsonResponse({ error: `Image generation failed (${imageRes.status}).` }, imageRes.status || 500);
+      return jsonResponse(
+        { error: `Image generation failed (${imageRes.status}).` },
+        imageRes.status || 500
+      );
     }
 
     const imageData = await imageRes.json().catch((err) => {
@@ -246,7 +266,8 @@ Deno.serve(async (req: Request) => {
       contentType = decoded.contentType;
     } else if (typeof url === "string" && url.length > 0) {
       const assetRes = await fetch(url);
-      if (!assetRes.ok) return jsonResponse({ error: "Generated image could not be downloaded." }, 500);
+      if (!assetRes.ok)
+        return jsonResponse({ error: "Generated image could not be downloaded." }, 500);
       bytes = new Uint8Array(await assetRes.arrayBuffer());
       contentType = assetRes.headers.get("content-type") || "image/png";
     } else {
@@ -276,7 +297,11 @@ Deno.serve(async (req: Request) => {
       console.warn(`Failed to orphan old media references: ${orphanRes.status}`, text);
     }
 
-    const ext = contentType.includes("jpeg") ? "jpg" : contentType.includes("webp") ? "webp" : "png";
+    const ext = contentType.includes("jpeg")
+      ? "jpg"
+      : contentType.includes("webp")
+        ? "webp"
+        : "png";
     const storagePath = `${userId}/${calendarId}/day-${postDay}-${Date.now()}.${ext}`;
     await uploadToStorage({
       supabaseUrl: SUPABASE_URL,

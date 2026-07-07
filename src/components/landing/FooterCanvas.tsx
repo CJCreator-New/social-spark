@@ -66,7 +66,7 @@ export default function FooterCanvas() {
       const rect = container.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      
+
       // Distance from center normalized between -1 and 1
       mouseRef.current.targetX = (e.clientX - centerX) / (window.innerWidth / 2);
       mouseRef.current.targetY = -(e.clientY - centerY) / (window.innerHeight / 2);
@@ -111,7 +111,7 @@ export default function FooterCanvas() {
       // Base rotation + interactive cursor tilt
       mesh.rotation.y = elapsedTime * 0.22 + mouse.x * 0.8;
       mesh.rotation.x = elapsedTime * 0.11 + mouse.y * 0.8;
-      
+
       // Floating motion
       mesh.position.y = Math.sin(elapsedTime * 1.5) * 0.06;
 
@@ -126,7 +126,7 @@ export default function FooterCanvas() {
       resizeObserver.disconnect();
       io.disconnect();
       cancelAnimationFrame(animationFrameId);
-      
+
       geometry.dispose();
       material.dispose();
       renderer.dispose();
@@ -137,9 +137,6 @@ export default function FooterCanvas() {
   }, []);
 
   return (
-    <div 
-      ref={containerRef} 
-      className="w-full h-full min-h-[300px] relative pointer-events-none"
-    />
+    <div ref={containerRef} className="w-full h-full min-h-[300px] relative pointer-events-none" />
   );
 }

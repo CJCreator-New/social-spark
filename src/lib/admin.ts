@@ -6,7 +6,7 @@
  * those fields return zero/empty placeholders.
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from "@/integrations/supabase/client";
 
 export interface AdminStats {
   overview: {
@@ -58,7 +58,7 @@ export async function fetchAdminStats(): Promise<AdminStats> {
   // policy, so this must go through an admin-gated SECURITY DEFINER RPC rather
   // than querying the table directly — otherwise an admin only ever sees their
   // own calendars, silently, with no indication the numbers are wrong.
-  const { data, error } = await supabase.rpc('admin_calendar_stats' as any);
+  const { data, error } = await supabase.rpc("admin_calendar_stats" as any);
   if (error) throw error;
   const result = data as unknown as AdminCalendarStatsRpcResult;
 
@@ -96,10 +96,10 @@ export async function fetchAdminStats(): Promise<AdminStats> {
 
 export async function isUserAdmin(userId: string): Promise<boolean> {
   const { data } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', userId)
-    .eq('role', 'admin')
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
     .maybeSingle();
   return !!data;
 }

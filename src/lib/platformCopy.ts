@@ -42,7 +42,14 @@ export function resolvePlatform(input?: string | null): PlatformKey {
   const s = (input || "").toLowerCase();
   if (s.includes("linkedin")) return "linkedin";
   if (s.includes("instagram") || s === "ig") return "instagram";
-  if (s.includes("twitter") || s.includes("x/") || s === "x" || s.startsWith("x ") || s.includes("/x")) return "twitter";
+  if (
+    s.includes("twitter") ||
+    s.includes("x/") ||
+    s === "x" ||
+    s.startsWith("x ") ||
+    s.includes("/x")
+  )
+    return "twitter";
   if (s.includes("facebook") || s === "fb") return "facebook";
   if (s.includes("tiktok") || s === "tt") return "tiktok";
   return "facebook";
@@ -119,7 +126,12 @@ function breakSentences(body: string): string {
       const sentences = para.match(/[^.!?]+[.!?]+(?:["')\]]+)?|\S[^.!?]*$/g) || [para];
       const grouped: string[] = [];
       for (let i = 0; i < sentences.length; i += 2) {
-        grouped.push(sentences.slice(i, i + 2).join(" ").trim());
+        grouped.push(
+          sentences
+            .slice(i, i + 2)
+            .join(" ")
+            .trim()
+        );
       }
       return grouped.filter(Boolean).join("\n\n");
     })
@@ -156,7 +168,9 @@ function buildFacebook(post: PostLike): string {
 function buildTwitter(post: PostLike): { text: string; truncated: boolean } {
   const limit = PLATFORM_LIMITS.twitter;
   const hook = stripMarkdown(post.hook || "").trim();
-  const body = stripMarkdown(post.body || "").trim().replace(/\s*\n+\s*/g, " ");
+  const body = stripMarkdown(post.body || "")
+    .trim()
+    .replace(/\s*\n+\s*/g, " ");
   const cta = stripMarkdown(post.cta || "").trim();
   const tags = normalizeHashtags(post.hashtags, 2);
 
@@ -183,7 +197,11 @@ function buildTwitter(post: PostLike): { text: string; truncated: boolean } {
 
 import { FontStyle, applyStyle } from "./unicodeFonts";
 
-export function formatForPlatform(post: PostLike, platformInput?: string | null, options?: { style?: FontStyle }): FormattedCopy {
+export function formatForPlatform(
+  post: PostLike,
+  platformInput?: string | null,
+  options?: { style?: FontStyle }
+): FormattedCopy {
   const platform = resolvePlatform(platformInput);
   const limit = PLATFORM_LIMITS[platform];
   const platformLabel = PLATFORM_LABELS[platform];
@@ -246,9 +264,7 @@ export function buildRawMarkdown(post: PostLike): string {
   if (post.hook) parts.push(`> ${String(post.hook).replace(/\n/g, "\n> ")}`);
   if (post.body) parts.push(String(post.body));
   if (post.cta) parts.push(`**CTA:** ${post.cta}`);
-  const tags = Array.isArray(post.hashtags)
-    ? post.hashtags.join(" ")
-    : (post.hashtags || "");
+  const tags = Array.isArray(post.hashtags) ? post.hashtags.join(" ") : post.hashtags || "";
   if (tags.trim()) parts.push(tags.trim());
   return parts.join("\n\n").trim();
 }
@@ -271,7 +287,11 @@ export async function writeToClipboard(text: string): Promise<boolean> {
   ta.focus();
   ta.select();
   let ok = false;
-  try { ok = document.execCommand("copy"); } catch { ok = false; }
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
   document.body.removeChild(ta);
   return ok;
 }

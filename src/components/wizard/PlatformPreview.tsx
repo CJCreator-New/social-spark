@@ -48,9 +48,14 @@ export function PlatformPreview({ post, platform, selectedIndustryLabel }: Platf
         )}
       </div>
       <div className="li-tags">
-        {post.hashtags.split(/\s+/).filter(Boolean).map(tag => (
-          <span key={tag} className="li-tag">{tag}</span>
-        ))}
+        {post.hashtags
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((tag) => (
+            <span key={tag} className="li-tag">
+              {tag}
+            </span>
+          ))}
       </div>
     </div>
   );

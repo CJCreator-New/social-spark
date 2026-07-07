@@ -14,7 +14,13 @@ export default defineTool({
   title: "List content calendars",
   description: "List the signed-in user's saved ContentForge content calendars, newest first.",
   inputSchema: {
-    limit: z.number().int().min(1).max(50).optional().describe("Max calendars to return (default 20)."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(50)
+      .optional()
+      .describe("Max calendars to return (default 20)."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ limit }, ctx) => {
@@ -23,7 +29,9 @@ export default defineTool({
     }
     const { data, error } = await supabaseForUser(ctx)
       .from("saved_calendars")
-      .select("id, title, platform, industry_label, week_start_date, is_favorite, created_at, updated_at")
+      .select(
+        "id, title, platform, industry_label, week_start_date, is_favorite, created_at, updated_at"
+      )
       .order("created_at", { ascending: false })
       .limit(limit ?? 20);
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };

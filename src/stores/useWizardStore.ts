@@ -22,7 +22,9 @@ interface WizardState {
   setCustomTopic: (topic: string) => void;
   setExtraTopics: (topics: string[] | ((prev: string[]) => string[])) => void;
   setPosts: (posts: Post[] | ((prev: Post[]) => Post[])) => void;
-  setPostTimes: (times: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void;
+  setPostTimes: (
+    times: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)
+  ) => void;
   setActiveDay: (day: number | ((prev: number) => number)) => void;
   toggleLockedDay: (day: number) => void;
   setLockedDays: (days: number[] | ((prev: number[]) => number[])) => void;
@@ -107,7 +109,11 @@ export const useWizardStore = create<WizardState>((set) => ({
   reset: () =>
     set({
       step: 1,
-      form: { ...INITIAL_FORM, weekStart: toDateInputValue(nextMonday()), targetDate: toDateInputValue(nextMonday()) },
+      form: {
+        ...INITIAL_FORM,
+        weekStart: toDateInputValue(nextMonday()),
+        targetDate: toDateInputValue(nextMonday()),
+      },
       customTopic: "",
       extraTopics: [],
       posts: [],
@@ -122,5 +128,7 @@ export const useWizardStore = create<WizardState>((set) => ({
     }),
 }));
 
-/** Convenience selector returning lockedDays as a Set for `.has()` checks. */
-export const selectLockedDaysSet = (state: WizardState): Set<number> => new Set(state.lockedDays);
+export const selectPosts = (state: WizardState): Post[] => state.posts;
+export const selectLockedDays = (state: WizardState): number[] => state.lockedDays;
+export const selectActiveDay = (state: WizardState): number => state.activeDay;
+export const selectForm = (state: WizardState): WizardForm => state.form;

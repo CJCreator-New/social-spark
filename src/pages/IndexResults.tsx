@@ -19,7 +19,20 @@ import { toast } from "sonner";
 import type { Post, WizardForm } from "@/components/wizard/constants";
 import { Button } from "@/components/ui/button";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { Loader2, Key, Sparkles, Check, Pin, RefreshCw, Sliders, Image as ImageIcon, Eye, Download, Users, Settings } from "lucide-react";
+import {
+  Loader2,
+  Key,
+  Sparkles,
+  Check,
+  Pin,
+  RefreshCw,
+  Sliders,
+  Image as ImageIcon,
+  Eye,
+  Download,
+  Users,
+  Settings,
+} from "lucide-react";
 
 interface IndexResultsProps {
   posts: Post[];
@@ -166,7 +179,7 @@ export function IndexResults({
     }
   }, [p]);
 
-  const handleFieldChange = (field: 'title' | 'hook' | 'body' | 'cta', value: string) => {
+  const handleFieldChange = (field: "title" | "hook" | "body" | "cta", value: string) => {
     const updated = [...posts];
     if (updated[activeDay]) {
       updated[activeDay] = { ...updated[activeDay], [field]: value };
@@ -211,12 +224,18 @@ export function IndexResults({
   const handleDownloadMd = async () => {
     try {
       const { downloadMd } = await import("@/lib/exportCalendar");
-      downloadMd({
-        title: form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
-        industryLabel: selectedIndustry?.label,
-        platform: form.platform,
-        coreIdea: form.coreIdea,
-      }, posts, { style: getClipboardStyle() });
+      downloadMd(
+        {
+          title:
+            form.coreIdea.slice(0, 80) ||
+            `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
+          industryLabel: selectedIndustry?.label,
+          platform: form.platform,
+          coreIdea: form.coreIdea,
+        },
+        posts,
+        { style: getClipboardStyle() }
+      );
       toast.success("Downloaded .md ✓");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Download .md failed");
@@ -226,12 +245,17 @@ export function IndexResults({
   const handleDownloadPdf = async () => {
     try {
       const { downloadPdf } = await import("@/lib/exportCalendar");
-      downloadPdf({
-        title: form.coreIdea.slice(0, 80) || `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
-        industryLabel: selectedIndustry?.label,
-        platform: form.platform,
-        coreIdea: form.coreIdea,
-      }, posts);
+      downloadPdf(
+        {
+          title:
+            form.coreIdea.slice(0, 80) ||
+            `${selectedIndustry?.label || "Calendar"} — ${form.platform}`,
+          industryLabel: selectedIndustry?.label,
+          platform: form.platform,
+          coreIdea: form.coreIdea,
+        },
+        posts
+      );
       toast.success("Downloaded .pdf ✓");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Download .pdf failed");
@@ -247,7 +271,8 @@ export function IndexResults({
         {generationMeta?.inferredTopics && !sampleMode && (
           <div className="sample-banner" style={{ marginBottom: 0 }}>
             <div className="sample-banner-text">
-              <strong>Topics were inferred.</strong> The generator filled the gap from your core idea and industry, so you can still refine the angles later.
+              <strong>Topics were inferred.</strong> The generator filled the gap from your core
+              idea and industry, so you can still refine the angles later.
             </div>
           </div>
         )}
@@ -257,7 +282,9 @@ export function IndexResults({
               <strong>Sample calendar.</strong> This is a pre-baked example to show you the layout.
               Save isn't available — start your own to keep results.
             </div>
-            <button type="button" className="sample-cta" onClick={exitSample}>Start my own →</button>
+            <button type="button" className="sample-cta" onClick={exitSample}>
+              Start my own →
+            </button>
           </div>
         )}
 
@@ -296,7 +323,11 @@ export function IndexResults({
             <button
               type="button"
               className="reformat-btn"
-              style={{ background: "transparent", color: "var(--text2)", borderColor: "var(--border2)" }}
+              style={{
+                background: "transparent",
+                color: "var(--text2)",
+                borderColor: "var(--border2)",
+              }}
               disabled={reformatting || regenIdx !== null || lockedDays.size === posts.length}
               onClick={regenerateUnlocked}
             >
@@ -335,7 +366,10 @@ export function IndexResults({
         {/* Main Workspace Editor Card */}
         {p && (
           <div className="workspace-editor-card">
-            <h2 className="editor-h" style={{ fontSize: 18, fontWeight: 500, color: "var(--text)", marginBottom: 12 }}>
+            <h2
+              className="editor-h"
+              style={{ fontSize: 18, fontWeight: 500, color: "var(--text)", marginBottom: 12 }}
+            >
               ✏️ Review & Edit Day {p.day}
             </h2>
             <PostDetailCard
@@ -343,7 +377,9 @@ export function IndexResults({
               activeDay={activeDay}
               form={form}
               weekStartDate={weekStartDate}
-              onHashtagsChange={onHashtagsChange ? (newTags) => onHashtagsChange(activeDay, newTags) : undefined}
+              onHashtagsChange={
+                onHashtagsChange ? (newTags) => onHashtagsChange(activeDay, newTags) : undefined
+              }
               onFieldChange={handleFieldChange}
               showRationale={showRationale}
               setShowRationale={setShowRationale}
@@ -359,7 +395,13 @@ export function IndexResults({
             className="min-h-11"
             onClick={() => {
               if (savedId) {
-                clearDraft(); setPostsWithHistory([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setStep(1); setError("");
+                clearDraft();
+                setPostsWithHistory([]);
+                setActiveDay(0);
+                setSavedId(null);
+                setLockedDays(new Set());
+                setStep(1);
+                setError("");
               } else {
                 setConfirmStartOver(true);
               }
@@ -375,14 +417,24 @@ export function IndexResults({
               onCancel={() => setConfirmStartOver(false)}
               onConfirm={() => {
                 setConfirmStartOver(false);
-                clearDraft(); setPostsWithHistory([]); setActiveDay(0); setSavedId(null); setLockedDays(new Set()); setStep(1); setError("");
+                clearDraft();
+                setPostsWithHistory([]);
+                setActiveDay(0);
+                setSavedId(null);
+                setLockedDays(new Set());
+                setStep(1);
+                setError("");
               }}
             />
           )}
           <Button
             variant="ghost"
             className="min-h-11"
-            onClick={() => { setError(""); setStep(2); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onClick={() => {
+              setError("");
+              setStep(2);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
           >
             ✎ Edit Inputs
           </Button>
@@ -391,16 +443,37 @@ export function IndexResults({
 
       {/* RIGHT SIDE ACTION PANEL */}
       <div className="step4-side" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        
         {/* Section 1: Export & Schedule (Primary CTA) */}
-        <div className="action-block primary-action" style={{ background: "rgba(200, 240, 154, 0.08)", border: "1px solid rgba(200, 240, 154, 0.3)", borderRadius: 16, padding: 18 }}>
-          <h3 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--accent)", fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+        <div
+          className="action-block primary-action"
+          style={{
+            background: "rgba(200, 240, 154, 0.08)",
+            border: "1px solid rgba(200, 240, 154, 0.3)",
+            borderRadius: 16,
+            padding: 18,
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 13,
+              textTransform: "uppercase",
+              letterSpacing: ".06em",
+              color: "var(--accent)",
+              fontWeight: 600,
+              marginBottom: 8,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
             <span>🚀 Publish & Schedule</span>
           </h3>
-          <p style={{ fontSize: 11, color: "var(--text3)", marginBottom: 12 }}>Push your calendar updates directly to Buffer or Hootsuite feeds.</p>
-          
+          <p style={{ fontSize: 11, color: "var(--text3)", marginBottom: 12 }}>
+            Push your calendar updates directly to Buffer or Hootsuite feeds.
+          </p>
+
           <BufferScheduler posts={posts} platform={form.platform} postTimes={postTimes} />
-          
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 }}>
             {savedId ? (
               <Button variant="outline" size="sm" className="w-full text-xs" asChild>
@@ -430,43 +503,104 @@ export function IndexResults({
           </div>
 
           <div style={{ display: "flex", gap: 6, width: "100%", marginTop: 8 }}>
-            <Button variant="default" size="sm" className="w-full font-medium" style={{ background: "var(--accent)", color: "#000" }} onClick={copyAll}>
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full font-medium"
+              style={{ background: "var(--accent)", color: "var(--color-text)" }}
+              onClick={copyAll}
+            >
               {copiedAll ? "All copied ✓" : `Copy all ${posts.length} posts`}
             </Button>
           </div>
 
           {/* Export formats group */}
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px dashed rgba(255,255,255,0.08)", display: "flex", flexWrap: "wrap", gap: 6 }}>
-            <Button variant="ghost" className="h-8 text-xs p-2" onClick={downloadTxt}>.TXT</Button>
-            <Button variant="ghost" className="h-8 text-xs p-2" onClick={handleDownloadMd}>.MD</Button>
-            <Button variant="ghost" className="h-8 text-xs p-2" onClick={handleDownloadPdf}>.PDF</Button>
-            <Button variant="ghost" className="h-8 text-xs p-2" onClick={exportIcs}>📅 .ICS</Button>
+          <div
+            style={{
+              marginTop: 14,
+              paddingTop: 12,
+              borderTop: "1px dashed color-mix(in srgb, var(--color-surface) 8%, transparent)",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+            }}
+          >
+            <Button variant="ghost" className="h-8 text-xs p-2" onClick={downloadTxt}>
+              .TXT
+            </Button>
+            <Button variant="ghost" className="h-8 text-xs p-2" onClick={handleDownloadMd}>
+              .MD
+            </Button>
+            <Button variant="ghost" className="h-8 text-xs p-2" onClick={handleDownloadPdf}>
+              .PDF
+            </Button>
+            <Button variant="ghost" className="h-8 text-xs p-2" onClick={exportIcs}>
+              📅 .ICS
+            </Button>
           </div>
         </div>
 
         {/* Section 2: Edit & Tweak Panel */}
         {p && (
-          <div className="action-block" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
-            <h3 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text2)", fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+          <div
+            className="action-block"
+            style={{
+              background: "color-mix(in srgb, var(--color-surface) 2%, transparent)",
+              border: "1px solid var(--border)",
+              borderRadius: 16,
+              padding: 18,
+            }}
+          >
+            <h3
+              style={{
+                fontSize: 13,
+                textTransform: "uppercase",
+                letterSpacing: ".06em",
+                color: "var(--text2)",
+                fontWeight: 600,
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
               <Sliders size={14} />
               <span>Tweak & Adjust</span>
             </h3>
 
             {/* Post Time Input */}
             <div style={{ marginBottom: 14 }}>
-              <label className="time-label" htmlFor={`cf-time-input-${p.day}`} style={{ display: "block", fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>Posting schedule time</label>
+              <label
+                className="time-label"
+                htmlFor={`cf-time-input-${p.day}`}
+                style={{ display: "block", fontSize: 11, color: "var(--text3)", marginBottom: 4 }}
+              >
+                Posting schedule time
+              </label>
               <input
                 id={`cf-time-input-${p.day}`}
                 type="time"
                 className="time-input w-full"
                 value={postTimes[String(p.day)] || suggestedTimeForDay(p.day, form.platform)}
-                onChange={e => setPostTimes(prev => ({ ...prev, [String(p.day)]: e.target.value }))}
-                style={{ background: "var(--bg)", border: "1px solid var(--border2)", borderRadius: 6, padding: "5px 8px", fontSize: 12, color: "var(--text)", width: "100%" }}
+                onChange={(e) =>
+                  setPostTimes((prev) => ({ ...prev, [String(p.day)]: e.target.value }))
+                }
+                style={{
+                  background: "var(--bg)",
+                  border: "1px solid var(--border2)",
+                  borderRadius: 6,
+                  padding: "5px 8px",
+                  fontSize: 12,
+                  color: "var(--text)",
+                  width: "100%",
+                }}
               />
             </div>
 
             {/* Quick Actions grid: Pin, Regenerate, Persona Compare */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+            <div
+              style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}
+            >
               <button
                 type="button"
                 className={`cpbtn flex justify-center items-center gap-1.5 ${lockedDays.has(p.day) ? "done" : ""}`}
@@ -476,7 +610,7 @@ export function IndexResults({
                 <Pin size={11} />
                 <span>{lockedDays.has(p.day) ? "Pinned" : "Pin Post"}</span>
               </button>
-              
+
               <button
                 type="button"
                 className="cpbtn flex justify-center items-center gap-1.5"
@@ -490,7 +624,11 @@ export function IndexResults({
             </div>
 
             {/* Quick tweaks dropdown */}
-            <div className="tweak-wrap relative" ref={tweakOpenIdx === activeDay ? tweakRef as any : undefined} style={{ marginBottom: 14 }}>
+            <div
+              className="tweak-wrap relative"
+              ref={tweakOpenIdx === activeDay ? (tweakRef as any) : undefined}
+              style={{ marginBottom: 14 }}
+            >
               <button
                 className="cpbtn w-full text-center"
                 disabled={regenIdx !== null || reformatting}
@@ -502,40 +640,129 @@ export function IndexResults({
                 ⚡ Quick Tone Tweaks ▾
               </button>
               {tweakOpenIdx === activeDay && (
-                <div className="tweak-menu absolute left-0 right-0 z-50 mt-1 bg-card border border-border rounded-md shadow-xl" role="menu">
-                  <button className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted" onClick={() => { regenerateDay(activeDay, "shorter"); setTweakOpenIdx(null); }}>Make shorter</button>
-                  <button className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted" onClick={() => { regenerateDay(activeDay, "punchier"); setTweakOpenIdx(null); }}>Make punchier</button>
-                  <button className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted" onClick={() => { regenerateDay(activeDay, "add-stat"); setTweakOpenIdx(null); }}>Add a stat</button>
+                <div
+                  className="tweak-menu absolute left-0 right-0 z-50 mt-1 bg-card border border-border rounded-md shadow-xl"
+                  role="menu"
+                >
                   <button
                     className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted"
-                    onClick={() => { regenerateDay(activeDay, "remove-emoji"); setTweakOpenIdx(null); }}
+                    onClick={() => {
+                      regenerateDay(activeDay, "shorter");
+                      setTweakOpenIdx(null);
+                    }}
+                  >
+                    Make shorter
+                  </button>
+                  <button
+                    className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted"
+                    onClick={() => {
+                      regenerateDay(activeDay, "punchier");
+                      setTweakOpenIdx(null);
+                    }}
+                  >
+                    Make punchier
+                  </button>
+                  <button
+                    className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted"
+                    onClick={() => {
+                      regenerateDay(activeDay, "add-stat");
+                      setTweakOpenIdx(null);
+                    }}
+                  >
+                    Add a stat
+                  </button>
+                  <button
+                    className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted"
+                    onClick={() => {
+                      regenerateDay(activeDay, "remove-emoji");
+                      setTweakOpenIdx(null);
+                    }}
                     disabled={!hasEmoji(p.title + " " + p.hook + " " + p.body + " " + p.cta)}
                   >
                     Remove emoji
                   </button>
-                  <button className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted" onClick={() => { regenerateDay(activeDay, "clean-formatting"); setTweakOpenIdx(null); }}>Clean formatting symbols</button>
-                  <button className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted" onClick={() => { regenerateDay(activeDay, "more-personal"); setTweakOpenIdx(null); }}>More personal</button>
-                  <button className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted" onClick={() => { regenerateDay(activeDay, "enhance"); setTweakOpenIdx(null); }}>Enhance for performance</button>
+                  <button
+                    className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted"
+                    onClick={() => {
+                      regenerateDay(activeDay, "clean-formatting");
+                      setTweakOpenIdx(null);
+                    }}
+                  >
+                    Clean formatting symbols
+                  </button>
+                  <button
+                    className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted"
+                    onClick={() => {
+                      regenerateDay(activeDay, "more-personal");
+                      setTweakOpenIdx(null);
+                    }}
+                  >
+                    More personal
+                  </button>
+                  <button
+                    className="tweak-opt w-full text-left p-2 text-xs text-foreground hover:bg-muted"
+                    onClick={() => {
+                      regenerateDay(activeDay, "enhance");
+                      setTweakOpenIdx(null);
+                    }}
+                  >
+                    Enhance for performance
+                  </button>
                 </div>
               )}
             </div>
 
             {/* Tone slider register */}
             {onToneShift && (
-              <div style={{ padding: "10px 12px", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text2)", fontWeight: 500 }}>Tone Register</span>
+              <div
+                style={{
+                  padding: "10px 12px",
+                  background: "color-mix(in srgb, var(--color-surface) 2%, transparent)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: ".1em",
+                      textTransform: "uppercase",
+                      color: "var(--text2)",
+                      fontWeight: 500,
+                    }}
+                  >
+                    Tone Register
+                  </span>
                   <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 500 }}>
-                    {toneLevel === 1 ? "Very Formal" : toneLevel === 2 ? "Formal" : toneLevel === 3 ? "Balanced" : toneLevel === 4 ? "Casual" : "Very Casual"}
+                    {toneLevel === 1
+                      ? "Very Formal"
+                      : toneLevel === 2
+                        ? "Formal"
+                        : toneLevel === 3
+                          ? "Balanced"
+                          : toneLevel === 4
+                            ? "Casual"
+                            : "Very Casual"}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 9, color: "var(--text3)" }}>Formal</span>
                   <input
-                    type="range" min="1" max="5" step="1"
+                    type="range"
+                    min="1"
+                    max="5"
+                    step="1"
                     aria-label="Tone slider register"
                     value={toneLevel}
-                    onChange={e => {
+                    onChange={(e) => {
                       const v = Number(e.target.value);
                       setToneLevel(v);
                       if (toneDebounce.current) clearTimeout(toneDebounce.current);
@@ -567,8 +794,28 @@ export function IndexResults({
 
         {/* Section 3: AI Image Generation Prompt & Preview */}
         {p && (
-          <div className="action-block" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
-            <h3 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text2)", fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+          <div
+            className="action-block"
+            style={{
+              background: "color-mix(in srgb, var(--color-surface) 2%, transparent)",
+              border: "1px solid var(--border)",
+              borderRadius: 16,
+              padding: 18,
+            }}
+          >
+            <h3
+              style={{
+                fontSize: 13,
+                textTransform: "uppercase",
+                letterSpacing: ".06em",
+                color: "var(--text2)",
+                fontWeight: 600,
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
               <ImageIcon size={14} />
               <span>AI Cover Image</span>
             </h3>
@@ -579,7 +826,18 @@ export function IndexResults({
               onChange={(e) => setImagePrompt(e.target.value)}
               rows={3}
               aria-label="Describe the image you want to generate"
-              style={{ width: "100%", fontSize: 12, padding: 8, background: "var(--bg)", border: "1px solid var(--border2)", borderRadius: 6, outline: "none", resize: "none", color: "var(--text)", marginBottom: 10 }}
+              style={{
+                width: "100%",
+                fontSize: 12,
+                padding: 8,
+                background: "var(--bg)",
+                border: "1px solid var(--border2)",
+                borderRadius: 6,
+                outline: "none",
+                resize: "none",
+                color: "var(--text)",
+                marginBottom: 10,
+              }}
               placeholder="Describe the image you want to generate..."
             />
 
@@ -604,15 +862,31 @@ export function IndexResults({
 
             {/* Custom Paste Image block */}
             {pasteImageOpen && (
-              <div style={{ marginTop: 10, padding: 10, border: "1px dashed var(--border)", borderRadius: 8 }}>
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: 10,
+                  border: "1px dashed var(--border)",
+                  borderRadius: 8,
+                }}
+              >
                 <input
                   type="url"
                   value={pasteImageUrl}
-                  onChange={e => setPasteImageUrl(e.target.value)}
+                  onChange={(e) => setPasteImageUrl(e.target.value)}
                   placeholder="https://images.unsplash.com/photo-..."
                   aria-label="Paste Image URL"
-                  style={{ width: "100%", background: "var(--bg)", border: "1px solid var(--border)", padding: 6, fontSize: 11, color: "var(--text)", borderRadius: 4, outline: "none" }}
-                  onKeyDown={e => {
+                  style={{
+                    width: "100%",
+                    background: "var(--bg)",
+                    border: "1px solid var(--border)",
+                    padding: 6,
+                    fontSize: 11,
+                    color: "var(--text)",
+                    borderRadius: 4,
+                    outline: "none",
+                  }}
+                  onKeyDown={(e) => {
                     if (e.key === "Enter" && pasteImageUrl.startsWith("http")) {
                       handleApplyImage(activeDay, pasteImageUrl);
                       setPasteImageOpen(false);
@@ -638,7 +912,15 @@ export function IndexResults({
 
             {/* Cover image preview */}
             {p.cover_image && (
-              <div style={{ marginTop: 12, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)", position: "relative" }}>
+              <div
+                style={{
+                  marginTop: 12,
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  border: "1px solid var(--border)",
+                  position: "relative",
+                }}
+              >
                 <img
                   src={p.cover_image}
                   alt="Post cover art"
@@ -651,7 +933,18 @@ export function IndexResults({
                 <button
                   type="button"
                   onClick={() => handleApplyImage(activeDay, "")}
-                  style={{ position: "absolute", bottom: 6, right: 6, background: "rgba(0,0,0,0.85)", color: "#f00", border: "1px solid #333", borderRadius: 4, padding: "2px 6px", fontSize: 9, cursor: "pointer" }}
+                  style={{
+                    position: "absolute",
+                    bottom: 6,
+                    right: 6,
+                    background: "color-mix(in srgb, var(--color-text) 85%, transparent)",
+                    color: "var(--color-error)",
+                    border: "1px solid var(--color-overlay-border)",
+                    borderRadius: 4,
+                    padding: "2px 6px",
+                    fontSize: 9,
+                    cursor: "pointer",
+                  }}
                 >
                   Remove Cover
                 </button>
@@ -662,15 +955,39 @@ export function IndexResults({
 
         {/* Section 4: Live feed preview */}
         {p && (
-          <div className="action-block" role="region" aria-label="Feed preview" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
-            <h3 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text2)", fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+          <div
+            className="action-block"
+            role="region"
+            aria-label="Feed preview"
+            style={{
+              background: "color-mix(in srgb, var(--color-surface) 2%, transparent)",
+              border: "1px solid var(--border)",
+              borderRadius: 16,
+              padding: 18,
+            }}
+          >
+            <h3
+              style={{
+                fontSize: 13,
+                textTransform: "uppercase",
+                letterSpacing: ".06em",
+                color: "var(--text2)",
+                fontWeight: 600,
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
               <Eye size={14} />
               <span>Feed Preview</span>
             </h3>
-            
+
             <div className="li-preview" style={{ margin: 0 }}>
               <div className="li-head">
-                <div className="li-avatar">{(selectedIndustry?.label || form.platform || "C").slice(0, 1)}</div>
+                <div className="li-avatar">
+                  {(selectedIndustry?.label || form.platform || "C").slice(0, 1)}
+                </div>
                 <div>
                   <div className="li-name">{selectedIndustry?.label || "ContentForge"}</div>
                   <div className="li-meta">{niceLabel} preview</div>
@@ -683,14 +1000,28 @@ export function IndexResults({
                   const previewPlain = stripMarkdown(previewSource);
                   return (
                     <>
-                      <div className="li-content" style={{ fontSize: 12, lineHeight: 1.45 }}>{renderLinkedInPreviewText(previewSource)}</div>
-                      {previewPlain.length > 210 && <><div className="li-fade" /><div className="li-more">See more</div></>}
+                      <div className="li-content" style={{ fontSize: 12, lineHeight: 1.45 }}>
+                        {renderLinkedInPreviewText(previewSource)}
+                      </div>
+                      {previewPlain.length > 210 && (
+                        <>
+                          <div className="li-fade" />
+                          <div className="li-more">See more</div>
+                        </>
+                      )}
                     </>
                   );
                 })()}
               </div>
               <div className="li-tags">
-                {p.hashtags.split(/\s+/).filter(Boolean).map(tag => <span key={tag} className="li-tag">{tag}</span>)}
+                {p.hashtags
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .map((tag) => (
+                    <span key={tag} className="li-tag">
+                      {tag}
+                    </span>
+                  ))}
               </div>
             </div>
           </div>
@@ -698,11 +1029,28 @@ export function IndexResults({
 
         {/* Section 5: Performance & Insights */}
         {p && (
-          <div className="action-block" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
-            <h3 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text2)", fontWeight: 600, marginBottom: 12 }}>
+          <div
+            className="action-block"
+            style={{
+              background: "color-mix(in srgb, var(--color-surface) 2%, transparent)",
+              border: "1px solid var(--border)",
+              borderRadius: 16,
+              padding: 18,
+            }}
+          >
+            <h3
+              style={{
+                fontSize: 13,
+                textTransform: "uppercase",
+                letterSpacing: ".06em",
+                color: "var(--text2)",
+                fontWeight: 600,
+                marginBottom: 12,
+              }}
+            >
               📊 Post Quality Audit
             </h3>
-            
+
             <PerformanceScoreCard post={p} topic={form.coreIdea} onEnhance={enhanceCurrentPost} />
             <div style={{ marginTop: 12 }}>
               <PostInsights post={p} platform={form.platform} topic={form.coreIdea} />
@@ -711,22 +1059,86 @@ export function IndexResults({
         )}
 
         {/* Section 6: Weekly summary statistics */}
-        <div className="action-block" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
-          <h3 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text2)", fontWeight: 600, marginBottom: 12 }}>
+        <div
+          className="action-block"
+          style={{
+            background: "color-mix(in srgb, var(--color-surface) 2%, transparent)",
+            border: "1px solid var(--border)",
+            borderRadius: 16,
+            padding: 18,
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 13,
+              textTransform: "uppercase",
+              letterSpacing: ".06em",
+              color: "var(--text2)",
+              fontWeight: 600,
+              marginBottom: 12,
+            }}
+          >
             📅 Week Summary
           </h3>
           <div className="summary-list">
-            <div className="summary-row" style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 6 }}><span>Total posts</span><strong>{weekSummary.totalPosts}</strong></div>
-            <div className="summary-row" style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 6 }}><span>Average length</span><strong>{weekSummary.avgChars} Chars</strong></div>
-            <div className="summary-row" style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 6 }}><span>In limit</span><strong>{weekSummary.withinLimitPct}%</strong></div>
+            <div
+              className="summary-row"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 11,
+                marginBottom: 6,
+              }}
+            >
+              <span>Total posts</span>
+              <strong>{weekSummary.totalPosts}</strong>
+            </div>
+            <div
+              className="summary-row"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 11,
+                marginBottom: 6,
+              }}
+            >
+              <span>Average length</span>
+              <strong>{weekSummary.avgChars} Chars</strong>
+            </div>
+            <div
+              className="summary-row"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 11,
+                marginBottom: 6,
+              }}
+            >
+              <span>In limit</span>
+              <strong>{weekSummary.withinLimitPct}%</strong>
+            </div>
           </div>
-          <div className="summary-meta" style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
-            {Object.entries(weekSummary.formatCounts).slice(0, 4).map(([label, count]: [string, any]) => (
-              <span key={label} className="summary-pill text-[10px]" style={{ background: "rgba(255,255,255,0.04)", padding: "2px 6px", borderRadius: 4 }}>{count} {label.toLowerCase()}</span>
-            ))}
+          <div
+            className="summary-meta"
+            style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}
+          >
+            {Object.entries(weekSummary.formatCounts)
+              .slice(0, 4)
+              .map(([label, count]: [string, any]) => (
+                <span
+                  key={label}
+                  className="summary-pill text-[10px]"
+                  style={{
+                    background: "color-mix(in srgb, var(--color-surface) 4%, transparent)",
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                  }}
+                >
+                  {count} {label.toLowerCase()}
+                </span>
+              ))}
           </div>
         </div>
-
       </div>
 
       {p && (

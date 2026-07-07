@@ -18,7 +18,7 @@ export async function fetchWithRetry(url: string, opts: FetchOptions = {}, maxAt
 
       if (res.status === 429) {
         // rate limited — honor Retry-After header if present
-        const ra = res.headers.get('Retry-After');
+        const ra = res.headers.get("Retry-After");
         const wait = ra ? Number(ra) * 1000 : baseDelay * Math.pow(2, attempt);
         await sleep(wait + Math.random() * 200);
         continue;
@@ -37,5 +37,5 @@ export async function fetchWithRetry(url: string, opts: FetchOptions = {}, maxAt
       await sleep(wait + Math.random() * 200);
     }
   }
-  throw new Error('fetchWithRetry: exhausted attempts');
+  throw new Error("fetchWithRetry: exhausted attempts");
 }

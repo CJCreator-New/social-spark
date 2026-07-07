@@ -10,7 +10,8 @@ export interface PerformanceScore {
   feedback: string[]; // Actionable suggestions
 }
 
-export type PerformanceFocusMetric = "hookStrength" | "ctaEffectiveness" | "hashtagRelevance" | "readability";
+export type PerformanceFocusMetric =
+  "hookStrength" | "ctaEffectiveness" | "hashtagRelevance" | "readability";
 
 /**
  * Detect if a hook creates curiosity (starts with stat, question, or strong verb)
@@ -136,9 +137,7 @@ function scoreCtaEffectiveness(cta: string, topic: string, platform?: string): n
  * "marketing"/"marketed" are recognized as related.
  */
 function stem(word: string): string {
-  return word
-    .replace(/(ies)$/, "y")
-    .replace(/(ing|ers|er|ed|es|s)$/, "");
+  return word.replace(/(ies)$/, "y").replace(/(ing|ers|er|ed|es|s)$/, "");
 }
 
 /**
@@ -215,7 +214,9 @@ function generateFeedback(scores: Partial<PerformanceScore>, post: Post): string
   const feedback: string[] = [];
 
   if (!scores.hookStrength || scores.hookStrength < 5) {
-    feedback.push("💡 Hook: Try starting with a question, stat, or surprising statement to grab attention.");
+    feedback.push(
+      "💡 Hook: Try starting with a question, stat, or surprising statement to grab attention."
+    );
   }
 
   if (!scores.ctaEffectiveness || scores.ctaEffectiveness < 5) {
@@ -261,7 +262,11 @@ function scoreReadability(grade: number): number {
 /**
  * Calculate complete performance score for a post
  */
-export function calculatePerformanceScore(post: Post, topic: string = "", platform?: string): PerformanceScore {
+export function calculatePerformanceScore(
+  post: Post,
+  topic: string = "",
+  platform?: string
+): PerformanceScore {
   const plat = platform || post.platform || "";
   const hookStrength = scoreHookStrength(post.hook, plat);
   const ctaEffectiveness = scoreCtaEffectiveness(post.cta, topic, plat);
@@ -272,9 +277,9 @@ export function calculatePerformanceScore(post: Post, topic: string = "", platfo
   // Weight formula: hook 35%, CTA 30%, hashtags 20%, readability 15%
   const overallScore = Math.round(
     hookStrength * 0.35 +
-    ctaEffectiveness * 0.30 +
-    (hashtagRelevance / 10) * 0.20 +
-    readabilityScoreVal * 0.15
+      ctaEffectiveness * 0.3 +
+      (hashtagRelevance / 10) * 0.2 +
+      readabilityScoreVal * 0.15
   );
 
   const feedback = generateFeedback(
@@ -297,7 +302,7 @@ export function getWeakestPerformanceMetric(score: PerformanceScore): Performanc
   const candidates: Array<{ metric: PerformanceFocusMetric; gap: number }> = [
     { metric: "hookStrength", gap: 10 - score.hookStrength },
     { metric: "ctaEffectiveness", gap: 10 - score.ctaEffectiveness },
-    { metric: "hashtagRelevance", gap: 10 - (score.hashtagRelevance / 10) },
+    { metric: "hashtagRelevance", gap: 10 - score.hashtagRelevance / 10 },
     { metric: "readability", gap: 10 - readabilityScoreVal },
   ];
 
@@ -309,7 +314,7 @@ export function getWeakestPerformanceMetric(score: PerformanceScore): Performanc
  */
 export function getScoreColor(score: number): string {
   if (score >= 8) return WARM_PALETTE.scoreHigh;
-  if (score >= 6) return "#ffd700"; // Golden
+  if (score >= 6) return WARM_PALETTE.scoreGold; // Golden
   if (score >= 4) return WARM_PALETTE.scoreMed;
   return WARM_PALETTE.scoreLow;
 }
@@ -347,19 +352,30 @@ export function getRegenerationGuidance(metric: PerformanceFocusMetric): string 
 /**
  * Returns all weak metrics below a certain threshold.
  */
-export function getWeakestMetrics(score: PerformanceScore, threshold: number = 6): PerformanceFocusMetric[] {
+export function getWeakestMetrics(
+  score: PerformanceScore,
+  threshold: number = 6
+): PerformanceFocusMetric[] {
   const readabilityScoreVal = scoreReadability(score.readability);
   const candidates: Array<{ metric: PerformanceFocusMetric; gap: number; scoreVal: number }> = [
     { metric: "hookStrength", gap: 10 - score.hookStrength, scoreVal: score.hookStrength },
-    { metric: "ctaEffectiveness", gap: 10 - score.ctaEffectiveness, scoreVal: score.ctaEffectiveness },
-    { metric: "hashtagRelevance", gap: 10 - (score.hashtagRelevance / 10), scoreVal: score.hashtagRelevance / 10 },
+    {
+      metric: "ctaEffectiveness",
+      gap: 10 - score.ctaEffectiveness,
+      scoreVal: score.ctaEffectiveness,
+    },
+    {
+      metric: "hashtagRelevance",
+      gap: 10 - score.hashtagRelevance / 10,
+      scoreVal: score.hashtagRelevance / 10,
+    },
     { metric: "readability", gap: 10 - readabilityScoreVal, scoreVal: readabilityScoreVal },
   ];
 
   return candidates
-    .filter(c => c.scoreVal < threshold)
+    .filter((c) => c.scoreVal < threshold)
     .sort((a, b) => b.gap - a.gap)
-    .map(c => c.metric);
+    .map((c) => c.metric);
 }
 
 /**
@@ -367,20 +383,38 @@ export function getWeakestMetrics(score: PerformanceScore, threshold: number = 6
  */
 export function suggestBetterCta(currentCta: string, topic: string, platform?: string): string {
   const topicLower = topic.toLowerCase();
-  
-  if (topicLower.includes("tech") || topicLower.includes("code") || topicLower.includes("build") || topicLower.includes("ai")) {
+
+  if (
+    topicLower.includes("tech") ||
+    topicLower.includes("code") ||
+    topicLower.includes("build") ||
+    topicLower.includes("ai")
+  ) {
     return "What's in your current tech stack? Drop a comment below! 👇";
   }
-  if (topicLower.includes("growth") || topicLower.includes("marketing") || topicLower.includes("sales") || topicLower.includes("audience")) {
+  if (
+    topicLower.includes("growth") ||
+    topicLower.includes("marketing") ||
+    topicLower.includes("sales") ||
+    topicLower.includes("audience")
+  ) {
     return "What is your main growth channel right now? Let's discuss in the comments!";
   }
   if (topicLower.includes("design") || topicLower.includes("ux") || topicLower.includes("art")) {
     return "Which design trend are you loving (or hating) lately? Comment below!";
   }
-  if (topicLower.includes("productivity") || topicLower.includes("routine") || topicLower.includes("habit")) {
+  if (
+    topicLower.includes("productivity") ||
+    topicLower.includes("routine") ||
+    topicLower.includes("habit")
+  ) {
     return "What is the single best productivity hack you've adopted this year? 👇";
   }
-  if (topicLower.includes("career") || topicLower.includes("job") || topicLower.includes("hiring")) {
+  if (
+    topicLower.includes("career") ||
+    topicLower.includes("job") ||
+    topicLower.includes("hiring")
+  ) {
     return "What is the biggest lesson you've learned in your career journey? Tell me below!";
   }
 
@@ -398,7 +432,10 @@ export function suggestBetterCta(currentCta: string, topic: string, platform?: s
  * Feature: Engagement Prediction Badge
  * Returns a simple High/Medium/Low prediction for use on the WeekStrip
  */
-export function getEngagementPrediction(post: Post, platform: string = ""): "High" | "Medium" | "Low" {
+export function getEngagementPrediction(
+  post: Post,
+  platform: string = ""
+): "High" | "Medium" | "Low" {
   const score = calculatePerformanceScore(post, post.topic || "", platform);
   if (score.overallScore >= 7) return "High";
   if (score.overallScore >= 5) return "Medium";
@@ -407,9 +444,11 @@ export function getEngagementPrediction(post: Post, platform: string = ""): "Hig
 
 export type EngagementLevel = "High" | "Medium" | "Low";
 
-export const ENGAGEMENT_BADGE: Record<EngagementLevel, { emoji: string; color: string; bg: string }> = {
-  High:   { emoji: "🟢", color: WARM_PALETTE.scoreHigh, bg: "rgba(21,128,61,0.10)" },
-  Medium: { emoji: "🟡", color: WARM_PALETTE.scoreMed,  bg: "rgba(180,83,9,0.10)" },
-  Low:    { emoji: "🔴", color: WARM_PALETTE.scoreLow,  bg: "rgba(185,28,28,0.10)" },
+export const ENGAGEMENT_BADGE: Record<
+  EngagementLevel,
+  { emoji: string; color: string; bg: string }
+> = {
+  High: { emoji: "🟢", color: WARM_PALETTE.scoreHigh, bg: "rgba(21,128,61,0.10)" },
+  Medium: { emoji: "🟡", color: WARM_PALETTE.scoreMed, bg: "rgba(180,83,9,0.10)" },
+  Low: { emoji: "🔴", color: WARM_PALETTE.scoreLow, bg: "rgba(185,28,28,0.10)" },
 };
-

@@ -1,16 +1,34 @@
-import { formatForPlatform, writeToClipboard, resolvePlatform, niceLabelFor, buildRawMarkdown, PLATFORM_LABELS, stripMarkdown } from "@/lib/platformCopy";
+import {
+  formatForPlatform,
+  writeToClipboard,
+  resolvePlatform,
+  niceLabelFor,
+  buildRawMarkdown,
+  PLATFORM_LABELS,
+  stripMarkdown,
+} from "@/lib/platformCopy";
 import { useEffect, useMemo, useRef, useState, useCallback, lazy, Suspense } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
-import { useCalendarQuery, useProfileQuery, useProfileUpdateMutation, useScheduledPostsQuery, useCreateCalendarMutation, useRegeneratePostMutation, useUpdateSavedCalendarMutation, useRepurposePostMutation, useGeneratePostImageMutation, useInlineRewriteMutation } from "@/hooks/useAppQueries";
+import {
+  useCalendarQuery,
+  useProfileQuery,
+  useProfileUpdateMutation,
+  useScheduledPostsQuery,
+  useCreateCalendarMutation,
+  useRegeneratePostMutation,
+  useUpdateSavedCalendarMutation,
+  useRepurposePostMutation,
+  useGeneratePostImageMutation,
+  useInlineRewriteMutation,
+} from "@/hooks/useAppQueries";
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
 import { BufferScheduler } from "@/components/BufferScheduler";
 import { HashtagChipEditor } from "@/components/HashtagChipEditor";
 import { PersonaCompare } from "@/components/PersonaCompare";
 import { WeekBalanceScore } from "@/components/WeekBalanceScore";
-
 
 import {
   downloadIcs,
@@ -21,16 +39,37 @@ import {
   shortDateLabel,
 } from "@/lib/calendarSchedule";
 import { suggestedTimeForDay } from "@/lib/postingTimes";
-import { applyPolicy, parsePolicyList, parseHashtagsString, normalizeTag, displayTag, HashtagPolicy } from "@/lib/hashtagPolicy";
+import {
+  applyPolicy,
+  parsePolicyList,
+  parseHashtagsString,
+  normalizeTag,
+  displayTag,
+  HashtagPolicy,
+} from "@/lib/hashtagPolicy";
 import { insightFor } from "@/lib/postInsights";
 import PostInsights from "@/components/PostInsights";
 import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
 import { TopicGapBadge } from "@/components/TopicGapBadge";
-import { PerformanceFocusMetric, calculatePerformanceScore, getWeakestPerformanceMetric, getRegenerationGuidance, getEngagementPrediction, ENGAGEMENT_BADGE } from "@/lib/postPerformanceScore";
+import {
+  PerformanceFocusMetric,
+  calculatePerformanceScore,
+  getWeakestPerformanceMetric,
+  getRegenerationGuidance,
+  getEngagementPrediction,
+  ENGAGEMENT_BADGE,
+} from "@/lib/postPerformanceScore";
 import { buildBrandMemoryPrompt } from "@/lib/brandMemory";
 import { createSeedFromPost, storeSeed } from "@/lib/seedFromPost";
 import { isEnabled } from "@/lib/featureFlags";
-import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
+import {
+  browserTimezone,
+  fmtDateInTz,
+  fmtTimeInTz,
+  listTimezones,
+  tzLabel,
+  zonedToUtcIso,
+} from "@/lib/timezones";
 import { buildTrackingUrl } from "@/lib/utm";
 import { useAuth } from "@/contexts/AuthContext";
 import { getE2EAuthFlag } from "@/lib/e2eFixtures";
@@ -90,158 +129,156 @@ interface FormPayload {
   topics?: string[];
 }
 
-
-
 const css = `
-.cd-app { min-height:100vh; background:#faf8f4; color:#1c1917; font-family:var(--font-body); padding:40px 24px 100px; }
+.cd-app { min-height:100vh; background:var(--color-bg); color:var(--color-text); font-family:var(--font-body); padding:40px 24px 100px; }
 .cd-inner { max-width:760px; margin:0 auto; }
-.cd-back { font-size:12px; color:#5a5753; text-decoration:none; }
-.cd-back:hover { color:#c2410c; }
+.cd-back { font-size:12px; color:var(--color-text-secondary); text-decoration:none; }
+.cd-back:hover { color:var(--color-primary); }
 .cd-title { font-family:var(--font-display); font-size:28px; font-weight:400; margin:14px 0 6px; }
-.cd-meta { font-size:12px; color:#5a5753; margin-bottom:24px; }
+.cd-meta { font-size:12px; color:var(--color-text-secondary); margin-bottom:24px; }
 .cd-hero { display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);gap:14px;align-items:stretch;margin:18px 0 18px; }
-.cd-hero-main,.cd-hero-side { background:#ffffff; border:1px solid #e7e5e4; border-radius:20px; padding:20px; }
-.cd-hero-main { background:linear-gradient(180deg,#ffffff,#fdfcfa); }
-.cd-hero-side { background:linear-gradient(180deg,rgba(194,65,12,0.05),#fdfcfa); display:grid; gap:10px; }
-.cd-hero-kicker { font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:#c2410c;font-weight:500;margin-bottom:12px; }
+.cd-hero-main,.cd-hero-side { background:var(--color-surface); border:1px solid var(--color-border); border-radius:20px; padding:20px; }
+.cd-hero-main { background:linear-gradient(180deg,var(--color-surface),var(--color-surface)); }
+.cd-hero-side { background:linear-gradient(180deg,hsl(var(--primary) / 0.05),var(--color-surface)); display:grid; gap:10px; }
+.cd-hero-kicker { font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--color-primary);font-weight:500;margin-bottom:12px; }
 .cd-hero-title { font-family:var(--font-display); font-size:30px; font-weight:400; line-height:1.08; letter-spacing:-.4px; margin:0 0 10px; max-width:15ch; }
-.cd-hero-copy { font-size:13px; color:#5a5753; line-height:1.7; margin:0 0 16px; max-width:54ch; }
+.cd-hero-copy { font-size:13px; color:var(--color-text-secondary); line-height:1.7; margin:0 0 16px; max-width:54ch; }
 .cd-hero-chiprow { display:flex;flex-wrap:wrap;gap:8px; }
-.cd-hero-chip { display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid #e7e5e4;background:#f5f0e8;font-size:11px;color:#5a5753; }
-.cd-hero-card { border:1px solid #e7e5e4;background:#faf8f4;border-radius:16px;padding:14px 15px; }
-.cd-hero-card span { display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#5a5753;font-weight:500;margin-bottom:6px; }
-.cd-hero-card strong { display:block;font-family:var(--font-display);font-size:22px;font-weight:400;color:#1c1917;line-height:1.15;margin-bottom:3px; }
-.cd-hero-card small { display:block;font-size:11px;color:#5a5753;line-height:1.5; }
+.cd-hero-chip { display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid var(--color-border);background:var(--color-surface-muted);font-size:11px;color:var(--color-text-secondary); }
+.cd-hero-card { border:1px solid var(--color-border);background:var(--color-bg);border-radius:16px;padding:14px 15px; }
+.cd-hero-card span { display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-secondary);font-weight:500;margin-bottom:6px; }
+.cd-hero-card strong { display:block;font-family:var(--font-display);font-size:22px;font-weight:400;color:var(--color-text);line-height:1.15;margin-bottom:3px; }
+.cd-hero-card small { display:block;font-size:11px;color:var(--color-text-secondary);line-height:1.5; }
 .cd-hero-surface { display:grid; gap:12px; margin-top:16px; }
-.cd-hero-surface .cd-hero-card { box-shadow:0 12px 28px rgba(120,113,108,.08); }
+.cd-hero-surface .cd-hero-card { box-shadow:0 12px 28px color-mix(in srgb, var(--color-text-muted) 8%, transparent); }
 .cd-strip { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-bottom:18px; }
-.cd-tab { padding:10px 4px; border-radius:8px; border:1px solid #e7e5e4; text-align:center; cursor:pointer; background:#ffffff; font-family:var(--font-body); color:inherit; width:100%; transition:border-color .15s; }
-.cd-tab:hover { border-color:#d6d3d1; }
-.cd-tab.on { background:rgba(194,65,12,0.1); border-color:rgba(194,65,12,0.32); }
-.cd-tab:focus-visible { outline:2px solid rgba(194,65,12,0.7); outline-offset:2px; }
-.cd-tab-dow { font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:#5a5753; }
-.cd-tab.on .cd-tab-dow { color:#9a3412; }
-.cd-tab-n { font-family:var(--font-display); font-size:17px; color:#5a5753; margin-top:2px; }
-.cd-tab.on .cd-tab-n { color:#c2410c; }
+.cd-tab { padding:10px 4px; border-radius:8px; border:1px solid var(--color-border); text-align:center; cursor:pointer; background:var(--color-surface); font-family:var(--font-body); color:inherit; width:100%; transition:border-color .15s; }
+.cd-tab:hover { border-color:var(--color-border-strong); }
+.cd-tab.on { background:hsl(var(--primary) / 0.1); border-color:hsl(var(--primary) / 0.32); }
+.cd-tab:focus-visible { outline:2px solid hsl(var(--primary) / 0.7); outline-offset:2px; }
+.cd-tab-dow { font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--color-text-secondary); }
+.cd-tab.on .cd-tab-dow { color:var(--color-primary-hover); }
+.cd-tab-n { font-family:var(--font-display); font-size:17px; color:var(--color-text-secondary); margin-top:2px; }
+.cd-tab.on .cd-tab-n { color:var(--color-primary); }
 .cd-export-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; justify-content:flex-end; }
-.cd-export-btn { padding:7px 14px; border-radius:8px; border:1px solid #d6d3d1; background:transparent; color:#5a5753; font-size:12px; cursor:pointer; font-family:var(--font-body); transition:all .15s; }
-.cd-export-btn:hover { border-color:rgba(194,65,12,0.32); color:#c2410c; }
-.cd-export-btn:focus-visible { outline:2px solid rgba(194,65,12,0.7); outline-offset:2px; }
+.cd-export-btn { padding:7px 14px; border-radius:8px; border:1px solid var(--color-border-strong); background:transparent; color:var(--color-text-secondary); font-size:12px; cursor:pointer; font-family:var(--font-body); transition:all .15s; }
+.cd-export-btn:hover { border-color:hsl(var(--primary) / 0.32); color:var(--color-primary); }
+.cd-export-btn:focus-visible { outline:2px solid hsl(var(--primary) / 0.7); outline-offset:2px; }
 .cd-toolbar-shell { display:grid; grid-template-columns:1fr; gap:12px; margin-bottom:14px; }
-.cd-toolbar-card { background:#ffffff; border:1px solid #e7e5e4; border-radius:16px; padding:14px 16px; }
+.cd-toolbar-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:16px; padding:14px 16px; }
 .cd-toolbar-card h2 { font-family:var(--font-display); font-size:18px; font-weight:400; margin:0 0 8px; }
-.cd-toolbar-card p { margin:0; font-size:12px; color:#5a5753; line-height:1.65; }
+.cd-toolbar-card p { margin:0; font-size:12px; color:var(--color-text-secondary); line-height:1.65; }
 .cd-toolbar-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; }
-.cd-card { background:#ffffff; border:1px solid #e7e5e4; border-radius:16px; padding:26px; }
+.cd-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:16px; padding:26px; }
 .cd-ptitle { font-family:var(--font-display); font-size:21px; font-weight:400; line-height:1.35; margin-bottom:18px; }
-.cd-blabel { font-size:9px; letter-spacing:.15em; text-transform:uppercase; color:#5a5753; margin:16px 0 7px; font-weight:500; display:flex; justify-content:space-between; align-items:center; }
-.cd-blabel-count { color:#5a5753; font-weight:400; letter-spacing:.06em; text-transform:none; font-size:10px; }
-.cd-hook { border-left:2px solid rgba(194,65,12,0.3); padding:10px 15px; background:rgba(194,65,12,0.03); border-radius:0 6px 6px 0; font-family:var(--font-display); font-size:14px; font-style:italic; color:#5a5753; line-height:1.65; white-space:pre-line; }
-.cd-body { font-size:13px; color:#57534e; line-height:1.85; white-space:pre-line; font-weight:300; }
-.cd-cta { background:rgba(194,65,12,0.06); border:1px solid rgba(194,65,12,0.14); border-radius:8px; padding:13px 15px; font-size:13px; color:#9a3412; line-height:1.6; font-weight:300; }
-.cd-tags { font-size:12px; color:#5a5753; line-height:2; font-weight:300; }
-.cd-actions { display:flex; gap:8px; margin-top:22px; padding-top:18px; border-top:1px solid #e7e5e4; flex-wrap:wrap; }
-.cd-btn { padding:9px 16px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; border:1px solid #d6d3d1; background:transparent; color:#1c1917; font-family:var(--font-body); }
-.cd-btn:hover { border-color:rgba(194,65,12,0.32); }
-.cd-btn-p { background:#c2410c; color:#ffffff; border-color:#c2410c; }
+.cd-blabel { font-size:9px; letter-spacing:.15em; text-transform:uppercase; color:var(--color-text-secondary); margin:16px 0 7px; font-weight:500; display:flex; justify-content:space-between; align-items:center; }
+.cd-blabel-count { color:var(--color-text-secondary); font-weight:400; letter-spacing:.06em; text-transform:none; font-size:10px; }
+.cd-hook { border-left:2px solid hsl(var(--primary) / 0.3); padding:10px 15px; background:hsl(var(--primary) / 0.03); border-radius:0 6px 6px 0; font-family:var(--font-display); font-size:14px; font-style:italic; color:var(--color-text-secondary); line-height:1.65; white-space:pre-line; }
+.cd-body { font-size:13px; color:var(--color-text-secondary); line-height:1.85; white-space:pre-line; font-weight:300; }
+.cd-cta { background:hsl(var(--primary) / 0.06); border:1px solid hsl(var(--primary) / 0.14); border-radius:8px; padding:13px 15px; font-size:13px; color:var(--color-primary-hover); line-height:1.6; font-weight:300; }
+.cd-tags { font-size:12px; color:var(--color-text-secondary); line-height:2; font-weight:300; }
+.cd-actions { display:flex; gap:8px; margin-top:22px; padding-top:18px; border-top:1px solid var(--color-border); flex-wrap:wrap; }
+.cd-btn { padding:9px 16px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; border:1px solid var(--color-border-strong); background:transparent; color:var(--color-text); font-family:var(--font-body); }
+.cd-btn:hover { border-color:hsl(var(--primary) / 0.32); }
+.cd-btn-p { background:var(--color-primary); color:var(--color-surface); border-color:var(--color-primary); }
 .cd-btn-p:disabled { opacity:.5; cursor:not-allowed; }
 .cd-btn:disabled { opacity:.5; cursor:not-allowed; }
-.cd-edit-input { width:100%; background:#ffffff; border:1px solid #d6d3d1; border-radius:8px; padding:11px 13px; font-size:14px; color:#1c1917; font-family:var(--font-display); outline:none; box-sizing:border-box; margin-bottom:10px; }
-.cd-edit-input:focus { border-color:rgba(194,65,12,0.32); }
-.cd-edit-area { width:100%; background:#ffffff; border:1px solid #d6d3d1; border-radius:8px; padding:11px 13px; font-size:13px; color:#1c1917; font-family:var(--font-body); font-weight:300; outline:none; box-sizing:border-box; resize:vertical; line-height:1.65; }
-.cd-edit-area:focus { border-color:rgba(194,65,12,0.32); }
-.cd-tab-date { font-size:9px; color:#5a5753; font-weight:300; margin-top:2px; }
-.cd-tab.on .cd-tab-date { color:#9a3412; }
-.cd-date-pill { display:inline-block; padding:3px 10px; border-radius:99px; background:rgba(194,65,12,0.06); border:1px solid rgba(194,65,12,0.18); color:#9a3412; font-size:11px; margin-left:8px; }
+.cd-edit-input { width:100%; background:var(--color-surface); border:1px solid var(--color-border-strong); border-radius:8px; padding:11px 13px; font-size:14px; color:var(--color-text); font-family:var(--font-display); outline:none; box-sizing:border-box; margin-bottom:10px; }
+.cd-edit-input:focus { border-color:hsl(var(--primary) / 0.32); }
+.cd-edit-area { width:100%; background:var(--color-surface); border:1px solid var(--color-border-strong); border-radius:8px; padding:11px 13px; font-size:13px; color:var(--color-text); font-family:var(--font-body); font-weight:300; outline:none; box-sizing:border-box; resize:vertical; line-height:1.65; }
+.cd-edit-area:focus { border-color:hsl(var(--primary) / 0.32); }
+.cd-tab-date { font-size:9px; color:var(--color-text-secondary); font-weight:300; margin-top:2px; }
+.cd-tab.on .cd-tab-date { color:var(--color-primary-hover); }
+.cd-date-pill { display:inline-block; padding:3px 10px; border-radius:99px; background:hsl(var(--primary) / 0.06); border:1px solid hsl(var(--primary) / 0.18); color:var(--color-primary-hover); font-size:11px; margin-left:8px; }
 .cd-time-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:14px 0 4px; }
-.cd-time-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#5a5753; font-weight:500; }
-.cd-time-input { background:#ffffff; border:1px solid #d6d3d1; border-radius:6px; padding:6px 9px; font-size:12px; color:#1c1917; font-family:var(--font-body); outline:none; color-scheme:light; width:100px; }
-.cd-time-input:focus { border-color:rgba(194,65,12,0.32); }
+.cd-time-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--color-text-secondary); font-weight:500; }
+.cd-time-input { background:var(--color-surface); border:1px solid var(--color-border-strong); border-radius:6px; padding:6px 9px; font-size:12px; color:var(--color-text); font-family:var(--font-body); outline:none; color-scheme:light; width:100px; }
+.cd-time-input:focus { border-color:hsl(var(--primary) / 0.32); }
 .cd-tweak-wrap { position:relative; display:inline-block; }
-.cd-tweak-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:200; background:#ffffff; border:1px solid #e7e5e4; border-radius:10px; overflow:hidden; min-width:170px; box-shadow:0 6px 24px rgba(120,113,108,.2); }
-.cd-tweak-opt { padding:9px 13px; font-size:12px; color:#5a5753; cursor:pointer; font-family:var(--font-body); font-weight:300; border:none; background:transparent; width:100%; text-align:left; display:block; }
-.cd-tweak-opt:hover { background:rgba(194,65,12,0.06); color:#c2410c; }
-.cd-fav-btn { background:transparent; border:1px solid #d6d3d1; color:#5a5753; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-family:var(--font-body); transition:all .15s; }
-.cd-fav-btn.on { color:#c2410c; border-color:rgba(194,65,12,0.32); background:rgba(194,65,12,0.06); }
-.cd-fav-btn:hover { border-color:rgba(194,65,12,0.32); }
-.cd-budget { display:inline-flex; align-items:center; gap:5px; font-size:10px; letter-spacing:.04em; padding:3px 9px; border-radius:99px; border:1px solid #d6d3d1; background:#f5f0e8; color:#5a5753; font-family:var(--font-body); font-weight:400; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.cd-budget.warn { color:#92400e; border-color:rgba(180,83,9,.3); background:rgba(180,83,9,.06); }
-.cd-budget.over { color:#b91c1c; border-color:rgba(185,28,28,.3); background:rgba(185,28,28,.06); }
+.cd-tweak-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:200; background:var(--color-surface); border:1px solid var(--color-border); border-radius:10px; overflow:hidden; min-width:170px; box-shadow:0 6px 24px color-mix(in srgb, var(--color-text-muted) 20%, transparent); }
+.cd-tweak-opt { padding:9px 13px; font-size:12px; color:var(--color-text-secondary); cursor:pointer; font-family:var(--font-body); font-weight:300; border:none; background:transparent; width:100%; text-align:left; display:block; }
+.cd-tweak-opt:hover { background:hsl(var(--primary) / 0.06); color:var(--color-primary); }
+.cd-fav-btn { background:transparent; border:1px solid var(--color-border-strong); color:var(--color-text-secondary); padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-family:var(--font-body); transition:all .15s; }
+.cd-fav-btn.on { color:var(--color-primary); border-color:hsl(var(--primary) / 0.32); background:hsl(var(--primary) / 0.06); }
+.cd-fav-btn:hover { border-color:hsl(var(--primary) / 0.32); }
+.cd-budget { display:inline-flex; align-items:center; gap:5px; font-size:10px; letter-spacing:.04em; padding:3px 9px; border-radius:99px; border:1px solid var(--color-border-strong); background:var(--color-surface-muted); color:var(--color-text-secondary); font-family:var(--font-body); font-weight:400; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cd-budget.warn { color:var(--color-warning-text); border-color:color-mix(in srgb, var(--color-warning-text) 30%, transparent); background:color-mix(in srgb, var(--color-warning-text) 6%, transparent); }
+.cd-budget.over { color:var(--color-error-text); border-color:color-mix(in srgb, var(--color-error-text) 30%, transparent); background:color-mix(in srgb, var(--color-error-text) 6%, transparent); }
 .cd-budget-dot { width:5px; height:5px; border-radius:50%; background:currentColor; opacity:.7; }
-.cd-pin-btn { background:transparent; border:1px solid #d6d3d1; color:#5a5753; width:30px; height:30px; border-radius:50%; cursor:pointer; font-size:14px; display:inline-flex; align-items:center; justify-content:center; transition:all .15s; flex-shrink:0; }
-.cd-pin-btn.on { background:rgba(194,65,12,.1); border-color:rgba(194,65,12,.42); color:#c2410c; }
-.cd-pin-btn:hover { border-color:rgba(194,65,12,.32); color:#c2410c; }
+.cd-pin-btn { background:transparent; border:1px solid var(--color-border-strong); color:var(--color-text-secondary); width:30px; height:30px; border-radius:50%; cursor:pointer; font-size:14px; display:inline-flex; align-items:center; justify-content:center; transition:all .15s; flex-shrink:0; }
+.cd-pin-btn.on { background:hsl(var(--primary) / .1); border-color:hsl(var(--primary) / .42); color:var(--color-primary); }
+.cd-pin-btn:hover { border-color:hsl(var(--primary) / .32); color:var(--color-primary); }
 .cd-tab.locked::after { content:'📌'; position:absolute; top:3px; right:4px; font-size:9px; line-height:1; }
 .cd-tab { position:relative; }
-.cd-reformat-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#ffffff; border:1px solid #e7e5e4; border-radius:12px; padding:10px 14px; margin-bottom:14px; }
-.cd-reformat-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#5a5753; font-weight:500; }
-.cd-reformat-sel { background:#faf8f4; border:1px solid #d6d3d1; border-radius:6px; padding:6px 28px 6px 10px; font-size:12px; color:#1c1917; font-family:var(--font-body); outline:none; appearance:none; cursor:pointer; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 11 11' fill='none' stroke='%2378716c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M2.5 4l3 3 3-3'/></svg>"); background-repeat:no-repeat; background-position:right 9px center; }
-.cd-reformat-btn { background:rgba(194,65,12,.1); border:1px solid rgba(194,65,12,.28); color:#c2410c; padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer; font-family:var(--font-body); font-weight:500; }
+.cd-reformat-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:10px 14px; margin-bottom:14px; }
+.cd-reformat-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--color-text-secondary); font-weight:500; }
+.cd-reformat-sel { background:var(--color-bg); border:1px solid var(--color-border-strong); border-radius:6px; padding:6px 28px 6px 10px; font-size:12px; color:var(--color-text); font-family:var(--font-body); outline:none; appearance:none; cursor:pointer; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 11 11' fill='none' stroke='%2378716c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M2.5 4l3 3 3-3'/></svg>"); background-repeat:no-repeat; background-position:right 9px center; }
+.cd-reformat-btn { background:hsl(var(--primary) / .1); border:1px solid hsl(var(--primary) / .28); color:var(--color-primary); padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer; font-family:var(--font-body); font-weight:500; }
 .cd-reformat-btn:disabled { opacity:.5; cursor:not-allowed; }
 .cd-copy-split { position:relative; display:inline-flex; }
 .cd-copy-split-main { border-top-right-radius:0; border-bottom-right-radius:0; border-right-width:0; }
-.cd-copy-caret { padding:0 10px; border-radius:0 8px 8px 0; border:1px solid #d6d3d1; background:transparent; color:#5a5753; cursor:pointer; font-family:var(--font-body); display:inline-flex; align-items:center; transition:all .15s; }
-.cd-copy-caret:hover { border-color:rgba(194,65,12,.32); color:#c2410c; }
-.cd-copy-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:200; background:#ffffff; border:1px solid #e7e5e4; border-radius:10px; overflow:hidden; min-width:200px; box-shadow:0 6px 24px rgba(120,113,108,.2); }
-.cd-copy-menu-opt { padding:9px 13px; font-size:12px; color:#5a5753; cursor:pointer; font-family:var(--font-body); font-weight:300; border:none; background:transparent; width:100%; text-align:left; display:block; }
-.cd-copy-menu-opt:hover { background:rgba(194,65,12,.06); color:#c2410c; }
-.cd-stats { background:#ffffff; border:1px solid #e7e5e4; border-radius:12px; padding:14px 18px; margin-bottom:14px; display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; }
+.cd-copy-caret { padding:0 10px; border-radius:0 8px 8px 0; border:1px solid var(--color-border-strong); background:transparent; color:var(--color-text-secondary); cursor:pointer; font-family:var(--font-body); display:inline-flex; align-items:center; transition:all .15s; }
+.cd-copy-caret:hover { border-color:hsl(var(--primary) / .32); color:var(--color-primary); }
+.cd-copy-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:200; background:var(--color-surface); border:1px solid var(--color-border); border-radius:10px; overflow:hidden; min-width:200px; box-shadow:0 6px 24px color-mix(in srgb, var(--color-text-muted) 20%, transparent); }
+.cd-copy-menu-opt { padding:9px 13px; font-size:12px; color:var(--color-text-secondary); cursor:pointer; font-family:var(--font-body); font-weight:300; border:none; background:transparent; width:100%; text-align:left; display:block; }
+.cd-copy-menu-opt:hover { background:hsl(var(--primary) / .06); color:var(--color-primary); }
+.cd-stats { background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:14px 18px; margin-bottom:14px; display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; }
 .cd-stat { display:flex; flex-direction:column; gap:3px; }
-.cd-stat-label { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#5a5753; font-weight:500; }
-.cd-stat-val { font-family:var(--font-display); font-size:18px; color:#1c1917; font-variant-numeric:tabular-nums; }
-.cd-stat-val em { font-style:normal; color:#c2410c; }
-.cd-stat-sub { font-size:10px; color:#5a5753; font-weight:300; }
-.cd-chip { display:inline-flex; align-items:center; gap:5px; font-size:10px; letter-spacing:.04em; padding:3px 9px; border-radius:99px; border:1px solid #d6d3d1; background:#f5f0e8; color:#5a5753; font-family:var(--font-body); font-weight:400; white-space:nowrap; }
-.cd-chip.good { color:#c2410c; border-color:rgba(194,65,12,.32); background:rgba(194,65,12,.06); }
-.cd-chip.warn { color:#92400e; border-color:rgba(180,83,9,.3); background:rgba(180,83,9,.06); }
-.cd-chip.bad { color:#b91c1c; border-color:rgba(185,28,28,.3); background:rgba(185,28,28,.06); }
-.cd-bulk-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; padding:10px 14px; background:#ffffff; border:1px solid #e7e5e4; border-radius:12px; }
-.cd-bulk-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#5a5753; font-weight:500; flex:1; }
-.cd-bulk-btn { background:transparent; border:1px solid #d6d3d1; color:#5a5753; padding:7px 14px; border-radius:8px; font-size:12px; cursor:pointer; font-family:var(--font-body); transition:all .15s; }
-.cd-bulk-btn:hover { border-color:rgba(194,65,12,.32); color:#c2410c; }
-.cd-bulk-btn.primary { background:rgba(194,65,12,.1); border-color:rgba(194,65,12,.32); color:#9a3412; }
+.cd-stat-label { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--color-text-secondary); font-weight:500; }
+.cd-stat-val { font-family:var(--font-display); font-size:18px; color:var(--color-text); font-variant-numeric:tabular-nums; }
+.cd-stat-val em { font-style:normal; color:var(--color-primary); }
+.cd-stat-sub { font-size:10px; color:var(--color-text-secondary); font-weight:300; }
+.cd-chip { display:inline-flex; align-items:center; gap:5px; font-size:10px; letter-spacing:.04em; padding:3px 9px; border-radius:99px; border:1px solid var(--color-border-strong); background:var(--color-surface-muted); color:var(--color-text-secondary); font-family:var(--font-body); font-weight:400; white-space:nowrap; }
+.cd-chip.good { color:var(--color-primary); border-color:hsl(var(--primary) / .32); background:hsl(var(--primary) / .06); }
+.cd-chip.warn { color:var(--color-warning-text); border-color:color-mix(in srgb, var(--color-warning-text) 30%, transparent); background:color-mix(in srgb, var(--color-warning-text) 6%, transparent); }
+.cd-chip.bad { color:var(--color-error-text); border-color:color-mix(in srgb, var(--color-error-text) 30%, transparent); background:color-mix(in srgb, var(--color-error-text) 6%, transparent); }
+.cd-bulk-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; padding:10px 14px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; }
+.cd-bulk-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--color-text-secondary); font-weight:500; flex:1; }
+.cd-bulk-btn { background:transparent; border:1px solid var(--color-border-strong); color:var(--color-text-secondary); padding:7px 14px; border-radius:8px; font-size:12px; cursor:pointer; font-family:var(--font-body); transition:all .15s; }
+.cd-bulk-btn:hover { border-color:hsl(var(--primary) / .32); color:var(--color-primary); }
+.cd-bulk-btn.primary { background:hsl(var(--primary) / .1); border-color:hsl(var(--primary) / .32); color:var(--color-primary-hover); }
 .cd-bulk-btn:disabled { opacity:.5; cursor:not-allowed; }
-.cd-modal-bg { position:fixed; inset:0; background:rgba(28,25,23,.55); z-index:300; display:flex; align-items:center; justify-content:center; padding:20px; }
-.cd-modal { background:#ffffff; border:1px solid #e7e5e4; border-radius:16px; padding:26px; max-width:520px; width:100%; max-height:90vh; overflow:auto; }
-.cd-modal h3 { font-family:var(--font-display); font-size:22px; font-weight:400; margin:0 0 6px; color:#1c1917; }
-.cd-modal p { font-size:12px; color:#5a5753; margin:0 0 16px; line-height:1.6; }
-.cd-modal-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #e7e5e4; }
+.cd-modal-bg { position:fixed; inset:0; background:color-mix(in srgb, var(--color-text) 55%, transparent); z-index:300; display:flex; align-items:center; justify-content:center; padding:20px; }
+.cd-modal { background:var(--color-surface); border:1px solid var(--color-border); border-radius:16px; padding:26px; max-width:520px; width:100%; max-height:90vh; overflow:auto; }
+.cd-modal h3 { font-family:var(--font-display); font-size:22px; font-weight:400; margin:0 0 6px; color:var(--color-text); }
+.cd-modal p { font-size:12px; color:var(--color-text-secondary); margin:0 0 16px; line-height:1.6; }
+.cd-modal-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--color-border); }
 .cd-modal-row:last-of-type { border-bottom:none; }
-.cd-modal-day { font-size:11px; color:#5a5753; min-width:90px; }
-.cd-modal-time { background:#faf8f4; border:1px solid #d6d3d1; border-radius:6px; padding:6px 9px; font-size:12px; color:#1c1917; font-family:var(--font-body); outline:none; color-scheme:light; }
+.cd-modal-day { font-size:11px; color:var(--color-text-secondary); min-width:90px; }
+.cd-modal-time { background:var(--color-bg); border:1px solid var(--color-border-strong); border-radius:6px; padding:6px 9px; font-size:12px; color:var(--color-text); font-family:var(--font-body); outline:none; color-scheme:light; }
 .cd-modal-actions { display:flex; gap:8px; margin-top:18px; justify-content:flex-end; }
-.cd-tz-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; padding:10px 14px; background:#ffffff; border:1px solid #e7e5e4; border-radius:12px; }
-.cd-tz-input, .cd-tz-sel { background:#faf8f4; border:1px solid #d6d3d1; border-radius:6px; padding:6px 10px; font-size:12px; color:#1c1917; font-family:var(--font-body); outline:none; }
-.cd-tz-input:focus, .cd-tz-sel:focus { border-color:rgba(194,65,12,0.4); }
+.cd-tz-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; padding:10px 14px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; }
+.cd-tz-input, .cd-tz-sel { background:var(--color-bg); border:1px solid var(--color-border-strong); border-radius:6px; padding:6px 10px; font-size:12px; color:var(--color-text); font-family:var(--font-body); outline:none; }
+.cd-tz-input:focus, .cd-tz-sel:focus { border-color:hsl(var(--primary) / 0.4); }
 .cd-tz-input { flex:1; min-width:200px; }
-.cd-tag-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; background:rgba(194,65,12,0.06); border:1px solid rgba(194,65,12,0.18); color:#9a3412; font-size:12px; cursor:pointer; transition:all .12s; font-family:var(--font-body); }
-.cd-tag-chip:hover { background:rgba(194,65,12,0.12); border-color:rgba(194,65,12,0.32); color:#c2410c; }
-.cd-tag-chip.locked { background:rgba(194,65,12,0.16); border-color:rgba(194,65,12,0.42); color:#c2410c; }
-.cd-tag-policy-warn { display:inline-flex; align-items:center; margin-left:4px; padding:2px 6px; border-radius:6px; border:1px solid rgba(180,83,9,.3); background:rgba(180,83,9,.06); color:#92400e; font-size:10px; line-height:1.3; vertical-align:middle; }
-.cd-tag-pop { position:absolute; z-index:300; background:#ffffff; border:1px solid #e7e5e4; border-radius:10px; padding:10px; min-width:240px; box-shadow:0 8px 28px rgba(120,113,108,.25); display:flex; flex-direction:column; gap:6px; }
-.cd-tag-pop-h { font-size:11px; color:#5a5753; padding-bottom:4px; border-bottom:1px solid #e7e5e4; margin-bottom:2px; }
+.cd-tag-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; background:hsl(var(--primary) / 0.06); border:1px solid hsl(var(--primary) / 0.18); color:var(--color-primary-hover); font-size:12px; cursor:pointer; transition:all .12s; font-family:var(--font-body); }
+.cd-tag-chip:hover { background:hsl(var(--primary) / 0.12); border-color:hsl(var(--primary) / 0.32); color:var(--color-primary); }
+.cd-tag-chip.locked { background:hsl(var(--primary) / 0.16); border-color:hsl(var(--primary) / 0.42); color:var(--color-primary); }
+.cd-tag-policy-warn { display:inline-flex; align-items:center; margin-left:4px; padding:2px 6px; border-radius:6px; border:1px solid color-mix(in srgb, var(--color-warning-text) 30%, transparent); background:color-mix(in srgb, var(--color-warning-text) 6%, transparent); color:var(--color-warning-text); font-size:10px; line-height:1.3; vertical-align:middle; }
+.cd-tag-pop { position:absolute; z-index:300; background:var(--color-surface); border:1px solid var(--color-border); border-radius:10px; padding:10px; min-width:240px; box-shadow:0 8px 28px color-mix(in srgb, var(--color-text-muted) 25%, transparent); display:flex; flex-direction:column; gap:6px; }
+.cd-tag-pop-h { font-size:11px; color:var(--color-text-secondary); padding-bottom:4px; border-bottom:1px solid var(--color-border); margin-bottom:2px; }
 .cd-tag-pop-row { display:flex; gap:6px; align-items:center; }
-.cd-tag-pop-btn { background:transparent; border:1px solid #d6d3d1; color:#5a5753; padding:6px 10px; border-radius:6px; font-size:11px; cursor:pointer; font-family:var(--font-body); flex:1; text-align:left; }
-.cd-tag-pop-btn:hover { border-color:rgba(194,65,12,0.32); color:#c2410c; }
-.cd-tag-pop-btn.danger:hover { border-color:rgba(185,28,28,.4); color:#b91c1c; }
-.cd-tag-pop-input { flex:1; background:#faf8f4; border:1px solid #d6d3d1; border-radius:6px; padding:5px 8px; font-size:12px; color:#1c1917; font-family:var(--font-body); outline:none; }
-.cd-tag-pop-input:focus { border-color:rgba(194,65,12,.4); }
+.cd-tag-pop-btn { background:transparent; border:1px solid var(--color-border-strong); color:var(--color-text-secondary); padding:6px 10px; border-radius:6px; font-size:11px; cursor:pointer; font-family:var(--font-body); flex:1; text-align:left; }
+.cd-tag-pop-btn:hover { border-color:hsl(var(--primary) / 0.32); color:var(--color-primary); }
+.cd-tag-pop-btn.danger:hover { border-color:color-mix(in srgb, var(--color-error-text) 40%, transparent); color:var(--color-error-text); }
+.cd-tag-pop-input { flex:1; background:var(--color-bg); border:1px solid var(--color-border-strong); border-radius:6px; padding:5px 8px; font-size:12px; color:var(--color-text); font-family:var(--font-body); outline:none; }
+.cd-tag-pop-input:focus { border-color:hsl(var(--primary) / .4); }
 .cd-tag-wrap { position:relative; display:inline-block; margin-right:4px; margin-bottom:4px; }
 .cd-tags-row { display:flex; flex-wrap:wrap; align-items:center; }
 .cd-status-dot { width:6px; height:6px; border-radius:50%; display:inline-block; margin-right:4px; }
-.cd-status-dot.drafted { background:#a8a29e; }
-.cd-status-dot.approved { background:#2563eb; }
-.cd-status-dot.published { background:#c2410c; }
-.cd-status-dot.failed { background:#b91c1c; }
+.cd-status-dot.drafted { background:var(--color-text-disabled); }
+.cd-status-dot.approved { background:var(--color-status-approved); }
+.cd-status-dot.published { background:var(--color-primary); }
+.cd-status-dot.failed { background:var(--color-error-text); }
 .cd-tab-status { position:absolute; top:3px; left:4px; width:5px; height:5px; border-radius:50%; }
-.cd-image-preview { margin:10px 0 12px; border:1px solid #e7e5e4; border-radius:10px; overflow:hidden; background:#faf8f4; }
+.cd-image-preview { margin:10px 0 12px; border:1px solid var(--color-border); border-radius:10px; overflow:hidden; background:var(--color-bg); }
 .cd-image-preview img { display:block; width:100%; max-height:420px; object-fit:cover; }
 .cd-editor-tools { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 12px; }
-.cd-editor-note { font-size:11px; color:#5a5753; line-height:1.55; }
+.cd-editor-note { font-size:11px; color:var(--color-text-secondary); line-height:1.55; }
 .cd-editor-meter { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:8px 0 12px; }
-.cd-editor-meter span { border:1px solid #e7e5e4; background:#f5f0e8; border-radius:8px; padding:8px 10px; font-size:11px; color:#5a5753; line-height:1.45; }
-.cd-editor-meter strong { display:block; color:#1c1917; font-size:13px; font-weight:500; margin-bottom:2px; }
-.cd-editor-warning { border:1px solid rgba(180,83,9,.28); background:rgba(180,83,9,.06); border-radius:8px; color:#92400e; padding:9px 10px; font-size:11px; line-height:1.55; margin-bottom:12px; }
+.cd-editor-meter span { border:1px solid var(--color-border); background:var(--color-surface-muted); border-radius:8px; padding:8px 10px; font-size:11px; color:var(--color-text-secondary); line-height:1.45; }
+.cd-editor-meter strong { display:block; color:var(--color-text); font-size:13px; font-weight:500; margin-bottom:2px; }
+.cd-editor-warning { border:1px solid color-mix(in srgb, var(--color-warning-text) 28%, transparent); background:color-mix(in srgb, var(--color-warning-text) 6%, transparent); border-radius:8px; color:var(--color-warning-text); padding:9px 10px; font-size:11px; line-height:1.55; margin-bottom:12px; }
 
 @media (max-width: 760px) {
   .cd-app { padding:28px 16px 80px; }
@@ -251,7 +288,7 @@ const css = `
   .cd-editor-meter { grid-template-columns:1fr; }
 }
 .cd-tz-input::placeholder {
-  color:#5a5753 !important;
+  color:var(--color-text-secondary) !important;
   font-style: italic !important;
 }
 `;
@@ -264,7 +301,15 @@ function wordCount(s: string): number {
 function hasEmoji(text: string): boolean {
   return /\p{Emoji}/u.test(text);
 }
-type TweakKind = "shorter" | "punchier" | "add-stat" | "remove-emoji" | "more-personal" | "clean-formatting" | "enhance" | string;
+type TweakKind =
+  | "shorter"
+  | "punchier"
+  | "add-stat"
+  | "remove-emoji"
+  | "more-personal"
+  | "clean-formatting"
+  | "enhance"
+  | string;
 
 function calculateScore(scores: Record<string, number>): number {
   const keys = Object.keys(scores);
@@ -290,10 +335,16 @@ function cssAspectRatioForPlatform(platform?: string): string {
 
 function readingStats(text: string) {
   const words = text.trim().split(/\s+/).filter(Boolean);
-  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
+  const sentences = text
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   const averageSentenceWords = sentences.length ? words.length / sentences.length : words.length;
-  const longSentences = sentences.filter(sentence => wordCount(sentence) > 28).length;
-  const score = Math.max(1, Math.min(100, Math.round(100 - averageSentenceWords * 2.1 - longSentences * 4)));
+  const longSentences = sentences.filter((sentence) => wordCount(sentence) > 28).length;
+  const score = Math.max(
+    1,
+    Math.min(100, Math.round(100 - averageSentenceWords * 2.1 - longSentences * 4))
+  );
   const label = score >= 72 ? "Easy" : score >= 52 ? "Moderate" : "Dense";
   return { score, label, averageSentenceWords: Math.round(averageSentenceWords), longSentences };
 }
@@ -304,7 +355,7 @@ function normalizeForRepeatCheck(text: string): string[] {
     .replace(/https?:\/\/\S+/g, "")
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter(word => word.length > 3);
+    .filter((word) => word.length > 3);
 }
 
 function repeatedPhraseWarning(text: string, corpus: string[]): string | null {
@@ -340,7 +391,7 @@ export default function CalendarDetail() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Post | null>(null);
   const [saving, setSaving] = useState(false);
-  
+
   // Feature 5: Post Field History / Versioning
   const [fieldHistory, setFieldHistory] = useState<Record<number, Record<string, string[]>>>({});
 
@@ -365,6 +416,11 @@ export default function CalendarDetail() {
   const [reformatTarget, setReformatTarget] = useState<string>("");
   const [pendingReformatTarget, setPendingReformatTarget] = useState<string | null>(null);
   const [reformatting, setReformatting] = useState(false);
+  const [pendingBanTag, setPendingBanTag] = useState<{ day: number; tag: string } | null>(null);
+  const [pendingBulkRegenerate, setPendingBulkRegenerate] = useState<{ count: number } | null>(
+    null
+  );
+  const [pendingRemoveVisual, setPendingRemoveVisual] = useState<number | null>(null);
   const [personaCompareOpen, setPersonaCompareOpen] = useState(false);
   const createCalendar = useCreateCalendarMutation();
 
@@ -392,14 +448,21 @@ export default function CalendarDetail() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [scheduling, setScheduling] = useState(false);
-  const [pendingScheduleConflict, setPendingScheduleConflict] = useState<{ rows: Record<string, unknown>[]; count: number } | null>(null);
+  const [pendingScheduleConflict, setPendingScheduleConflict] = useState<{
+    rows: Record<string, unknown>[];
+    count: number;
+  } | null>(null);
   const [timezone, setTimezone] = useState<string>(browserTimezone());
   const [profileTimezone, setProfileTimezone] = useState<string>("");
   const [trackingUrl, setTrackingUrl] = useState<string>("");
-  const [variantSaving, setVariantSaving] = useState<{ day: number; field: "hook" | "cta" } | null>(null);
+  const [variantSaving, setVariantSaving] = useState<{ day: number; field: "hook" | "cta" } | null>(
+    null
+  );
   const [lockedHashtags, setLockedHashtags] = useState<Record<string, string[]>>({});
   const [profilePolicy, setProfilePolicy] = useState<HashtagPolicy>({ banned: [], required: [] });
-  const [statusByDay, setStatusByDay] = useState<Record<number, "drafted" | "approved" | "published" | "failed">>({});
+  const [statusByDay, setStatusByDay] = useState<
+    Record<number, "drafted" | "approved" | "published" | "failed">
+  >({});
   const [tagPopover, setTagPopover] = useState<{ day: number; tag: string } | null>(null);
   const [tagReplacement, setTagReplacement] = useState("");
   const [repurposeOpen, setRepurposeOpen] = useState(false);
@@ -407,17 +470,29 @@ export default function CalendarDetail() {
   const [repurposedPost, setRepurposedPost] = useState<Post | null>(null);
   const [repurposedTarget, setRepurposedTarget] = useState("");
   const [repurposing, setRepurposing] = useState(false);
-  const [repurposeStage, setRepurposeStage] = useState<"" | "rewriting" | "scoring" | "illustrating">("");
+  const [repurposeStage, setRepurposeStage] = useState<
+    "" | "rewriting" | "scoring" | "illustrating"
+  >("");
   const repurposeMutation = useRepurposePostMutation();
   const generateImageMutation = useGeneratePostImageMutation();
   const inlineRewriteMutation = useInlineRewriteMutation();
   const [imageGeneratingDay, setImageGeneratingDay] = useState<number | null>(null);
-  const [inlineSelection, setInlineSelection] = useState<{ field: "hook" | "body" | "cta"; start: number; end: number; text: string } | null>(null);
+  const [inlineSelection, setInlineSelection] = useState<{
+    field: "hook" | "body" | "cta";
+    start: number;
+    end: number;
+    text: string;
+  } | null>(null);
   const [inlineRewriting, setInlineRewriting] = useState(false);
   const [pastPostText, setPastPostText] = useState<string[]>([]);
   const tzList = listTimezones();
 
-  const { data: calendarData, isLoading: calendarLoading, error: calendarError, refetch: refetchCalendar } = useCalendarQuery(id);
+  const {
+    data: calendarData,
+    isLoading: calendarLoading,
+    error: calendarError,
+    refetch: refetchCalendar,
+  } = useCalendarQuery(id);
   const { data: profileData } = useProfileQuery(user?.id);
   const { data: scheduledPostsData } = useScheduledPostsQuery(id);
   const updateCalendarMutation = useUpdateSavedCalendarMutation(id);
@@ -428,23 +503,28 @@ export default function CalendarDetail() {
   }, []);
 
   const handleCopyMenuClickOutside = useCallback((e: MouseEvent) => {
-    if (copyMenuRef.current && !copyMenuRef.current.contains(e.target as Node)) setCopyMenuOpen(false);
+    if (copyMenuRef.current && !copyMenuRef.current.contains(e.target as Node))
+      setCopyMenuOpen(false);
   }, []);
 
   const handleRepurposeClickOutside = useCallback((e: MouseEvent) => {
-    if (repurposeRef.current && !repurposeRef.current.contains(e.target as Node)) setRepurposeOpen(false);
+    if (repurposeRef.current && !repurposeRef.current.contains(e.target as Node))
+      setRepurposeOpen(false);
   }, []);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (posts.length <= 1) return;
-    if (e.key === "ArrowRight") {
-      e.preventDefault();
-      setActive(i => (i + 1) % posts.length);
-    } else if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      setActive(i => (i - 1 + posts.length) % posts.length);
-    }
-  }, [posts.length]);
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (posts.length <= 1) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setActive((i) => (i + 1) % posts.length);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setActive((i) => (i - 1 + posts.length) % posts.length);
+      }
+    },
+    [posts.length]
+  );
 
   useEffect(() => {
     if (!tweakOpen) return;
@@ -471,44 +551,73 @@ export default function CalendarDetail() {
   }, [handleKeyDown]);
 
   function toggleLock(day: number) {
-    setLockedDays(prev => {
+    setLockedDays((prev) => {
       const next = new Set(prev);
-      if (next.has(day)) next.delete(day); else next.add(day);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
       return next;
     });
   }
 
   async function reformatAllForPlatform(targetPlatform: string) {
     if (!targetPlatform || targetPlatform === platform || reformatting || regenerating) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { toast.error("Sign in required"); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Sign in required");
+      return;
+    }
     setReformatting(true);
     try {
       const SUPABASE_URL = resolveFunctionsBaseUrl(import.meta.env.VITE_SUPABASE_URL);
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const next: Post[] = [...posts];
       for (let i = 0; i < posts.length; i++) {
         const res = await fetch(`${SUPABASE_URL}/functions/v1/regenerate-post`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}` },
+          headers: {
+            "Content-Type": "application/json",
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
+          },
           body: JSON.stringify({
-            industry: formPayload.industry || "", industryLabel, platform: targetPlatform,
+            industry: formPayload.industry || "",
+            industryLabel,
+            platform: targetPlatform,
             language: formPayload.language || "English",
-            coreIdea: formPayload.coreIdea || title, audiences: formPayload.audiences || [],
-            voice: formPayload.voice || "", style: formPayload.style || "", goals: formPayload.goals || [],
-            format: formPayload.format || "Balanced mix", cta: formPayload.cta || "Share & repost bait",
-            length: formPayload.length || "medium", structure: formPayload.structure || "mixed",
-            extra: formPayload.extra || "", bannedWords: formPayload.bannedWords || [], requiredWords: formPayload.requiredWords || [],
-            post: posts[i], siblings: next,
+            coreIdea: formPayload.coreIdea || title,
+            audiences: formPayload.audiences || [],
+            voice: formPayload.voice || "",
+            style: formPayload.style || "",
+            goals: formPayload.goals || [],
+            format: formPayload.format || "Balanced mix",
+            cta: formPayload.cta || "Share & repost bait",
+            length: formPayload.length || "medium",
+            structure: formPayload.structure || "mixed",
+            extra: formPayload.extra || "",
+            bannedWords: formPayload.bannedWords || [],
+            requiredWords: formPayload.requiredWords || [],
+            post: posts[i],
+            siblings: next,
           }),
         });
         const data = await res.json().catch(() => ({}));
-        if (res.status === 402 || data?.error === "QUOTA_EXCEEDED" || data?.error === "UPGRADE_REQUIRED") {
-          toast.error(data?.message || "You've reached your generation limit. Upgrade to continue.", {
-            duration: 8000,
-            action: { label: "See plans", onClick: () => navigate("/profile?tab=plan") },
-          });
+        if (
+          res.status === 402 ||
+          data?.error === "QUOTA_EXCEEDED" ||
+          data?.error === "UPGRADE_REQUIRED"
+        ) {
+          toast.error(
+            data?.message || "You've reached your generation limit. Upgrade to continue.",
+            {
+              duration: 8000,
+              action: { label: "See plans", onClick: () => navigate("/profile?tab=plan") },
+            }
+          );
           return;
         }
         if (res.ok && data?.post) next[i] = data.post;
@@ -554,35 +663,55 @@ export default function CalendarDetail() {
     let cancelled = false;
     const load = async () => {
       const loadedPosts = (calendarData.posts as unknown as Post[]) || [];
-      const isE2E = typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true";
-      const hydratedPosts: Post[] = loadedPosts.length > 0
-        ? loadedPosts
-        : isE2E
-          ? await (async () => {
-              const { generateLocalPosts } = await import("@/lib/localPostGenerator");
-              return generateLocalPosts({
-                industry: (calendarData as { industry?: string | null }).industry || "",
-                industryLabel: calendarData.industry_label || "",
-                platform: calendarData.platform || "LinkedIn",
-                language: (calendarData.form_payload as { language?: string } | null)?.language || "English",
-                coreIdea: calendarData.core_idea || calendarData.title || "",
-                audiences: (calendarData.form_payload as { audiences?: string[] } | null)?.audiences || [],
-                voice: (calendarData.form_payload as { voice?: string } | null)?.voice || "",
-                style: (calendarData.form_payload as { style?: string } | null)?.style || "",
-                goals: (calendarData.form_payload as { goals?: string[] } | null)?.goals || [],
-                topics: (calendarData.form_payload as { topics?: string[] } | null)?.topics || [],
-                format: (calendarData.form_payload as { format?: string } | null)?.format || "Balanced mix",
-                cta: (calendarData.form_payload as { cta?: string } | null)?.cta || "Share & repost bait",
-                length: (calendarData.form_payload as { length?: string } | null)?.length || "medium",
-                structure: (calendarData.form_payload as { structure?: string } | null)?.structure || "mixed",
-                extra: (calendarData.form_payload as { extra?: string } | null)?.extra || "",
-                bannedWords: (calendarData.form_payload as { bannedWords?: string[] } | null)?.bannedWords || [],
-                requiredWords: (calendarData.form_payload as { requiredWords?: string[] } | null)?.requiredWords || [],
-                targetTopic: (calendarData.form_payload as { topics?: string[] } | null)?.topics?.[0] || calendarData.core_idea || calendarData.title || "",
-                targetDow: "Mon",
-              }) as unknown as Post[];
-            })()
-          : [];
+      const isE2E =
+        typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true";
+      const hydratedPosts: Post[] =
+        loadedPosts.length > 0
+          ? loadedPosts
+          : isE2E
+            ? await (async () => {
+                const { generateLocalPosts } = await import("@/lib/localPostGenerator");
+                return generateLocalPosts({
+                  industry: (calendarData as { industry?: string | null }).industry || "",
+                  industryLabel: calendarData.industry_label || "",
+                  platform: calendarData.platform || "LinkedIn",
+                  language:
+                    (calendarData.form_payload as { language?: string } | null)?.language ||
+                    "English",
+                  coreIdea: calendarData.core_idea || calendarData.title || "",
+                  audiences:
+                    (calendarData.form_payload as { audiences?: string[] } | null)?.audiences || [],
+                  voice: (calendarData.form_payload as { voice?: string } | null)?.voice || "",
+                  style: (calendarData.form_payload as { style?: string } | null)?.style || "",
+                  goals: (calendarData.form_payload as { goals?: string[] } | null)?.goals || [],
+                  topics: (calendarData.form_payload as { topics?: string[] } | null)?.topics || [],
+                  format:
+                    (calendarData.form_payload as { format?: string } | null)?.format ||
+                    "Balanced mix",
+                  cta:
+                    (calendarData.form_payload as { cta?: string } | null)?.cta ||
+                    "Share & repost bait",
+                  length:
+                    (calendarData.form_payload as { length?: string } | null)?.length || "medium",
+                  structure:
+                    (calendarData.form_payload as { structure?: string } | null)?.structure ||
+                    "mixed",
+                  extra: (calendarData.form_payload as { extra?: string } | null)?.extra || "",
+                  bannedWords:
+                    (calendarData.form_payload as { bannedWords?: string[] } | null)?.bannedWords ||
+                    [],
+                  requiredWords:
+                    (calendarData.form_payload as { requiredWords?: string[] } | null)
+                      ?.requiredWords || [],
+                  targetTopic:
+                    (calendarData.form_payload as { topics?: string[] } | null)?.topics?.[0] ||
+                    calendarData.core_idea ||
+                    calendarData.title ||
+                    "",
+                  targetDow: "Mon",
+                }) as unknown as Post[];
+              })()
+            : [];
 
       if (cancelled) return;
       setPosts(hydratedPosts);
@@ -590,27 +719,39 @@ export default function CalendarDetail() {
       setPlatform(calendarData.platform || "");
       setIndustryLabel(calendarData.industry_label || "");
       setFormPayload((calendarData.form_payload as unknown as FormPayload) || {});
-      setMeta(`${calendarData.industry_label || ""} · ${calendarData.platform || ""} · ${new Date(calendarData.created_at).toLocaleDateString()}`);
-      const dx = calendarData as { is_favorite?: boolean; timezone?: string | null; tracking_url?: string | null; locked_hashtags?: Record<string, string[]> | null };
+      setMeta(
+        `${calendarData.industry_label || ""} · ${calendarData.platform || ""} · ${new Date(calendarData.created_at).toLocaleDateString()}`
+      );
+      const dx = calendarData as {
+        is_favorite?: boolean;
+        timezone?: string | null;
+        tracking_url?: string | null;
+        locked_hashtags?: Record<string, string[]> | null;
+      };
       setIsFavorite(!!dx.is_favorite);
       setTrackingUrl(dx.tracking_url || "");
       setLockedHashtags(dx.locked_hashtags || {});
-      const fp = (calendarData.form_payload as { weekStart?: string } | null);
-      const ws = (calendarData as { week_start_date?: string | null }).week_start_date
-        || fp?.weekStart
-        || toDateInputValue(nextMonday());
+      const fp = calendarData.form_payload as { weekStart?: string } | null;
+      const ws =
+        (calendarData as { week_start_date?: string | null }).week_start_date ||
+        fp?.weekStart ||
+        toDateInputValue(nextMonday());
       setWeekStart(ws);
-      const storedTimes = (calendarData as { post_times?: Record<string, string> | null }).post_times;
+      const storedTimes = (calendarData as { post_times?: Record<string, string> | null })
+        .post_times;
       if (storedTimes && typeof storedTimes === "object") {
         setPostTimes(storedTimes);
       } else {
         const seed: Record<string, string> = {};
-        for (const p of hydratedPosts) seed[String(p.day)] = suggestedTimeForDay(Number(p.day) || 1, platform);
+        for (const p of hydratedPosts)
+          seed[String(p.day)] = suggestedTimeForDay(Number(p.day) || 1, platform);
         setPostTimes(seed);
       }
     };
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [calendarData, calendarError, navigate]);
 
   // Handle profile data loading
@@ -670,7 +811,9 @@ export default function CalendarDetail() {
       }
       setPastPostText(snippets.filter(Boolean));
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [id, user?.id]);
 
   // Set loading state based on queries
@@ -698,9 +841,17 @@ export default function CalendarDetail() {
     const newHistory = { ...fieldHistory };
     if (!newHistory[day]) newHistory[day] = {};
 
-    const fieldsToTrack = ["title", "hook", "body", "cta", "hashtags", "rationale", "image_prompt"] as const;
+    const fieldsToTrack = [
+      "title",
+      "hook",
+      "body",
+      "cta",
+      "hashtags",
+      "rationale",
+      "image_prompt",
+    ] as const;
     let changed = false;
-    fieldsToTrack.forEach(f => {
+    fieldsToTrack.forEach((f) => {
       const oldVal = currentPost[f] || "";
       const newVal = draft[f] || "";
       if (oldVal !== newVal) {
@@ -713,7 +864,7 @@ export default function CalendarDetail() {
       setFieldHistory(newHistory);
     }
 
-    const updated = posts.map((p, i) => i === active ? draft : p);
+    const updated = posts.map((p, i) => (i === active ? draft : p));
     try {
       await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
     } catch (error) {
@@ -727,28 +878,31 @@ export default function CalendarDetail() {
     toast.success("Post updated");
   }
 
-  const undoField = useCallback((field: string) => {
-    if (!draft) return;
-    const day = draft.day;
-    const stack = fieldHistory[day]?.[field];
-    if (!stack || stack.length === 0) return;
-    const nextStack = [...stack];
-    const poppedValue = nextStack.pop()!;
-    
-    setDraft(prev => prev ? { ...prev, [field]: poppedValue } : null);
-    
-    setFieldHistory(prev => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        [field]: nextStack
-      }
-    }));
-    toast.success(`Restored last version of ${field} ✓`);
-  }, [draft, fieldHistory]);
+  const undoField = useCallback(
+    (field: string) => {
+      if (!draft) return;
+      const day = draft.day;
+      const stack = fieldHistory[day]?.[field];
+      if (!stack || stack.length === 0) return;
+      const nextStack = [...stack];
+      const poppedValue = nextStack.pop()!;
+
+      setDraft((prev) => (prev ? { ...prev, [field]: poppedValue } : null));
+
+      setFieldHistory((prev) => ({
+        ...prev,
+        [day]: {
+          ...prev[day],
+          [field]: nextStack,
+        },
+      }));
+      toast.success(`Restored last version of ${field} ✓`);
+    },
+    [draft, fieldHistory]
+  );
 
   async function applyImageToPost(day: number, imageUrl: string) {
-    const updated = posts.map(p => {
+    const updated = posts.map((p) => {
       if (p.day === day) {
         return {
           ...p,
@@ -770,7 +924,7 @@ export default function CalendarDetail() {
 
   async function selectHookVariant(day: number, variant: string) {
     const previous = posts;
-    const updated = previous.map(p => p.day === day ? { ...p, hook: variant } : p);
+    const updated = previous.map((p) => (p.day === day ? { ...p, hook: variant } : p));
     setPosts(updated);
     setVariantSaving({ day, field: "hook" });
     try {
@@ -780,13 +934,13 @@ export default function CalendarDetail() {
       setPosts(previous);
       toast.error(error instanceof Error ? error.message : "Failed to save hook variant");
     } finally {
-      setVariantSaving(prev => prev?.day === day && prev?.field === "hook" ? null : prev);
+      setVariantSaving((prev) => (prev?.day === day && prev?.field === "hook" ? null : prev));
     }
   }
 
   async function selectCtaVariant(day: number, variant: string) {
     const previous = posts;
-    const updated = previous.map(p => p.day === day ? { ...p, cta: variant } : p);
+    const updated = previous.map((p) => (p.day === day ? { ...p, cta: variant } : p));
     setPosts(updated);
     setVariantSaving({ day, field: "cta" });
     try {
@@ -796,7 +950,7 @@ export default function CalendarDetail() {
       setPosts(previous);
       toast.error(error instanceof Error ? error.message : "Failed to save CTA variant");
     } finally {
-      setVariantSaving(prev => prev?.day === day && prev?.field === "cta" ? null : prev);
+      setVariantSaving((prev) => (prev?.day === day && prev?.field === "cta" ? null : prev));
     }
   }
 
@@ -808,7 +962,7 @@ export default function CalendarDetail() {
     focusMetric?: PerformanceFocusMetric,
     guidance?: string
   ) {
-    const log = createScopedLogger('CalendarDetail-RegenerateDay');
+    const log = createScopedLogger("CalendarDetail-RegenerateDay");
     if (!id || regenerating || editing) return;
     const target = posts[active];
     if (!target) return;
@@ -852,7 +1006,10 @@ export default function CalendarDetail() {
         extra: formPayload.extra || "",
         bannedWords: formPayload.bannedWords || [],
         requiredWords: formPayload.requiredWords || [],
-        brandMemory: isEnabled("brandMemory") && profileData ? buildBrandMemoryPrompt(profileData as Database["public"]["Tables"]["profiles"]["Row"]) : "",
+        brandMemory:
+          isEnabled("brandMemory") && profileData
+            ? buildBrandMemoryPrompt(profileData as Database["public"]["Tables"]["profiles"]["Row"])
+            : "",
         post: target,
         siblings: posts,
         tweak,
@@ -860,7 +1017,15 @@ export default function CalendarDetail() {
         feedbackCategory: category,
         feedbackRating: rating,
         calendarId: id,
-        ...(tweak === "enhance" ? { focusMetric: focusMetric || getWeakestPerformanceMetric(calculatePerformanceScore(target, formPayload.coreIdea || title)) } : {}),
+        ...(tweak === "enhance"
+          ? {
+              focusMetric:
+                focusMetric ||
+                getWeakestPerformanceMetric(
+                  calculatePerformanceScore(target, formPayload.coreIdea || title)
+                ),
+            }
+          : {}),
         ...(focusMetric ? { focusMetric } : {}),
         ...(guidance ? { guidance } : {}),
       };
@@ -901,13 +1066,23 @@ export default function CalendarDetail() {
     }
   }
 
-  const handleToneShift = useCallback((level: number) => {
-    const toneLabel = level === 1 ? "very-formal" : level === 2 ? "formal" : level === 4 ? "casual" : "very-casual";
-    void regenerateDay(`tone-${toneLabel}` as any);
-  }, [regenerateDay]);
+  const handleToneShift = useCallback(
+    (level: number) => {
+      const toneLabel =
+        level === 1
+          ? "very-formal"
+          : level === 2
+            ? "formal"
+            : level === 4
+              ? "casual"
+              : "very-casual";
+      void regenerateDay(`tone-${toneLabel}` as any);
+    },
+    [regenerateDay]
+  );
 
   async function repurposeTo(targetPlatform: string) {
-    const log = createScopedLogger('CalendarDetail-Repurpose');
+    const log = createScopedLogger("CalendarDetail-Repurpose");
     if (repurposing) return;
     const sourcePost = posts[active];
     if (!sourcePost) return;
@@ -925,7 +1100,7 @@ export default function CalendarDetail() {
           voice: formPayload.voice || "",
           style: formPayload.style || "",
           goals: formPayload.goals || [],
-        }
+        },
       };
       const data = await repurposeMutation.mutateAsync(payload);
       const result = unwrapPost(data);
@@ -963,18 +1138,24 @@ export default function CalendarDetail() {
             aspectRatio,
           });
           if (imgResult?.publicUrl) {
-            setRepurposedPost(prev => prev ? {
-              ...prev,
-              image_url: String(imgResult.publicUrl || ""),
-              image_storage_path: String(imgResult.storagePath || ""),
-              image_aspect_ratio: String(imgResult.aspectRatio || aspectRatio),
-              image_generated_at: String(imgResult.generatedAt || new Date().toISOString()),
-            } : prev);
+            setRepurposedPost((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    image_url: String(imgResult.publicUrl || ""),
+                    image_storage_path: String(imgResult.storagePath || ""),
+                    image_aspect_ratio: String(imgResult.aspectRatio || aspectRatio),
+                    image_generated_at: String(imgResult.generatedAt || new Date().toISOString()),
+                  }
+                : prev
+            );
           }
         } catch (imgErr) {
           // Image generation is an enhancement, not a blocker — surface a soft warning only.
           log.error("Repurpose image generation failed", imgErr);
-          toast.message("Repurposed text is ready. Visual generation failed — you can retry it after saving.");
+          toast.message(
+            "Repurposed text is ready. Visual generation failed — you can retry it after saving."
+          );
         }
       }
     } catch (e) {
@@ -989,7 +1170,7 @@ export default function CalendarDetail() {
   async function saveRepurposedPost() {
     if (!repurposedPost || !id) return;
     const previous = posts;
-    const updated = posts.map((post, index) => index === active ? repurposedPost : post);
+    const updated = posts.map((post, index) => (index === active ? repurposedPost : post));
     setPosts(updated);
     try {
       await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
@@ -1029,7 +1210,7 @@ export default function CalendarDetail() {
         image_generated_at: String(result.generatedAt || new Date().toISOString()),
       };
       if (!updatedPost.image_url) throw new Error("Image generation returned no URL");
-      const updated = posts.map(p => p.day === post.day ? updatedPost : p);
+      const updated = posts.map((p) => (p.day === post.day ? updatedPost : p));
       setPosts(updated);
       await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
       toast.success("Visual generated");
@@ -1047,7 +1228,9 @@ export default function CalendarDetail() {
     setInlineSelection(text ? { field, start, end, text } : null);
   }
 
-  async function rewriteInlineSelection(instruction: "punchier" | "add-stat" | "question" | "simpler") {
+  async function rewriteInlineSelection(
+    instruction: "punchier" | "add-stat" | "question" | "simpler"
+  ) {
     if (!draft || !inlineSelection) {
       toast.error("Select text in the hook, body, or CTA first");
       return;
@@ -1146,7 +1329,7 @@ export default function CalendarDetail() {
 
   async function persistPostHashtags(day: number, newHashtags: string) {
     if (!id) return;
-    const updated = posts.map(po => po.day === day ? { ...po, hashtags: newHashtags } : po);
+    const updated = posts.map((po) => (po.day === day ? { ...po, hashtags: newHashtags } : po));
     setPosts(updated);
     try {
       await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
@@ -1156,7 +1339,11 @@ export default function CalendarDetail() {
   }
 
   // Re-render a post's hashtag string by applying workspace policy + this post's locks.
-  function rebuildHashtagsForDay(day: number, currentTags: string[], lockedForDay: string[]): string {
+  function rebuildHashtagsForDay(
+    day: number,
+    currentTags: string[],
+    lockedForDay: string[]
+  ): string {
     return applyPolicy(currentTags.join(" "), platform, profilePolicy, lockedForDay);
   }
 
@@ -1174,20 +1361,27 @@ export default function CalendarDetail() {
     const norm = normalizeTag(tag);
     const cur = lockedHashtags[String(day)] || [];
     if (!cur.includes(norm)) return;
-    const nextLocks = { ...lockedHashtags, [String(day)]: cur.filter(t => t !== norm) };
+    const nextLocks = { ...lockedHashtags, [String(day)]: cur.filter((t) => t !== norm) };
     if (nextLocks[String(day)].length === 0) delete nextLocks[String(day)];
     await persistLockedHashtags(nextLocks);
     toast.success(`#${norm} unpinned`);
   }
 
-  async function banTagWorkspaceWide(day: number, tag: string) {
+  function banTagWorkspaceWide(day: number, tag: string) {
     const norm = normalizeTag(tag);
     if (!norm) return;
-    if (!window.confirm(`Ban #${norm} from EVERY future post across all calendars? You can undo from Profile → Hashtag policy.`)) return;
+    setPendingBanTag({ day, tag: norm });
+  }
+
+  async function commitBanTagWorkspaceWide(day: number, norm: string) {
     // 1) Add to workspace banned list
-    const nextBanned = profilePolicy.banned.includes(norm) ? profilePolicy.banned : [...profilePolicy.banned, norm];
+    const nextBanned = profilePolicy.banned.includes(norm)
+      ? profilePolicy.banned
+      : [...profilePolicy.banned, norm];
     setProfilePolicy({ ...profilePolicy, banned: nextBanned });
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (user) {
       try {
         await updateProfileMutation.mutateAsync({ banned_hashtags: nextBanned });
@@ -1198,14 +1392,18 @@ export default function CalendarDetail() {
     // 2) Strip the tag from this post immediately + unlock it if locked
     const cur = lockedHashtags[String(day)] || [];
     if (cur.includes(norm)) {
-      const nextLocks = { ...lockedHashtags, [String(day)]: cur.filter(t => t !== norm) };
+      const nextLocks = { ...lockedHashtags, [String(day)]: cur.filter((t) => t !== norm) };
       if (nextLocks[String(day)].length === 0) delete nextLocks[String(day)];
       await persistLockedHashtags(nextLocks);
     }
-    const post = posts.find(po => po.day === day);
+    const post = posts.find((po) => po.day === day);
     if (post) {
-      const tagsNow = parseHashtagsString(post.hashtags).filter(t => t !== norm);
-      const newStr = rebuildHashtagsForDay(day, tagsNow, (lockedHashtags[String(day)] || []).filter(t => t !== norm));
+      const tagsNow = parseHashtagsString(post.hashtags).filter((t) => t !== norm);
+      const newStr = rebuildHashtagsForDay(
+        day,
+        tagsNow,
+        (lockedHashtags[String(day)] || []).filter((t) => t !== norm)
+      );
       await persistPostHashtags(day, newStr);
     }
     toast.success(`#${norm} banned workspace-wide ✓`);
@@ -1217,7 +1415,7 @@ export default function CalendarDetail() {
     const newNorm = normalizeTag(replacementRaw);
     if (!oldNorm || !newNorm) return toast.error("Enter a valid replacement tag");
     if (oldNorm === newNorm) return setTagPopover(null);
-    const post = posts.find(po => po.day === day);
+    const post = posts.find((po) => po.day === day);
     if (!post) return;
     const tagsNow = parseHashtagsString(post.hashtags);
     const idx = tagsNow.indexOf(oldNorm);
@@ -1227,7 +1425,10 @@ export default function CalendarDetail() {
     const cur = lockedHashtags[String(day)] || [];
     let nextLocks = lockedHashtags;
     if (cur.includes(oldNorm)) {
-      nextLocks = { ...lockedHashtags, [String(day)]: cur.map(t => t === oldNorm ? newNorm : t) };
+      nextLocks = {
+        ...lockedHashtags,
+        [String(day)]: cur.map((t) => (t === oldNorm ? newNorm : t)),
+      };
       await persistLockedHashtags(nextLocks);
     }
     const newStr = rebuildHashtagsForDay(day, tagsNow, nextLocks[String(day)] || []);
@@ -1256,7 +1457,10 @@ export default function CalendarDetail() {
       } else {
         const ws = parseLocalDate(weekStart) || nextMonday();
         const tz = timezone || profileTimezone || browserTimezone();
-        downloadIcs({ calendarTitle: title, weekStart: ws, postTimes, platform, timezone: tz }, posts);
+        downloadIcs(
+          { calendarTitle: title, weekStart: ws, postTimes, platform, timezone: tz },
+          posts
+        );
       }
       toast.success(`Downloaded .${format} ✓`);
     } catch (err) {
@@ -1266,39 +1470,56 @@ export default function CalendarDetail() {
     }
   }
 
-  async function regenerateAllUnlocked() {
-    const log = createScopedLogger('CalendarDetail-BulkRegenerate');
+  function regenerateAllUnlocked() {
     if (!id || regenerating || bulkRegenerating || editing) return;
     const targets = posts.map((p, i) => ({ p, i })).filter(({ p }) => !lockedDays.has(p.day));
-    if (targets.length === 0) { toast.error("All posts are pinned. Nothing to regenerate."); return; }
-    const ok = window.confirm(`Regenerate ${targets.length} unlocked post${targets.length === 1 ? "" : "s"} for ${niceLabelFor(platform)}? Pinned posts stay untouched.`);
-    if (!ok) return;
+    if (targets.length === 0) {
+      toast.error("All posts are pinned. Nothing to regenerate.");
+      return;
+    }
+    setPendingBulkRegenerate({ count: targets.length });
+  }
+
+  async function commitRegenerateAllUnlocked() {
+    const log = createScopedLogger("CalendarDetail-BulkRegenerate");
+    const targets = posts.map((p, i) => ({ p, i })).filter(({ p }) => !lockedDays.has(p.day));
     setBulkRegenerating(true);
     setBulkProgress({ done: 0, total: targets.length });
     try {
       log.info(`Starting bulk regenerate`, { count: targets.length, platform, calendarId: id });
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const next: Post[] = [...posts];
       let done = 0;
       const failures: { day: number; reason: string }[] = [];
 
-      const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
       async function runOne({ p: target, i }: { p: Post; i: number }) {
         const maxAttempts = 3;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           try {
             const payload = {
-              industry: formPayload.industry || "", industryLabel,
+              industry: formPayload.industry || "",
+              industryLabel,
               platform: platform || formPayload.platform || "LinkedIn",
-              coreIdea: formPayload.coreIdea || title, audiences: formPayload.audiences || [],
-              voice: formPayload.voice || "", style: formPayload.style || "", goals: formPayload.goals || [],
-              format: formPayload.format || "Balanced mix", cta: formPayload.cta || "Share & repost bait",
-              length: formPayload.length || "medium", structure: formPayload.structure || "mixed",
-              extra: formPayload.extra || "", bannedWords: formPayload.bannedWords || [], requiredWords: formPayload.requiredWords || [],
-              post: target, siblings: next,
+              coreIdea: formPayload.coreIdea || title,
+              audiences: formPayload.audiences || [],
+              voice: formPayload.voice || "",
+              style: formPayload.style || "",
+              goals: formPayload.goals || [],
+              format: formPayload.format || "Balanced mix",
+              cta: formPayload.cta || "Share & repost bait",
+              length: formPayload.length || "medium",
+              structure: formPayload.structure || "mixed",
+              extra: formPayload.extra || "",
+              bannedWords: formPayload.bannedWords || [],
+              requiredWords: formPayload.requiredWords || [],
+              post: target,
+              siblings: next,
             };
             const newPost = unwrapPost(await regenerateMutation.mutateAsync(payload));
             if (!newPost) throw new Error("Regenerate failed: no post returned");
@@ -1331,18 +1552,30 @@ export default function CalendarDetail() {
 
       try {
         await updateCalendarMutation.mutateAsync({ posts: next as unknown as never });
-      } catch (updErr) { toast.error(updErr instanceof Error ? updErr.message : "Failed to save reordered posts"); return; }
+      } catch (updErr) {
+        toast.error(updErr instanceof Error ? updErr.message : "Failed to save reordered posts");
+        return;
+      }
 
       const okCount = targets.length - failures.length;
       if (failures.length === 0) {
         log.info(`Bulk regenerate completed successfully`, { count: okCount, calendarId: id });
         toast.success(`Regenerated ${okCount} post${okCount === 1 ? "" : "s"} ✓`);
       } else if (okCount === 0) {
-        log.warn(`All bulk regenerations failed`, new Error(failures[0].reason), { totalCount: targets.length, failureReasons: failures });
+        log.warn(`All bulk regenerations failed`, new Error(failures[0].reason), {
+          totalCount: targets.length,
+          failureReasons: failures,
+        });
         toast.error(`All ${failures.length} regenerations failed. ${failures[0].reason}`);
       } else {
-        log.warn(`Partial bulk regenerate failure`, new Error(`${failures.length} of ${targets.length} failed`), { okCount, failureCount: failures.length, failedDays: failures.map(f => f.day) });
-        toast.warning(`${okCount} regenerated, ${failures.length} failed (days ${failures.map(f => f.day).join(", ")})`);
+        log.warn(
+          `Partial bulk regenerate failure`,
+          new Error(`${failures.length} of ${targets.length} failed`),
+          { okCount, failureCount: failures.length, failedDays: failures.map((f) => f.day) }
+        );
+        toast.warning(
+          `${okCount} regenerated, ${failures.length} failed (days ${failures.map((f) => f.day).join(", ")})`
+        );
       }
     } catch (e) {
       log.error(`Bulk regenerate exception`, e, { calendarId: id });
@@ -1355,8 +1588,13 @@ export default function CalendarDetail() {
 
   async function scheduleWeek() {
     if (!id || scheduling) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { toast.error("Sign in required"); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Sign in required");
+      return;
+    }
     setScheduling(true);
     try {
       const ws = parseLocalDate(weekStart) || nextMonday();
@@ -1409,7 +1647,10 @@ export default function CalendarDetail() {
       const { error } = await supabase
         .from("scheduled_posts")
         .upsert(rows as never, { onConflict: "calendar_id,post_day" });
-      if (error) { toast.error(error.message); return; }
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
       const newStatus: typeof statusByDay = {};
       for (const p of posts) newStatus[p.day] = "drafted";
       setStatusByDay(newStatus);
@@ -1428,25 +1669,35 @@ export default function CalendarDetail() {
 
   const activeDate = useMemo(() => {
     if (!p) return null;
-    return new Date(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate() + (p.day - 1));
+    return new Date(
+      weekStartDate.getFullYear(),
+      weekStartDate.getMonth(),
+      weekStartDate.getDate() + (p.day - 1)
+    );
   }, [weekStartDate, p]);
 
   const activeDowName = useMemo(() => {
     if (!activeDate) return "—";
-    return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][activeDate.getDay()];
+    return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][activeDate.getDay()];
   }, [activeDate]);
   const bodyWords = useMemo(() => wordCount(draft?.body || ""), [draft?.body]);
   const hookWords = useMemo(() => wordCount(draft?.hook || ""), [draft?.hook]);
   const titleChars = (draft?.title || "").length;
   const ctaChars = (draft?.cta || "").length;
   const draftReadability = useMemo(() => readingStats(draft?.body || ""), [draft?.body]);
-  const repeatWarning = useMemo(() => repeatedPhraseWarning(draft?.body || "", pastPostText), [draft?.body, pastPostText]);
+  const repeatWarning = useMemo(
+    () => repeatedPhraseWarning(draft?.body || "", pastPostText),
+    [draft?.body, pastPostText]
+  );
   const lengthTarget = formPayload.length;
   const targetHint =
-    lengthTarget === "short" ? "target 80–120" :
-    lengthTarget === "long" ? "target 280–380" :
-    lengthTarget === "mixed" ? "varies (80–380)" :
-    "target 160–230";
+    lengthTarget === "short"
+      ? "target 80–120"
+      : lengthTarget === "long"
+        ? "target 280–380"
+        : lengthTarget === "mixed"
+          ? "varies (80–380)"
+          : "target 160–230";
 
   // K4 — calendar analytics (client-computed, no backend)
   const analytics = useMemo(() => {
@@ -1460,7 +1711,8 @@ export default function CalendarDetail() {
       totalChars += f.charCount;
       if (f.charCount <= f.limit) withinLimit += 1;
       const tagCount = String(post.hashtags || "")
-        .split(/[\s,]+/).filter(t => t.trim().length > 1).length;
+        .split(/[\s,]+/)
+        .filter((t) => t.trim().length > 1).length;
       totalHashtags += tagCount;
       const fmt = (post.format || "—").trim();
       formats.set(fmt, (formats.get(fmt) || 0) + 1);
@@ -1484,14 +1736,23 @@ export default function CalendarDetail() {
       <WorkspacePage size="wide">
         <ErrorState
           title="Couldn't load this calendar"
-          description={calendarError instanceof Error ? calendarError.message : "This calendar may have been deleted, or something went wrong while fetching it."}
+          description={
+            calendarError instanceof Error
+              ? calendarError.message
+              : "This calendar may have been deleted, or something went wrong while fetching it."
+          }
           onRetry={() => refetchCalendar()}
         />
       </WorkspacePage>
     );
   }
 
-  if (loading) return <WorkspacePage size="wide"><div className="cd-inner">Loading…</div></WorkspacePage>;
+  if (loading)
+    return (
+      <WorkspacePage size="wide">
+        <div className="cd-inner">Loading…</div>
+      </WorkspacePage>
+    );
 
   return (
     <>
@@ -1500,20 +1761,23 @@ export default function CalendarDetail() {
       </Helmet>
       <style>{css}</style>
       {isE2EModeActive && (
-        <div style={{
-          background: "rgba(180, 83, 9, 0.08)",
-          borderBottom: "1px solid rgba(180, 83, 9, 0.2)",
-          padding: "10px 16px",
-          textAlign: "center",
-          fontSize: "12px",
-          color: "#92400e",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          gap: "8px",
-          zIndex: 1000,
-          position: "relative"
-        }}>
+        <div
+          style={{
+            background: "color-mix(in srgb, var(--color-warning-text) 8%, transparent)",
+            borderBottom:
+              "1px solid color-mix(in srgb, var(--color-warning-text) 20%, transparent)",
+            padding: "10px 16px",
+            textAlign: "center",
+            fontSize: "12px",
+            color: "var(--color-warning-text)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: "8px",
+            zIndex: 1000,
+            position: "relative",
+          }}
+        >
           <span>⚠️ Sandbox Mode Active (using mock test data)</span>
           <button
             onClick={() => {
@@ -1523,21 +1787,23 @@ export default function CalendarDetail() {
               }
             }}
             style={{
-              background: "rgba(180, 83, 9, 0.14)",
-              border: "1px solid rgba(180, 83, 9, 0.32)",
-              color: "#92400e",
+              background: "color-mix(in srgb, var(--color-warning-text) 14%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--color-warning-text) 32%, transparent)",
+              color: "var(--color-warning-text)",
               padding: "2px 8px",
               borderRadius: "4px",
               cursor: "pointer",
               fontSize: "11px",
               fontWeight: 500,
-              transition: "all 0.15s"
+              transition: "all 0.15s",
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.background = "rgba(240, 212, 154, 0.35)";
+              e.currentTarget.style.background =
+                "color-mix(in srgb, var(--color-primary-light) 35%, transparent)";
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.background = "rgba(240, 212, 154, 0.2)";
+              e.currentTarget.style.background =
+                "color-mix(in srgb, var(--color-primary-light) 20%, transparent)";
             }}
           >
             Switch to Live Database & AI
@@ -1545,8 +1811,18 @@ export default function CalendarDetail() {
         </div>
       )}
       <WorkspacePage size="wide">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <Link to="/my-calendars" className="cd-back">← Back to my calendars</Link>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <Link to="/my-calendars" className="cd-back">
+            ← Back to my calendars
+          </Link>
           <button
             type="button"
             className={`cd-fav-btn ${isFavorite ? "on" : ""}`}
@@ -1564,13 +1840,25 @@ export default function CalendarDetail() {
           <div className="cd-hero-main">
             <div className="cd-hero-kicker">Review workspace</div>
             <div className="cd-hero-title">Polish the week, then ship it.</div>
-            <p className="cd-hero-copy">Use the active-day card for edits, keep pinned posts protected, and move to schedule only when the calendar reads clean. The workflow is set up to help you review at a glance, not hunt for controls.</p>
+            <p className="cd-hero-copy">
+              Use the active-day card for edits, keep pinned posts protected, and move to schedule
+              only when the calendar reads clean. The workflow is set up to help you review at a
+              glance, not hunt for controls.
+            </p>
             <div className="cd-hero-chiprow">
-              {typeof window !== "undefined" && window.localStorage.getItem(getE2EAuthFlag()) === "true" && (() => {
-                const genCount = e2eStore.getLastGeneratedPosts ? e2eStore.getLastGeneratedPosts() : 0;
-                const visibleCount = genCount || posts.length;
-                return <span className="cd-hero-chip">{visibleCount > 1 ? `${visibleCount}-day calendar` : `1-day calendar`}</span>
-              })()}
+              {typeof window !== "undefined" &&
+                window.localStorage.getItem(getE2EAuthFlag()) === "true" &&
+                (() => {
+                  const genCount = e2eStore.getLastGeneratedPosts
+                    ? e2eStore.getLastGeneratedPosts()
+                    : 0;
+                  const visibleCount = genCount || posts.length;
+                  return (
+                    <span className="cd-hero-chip">
+                      {visibleCount > 1 ? `${visibleCount}-day calendar` : `1-day calendar`}
+                    </span>
+                  );
+                })()}
               <span className="cd-hero-chip">{posts.length} posts</span>
               <span className="cd-hero-chip">{lockedDays.size} pinned</span>
               <span className="cd-hero-chip">{timezone}</span>
@@ -1583,13 +1871,17 @@ export default function CalendarDetail() {
           <div className="cd-hero-side">
             <div className="cd-hero-card">
               <span>Active day</span>
-              <strong>Day {p?.day ?? 0} · {activeDowName}</strong>
+              <strong>
+                Day {p?.day ?? 0} · {activeDowName}
+              </strong>
               <small>{activeDate ? shortDateLabel(activeDate) : "No active post"}</small>
             </div>
             <div className="cd-hero-card">
               <span>Workflow</span>
               <strong>{sampleMode ? "Sample calendar" : "Live calendar"}</strong>
-              <small>{posts.length > 1 ? "Use the strip to jump between days" : "Single post review"}</small>
+              <small>
+                {posts.length > 1 ? "Use the strip to jump between days" : "Single post review"}
+              </small>
             </div>
           </div>
         </div>
@@ -1620,7 +1912,9 @@ export default function CalendarDetail() {
             </div>
             <div className="cd-stat">
               <span className="cd-stat-label">Top format</span>
-              <span className="cd-stat-val" style={{ fontSize: 14, lineHeight: 1.4 }}>{analytics.topFormat}</span>
+              <span className="cd-stat-val" style={{ fontSize: 14, lineHeight: 1.4 }}>
+                {analytics.topFormat}
+              </span>
               <span className="cd-stat-sub">most-used</span>
             </div>
           </div>
@@ -1629,17 +1923,32 @@ export default function CalendarDetail() {
         <div className="cd-toolbar-shell">
           <div className="cd-toolbar-card">
             <h2>Workspace controls</h2>
-            <p>Lock the week start, timezone, and tracking destination before you export or reformat. These settings stay attached to the calendar draft.</p>
+            <p>
+              Lock the week start, timezone, and tracking destination before you export or reformat.
+              These settings stay attached to the calendar draft.
+            </p>
             <div className="cd-toolbar-row">
               <span className="cd-reformat-label">Week starting</span>
               <input
                 type="date"
                 aria-label="Week start date"
                 value={weekStart}
-                onChange={e => updateWeekStart(e.target.value)}
-                style={{ background: "#faf8f4", border: "1px solid #d6d3d1", borderRadius: 6, padding: "6px 10px", fontSize: 12, color: "#1c1917", fontFamily: "var(--font-body)", outline: "none", colorScheme: "light" }}
+                onChange={(e) => updateWeekStart(e.target.value)}
+                style={{
+                  background: "var(--color-bg)",
+                  border: "1px solid var(--color-border-strong)",
+                  borderRadius: 6,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  color: "var(--color-text)",
+                  fontFamily: "var(--font-body)",
+                  outline: "none",
+                  colorScheme: "light",
+                }}
               />
-              <span style={{ fontSize: 11, color: "#5a5753" }}>Day 1 = {shortDateLabel(weekStartDate)}</span>
+              <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
+                Day 1 = {shortDateLabel(weekStartDate)}
+              </span>
             </div>
             <div className="cd-toolbar-row">
               <span className="cd-reformat-label">Timezone</span>
@@ -1647,27 +1956,36 @@ export default function CalendarDetail() {
                 className="cd-tz-sel"
                 aria-label="Calendar timezone"
                 value={timezone}
-                onChange={e => updateTimezone(e.target.value)}
+                onChange={(e) => updateTimezone(e.target.value)}
                 style={{ maxWidth: 240 }}
                 title={`Workspace default: ${profileTimezone || browserTimezone()}`}
               >
-                {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
+                {tzList.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tzLabel(tz)}
+                  </option>
+                ))}
               </select>
-              <span className="cd-reformat-label" style={{ marginLeft: 4 }}>Tracking URL</span>
+              <span className="cd-reformat-label" style={{ marginLeft: 4 }}>
+                Tracking URL
+              </span>
               <input
                 className="cd-tz-input"
                 type="url"
                 placeholder="https://yoursite.com/launch"
                 value={trackingUrl}
-                onChange={e => setTrackingUrl(e.target.value)}
-                onBlur={e => updateTrackingUrl(e.target.value.trim())}
+                onChange={(e) => setTrackingUrl(e.target.value)}
+                onBlur={(e) => updateTrackingUrl(e.target.value.trim())}
               />
             </div>
           </div>
 
           <div className="cd-toolbar-card">
             <h2>Reformat and export</h2>
-            <p>Use the quick actions below to generate alternate platform versions or export the calendar into the formats you need for handoff.</p>
+            <p>
+              Use the quick actions below to generate alternate platform versions or export the
+              calendar into the formats you need for handoff.
+            </p>
             <div className="cd-toolbar-row">
               <span className="cd-reformat-label">Reformat for</span>
               <select
@@ -1677,10 +1995,16 @@ export default function CalendarDetail() {
                 onChange={(e) => setReformatTarget(e.target.value)}
                 disabled={reformatting || regenerating}
               >
-                <option value="" disabled>Choose platform…</option>
-                {(["LinkedIn","Twitter/X","Instagram","Facebook","Newsletter","Blog"] as const)
-                  .filter(p => p !== platform)
-                  .map(p => <option key={p} value={p}>{p}</option>)}
+                <option value="" disabled>
+                  Choose platform…
+                </option>
+                {(["LinkedIn", "Twitter/X", "Instagram", "Facebook", "Newsletter", "Blog"] as const)
+                  .filter((p) => p !== platform)
+                  .map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
               </select>
               <button
                 type="button"
@@ -1694,7 +2018,11 @@ export default function CalendarDetail() {
               <button
                 type="button"
                 className="cd-reformat-btn"
-                style={{ background: "transparent", border: "1px solid #d6d3d1", color: "#c2410c" }}
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--color-border-strong)",
+                  color: "var(--color-primary)",
+                }}
                 onClick={() => setPersonaCompareOpen(true)}
                 title="Compare this post with another persona side-by-side"
               >
@@ -1703,13 +2031,29 @@ export default function CalendarDetail() {
             </div>
             <div className="cd-toolbar-row">
               <span className="cd-reformat-label">Export</span>
-              <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("md")}>
+              <button
+                type="button"
+                className="cd-export-btn"
+                disabled={!!exportingFormat}
+                onClick={() => handleExport("md")}
+              >
                 {exportingFormat === "md" ? "↓ .md…" : "↓ .md"}
               </button>
-              <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("pdf")}>
+              <button
+                type="button"
+                className="cd-export-btn"
+                disabled={!!exportingFormat}
+                onClick={() => handleExport("pdf")}
+              >
                 {exportingFormat === "pdf" ? "↓ .pdf…" : "↓ .pdf"}
               </button>
-              <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("ics")} title="Export to Google Calendar / Outlook / Apple Cal">
+              <button
+                type="button"
+                className="cd-export-btn"
+                disabled={!!exportingFormat}
+                onClick={() => handleExport("ics")}
+                title="Export to Google Calendar / Outlook / Apple Cal"
+              >
                 {exportingFormat === "ics" ? "📅 .ics…" : "📅 .ics"}
               </button>
             </div>
@@ -1719,11 +2063,22 @@ export default function CalendarDetail() {
         {posts.length > 1 && (
           <>
             <WeekBalanceScore posts={posts} />
-            <div className="cd-strip" role="tablist" aria-label="Days of the week" style={{ height: "auto", minHeight: "68px" }}>
+            <div
+              className="cd-strip"
+              role="tablist"
+              aria-label="Days of the week"
+              style={{ height: "auto", minHeight: "68px" }}
+            >
               {posts.map((post, i) => {
                 const st = statusByDay[post.day];
-                const dayDate = new Date(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate() + i);
-                const dayOfWeekName = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dayDate.getDay()];
+                const dayDate = new Date(
+                  weekStartDate.getFullYear(),
+                  weekStartDate.getMonth(),
+                  weekStartDate.getDate() + i
+                );
+                const dayOfWeekName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+                  dayDate.getDay()
+                ];
                 return (
                   <button
                     key={i}
@@ -1732,11 +2087,28 @@ export default function CalendarDetail() {
                     aria-selected={i === active}
                     disabled={editing}
                     className={`cd-tab ${i === active ? "on" : ""} ${lockedDays.has(post.day) ? "locked" : ""}`}
-                    onClick={() => { if (!editing) setActive(i); }}
+                    onClick={() => {
+                      if (!editing) setActive(i);
+                    }}
                     title={st ? `Status: ${st}` : "Not scheduled"}
                     style={{ paddingBottom: 6 }}
                   >
-                    {st && <span className={`cd-tab-status ${st}`} aria-hidden="true" style={{ background: st === "published" ? "#c2410c" : st === "approved" ? "#2563eb" : st === "failed" ? "#b91c1c" : "#a8a29e" }} />}
+                    {st && (
+                      <span
+                        className={`cd-tab-status ${st}`}
+                        aria-hidden="true"
+                        style={{
+                          background:
+                            st === "published"
+                              ? "var(--color-primary)"
+                              : st === "approved"
+                                ? "var(--color-status-approved)"
+                                : st === "failed"
+                                  ? "var(--color-error-text)"
+                                  : "var(--color-text-disabled)",
+                        }}
+                      />
+                    )}
                     <div className="cd-tab-dow">{dayOfWeekName}</div>
                     <div className="cd-tab-n">{i + 1}</div>
                     <div className="cd-tab-date">{shortDateLabel(dayDate).split(" · ")[1]}</div>
@@ -1774,63 +2146,78 @@ export default function CalendarDetail() {
         )}
 
         <div className="cd-export-row" aria-label="Export options">
-            <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("md")}>
-              {exportingFormat === "md" ? "↓ .md…" : "↓ .md"}
-            </button>
-            <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("pdf")}>
-              {exportingFormat === "pdf" ? "↓ .pdf…" : "↓ .pdf"}
-            </button>
-            <button type="button" className="cd-export-btn" disabled={!!exportingFormat} onClick={() => handleExport("ics")} title="Export to Google Calendar / Outlook / Apple Cal">
-              {exportingFormat === "ics" ? "📅 .ics…" : "📅 .ics"}
-            </button>
-          </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
-            <BufferScheduler posts={posts} platform={platform} postTimes={postTimes} />
-          </div>
-
+          <button
+            type="button"
+            className="cd-export-btn"
+            disabled={!!exportingFormat}
+            onClick={() => handleExport("md")}
+          >
+            {exportingFormat === "md" ? "↓ .md…" : "↓ .md"}
+          </button>
+          <button
+            type="button"
+            className="cd-export-btn"
+            disabled={!!exportingFormat}
+            onClick={() => handleExport("pdf")}
+          >
+            {exportingFormat === "pdf" ? "↓ .pdf…" : "↓ .pdf"}
+          </button>
+          <button
+            type="button"
+            className="cd-export-btn"
+            disabled={!!exportingFormat}
+            onClick={() => handleExport("ics")}
+            title="Export to Google Calendar / Outlook / Apple Cal"
+          >
+            {exportingFormat === "ics" ? "📅 .ics…" : "📅 .ics"}
+          </button>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
+          <BufferScheduler posts={posts} platform={platform} postTimes={postTimes} />
+        </div>
 
         <div className="cd-bulk-bar">
-            {posts.length > 1 ? (
-              <>
-                <span className="cd-bulk-label">
-                  Bulk actions · {posts.length - lockedDays.size} unlocked / {lockedDays.size} pinned
-                </span>
-                <button
-                  type="button"
-                  className="cd-bulk-btn"
-                  onClick={regenerateAllUnlocked}
-                  disabled={bulkRegenerating || regenerating || reformatting || editing}
-                  title="Re-rolls every unpinned post with the same constraints"
-                >
-                  {bulkRegenerating
-                    ? `↻ Regenerating ${bulkProgress?.done ?? 0}/${bulkProgress?.total ?? 0}…`
-                    : `↻ Regenerate all unlocked`}
-                </button>
-                <button
-                  type="button"
-                  className="cd-bulk-btn primary"
-                  onClick={() => setScheduleOpen(true)}
-                  disabled={bulkRegenerating || regenerating || editing}
-                  title="Queue all posts at the times shown"
-                >
-                  📅 Schedule week →
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="cd-bulk-label">Single-day post</span>
-                <button
-                  type="button"
-                  className="cd-bulk-btn primary"
-                  onClick={() => setScheduleOpen(true)}
-                  disabled={bulkRegenerating || regenerating || editing}
-                  title="Schedule this post"
-                >
-                  📅 Schedule this post →
-                </button>
-              </>
-            )}
-          </div>
+          {posts.length > 1 ? (
+            <>
+              <span className="cd-bulk-label">
+                Bulk actions · {posts.length - lockedDays.size} unlocked / {lockedDays.size} pinned
+              </span>
+              <button
+                type="button"
+                className="cd-bulk-btn"
+                onClick={regenerateAllUnlocked}
+                disabled={bulkRegenerating || regenerating || reformatting || editing}
+                title="Re-rolls every unpinned post with the same constraints"
+              >
+                {bulkRegenerating
+                  ? `↻ Regenerating ${bulkProgress?.done ?? 0}/${bulkProgress?.total ?? 0}…`
+                  : `↻ Regenerate all unlocked`}
+              </button>
+              <button
+                type="button"
+                className="cd-bulk-btn primary"
+                onClick={() => setScheduleOpen(true)}
+                disabled={bulkRegenerating || regenerating || editing}
+                title="Queue all posts at the times shown"
+              >
+                📅 Schedule week →
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="cd-bulk-label">Single-day post</span>
+              <button
+                type="button"
+                className="cd-bulk-btn primary"
+                onClick={() => setScheduleOpen(true)}
+                disabled={bulkRegenerating || regenerating || editing}
+                title="Schedule this post"
+              >
+                📅 Schedule this post →
+              </button>
+            </>
+          )}
+        </div>
 
         <AnimatePresence mode="wait">
           {p && !editing && (
@@ -1842,14 +2229,34 @@ export default function CalendarDetail() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ type: "spring", bounce: 0, duration: 0.3 }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  marginBottom: 4,
+                }}
+              >
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                  <span className="cd-date-pill">{activeDate ? shortDateLabel(activeDate) : ""}</span>
-                  <span className="ptag pt-topic" style={{ fontSize: 11 }}>{p.topic}</span>
+                  <span className="cd-date-pill">
+                    {activeDate ? shortDateLabel(activeDate) : ""}
+                  </span>
+                  <span className="ptag pt-topic" style={{ fontSize: 11 }}>
+                    {p.topic}
+                  </span>
                   <TopicGapBadge
                     topic={p.topic}
                     rationale={p.rationale}
-                    isInferred={isEnabled("topicGapIndicator") && (!formPayload.topics || !formPayload.topics.some((t: string) => t && t.trim().toLowerCase() === p.topic.trim().toLowerCase()))}
+                    isInferred={
+                      isEnabled("topicGapIndicator") &&
+                      (!formPayload.topics ||
+                        !formPayload.topics.some(
+                          (t: string) =>
+                            t && t.trim().toLowerCase() === p.topic.trim().toLowerCase()
+                        ))
+                    }
                   />
                 </div>
                 <button
@@ -1869,85 +2276,160 @@ export default function CalendarDetail() {
                   className="cd-time-input"
                   aria-label={`Post time for day ${p.day}`}
                   value={postTimes[String(p.day)] || suggestedTimeForDay(p.day, platform)}
-                  onChange={e => updatePostTime(p.day, e.target.value)}
+                  onChange={(e) => updatePostTime(p.day, e.target.value)}
                 />
               </div>
-              <div className="cd-ptitle" style={{ marginTop: 14 }}>{p.title}</div>
-              <div className="cd-blabel"><span>Hook</span></div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <div className="cd-hook" style={{ flex: 1 }}>{p.hook}</div>
+              <div className="cd-ptitle" style={{ marginTop: 14 }}>
+                {p.title}
+              </div>
+              <div className="cd-blabel">
+                <span>Hook</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <div className="cd-hook" style={{ flex: 1 }}>
+                  {p.hook}
+                </div>
                 {p.hook_options && p.hook_options.length > 1 && (
                   <select
                     className="cd-reformat-sel"
                     value={p.hook}
-                    onChange={e => selectHookVariant(p.day, e.target.value)}
+                    onChange={(e) => selectHookVariant(p.day, e.target.value)}
                     aria-label={`Choose hook variant for day ${p.day}`}
                   >
                     {p.hook_options.map((h, i) => (
-                      <option key={i} value={h}>{h.length > 60 ? `${h.slice(0, 60)}…` : h}</option>
+                      <option key={i} value={h}>
+                        {h.length > 60 ? `${h.slice(0, 60)}…` : h}
+                      </option>
                     ))}
                   </select>
                 )}
               </div>
-              <div className="cd-blabel"><span>Post body</span></div>
+              <div className="cd-blabel">
+                <span>Post body</span>
+              </div>
               <div className="cd-body">{stripMarkdown(p.body)}</div>
-              <div className="cd-blabel"><span>CTA</span></div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <div className="cd-cta" style={{ flex: 1 }}>{p.cta}</div>
+              <div className="cd-blabel">
+                <span>CTA</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div className="cd-cta" style={{ flex: 1 }}>
+                  {p.cta}
+                </div>
                 {p.cta_options && p.cta_options.length > 1 && (
                   <select
                     className="cd-reformat-sel"
                     value={p.cta}
-                    onChange={e => selectCtaVariant(p.day, e.target.value)}
+                    onChange={(e) => selectCtaVariant(p.day, e.target.value)}
                     aria-label={`Choose CTA variant for day ${p.day}`}
                   >
                     {p.cta_options.map((c, i) => (
-                      <option key={i} value={c}>{c.length > 60 ? `${c.slice(0, 60)}…` : c}</option>
+                      <option key={i} value={c}>
+                        {c.length > 60 ? `${c.slice(0, 60)}…` : c}
+                      </option>
                     ))}
                   </select>
                 )}
               </div>
 
               {/* ── Tone Slider (Feature 6) ─────────────────────────────────── */}
-              <div style={{ marginTop: 14, padding: "12px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <span style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--text2)", fontWeight: 500 }}>Tone</span>
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: "12px 14px",
+                  background: "color-mix(in srgb, var(--color-surface) 2%, transparent)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 10,
+                      letterSpacing: ".14em",
+                      textTransform: "uppercase",
+                      color: "var(--text2)",
+                      fontWeight: 500,
+                    }}
+                  >
+                    Tone
+                  </span>
                   <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 500 }}>
-                    {(toneLevel[p.day] ?? 3) === 1 ? "Very Formal" : (toneLevel[p.day] ?? 3) === 2 ? "Formal" : (toneLevel[p.day] ?? 3) === 3 ? "Balanced" : (toneLevel[p.day] ?? 3) === 4 ? "Casual" : "Very Casual"}
+                    {(toneLevel[p.day] ?? 3) === 1
+                      ? "Very Formal"
+                      : (toneLevel[p.day] ?? 3) === 2
+                        ? "Formal"
+                        : (toneLevel[p.day] ?? 3) === 3
+                          ? "Balanced"
+                          : (toneLevel[p.day] ?? 3) === 4
+                            ? "Casual"
+                            : "Very Casual"}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 10, color: "var(--text3)" }}>Formal</span>
                   <input
-                    type="range" min="1" max="5" step="1"
+                    type="range"
+                    min="1"
+                    max="5"
+                    step="1"
                     aria-label="Tone, from formal to casual"
                     disabled={regenerating}
                     value={toneLevel[p.day] ?? 3}
-                    onChange={e => {
+                    onChange={(e) => {
                       const v = Number(e.target.value);
-                      setToneLevel(prev => ({ ...prev, [p.day]: v }));
+                      setToneLevel((prev) => ({ ...prev, [p.day]: v }));
                       if (toneDebounce.current) clearTimeout(toneDebounce.current);
                       toneDebounce.current = setTimeout(() => {
                         if (v !== 3) {
-                          const toneLabel = v === 1 ? "very-formal" : v === 2 ? "formal" : v === 4 ? "casual" : "very-casual";
+                          const toneLabel =
+                            v === 1
+                              ? "very-formal"
+                              : v === 2
+                                ? "formal"
+                                : v === 4
+                                  ? "casual"
+                                  : "very-casual";
                           void regenerateDay(`tone-${toneLabel}` as any);
                         }
                       }, 700);
                     }}
-                    style={{ flex: 1, accentColor: "var(--accent)", cursor: regenerating ? "not-allowed" : "pointer" }}
+                    style={{
+                      flex: 1,
+                      accentColor: "var(--accent)",
+                      cursor: regenerating ? "not-allowed" : "pointer",
+                    }}
                   />
                   <span style={{ fontSize: 10, color: "var(--text3)" }}>Casual</span>
                 </div>
-                <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 5, fontStyle: "italic" }}>Adjusts register only — content and structure stay the same</div>
+                <div
+                  style={{ fontSize: 10, color: "var(--text3)", marginTop: 5, fontStyle: "italic" }}
+                >
+                  Adjusts register only — content and structure stay the same
+                </div>
               </div>
 
-              <div className="cd-blabel"><span>Hashtags</span><span className="cd-blabel-count">click a tag to lock, ban, or replace</span></div>
+              <div className="cd-blabel">
+                <span>Hashtags</span>
+                <span className="cd-blabel-count">click a tag to lock, ban, or replace</span>
+              </div>
               <div className="cd-tags-row">
                 {(() => {
                   const tags = parseHashtagsString(p.hashtags);
                   const locks = lockedHashtags[String(p.day)] || [];
-                  if (tags.length === 0) return <span className="cd-tags" style={{ color: "#5a5753" }}>— none —</span>;
-                  return tags.map(t => {
+                  if (tags.length === 0)
+                    return (
+                      <span className="cd-tags" style={{ color: "var(--color-text-secondary)" }}>
+                        — none —
+                      </span>
+                    );
+                  return tags.map((t) => {
                     const isLocked = locks.includes(t);
                     const overridesBan = isLocked && profilePolicy.banned.includes(t);
                     const open = tagPopover && tagPopover.day === p.day && tagPopover.tag === t;
@@ -1956,13 +2438,20 @@ export default function CalendarDetail() {
                         <button
                           type="button"
                           className={`cd-tag-chip ${isLocked ? "locked" : ""}`}
-                          onClick={() => { setTagPopover(open ? null : { day: p.day, tag: t }); setTagReplacement(""); }}
+                          onClick={() => {
+                            setTagPopover(open ? null : { day: p.day, tag: t });
+                            setTagReplacement("");
+                          }}
                           title={isLocked ? "Pinned — survives regenerates" : "Click for actions"}
                         >
-                          {isLocked ? "📌 " : ""}{displayTag(t)}
+                          {isLocked ? "📌 " : ""}
+                          {displayTag(t)}
                         </button>
                         {overridesBan && (
-                          <span className="cd-tag-policy-warn" title="Locked tag overrides the workspace ban list">
+                          <span
+                            className="cd-tag-policy-warn"
+                            title="Locked tag overrides the workspace ban list"
+                          >
                             overrides ban
                           </span>
                         )}
@@ -1970,23 +2459,55 @@ export default function CalendarDetail() {
                           <div className="cd-tag-pop" style={{ top: "calc(100% + 4px)", left: 0 }}>
                             <div className="cd-tag-pop-h">{displayTag(t)}</div>
                             {isLocked ? (
-                              <button className="cd-tag-pop-btn" onClick={() => unlockTagOnPost(p.day, t)}>📍 Unpin</button>
+                              <button
+                                className="cd-tag-pop-btn"
+                                onClick={() => unlockTagOnPost(p.day, t)}
+                              >
+                                📍 Unpin
+                              </button>
                             ) : (
-                              <button className="cd-tag-pop-btn" onClick={() => lockTagOnPost(p.day, t)}>📌 Lock on this post</button>
+                              <button
+                                className="cd-tag-pop-btn"
+                                onClick={() => lockTagOnPost(p.day, t)}
+                              >
+                                📌 Lock on this post
+                              </button>
                             )}
-                            <button className="cd-tag-pop-btn danger" onClick={() => banTagWorkspaceWide(p.day, t)}>✕ Ban workspace-wide</button>
+                            <button
+                              className="cd-tag-pop-btn danger"
+                              onClick={() => banTagWorkspaceWide(p.day, t)}
+                            >
+                              ✕ Ban workspace-wide
+                            </button>
                             <div className="cd-tag-pop-row">
                               <input
                                 className="cd-tag-pop-input"
                                 placeholder="replace with…"
                                 value={tagReplacement}
-                                onChange={e => setTagReplacement(e.target.value)}
-                                onKeyDown={e => e.key === "Enter" && replaceTagOnPost(p.day, t, tagReplacement)}
+                                onChange={(e) => setTagReplacement(e.target.value)}
+                                onKeyDown={(e) =>
+                                  e.key === "Enter" && replaceTagOnPost(p.day, t, tagReplacement)
+                                }
                                 autoFocus
                               />
-                              <button className="cd-tag-pop-btn" style={{ flex: "0 0 auto" }} onClick={() => replaceTagOnPost(p.day, t, tagReplacement)}>↻</button>
+                              <button
+                                className="cd-tag-pop-btn"
+                                style={{ flex: "0 0 auto" }}
+                                onClick={() => replaceTagOnPost(p.day, t, tagReplacement)}
+                              >
+                                ↻
+                              </button>
                             </div>
-                            <button className="cd-tag-pop-btn" onClick={() => setTagPopover(null)} style={{ borderColor: "transparent", color: "#5a5753" }}>Close</button>
+                            <button
+                              className="cd-tag-pop-btn"
+                              onClick={() => setTagPopover(null)}
+                              style={{
+                                borderColor: "transparent",
+                                color: "var(--color-text-secondary)",
+                              }}
+                            >
+                              Close
+                            </button>
                           </div>
                         )}
                       </span>
@@ -1994,30 +2515,34 @@ export default function CalendarDetail() {
                   });
                 })()}
               </div>
-              <div className="cd-blabel"><span>Cinematic image prompt</span></div>
-              <div className="cd-body" style={{ whiteSpace: "pre-wrap" }}>{p.image_prompt || "No image prompt generated yet."}</div>
+              <div className="cd-blabel">
+                <span>Cinematic image prompt</span>
+              </div>
+              <div className="cd-body" style={{ whiteSpace: "pre-wrap" }}>
+                {p.image_prompt || "No image prompt generated yet."}
+              </div>
               {p.image_url && (
-                <div 
-                  className="cd-image-preview" 
-                  style={{ 
+                <div
+                  className="cd-image-preview"
+                  style={{
                     aspectRatio: cssAspectRatioForPlatform(platform),
-                    display: "flex", 
-                    alignItems: "center", 
+                    display: "flex",
+                    alignItems: "center",
                     justifyContent: "center",
                     overflow: "hidden",
                     borderRadius: 10,
                     border: "1px solid var(--border)",
-                    backgroundColor: "rgba(0,0,0,0.2)"
+                    backgroundColor: "color-mix(in srgb, var(--color-text) 20%, transparent)",
                   }}
                 >
-                  <img 
-                    src={p.image_url} 
-                    alt={`Generated visual for day ${p.day}`} 
-                    style={{ 
-                      width: "100%", 
-                      height: "100%", 
-                      objectFit: "cover" 
-                    }} 
+                  <img
+                    src={p.image_url}
+                    alt={`Generated visual for day ${p.day}`}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
                   />
                 </div>
               )}
@@ -2026,9 +2551,17 @@ export default function CalendarDetail() {
                   className="cd-btn"
                   disabled={regenerating || imageGeneratingDay === p.day || !p.image_prompt}
                   onClick={() => generateVisualForPost(p)}
-                  title={!p.image_prompt ? "This post needs an image prompt first" : `Generate a ${aspectRatioForPlatform(platform)} visual`}
+                  title={
+                    !p.image_prompt
+                      ? "This post needs an image prompt first"
+                      : `Generate a ${aspectRatioForPlatform(platform)} visual`
+                  }
                 >
-                  {imageGeneratingDay === p.day ? "Generating visual..." : p.image_url ? "Regenerate visual" : "Generate visual"}
+                  {imageGeneratingDay === p.day
+                    ? "Generating visual..."
+                    : p.image_url
+                      ? "Regenerate visual"
+                      : "Generate visual"}
                 </button>
                 <button
                   type="button"
@@ -2054,12 +2587,11 @@ export default function CalendarDetail() {
                     </button>
                     <button
                       className="cd-btn"
-                      style={{ borderColor: "rgba(185,28,28,0.3)", color: "#b91c1c" }}
-                      onClick={() => {
-                        if (confirm("Are you sure you want to remove this visual?")) {
-                          applyImageToPost(p.day, "");
-                        }
+                      style={{
+                        borderColor: "color-mix(in srgb, var(--color-error-text) 30%, transparent)",
+                        color: "var(--color-error-text)",
                       }}
+                      onClick={() => setPendingRemoveVisual(p.day)}
                     >
                       Remove visual
                     </button>
@@ -2069,20 +2601,45 @@ export default function CalendarDetail() {
 
               {/* ── Collapsible Image URL Paste (Feature 2) ────────────────── */}
               {pasteImageOpenDay === p.day && (
-                <div style={{ marginTop: 10, padding: "12px 14px", background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(200,240,154,0.2)", borderRadius: 10 }}>
-                  <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--text2)", fontWeight: 500, marginBottom: 8 }}>Paste Your Own Image URL</div>
+                <div
+                  style={{
+                    marginTop: 10,
+                    padding: "12px 14px",
+                    background: "color-mix(in srgb, var(--color-surface) 2%, transparent)",
+                    border: "1px dashed rgba(200,240,154,0.2)",
+                    borderRadius: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 10,
+                      letterSpacing: ".14em",
+                      textTransform: "uppercase",
+                      color: "var(--text2)",
+                      fontWeight: 500,
+                      marginBottom: 8,
+                    }}
+                  >
+                    Paste Your Own Image URL
+                  </div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <input
                       type="url"
                       value={pasteImageUrl}
-                      onChange={e => setPasteImageUrl(e.target.value)}
+                      onChange={(e) => setPasteImageUrl(e.target.value)}
                       placeholder="https://your-image-url.com/image.jpg"
                       style={{
-                        flex: 1, background: "var(--bg)", border: "1px solid var(--border2)",
-                        borderRadius: 6, padding: "7px 10px", fontSize: 12, color: "var(--text)",
-                        fontFamily: "var(--font-body)", outline: "none",
+                        flex: 1,
+                        background: "var(--bg)",
+                        border: "1px solid var(--border2)",
+                        borderRadius: 6,
+                        padding: "7px 10px",
+                        fontSize: 12,
+                        color: "var(--text)",
+                        fontFamily: "var(--font-body)",
+                        outline: "none",
                       }}
-                      onKeyDown={async e => {
+                      onKeyDown={async (e) => {
                         if (e.key === "Enter" && pasteImageUrl.startsWith("http")) {
                           await applyImageToPost(p.day, pasteImageUrl);
                           setPasteImageOpenDay(null);
@@ -2105,28 +2662,44 @@ export default function CalendarDetail() {
                     </button>
                   </div>
                   {pasteImageUrl.startsWith("http") && (
-                    <div 
-                      style={{ 
-                        marginTop: 10, 
-                        borderRadius: 8, 
-                        overflow: "hidden", 
+                    <div
+                      style={{
+                        marginTop: 10,
+                        borderRadius: 8,
+                        overflow: "hidden",
                         border: "1px solid var(--border)",
                         aspectRatio: cssAspectRatioForPlatform(platform),
-                        backgroundColor: "rgba(0,0,0,0.2)",
+                        backgroundColor: "color-mix(in srgb, var(--color-text) 20%, transparent)",
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center"
+                        justifyContent: "center",
                       }}
                     >
                       <img
                         src={pasteImageUrl}
                         alt="Preview"
-                        style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }}
-                        onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
                       />
                     </div>
                   )}
-                  <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 6, fontStyle: "italic" }}>Paste a direct image URL (JPG, PNG, WebP). Press Enter or click Apply.</div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "var(--text3)",
+                      marginTop: 6,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    Paste a direct image URL (JPG, PNG, WebP). Press Enter or click Apply.
+                  </div>
                 </div>
               )}
               <div className="cd-actions">
@@ -2143,39 +2716,63 @@ export default function CalendarDetail() {
                         aria-label={`${f.charCount} of ${f.limit} characters used for ${niceLabel}`}
                       >
                         <span className="cd-budget-dot" aria-hidden="true" />
-                        {f.charCount.toLocaleString()} / {f.limit.toLocaleString()} ({Math.round(ratio * 100)}%)
+                        {f.charCount.toLocaleString()} / {f.limit.toLocaleString()} (
+                        {Math.round(ratio * 100)}%)
                       </span>
                       {(() => {
                         const ins = insightFor(p, platform);
-                        const tagCls = ins.hashtagState === "sweet" ? "good" : ins.hashtagState === "na" ? "" : ins.hashtagState === "dense" ? "bad" : "warn";
-                        const healthCls = ins.health === "good" ? "good" : ins.health === "warn" ? "warn" : "bad";
-                        const healthLabel = ins.health === "good" ? "✓ ready" : ins.health === "warn" ? "⚠ review" : "✕ Fix hashtags";
-                        const healthTooltip = ins.health === "good"
-                          ? "Post length and hashtag density are within recommended ranges."
-                          : ins.health === "warn"
-                            ? "Warning: Post has suboptimal length or hashtag density."
-                            : "Hashtag density exceeds recommended limit or contains banned hashtags. Please edit to fix.";
+                        const tagCls =
+                          ins.hashtagState === "sweet"
+                            ? "good"
+                            : ins.hashtagState === "na"
+                              ? ""
+                              : ins.hashtagState === "dense"
+                                ? "bad"
+                                : "warn";
+                        const healthCls =
+                          ins.health === "good" ? "good" : ins.health === "warn" ? "warn" : "bad";
+                        const healthLabel =
+                          ins.health === "good"
+                            ? "✓ ready"
+                            : ins.health === "warn"
+                              ? "⚠ review"
+                              : "✕ Fix hashtags";
+                        const healthTooltip =
+                          ins.health === "good"
+                            ? "Post length and hashtag density are within recommended ranges."
+                            : ins.health === "warn"
+                              ? "Warning: Post has suboptimal length or hashtag density."
+                              : "Hashtag density exceeds recommended limit or contains banned hashtags. Please edit to fix.";
                         return (
                           <>
-                            <span className={`cd-chip ${tagCls}`} title={`Hashtag density for ${niceLabel}`}>
+                            <span
+                              className={`cd-chip ${tagCls}`}
+                              title={`Hashtag density for ${niceLabel}`}
+                            >
                               # {ins.hashtagLabel}
                             </span>
                             <span className={`cd-chip ${healthCls}`} title={healthTooltip}>
                               {healthLabel}
                             </span>
-                            {p.variant_scores && p.chosen_index !== undefined && p.variant_scores[p.chosen_index] && (() => {
-                              const s = p.variant_scores[p.chosen_index];
-                              const avg = calculateScore(s);
-                              const scoreCls = avg >= 4.5 ? "good" : avg >= 3.5 ? "warn" : "bad";
-                              const breakdown = Object.entries(s)
-                                .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}/5`)
-                                .join("\n");
-                              return (
-                                <span className={`cd-chip ${scoreCls}`} title={`AI Quality Score (LLM-as-judge)\n\n${breakdown}\n\nSelected from ${p.variant_scores.length} variants.`}>
-                                  ✨ {avg}/5.0
-                                </span>
-                              );
-                            })()}
+                            {p.variant_scores &&
+                              p.chosen_index !== undefined &&
+                              p.variant_scores[p.chosen_index] &&
+                              (() => {
+                                const s = p.variant_scores[p.chosen_index];
+                                const avg = calculateScore(s);
+                                const scoreCls = avg >= 4.5 ? "good" : avg >= 3.5 ? "warn" : "bad";
+                                const breakdown = Object.entries(s)
+                                  .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}/5`)
+                                  .join("\n");
+                                return (
+                                  <span
+                                    className={`cd-chip ${scoreCls}`}
+                                    title={`AI Quality Score (LLM-as-judge)\n\n${breakdown}\n\nSelected from ${p.variant_scores.length} variants.`}
+                                  >
+                                    ✨ {avg}/5.0
+                                  </span>
+                                );
+                              })()}
                           </>
                         );
                       })()}
@@ -2185,7 +2782,10 @@ export default function CalendarDetail() {
                         title={`${f.charCount} / ${f.limit} chars`}
                         onClick={async () => {
                           const ok = await writeToClipboard(f.text);
-                          if (!ok) { toast.error("Could not copy to clipboard"); return; }
+                          if (!ok) {
+                            toast.error("Could not copy to clipboard");
+                            return;
+                          }
                           if (f.truncated && f.platform === "twitter") {
                             toast.error("Trimmed to fit X's 280-char limit");
                           } else {
@@ -2198,7 +2798,9 @@ export default function CalendarDetail() {
                     </>
                   );
                 })()}
-                <button className="cd-btn" onClick={startEdit} disabled={regenerating}>Edit this post</button>
+                <button className="cd-btn" onClick={startEdit} disabled={regenerating}>
+                  Edit this post
+                </button>
                 <button
                   className="cd-btn"
                   onClick={() => regenerateDay()}
@@ -2219,7 +2821,7 @@ export default function CalendarDetail() {
                   <button
                     className="cd-btn"
                     disabled={regenerating || repurposing}
-                    onClick={() => setRepurposeOpen(o => !o)}
+                    onClick={() => setRepurposeOpen((o) => !o)}
                     aria-haspopup="menu"
                     aria-expanded={repurposeOpen}
                   >
@@ -2227,11 +2829,21 @@ export default function CalendarDetail() {
                   </button>
                   {repurposeOpen && (
                     <div className="cd-tweak-menu" role="menu">
-                      <button className="cd-tweak-opt" onClick={() => repurposeTo("X")}>Repurpose for X (Twitter)</button>
-                      <button className="cd-tweak-opt" onClick={() => repurposeTo("Instagram")}>Repurpose for Instagram</button>
-                      <button className="cd-tweak-opt" onClick={() => repurposeTo("Facebook")}>Repurpose for Facebook</button>
-                      <button className="cd-tweak-opt" onClick={() => repurposeTo("LinkedIn")}>Repurpose for LinkedIn</button>
-                      <button className="cd-tweak-opt" onClick={() => repurposeTo("Newsletter")}>Repurpose for Newsletter</button>
+                      <button className="cd-tweak-opt" onClick={() => repurposeTo("X")}>
+                        Repurpose for X (Twitter)
+                      </button>
+                      <button className="cd-tweak-opt" onClick={() => repurposeTo("Instagram")}>
+                        Repurpose for Instagram
+                      </button>
+                      <button className="cd-tweak-opt" onClick={() => repurposeTo("Facebook")}>
+                        Repurpose for Facebook
+                      </button>
+                      <button className="cd-tweak-opt" onClick={() => repurposeTo("LinkedIn")}>
+                        Repurpose for LinkedIn
+                      </button>
+                      <button className="cd-tweak-opt" onClick={() => repurposeTo("Newsletter")}>
+                        Repurpose for Newsletter
+                      </button>
                     </div>
                   )}
                 </div>
@@ -2240,7 +2852,7 @@ export default function CalendarDetail() {
                   <button
                     className="cd-btn"
                     disabled={regenerating}
-                    onClick={() => setTweakOpen(o => !o)}
+                    onClick={() => setTweakOpen((o) => !o)}
                     aria-haspopup="menu"
                     aria-expanded={tweakOpen}
                   >
@@ -2248,14 +2860,37 @@ export default function CalendarDetail() {
                   </button>
                   {tweakOpen && (
                     <div className="cd-tweak-menu" role="menu">
-                      <button className="cd-tweak-opt" onClick={() => regenerateDay("shorter")}>Make shorter</button>
-                      <button className="cd-tweak-opt" onClick={() => regenerateDay("punchier")}>Make punchier</button>
-                      <button className="cd-tweak-opt" onClick={() => regenerateDay("add-stat")}>Add a stat</button>
-                      <button className="cd-tweak-opt" onClick={() => regenerateDay("remove-emoji")}>Remove emoji</button>
-                      <button className="cd-tweak-opt" onClick={() => regenerateDay("enhance")}>Enhance for performance</button>
+                      <button className="cd-tweak-opt" onClick={() => regenerateDay("shorter")}>
+                        Make shorter
+                      </button>
+                      <button className="cd-tweak-opt" onClick={() => regenerateDay("punchier")}>
+                        Make punchier
+                      </button>
+                      <button className="cd-tweak-opt" onClick={() => regenerateDay("add-stat")}>
+                        Add a stat
+                      </button>
+                      <button
+                        className="cd-tweak-opt"
+                        onClick={() => regenerateDay("remove-emoji")}
+                      >
+                        Remove emoji
+                      </button>
+                      <button className="cd-tweak-opt" onClick={() => regenerateDay("enhance")}>
+                        Enhance for performance
+                      </button>
                       {(() => {
                         const t = posts[active];
-                        const hasE = t ? hasEmoji((t.title || "") + " " + (t.hook || "") + " " + (t.body || "") + " " + (t.cta || "")) : false;
+                        const hasE = t
+                          ? hasEmoji(
+                              (t.title || "") +
+                                " " +
+                                (t.hook || "") +
+                                " " +
+                                (t.body || "") +
+                                " " +
+                                (t.cta || "")
+                            )
+                          : false;
                         return (
                           <button
                             className="cd-tweak-opt"
@@ -2267,8 +2902,18 @@ export default function CalendarDetail() {
                           </button>
                         );
                       })()}
-                      <button className="cd-tweak-opt" onClick={() => regenerateDay("clean-formatting")}>Clean formatting symbols</button>
-                      <button className="cd-tweak-opt" onClick={() => regenerateDay("more-personal")}>More personal</button>
+                      <button
+                        className="cd-tweak-opt"
+                        onClick={() => regenerateDay("clean-formatting")}
+                      >
+                        Clean formatting symbols
+                      </button>
+                      <button
+                        className="cd-tweak-opt"
+                        onClick={() => regenerateDay("more-personal")}
+                      >
+                        More personal
+                      </button>
                     </div>
                   )}
                 </div>
@@ -2285,56 +2930,148 @@ export default function CalendarDetail() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ type: "spring", bounce: 0, duration: 0.3 }}
             >
-              <div className="cd-blabel"><span>Day · Day-of-week</span></div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+              <div className="cd-blabel">
+                <span>Day · Day-of-week</span>
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 10,
+                  marginBottom: 10,
+                }}
+              >
                 <input
                   className="cd-edit-input"
                   type="number"
                   min={1}
                   max={7}
                   value={draft.day}
-                  onChange={e => setDraft({ ...draft, day: Number(e.target.value) || draft.day })}
+                  onChange={(e) => setDraft({ ...draft, day: Number(e.target.value) || draft.day })}
                   style={{ marginBottom: 0, fontFamily: "var(--font-body)", fontSize: 13 }}
                 />
                 <select
                   className="cd-edit-input"
                   value={draft.dow}
-                  onChange={e => setDraft({ ...draft, dow: e.target.value })}
-                  style={{ marginBottom: 0, fontFamily: "var(--font-body)", fontSize: 13, appearance: "auto" }}
+                  onChange={(e) => setDraft({ ...draft, dow: e.target.value })}
+                  style={{
+                    marginBottom: 0,
+                    fontFamily: "var(--font-body)",
+                    fontSize: 13,
+                    appearance: "auto",
+                  }}
                 >
-                  {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => <option key={d} value={d}>{d}</option>)}
+                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div className="cd-blabel">
                 <span>Topic</span>
                 {fieldHistory[draft.day]?.["topic"]?.length > 0 && (
-                  <button type="button" onClick={() => undoField("topic")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                  <button
+                    type="button"
+                    onClick={() => undoField("topic")}
+                    style={{
+                      marginLeft: 8,
+                      fontSize: "11px",
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    ↩ Restore previous
+                  </button>
                 )}
               </div>
-              <input className="cd-edit-input" style={{ fontFamily: "var(--font-body)", fontSize: 13 }} value={draft.topic} onChange={e => setDraft({ ...draft, topic: e.target.value })} />
+              <input
+                className="cd-edit-input"
+                style={{ fontFamily: "var(--font-body)", fontSize: 13 }}
+                value={draft.topic}
+                onChange={(e) => setDraft({ ...draft, topic: e.target.value })}
+              />
 
               <div className="cd-blabel">
                 <span>Format</span>
                 {fieldHistory[draft.day]?.["format"]?.length > 0 && (
-                  <button type="button" onClick={() => undoField("format")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                  <button
+                    type="button"
+                    onClick={() => undoField("format")}
+                    style={{
+                      marginLeft: 8,
+                      fontSize: "11px",
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    ↩ Restore previous
+                  </button>
                 )}
               </div>
-              <input className="cd-edit-input" style={{ fontFamily: "var(--font-body)", fontSize: 13 }} value={draft.format} onChange={e => setDraft({ ...draft, format: e.target.value })} />
+              <input
+                className="cd-edit-input"
+                style={{ fontFamily: "var(--font-body)", fontSize: 13 }}
+                value={draft.format}
+                onChange={(e) => setDraft({ ...draft, format: e.target.value })}
+              />
 
               <div className="cd-blabel">
                 <span>Title</span>
                 {fieldHistory[draft.day]?.["title"]?.length > 0 && (
-                  <button type="button" onClick={() => undoField("title")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                  <button
+                    type="button"
+                    onClick={() => undoField("title")}
+                    style={{
+                      marginLeft: 8,
+                      fontSize: "11px",
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    ↩ Restore previous
+                  </button>
                 )}
                 <span className="cd-blabel-count">{titleChars} chars</span>
               </div>
-              <input className="cd-edit-input" value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} />
+              <input
+                className="cd-edit-input"
+                value={draft.title}
+                onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+              />
 
               <div className="cd-blabel">
                 <span>Hook</span>
                 {fieldHistory[draft.day]?.["hook"]?.length > 0 && (
-                  <button type="button" onClick={() => undoField("hook")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                  <button
+                    type="button"
+                    onClick={() => undoField("hook")}
+                    style={{
+                      marginLeft: 8,
+                      fontSize: "11px",
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    ↩ Restore previous
+                  </button>
                 )}
                 <span className="cd-blabel-count">{hookWords} words</span>
               </div>
@@ -2342,45 +3079,115 @@ export default function CalendarDetail() {
                 className="cd-edit-area"
                 rows={3}
                 value={draft.hook}
-                onChange={e => setDraft({ ...draft, hook: e.target.value })}
-                onSelect={e => rememberInlineSelection("hook", e.currentTarget)}
+                onChange={(e) => setDraft({ ...draft, hook: e.target.value })}
+                onSelect={(e) => rememberInlineSelection("hook", e.currentTarget)}
               />
 
               <div className="cd-blabel">
                 <span>Post body</span>
                 {fieldHistory[draft.day]?.["body"]?.length > 0 && (
-                  <button type="button" onClick={() => undoField("body")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                  <button
+                    type="button"
+                    onClick={() => undoField("body")}
+                    style={{
+                      marginLeft: 8,
+                      fontSize: "11px",
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    ↩ Restore previous
+                  </button>
                 )}
-                <span className="cd-blabel-count">{bodyWords} words · {targetHint}</span>
+                <span className="cd-blabel-count">
+                  {bodyWords} words · {targetHint}
+                </span>
               </div>
               <textarea
                 className="cd-edit-area"
                 rows={10}
                 value={draft.body}
-                onChange={e => setDraft({ ...draft, body: e.target.value })}
-                onSelect={e => rememberInlineSelection("body", e.currentTarget)}
+                onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+                onSelect={(e) => rememberInlineSelection("body", e.currentTarget)}
               />
               <div className="cd-editor-tools">
-                <button className="cd-btn" disabled={inlineRewriting} onClick={() => rewriteInlineSelection("punchier")}>Punchier</button>
-                <button className="cd-btn" disabled={inlineRewriting} onClick={() => rewriteInlineSelection("add-stat")}>Add stat</button>
-                <button className="cd-btn" disabled={inlineRewriting} onClick={() => rewriteInlineSelection("question")}>Make question</button>
-                <button className="cd-btn" disabled={inlineRewriting} onClick={() => rewriteInlineSelection("simpler")}>Simpler</button>
+                <button
+                  className="cd-btn"
+                  disabled={inlineRewriting}
+                  onClick={() => rewriteInlineSelection("punchier")}
+                >
+                  Punchier
+                </button>
+                <button
+                  className="cd-btn"
+                  disabled={inlineRewriting}
+                  onClick={() => rewriteInlineSelection("add-stat")}
+                >
+                  Add stat
+                </button>
+                <button
+                  className="cd-btn"
+                  disabled={inlineRewriting}
+                  onClick={() => rewriteInlineSelection("question")}
+                >
+                  Make question
+                </button>
+                <button
+                  className="cd-btn"
+                  disabled={inlineRewriting}
+                  onClick={() => rewriteInlineSelection("simpler")}
+                >
+                  Simpler
+                </button>
                 <span className="cd-editor-note">
-                  {inlineSelection ? `${inlineSelection.text.length} selected in ${inlineSelection.field}` : "Select text in hook, body, or CTA"}
+                  {inlineSelection
+                    ? `${inlineSelection.text.length} selected in ${inlineSelection.field}`
+                    : "Select text in hook, body, or CTA"}
                   {inlineRewriting ? " · rewriting..." : ""}
                 </span>
               </div>
               <div className="cd-editor-meter">
-                <span><strong>{draftReadability.label}</strong>{draftReadability.score}/100 readability</span>
-                <span><strong>{draftReadability.averageSentenceWords}</strong>avg words per sentence</span>
-                <span><strong>{draftReadability.longSentences}</strong>long sentence{draftReadability.longSentences === 1 ? "" : "s"}</span>
+                <span>
+                  <strong>{draftReadability.label}</strong>
+                  {draftReadability.score}/100 readability
+                </span>
+                <span>
+                  <strong>{draftReadability.averageSentenceWords}</strong>avg words per sentence
+                </span>
+                <span>
+                  <strong>{draftReadability.longSentences}</strong>long sentence
+                  {draftReadability.longSentences === 1 ? "" : "s"}
+                </span>
               </div>
-              {repeatWarning && <div className="cd-editor-warning">{repeatWarning}. Consider rewriting this passage before saving.</div>}
+              {repeatWarning && (
+                <div className="cd-editor-warning">
+                  {repeatWarning}. Consider rewriting this passage before saving.
+                </div>
+              )}
 
               <div className="cd-blabel">
                 <span>CTA</span>
                 {fieldHistory[draft.day]?.["cta"]?.length > 0 && (
-                  <button type="button" onClick={() => undoField("cta")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                  <button
+                    type="button"
+                    onClick={() => undoField("cta")}
+                    style={{
+                      marginLeft: 8,
+                      fontSize: "11px",
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    ↩ Restore previous
+                  </button>
                 )}
                 <span className="cd-blabel-count">{ctaChars} chars</span>
               </div>
@@ -2388,37 +3195,100 @@ export default function CalendarDetail() {
                 className="cd-edit-area"
                 rows={2}
                 value={draft.cta}
-                onChange={e => setDraft({ ...draft, cta: e.target.value })}
-                onSelect={e => rememberInlineSelection("cta", e.currentTarget)}
+                onChange={(e) => setDraft({ ...draft, cta: e.target.value })}
+                onSelect={(e) => rememberInlineSelection("cta", e.currentTarget)}
               />
 
               <div className="cd-blabel">
                 <span>Hashtags</span>
                 {fieldHistory[draft.day]?.["hashtags"]?.length > 0 && (
-                  <button type="button" onClick={() => undoField("hashtags")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                  <button
+                    type="button"
+                    onClick={() => undoField("hashtags")}
+                    style={{
+                      marginLeft: 8,
+                      fontSize: "11px",
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    ↩ Restore previous
+                  </button>
                 )}
               </div>
-              <HashtagChipEditor hashtags={draft.hashtags} platform={platform} onChange={newTags => setDraft({ ...draft, hashtags: newTags })} />
+              <HashtagChipEditor
+                hashtags={draft.hashtags}
+                platform={platform}
+                onChange={(newTags) => setDraft({ ...draft, hashtags: newTags })}
+              />
 
               <div className="cd-blabel">
                 <span>Why this works (rationale)</span>
                 {fieldHistory[draft.day]?.["rationale"]?.length > 0 && (
-                  <button type="button" onClick={() => undoField("rationale")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                  <button
+                    type="button"
+                    onClick={() => undoField("rationale")}
+                    style={{
+                      marginLeft: 8,
+                      fontSize: "11px",
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    ↩ Restore previous
+                  </button>
                 )}
               </div>
-              <textarea className="cd-edit-area" rows={3} value={draft.rationale} onChange={e => setDraft({ ...draft, rationale: e.target.value })} />
+              <textarea
+                className="cd-edit-area"
+                rows={3}
+                value={draft.rationale}
+                onChange={(e) => setDraft({ ...draft, rationale: e.target.value })}
+              />
 
               <div className="cd-blabel">
                 <span>Cinematic image prompt</span>
                 {fieldHistory[draft.day]?.["image_prompt"]?.length > 0 && (
-                  <button type="button" onClick={() => undoField("image_prompt")} style={{ marginLeft: 8, fontSize: "11px", background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>↩ Restore previous</button>
+                  <button
+                    type="button"
+                    onClick={() => undoField("image_prompt")}
+                    style={{
+                      marginLeft: 8,
+                      fontSize: "11px",
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    ↩ Restore previous
+                  </button>
                 )}
               </div>
-              <textarea className="cd-edit-area" rows={8} value={draft.image_prompt || ""} onChange={e => setDraft({ ...draft, image_prompt: e.target.value })} />
+              <textarea
+                className="cd-edit-area"
+                rows={8}
+                value={draft.image_prompt || ""}
+                onChange={(e) => setDraft({ ...draft, image_prompt: e.target.value })}
+              />
 
               <div className="cd-actions">
-                <button className="cd-btn cd-btn-p" onClick={saveEdit} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
-                <button className="cd-btn" onClick={cancelEdit} disabled={saving}>Cancel</button>
+                <button className="cd-btn cd-btn-p" onClick={saveEdit} disabled={saving}>
+                  {saving ? "Saving…" : "Save changes"}
+                </button>
+                <button className="cd-btn" onClick={cancelEdit} disabled={saving}>
+                  Cancel
+                </button>
               </div>
             </motion.div>
           )}
@@ -2426,14 +3296,25 @@ export default function CalendarDetail() {
       </WorkspacePage>
       {scheduleOpen && (
         <div className="cd-modal-bg" onClick={() => !scheduling && setScheduleOpen(false)}>
-          <div className="cd-modal" onClick={e => e.stopPropagation()} tabIndex={0} role="dialog" aria-modal="true" aria-label="Schedule this week dialog">
+          <div
+            className="cd-modal"
+            onClick={(e) => e.stopPropagation()}
+            tabIndex={0}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Schedule this week dialog"
+          >
             <h3>Schedule this week</h3>
             <p>
-              Queues all 7 posts to your schedule using the times below. Existing scheduled
-              entries for this calendar will be replaced. Adjust times in the per-day cards if needed.
+              Queues all 7 posts to your schedule using the times below. Existing scheduled entries
+              for this calendar will be replaced. Adjust times in the per-day cards if needed.
             </p>
             {posts.map((post, idx) => {
-              const d = new Date(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate() + idx);
+              const d = new Date(
+                weekStartDate.getFullYear(),
+                weekStartDate.getMonth(),
+                weekStartDate.getDate() + idx
+              );
               return (
                 <div key={post.day} className="cd-modal-row">
                   <span className="cd-modal-day">{shortDateLabel(d)}</span>
@@ -2442,16 +3323,31 @@ export default function CalendarDetail() {
                     className="cd-modal-time"
                     aria-label={`Schedule time for day ${post.day}`}
                     value={postTimes[String(post.day)] || suggestedTimeForDay(post.day, platform)}
-                    onChange={e => updatePostTime(post.day, e.target.value)}
+                    onChange={(e) => updatePostTime(post.day, e.target.value)}
                   />
-                  <span style={{ fontSize: 11, color: "#5a5753", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: "var(--color-text-secondary)",
+                      flex: 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {post.title}
                   </span>
                 </div>
               );
             })}
             <div className="cd-modal-actions">
-              <button className="cd-bulk-btn" onClick={() => setScheduleOpen(false)} disabled={scheduling}>Cancel</button>
+              <button
+                className="cd-bulk-btn"
+                onClick={() => setScheduleOpen(false)}
+                disabled={scheduling}
+              >
+                Cancel
+              </button>
               <button className="cd-bulk-btn primary" onClick={scheduleWeek} disabled={scheduling}>
                 {scheduling ? "Scheduling…" : `Schedule ${posts.length} posts`}
               </button>
@@ -2464,7 +3360,9 @@ export default function CalendarDetail() {
           <FeedbackModal
             open={feedbackOpen}
             submitting={feedbackSubmitting || regenerating}
-            onClose={() => { if (!feedbackSubmitting && !regenerating) setFeedbackOpen(false); }}
+            onClose={() => {
+              if (!feedbackSubmitting && !regenerating) setFeedbackOpen(false);
+            }}
             onSubmit={async ({ feedback, category, rating }) => {
               try {
                 setFeedbackSubmitting(true);
@@ -2480,10 +3378,14 @@ export default function CalendarDetail() {
 
       {repurposedPost && (
         <div className="cd-modal-bg" onClick={() => setRepurposedPost(null)}>
-          <div className="cd-modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+          <div className="cd-modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
             <div className="cd-hero-kicker">✨ Repurposed Variant</div>
-            <h3 className="cd-title" style={{ marginTop: 0 }}>{repurposedPost.topic}</h3>
-            <p className="cd-meta" style={{ marginBottom: 15 }}>Optimized for {repurposedTarget || repurposedPost.format}</p>
+            <h3 className="cd-title" style={{ marginTop: 0 }}>
+              {repurposedPost.topic}
+            </h3>
+            <p className="cd-meta" style={{ marginBottom: 15 }}>
+              Optimized for {repurposedTarget || repurposedPost.format}
+            </p>
 
             {repurposeStage && (
               <p className="cd-meta" style={{ marginBottom: 12 }}>
@@ -2493,23 +3395,48 @@ export default function CalendarDetail() {
               </p>
             )}
 
-            <div className="cd-blabel"><span>Repurposed Body</span></div>
-            <div className="cd-card" style={{ background: "#f5f0e8", padding: 15, borderRadius: 12, marginBottom: 20 }}>
-              <div style={{ whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.6, color: "#1c1917" }}>
+            <div className="cd-blabel">
+              <span>Repurposed Body</span>
+            </div>
+            <div
+              className="cd-card"
+              style={{
+                background: "var(--color-surface-muted)",
+                padding: 15,
+                borderRadius: 12,
+                marginBottom: 20,
+              }}
+            >
+              <div
+                style={{
+                  whiteSpace: "pre-wrap",
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: "var(--color-text)",
+                }}
+              >
                 {repurposedPost.body}
               </div>
             </div>
 
             {repurposedPost.image_url && (
-              <div style={{ marginBottom: 20, border: "2px solid var(--color-border)", borderRadius: 4, overflow: "hidden" }}>
-                <img src={repurposedPost.image_url} alt="Generated cover for repurposed post" style={{ width: "100%", height: "auto", display: "block" }} />
+              <div
+                style={{
+                  marginBottom: 20,
+                  border: "2px solid var(--color-border)",
+                  borderRadius: 4,
+                  overflow: "hidden",
+                }}
+              >
+                <img
+                  src={repurposedPost.image_url}
+                  alt="Generated cover for repurposed post"
+                  style={{ width: "100%", height: "auto", display: "block" }}
+                />
               </div>
             )}
 
-            <PerformanceScoreCard
-              post={repurposedPost}
-              topic={formPayload.coreIdea}
-            />
+            <PerformanceScoreCard post={repurposedPost} topic={formPayload.coreIdea} />
 
             <div className="cd-modal-actions" style={{ marginTop: 16 }}>
               <button
@@ -2523,12 +3450,20 @@ export default function CalendarDetail() {
               </button>
               <button
                 className="cd-btn"
-                style={{ background: "#c2410c", color: "#ffffff" }}
+                style={{ background: "var(--color-primary)", color: "var(--color-surface)" }}
                 onClick={saveRepurposedPost}
               >
                 📥 Save this version
               </button>
-              <button className="cd-fav-btn" onClick={() => { setRepurposedPost(null); setRepurposedTarget(""); }}>Close</button>
+              <button
+                className="cd-fav-btn"
+                onClick={() => {
+                  setRepurposedPost(null);
+                  setRepurposedTarget("");
+                }}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -2538,7 +3473,10 @@ export default function CalendarDetail() {
           title="Reformat all 7 posts?"
           message={`This will create a new calendar reformatted for ${niceLabelFor(pendingReformatTarget)} and leave the current one untouched.`}
           onCancel={() => setPendingReformatTarget(null)}
-          onConfirm={async () => { setPendingReformatTarget(null); await reformatAllForPlatform(pendingReformatTarget); }}
+          onConfirm={async () => {
+            setPendingReformatTarget(null);
+            await reformatAllForPlatform(pendingReformatTarget);
+          }}
         />
       )}
       {pendingScheduleConflict && (
@@ -2553,6 +3491,44 @@ export default function CalendarDetail() {
             setScheduling(true);
             const tz = timezone || profileTimezone || browserTimezone();
             await commitScheduleWeek(conflict.rows, tz);
+          }}
+        />
+      )}
+      {pendingBanTag && (
+        <ConfirmDialog
+          title="Ban hashtag workspace-wide?"
+          message={`Ban #${pendingBanTag.tag} from EVERY future post across all calendars? You can undo from Profile → Hashtag policy.`}
+          confirmLabel="Ban tag"
+          onCancel={() => setPendingBanTag(null)}
+          onConfirm={async () => {
+            const { day, tag } = pendingBanTag;
+            setPendingBanTag(null);
+            await commitBanTagWorkspaceWide(day, tag);
+          }}
+        />
+      )}
+      {pendingBulkRegenerate && (
+        <ConfirmDialog
+          title="Regenerate unlocked posts?"
+          message={`Regenerate ${pendingBulkRegenerate.count} unlocked post${pendingBulkRegenerate.count === 1 ? "" : "s"} for ${niceLabelFor(platform)}? Pinned posts stay untouched.`}
+          confirmLabel="Regenerate"
+          onCancel={() => setPendingBulkRegenerate(null)}
+          onConfirm={async () => {
+            setPendingBulkRegenerate(null);
+            await commitRegenerateAllUnlocked();
+          }}
+        />
+      )}
+      {pendingRemoveVisual !== null && (
+        <ConfirmDialog
+          title="Remove visual?"
+          message="Are you sure you want to remove this visual?"
+          confirmLabel="Remove"
+          onCancel={() => setPendingRemoveVisual(null)}
+          onConfirm={async () => {
+            const day = pendingRemoveVisual;
+            setPendingRemoveVisual(null);
+            applyImageToPost(day, "");
           }}
         />
       )}

@@ -1,4 +1,4 @@
-import { FEATURES } from './config';
+import { FEATURES } from "./config";
 
 const DEFAULT_FLAGS: Record<string, boolean> = {
   enable_new_drag: true,
@@ -24,7 +24,7 @@ export function isEnabled(flag: string): boolean {
 export function setFlag(flag: string, value: boolean) {
   try {
     const stored = window.localStorage.getItem("ss:feature_flags");
-    const parsed = stored ? JSON.parse(stored) as Record<string, boolean> : {};
+    const parsed = stored ? (JSON.parse(stored) as Record<string, boolean>) : {};
     parsed[flag] = value;
     window.localStorage.setItem("ss:feature_flags", JSON.stringify(parsed));
   } catch (e) {

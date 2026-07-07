@@ -16,7 +16,9 @@ export const CoverImageGenerator: React.FC<CoverImageGeneratorProps> = ({
   onApplyImage,
   onClose,
 }) => {
-  const [prompt, setPrompt] = useState(post.image_prompt || `${post.title}. Modern digital art, vector illustration.`);
+  const [prompt, setPrompt] = useState(
+    post.image_prompt || `${post.title}. Modern digital art, vector illustration.`
+  );
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(post.cover_image || null);
   const generateMutation = useGeneratePostImageMutation();
@@ -59,14 +61,41 @@ export const CoverImageGenerator: React.FC<CoverImageGeneratorProps> = ({
   return (
     <div className="custom-modal-overlay">
       <div className="custom-modal-content" style={{ maxWidth: 500, width: "100%" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h3 style={{ margin: 0, fontSize: 20, fontFamily: "var(--font-heading)", fontWeight: "bold" }}>AI Cover Image Generator</h3>
-          <button onClick={onClose} className="cpbtn" style={{ padding: "4px 8px" }}>✕</button>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 20,
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 20,
+              fontFamily: "var(--font-heading)",
+              fontWeight: "bold",
+            }}
+          >
+            AI Cover Image Generator
+          </h3>
+          <button onClick={onClose} className="cpbtn" style={{ padding: "4px 8px" }}>
+            ✕
+          </button>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: "bold", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: 12,
+                fontWeight: "bold",
+                marginBottom: 6,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
               Image Description / Prompt
             </label>
             <textarea
@@ -81,7 +110,16 @@ export const CoverImageGenerator: React.FC<CoverImageGeneratorProps> = ({
 
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <div style={{ flex: 1 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 12,
+                  fontWeight: "bold",
+                  marginBottom: 6,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
                 Aspect Ratio
               </label>
               <select
@@ -107,19 +145,49 @@ export const CoverImageGenerator: React.FC<CoverImageGeneratorProps> = ({
 
           {generateMutation.isPending && (
             <div style={{ textAlign: "center", padding: "20px 0" }}>
-              <div style={{ display: "inline-block", width: 24, height: 24, border: "3px solid var(--color-border)", borderTopColor: "var(--color-primary)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-              <div style={{ marginTop: 8, fontSize: 13, color: "var(--color-muted)", fontFamily: "var(--font-mono)" }}>
+              <div
+                style={{
+                  display: "inline-block",
+                  width: 24,
+                  height: 24,
+                  border: "3px solid var(--color-border)",
+                  borderTopColor: "var(--color-primary)",
+                  borderRadius: "50%",
+                  animation: "spin 1s linear infinite",
+                }}
+              />
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 13,
+                  color: "var(--color-muted)",
+                  fontFamily: "var(--font-mono)",
+                }}
+              >
                 Generating visual concept...
               </div>
             </div>
           )}
 
           {generatedUrl && !generateMutation.isPending && (
-            <div className="bg-card" style={{ border: "2px solid var(--color-border)", borderRadius: 4, overflow: "hidden" }}>
+            <div
+              className="bg-card"
+              style={{
+                border: "2px solid var(--color-border)",
+                borderRadius: 4,
+                overflow: "hidden",
+              }}
+            >
               <img
                 src={generatedUrl}
                 alt="Generated concept"
-                style={{ width: "100%", height: "auto", display: "block", maxHeight: 300, objectFit: "contain" }}
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  display: "block",
+                  maxHeight: 300,
+                  objectFit: "contain",
+                }}
               />
             </div>
           )}
@@ -129,7 +197,13 @@ export const CoverImageGenerator: React.FC<CoverImageGeneratorProps> = ({
               onClick={handleGenerate}
               disabled={generateMutation.isPending}
               className="cpbtn"
-              style={{ flex: 1, padding: "10px 16px", background: "var(--color-primary)", color: "var(--color-bg)", fontWeight: "bold" }}
+              style={{
+                flex: 1,
+                padding: "10px 16px",
+                background: "var(--color-primary)",
+                color: "var(--color-bg)",
+                fontWeight: "bold",
+              }}
             >
               {generateMutation.isPending ? "Generating..." : "Generate Concept"}
             </button>

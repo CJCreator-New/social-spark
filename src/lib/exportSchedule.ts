@@ -20,7 +20,16 @@ function csvEscape(v: unknown): string {
 
 export function rowsToCsv(rows: ScheduledRowLike[], tz: string): string {
   const header = [
-    "Date", "Time", "Timezone", "Platform", "Status", "Calendar", "Title", "Caption", "Hashtags", "UTM link",
+    "Date",
+    "Time",
+    "Timezone",
+    "Platform",
+    "Status",
+    "Calendar",
+    "Title",
+    "Caption",
+    "Hashtags",
+    "UTM link",
   ];
   const lines: string[] = [header.join(",")];
   for (const r of rows) {
@@ -28,23 +37,29 @@ export function rowsToCsv(rows: ScheduledRowLike[], tz: string): string {
     const time = fmtTimeInTz(r.scheduled_at, tz);
     const title = r.post_snapshot?.title || r.post_snapshot?.topic || "";
     const tags = r.post_snapshot?.hashtags || "";
-    lines.push([
-      csvEscape(date),
-      csvEscape(time),
-      csvEscape(tz),
-      csvEscape(r.platform || ""),
-      csvEscape(r.workflow_status || ""),
-      csvEscape(r.calendar_title || ""),
-      csvEscape(title),
-      csvEscape(r.copy_text || ""),
-      csvEscape(tags),
-      csvEscape(r.utm_link || ""),
-    ].join(","));
+    lines.push(
+      [
+        csvEscape(date),
+        csvEscape(time),
+        csvEscape(tz),
+        csvEscape(r.platform || ""),
+        csvEscape(r.workflow_status || ""),
+        csvEscape(r.calendar_title || ""),
+        csvEscape(title),
+        csvEscape(r.copy_text || ""),
+        csvEscape(tags),
+        csvEscape(r.utm_link || ""),
+      ].join(",")
+    );
   }
   return lines.join("\r\n");
 }
 
-export function downloadScheduleCsv(rows: ScheduledRowLike[], tz: string, filename = "schedule.csv") {
+export function downloadScheduleCsv(
+  rows: ScheduledRowLike[],
+  tz: string,
+  filename = "schedule.csv"
+) {
   const csv = rowsToCsv(rows, tz);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);

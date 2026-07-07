@@ -1,9 +1,35 @@
 import React, { useState, useEffect, useRef } from "react";
 
-import { saveUserApiKey, getUserApiKey, setUseOwnKey, deleteUserApiKey, getQuotaStatus, validateUserApiKey, updateUserApiModel, type ApiProvider } from "@/lib/apiKeyManager";
-import { MODEL_CATALOG, getOpenRouterGroups, OPENROUTER_FREE_RATE_LIMIT_NOTE, CUSTOM_MODEL_SENTINEL } from "@/lib/models/catalogs";
+import {
+  saveUserApiKey,
+  getUserApiKey,
+  setUseOwnKey,
+  deleteUserApiKey,
+  getQuotaStatus,
+  validateUserApiKey,
+  updateUserApiModel,
+  type ApiProvider,
+} from "@/lib/apiKeyManager";
+import {
+  MODEL_CATALOG,
+  getOpenRouterGroups,
+  OPENROUTER_FREE_RATE_LIMIT_NOTE,
+  CUSTOM_MODEL_SENTINEL,
+} from "@/lib/models/catalogs";
 import { toast } from "sonner";
-import { Eye, EyeOff, Save, Key, CheckCircle2, AlertCircle, Loader2, Trash2, ShieldCheck, Info, BadgeCheck } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Save,
+  Key,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Trash2,
+  ShieldCheck,
+  Info,
+  BadgeCheck,
+} from "lucide-react";
 
 export function ApiKeySettings() {
   const [provider, setProvider] = useState<ApiProvider>("openai");
@@ -12,7 +38,7 @@ export function ApiKeySettings() {
   const [savedModel, setSavedModel] = useState<string>("");
   const [showKey, setShowKey] = useState(false);
   const [useOwnKey, setUseOwnKeyVal] = useState(false);
-  const [keyMode, setKeyMode] = useState<'fallback' | 'always'>('fallback');
+  const [keyMode, setKeyMode] = useState<"fallback" | "always">("fallback");
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ valid: boolean; reason?: string } | null>(null);
@@ -20,8 +46,14 @@ export function ApiKeySettings() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [savedKeyPreview, setSavedKeyPreview] = useState<string | null>(null);
-  const [statusMsg, setStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
-  const [quota, setQuota] = useState<{ used: number; limit: number; planPeriodEnd: string | null } | null>(null);
+  const [statusMsg, setStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(
+    null
+  );
+  const [quota, setQuota] = useState<{
+    used: number;
+    limit: number;
+    planPeriodEnd: string | null;
+  } | null>(null);
   const [keyFieldState, setKeyFieldState] = useState<"empty" | "masked" | "filled">("empty");
   const [settingsError, setSettingsError] = useState(false);
 
@@ -136,7 +168,11 @@ export function ApiKeySettings() {
         if (!check.valid) {
           setTestResult(check);
           setStatusMsg({ text: validationMessage(check.reason), type: "error" });
-          toast.error(check.reason === "INVALID_KEY_FORMAT" ? "Invalid API key format" : "API key check failed");
+          toast.error(
+            check.reason === "INVALID_KEY_FORMAT"
+              ? "Invalid API key format"
+              : "API key check failed"
+          );
           setLoading(false);
           return;
         }
@@ -157,18 +193,21 @@ export function ApiKeySettings() {
 
       setStatusMsg({
         text: "API Key settings saved successfully!",
-        type: "success"
+        type: "success",
       });
       toast.success("API Key settings saved!");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save API key";
       setStatusMsg({
-        text: msg === "INVALID_KEY_FORMAT"
-          ? `Invalid key format for ${provider}. Please check your API key and try again.`
-          : msg,
-        type: "error"
+        text:
+          msg === "INVALID_KEY_FORMAT"
+            ? `Invalid key format for ${provider}. Please check your API key and try again.`
+            : msg,
+        type: "error",
       });
-      toast.error(msg === "INVALID_KEY_FORMAT" ? "Invalid API key format" : "Failed to save API key settings");
+      toast.error(
+        msg === "INVALID_KEY_FORMAT" ? "Invalid API key format" : "Failed to save API key settings"
+      );
     } finally {
       setLoading(false);
       // SECURITY: Clear raw key from the DOM input immediately after save (success or error)
@@ -194,7 +233,10 @@ export function ApiKeySettings() {
       setStatusMsg({ text: "API key removed successfully.", type: "success" });
       toast.success("API key removed.");
     } catch (err) {
-      setStatusMsg({ text: err instanceof Error ? err.message : "Failed to remove key", type: "error" });
+      setStatusMsg({
+        text: err instanceof Error ? err.message : "Failed to remove key",
+        type: "error",
+      });
       toast.error("Failed to remove API key.");
     } finally {
       setDeleting(false);
@@ -203,8 +245,17 @@ export function ApiKeySettings() {
 
   if (fetching) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#5a5753", fontSize: 13, padding: "20px 0" }}>
-        <Loader2 className="animate-spin" size={16} style={{ color: "#c2410c" }} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          color: "var(--color-text-secondary)",
+          fontSize: 13,
+          padding: "20px 0",
+        }}
+      >
+        <Loader2 className="animate-spin" size={16} style={{ color: "var(--color-primary)" }} />
         <span>Loading API key configurations...</span>
       </div>
     );
@@ -213,409 +264,592 @@ export function ApiKeySettings() {
   return (
     <>
       <div className="pf-card" style={{ marginTop: 14 }}>
-      <h2 className="pf-section-h" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Key size={18} style={{ color: "#c2410c" }} />
-        <span>User API Key Fallback</span>
-      </h2>
+        <h2 className="pf-section-h" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Key size={18} style={{ color: "var(--color-primary)" }} />
+          <span>User API Key Fallback</span>
+        </h2>
 
-      {/* Inline Privacy Notice */}
-      <div role="note" className="pf-notice">
-        <ShieldCheck size={14} style={{ color: "#c2410c", flexShrink: 0, marginTop: 1 }} />
-        <span>
-          Your API key is encrypted with AES-256 and stored securely. It is never logged, shared, or used for
-          any purpose other than generating content on your behalf. You can delete it at any time.
-        </span>
-      </div>
+        {/* Inline Privacy Notice */}
+        <div role="note" className="pf-notice">
+          <ShieldCheck
+            size={14}
+            style={{ color: "var(--color-primary)", flexShrink: 0, marginTop: 1 }}
+          />
+          <span>
+            Your API key is encrypted with AES-256 and stored securely. It is never logged, shared,
+            or used for any purpose other than generating content on your behalf. You can delete it
+            at any time.
+          </span>
+        </div>
 
-      {quota && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9a9aae", marginBottom: 4, gap: 8, flexWrap: "wrap" }}>
-            <span>Monthly platform generations used</span>
-            <span>{Math.min(quota.used, quota.limit)} / {quota.limit}</span>
-          </div>
-          <div style={{ height: 6, borderRadius: 99, background: "#e7e5e4", overflow: "hidden" }}>
+        {quota && (
+          <div style={{ marginBottom: 16 }}>
             <div
               style={{
-                height: "100%",
-                width: `${Math.min(100, (quota.used / quota.limit) * 100)}%`,
-                background: quota.used >= quota.limit ? "#ef4444" : "#22c55e",
-                transition: "width 0.3s ease",
-              }}
-            />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, color: "#5a5753" }}>
-              Resets {quota.planPeriodEnd ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(quota.planPeriodEnd)) : "next month"}
-            </span>
-            {settingsError && (
-              <span style={{ fontSize: 10, padding: "2px 8px", background: "#fef3c7", color: "#a16207", border: "1px solid #fcd34d", borderRadius: 99 }}>
-                Settings row unavailable
-              </span>
-            )}
-          </div>
-          {quota.used >= quota.limit && !(useOwnKey && keyMode === 'always') && (
-            <div role="alert" className="pf-notice" style={{ marginTop: 10, borderColor: "rgba(239,68,68,0.2)", background: "#fee2e2" }}>
-              <AlertCircle size={14} style={{ color: "#b91c1c", flexShrink: 0, marginTop: 1 }} />
-              <span>
-                You've used your platform generations for this month. Upgrade for more credits, or add your
-                own API key below and enable "Always use my key" to keep generating at no platform cost.
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="pf-section-sub" style={{ marginBottom: 16 }}>
-        Configure your own AI API key to be used as a fallback if the platform-level generation is rate-limited or unavailable.
-      </div>
-
-      <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {statusMsg && (
-          <div
-            role={statusMsg.type === "error" ? "alert" : "status"}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "10px 14px",
-              borderRadius: "8px",
-              fontSize: "12px",
-              background: statusMsg.type === "error" ? "#fee2e2" : "#dcfce7",
-              border: statusMsg.type === "error" ? "1px solid #fca5a5" : "1px solid #86efac",
-              color: statusMsg.type === "error" ? "#b91c1c" : "#15803d",
-            }}
-          >
-            {statusMsg.type === "error" ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
-            <span>{statusMsg.text}</span>
-          </div>
-        )}
-
-        <div>
-          <label className="pf-label" htmlFor="api-provider">
-            API Provider
-          </label>
-          <select
-            id="api-provider"
-            className="pf-select"
-            value={provider}
-            onChange={(e) => {
-              const val = e.target.value as ApiProvider;
-              setProvider(val);
-              // Clear input and any stale test result when switching provider
-              if (keyInputRef.current) keyInputRef.current.value = "";
-              setKeyFieldState("empty");
-              setTestResult(null);
-              // Clear model selection — a model id from another provider is
-              // never valid on the new provider's endpoint.
-              setModel("");
-              setCustomModel("");
-            }}
-            style={{ marginBottom: 0 }}
-          >
-            <option value="openai">OpenAI (GPT-5 / GPT-4o)</option>
-            <option value="anthropic">Anthropic (Claude Sonnet / Haiku)</option>
-            <option value="openrouter">OpenRouter (Many models, free &amp; paid)</option>
-            <option value="gemini">Gemini (Google, direct)</option>
-            <option value="kimi">Kimi (Moonshot AI)</option>
-            <option value="glm">GLM (Zhipu AI)</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="pf-label" htmlFor="api-key">
-            API Key
-          </label>
-          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-            <input
-              id="api-key"
-              ref={keyInputRef}
-              type={showKey ? "text" : "password"}
-              className="pf-input"
-              placeholder={savedKeyPreview ? "Enter new API key to overwrite" : "sk-..."}
-              style={{ paddingRight: "40px", marginBottom: 0 }}
-              // SECURITY: Prevent password managers and OS spell-check from capturing the key
-              autoComplete="new-password"
-              data-1p-ignore
-              data-lpignore="true"
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
-              // Clear any stale verification result once the key is edited
-              onChange={() => {
-                const value = keyInputRef.current?.value?.trim() ?? "";
-                setKeyFieldState(!value ? "empty" : value.startsWith("••••") ? "masked" : "filled");
-                if (testResult) setTestResult(null);
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowKey(!showKey)}
-              aria-label={showKey ? "Hide API key" : "Show API key"}
-              style={{
-                position: "absolute",
-                right: "12px",
-                background: "none",
-                border: "none",
-                color: "#5a5753",
-                cursor: "pointer",
-                padding: 0,
                 display: "flex",
-                alignItems: "center"
+                justifyContent: "space-between",
+                fontSize: 12,
+                color: "var(--color-text-muted)",
+                marginBottom: 4,
+                gap: 8,
+                flexWrap: "wrap",
               }}
             >
-              {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-          {savedKeyPreview && (
-            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: "4px" }}>
-              Currently configured key ends in <span className="font-mono">{savedKeyPreview.slice(-4)}</span>
+              <span>Monthly platform generations used</span>
+              <span>
+                {Math.min(quota.used, quota.limit)} / {quota.limit}
+              </span>
             </div>
-          )}
-          {provider === "openai" && (
-            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-              <Info size={11} /> Format: <code>sk-...</code> (32+ characters)
-            </div>
-          )}
-          {provider === "anthropic" && (
-            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-              <Info size={11} /> Format: <code>sk-ant-...</code>
-            </div>
-          )}
-          {provider === "openrouter" && (
-            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-              <Info size={11} /> Format: <code>sk-or-...</code>
-            </div>
-          )}
-          {provider === "gemini" && (
-            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-              <Info size={11} /> Format: <code>AIza...</code>
-            </div>
-          )}
-          {provider === "kimi" && (
-            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-              <Info size={11} /> Format: <code>sk-...</code> (Moonshot platform key)
-            </div>
-          )}
-          {provider === "glm" && (
-            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-              <Info size={11} /> Format: <code>id.secret</code> (Zhipu API key)
-            </div>
-          )}
-
-          {/* Live key validation */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={handleTest}
-              disabled={testing || keyFieldState !== "filled"}
-              className="pf-btn ghost"
-              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "6px 12px" }}
+            <div
+              style={{
+                height: 6,
+                borderRadius: 99,
+                background: "var(--color-border)",
+                overflow: "hidden",
+              }}
             >
-              {testing ? <Loader2 className="animate-spin" size={13} /> : <BadgeCheck size={13} />}
-              <span>{testing ? "Testing…" : "Test key"}</span>
-            </button>
-            {testResult && (
-              <span
-                role="status"
+              <div
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 12,
-                  color: testResult.valid ? "#15803d" : "#b91c1c",
+                  height: "100%",
+                  width: `${Math.min(100, (quota.used / quota.limit) * 100)}%`,
+                  background:
+                    quota.used >= quota.limit ? "var(--color-error)" : "var(--color-success)",
+                  transition: "width 0.3s ease",
+                }}
+              />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+                marginTop: 6,
+                flexWrap: "wrap",
+              }}
+            >
+              <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
+                Resets{" "}
+                {quota.planPeriodEnd
+                  ? new Intl.DateTimeFormat(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    }).format(new Date(quota.planPeriodEnd))
+                  : "next month"}
+              </span>
+              {settingsError && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    padding: "2px 8px",
+                    background: "var(--color-primary-light)",
+                    color: "var(--color-warning-text)",
+                    border: "1px solid var(--color-warning-border)",
+                    borderRadius: 99,
+                  }}
+                >
+                  Settings row unavailable
+                </span>
+              )}
+            </div>
+            {quota.used >= quota.limit && !(useOwnKey && keyMode === "always") && (
+              <div
+                role="alert"
+                className="pf-notice"
+                style={{
+                  marginTop: 10,
+                  borderColor: "rgba(239,68,68,0.2)",
+                  background: "var(--color-error-bg)",
                 }}
               >
-                {testResult.valid ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
-                <span>{testResult.valid ? "Key verified — it works!" : validationMessage(testResult.reason)}</span>
-              </span>
+                <AlertCircle
+                  size={14}
+                  style={{ color: "var(--color-error-text)", flexShrink: 0, marginTop: 1 }}
+                />
+                <span>
+                  You've used your platform generations for this month. Upgrade for more credits, or
+                  add your own API key below and enable "Always use my key" to keep generating at no
+                  platform cost.
+                </span>
+              </div>
             )}
-          </div>
-        </div>
-
-        <div>
-          <label className="pf-label" htmlFor="api-model">
-            Model
-          </label>
-          <select
-            id="api-model"
-            className="pf-select"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            style={{ marginBottom: 0 }}
-          >
-            <option value="">Use provider default</option>
-            {provider === "openrouter"
-              ? getOpenRouterGroups().map((group) => (
-                  <optgroup key={group.label} label={group.label}>
-                    {group.models.map((m) => (
-                      <option key={m.id} value={m.id}>{m.label}</option>
-                    ))}
-                  </optgroup>
-                ))
-              : MODEL_CATALOG[provider].map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
-            <option value={CUSTOM_MODEL_SENTINEL}>Custom model id...</option>
-          </select>
-          {model === CUSTOM_MODEL_SENTINEL && (
-            <input
-              type="text"
-              className="pf-input"
-              placeholder="Enter a model id"
-              value={customModel}
-              onChange={(e) => setCustomModel(e.target.value)}
-              style={{ marginTop: 8, marginBottom: 0 }}
-            />
-          )}
-          {provider === "openrouter" && model.endsWith(":free") && (
-            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-              <Info size={11} /> {OPENROUTER_FREE_RATE_LIMIT_NOTE}
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "6px 0" }}>
-          <input
-            id="use-own-key"
-            type="checkbox"
-            checked={useOwnKey}
-            onChange={(e) => setUseOwnKeyVal(e.target.checked)}
-            style={{
-              width: "16px",
-              height: "16px",
-              accentColor: "#c2410c",
-              cursor: "pointer",
-            }}
-          />
-          <label
-            htmlFor="use-own-key"
-            style={{
-              fontSize: "13px",
-              color: "#1c1917",
-              cursor: "pointer",
-              userSelect: "none",
-            }}
-          >
-            Enable custom API key
-          </label>
-        </div>
-
-        {useOwnKey && (
-          <div>
-            <label className="pf-label" htmlFor="key-mode">
-              Key usage mode
-              <span className={`pf-mode-badge ${keyMode === 'always' ? 'active' : 'standby'}`}>
-                {keyMode === 'always' ? 'Active' : 'Standby'}
-              </span>
-            </label>
-            <div data-mode={keyMode === 'always' ? 'always' : undefined}>
-              <select
-                id="key-mode"
-                className="pf-select"
-                value={keyMode}
-                onChange={(e) => setKeyMode(e.target.value as 'fallback' | 'always')}
-                style={{ marginBottom: 0 }}
-              >
-                <option value="fallback">Fallback only — use my key when platform is unavailable</option>
-                <option value="always">Always — use my key for all content generation</option>
-              </select>
-            </div>
-            <div style={{ fontSize: "11px", color: "#5a5753", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-              <Info size={11} />
-              {keyMode === "always"
-                ? "Your key will be used directly. Platform credits are not consumed."
-                : "Your key activates only if the platform is rate-limited or unavailable."}
-            </div>
           </div>
         )}
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
-          <button
-            type="submit"
-            className="pf-btn"
-            disabled={loading}
-            style={{ display: "flex", alignItems: "center", gap: 6 }}
-          >
-            {loading ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
-            <span>{loading ? "Saving..." : "Save API configuration"}</span>
-          </button>
+        <div className="pf-section-sub" style={{ marginBottom: 16 }}>
+          Configure your own AI API key to be used as a fallback if the platform-level generation is
+          rate-limited or unavailable.
+        </div>
 
-          {savedKeyPreview && !confirmDelete && (
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
+        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {statusMsg && (
+            <div
+              role={statusMsg.type === "error" ? "alert" : "status"}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
-                fontSize: "13px",
-                padding: "8px 14px",
+                gap: 8,
+                padding: "10px 14px",
                 borderRadius: "8px",
-                background: "#fee2e2",
-                border: "1px solid #fca5a5",
-                color: "#b91c1c",
-                cursor: "pointer",
+                fontSize: "12px",
+                background:
+                  statusMsg.type === "error" ? "var(--color-error-bg)" : "var(--color-success-bg)",
+                border:
+                  statusMsg.type === "error"
+                    ? "1px solid var(--color-error-border)"
+                    : "1px solid var(--color-success-border)",
+                color:
+                  statusMsg.type === "error"
+                    ? "var(--color-error-text)"
+                    : "var(--color-success-text)",
               }}
             >
-              <Trash2 size={13} />
-              <span>Remove Key</span>
-            </button>
+              {statusMsg.type === "error" ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
+              <span>{statusMsg.text}</span>
+            </div>
           )}
 
-          {confirmDelete && (
+          <div>
+            <label className="pf-label" htmlFor="api-provider">
+              API Provider
+            </label>
+            <select
+              id="api-provider"
+              className="pf-select"
+              value={provider}
+              onChange={(e) => {
+                const val = e.target.value as ApiProvider;
+                setProvider(val);
+                // Clear input and any stale test result when switching provider
+                if (keyInputRef.current) keyInputRef.current.value = "";
+                setKeyFieldState("empty");
+                setTestResult(null);
+                // Clear model selection — a model id from another provider is
+                // never valid on the new provider's endpoint.
+                setModel("");
+                setCustomModel("");
+              }}
+              style={{ marginBottom: 0 }}
+            >
+              <option value="openai">OpenAI (GPT-5 / GPT-4o)</option>
+              <option value="anthropic">Anthropic (Claude Sonnet / Haiku)</option>
+              <option value="openrouter">OpenRouter (Many models, free &amp; paid)</option>
+              <option value="gemini">Gemini (Google, direct)</option>
+              <option value="kimi">Kimi (Moonshot AI)</option>
+              <option value="glm">GLM (Zhipu AI)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="pf-label" htmlFor="api-key">
+              API Key
+            </label>
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <input
+                id="api-key"
+                ref={keyInputRef}
+                type={showKey ? "text" : "password"}
+                className="pf-input"
+                placeholder={savedKeyPreview ? "Enter new API key to overwrite" : "sk-..."}
+                style={{ paddingRight: "40px", marginBottom: 0 }}
+                // SECURITY: Prevent password managers and OS spell-check from capturing the key
+                autoComplete="new-password"
+                data-1p-ignore
+                data-lpignore="true"
+                spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="off"
+                // Clear any stale verification result once the key is edited
+                onChange={() => {
+                  const value = keyInputRef.current?.value?.trim() ?? "";
+                  setKeyFieldState(
+                    !value ? "empty" : value.startsWith("••••") ? "masked" : "filled"
+                  );
+                  if (testResult) setTestResult(null);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey(!showKey)}
+                aria-label={showKey ? "Hide API key" : "Show API key"}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  background: "none",
+                  border: "none",
+                  color: "var(--color-text-secondary)",
+                  cursor: "pointer",
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {savedKeyPreview && (
+              <div
+                style={{ fontSize: "11px", color: "var(--color-text-secondary)", marginTop: "4px" }}
+              >
+                Currently configured key ends in{" "}
+                <span className="font-mono">{savedKeyPreview.slice(-4)}</span>
+              </div>
+            )}
+            {provider === "openai" && (
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "var(--color-text-secondary)",
+                  marginTop: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Info size={11} /> Format: <code>sk-...</code> (32+ characters)
+              </div>
+            )}
+            {provider === "anthropic" && (
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "var(--color-text-secondary)",
+                  marginTop: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Info size={11} /> Format: <code>sk-ant-...</code>
+              </div>
+            )}
+            {provider === "openrouter" && (
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "var(--color-text-secondary)",
+                  marginTop: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Info size={11} /> Format: <code>sk-or-...</code>
+              </div>
+            )}
+            {provider === "gemini" && (
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "var(--color-text-secondary)",
+                  marginTop: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Info size={11} /> Format: <code>AIza...</code>
+              </div>
+            )}
+            {provider === "kimi" && (
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "var(--color-text-secondary)",
+                  marginTop: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Info size={11} /> Format: <code>sk-...</code> (Moonshot platform key)
+              </div>
+            )}
+            {provider === "glm" && (
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "var(--color-text-secondary)",
+                  marginTop: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Info size={11} /> Format: <code>id.secret</code> (Zhipu API key)
+              </div>
+            )}
+
+            {/* Live key validation */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
-                padding: "10px 14px",
-                borderRadius: "8px",
-                background: "#fee2e2",
-                border: "1px solid #fca5a5",
-                fontSize: "12px",
-                color: "#b91c1c",
+                marginTop: 10,
+                flexWrap: "wrap",
               }}
             >
-              <AlertCircle size={13} />
-              <span>Are you sure? This cannot be undone.</span>
               <button
                 type="button"
-                onClick={handleDelete}
-                disabled={deleting}
+                onClick={handleTest}
+                disabled={testing || keyFieldState !== "filled"}
+                className="pf-btn ghost"
                 style={{
-                  background: "#ef4444",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "4px 10px",
-                  fontSize: "11px",
-                  cursor: "pointer",
-                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 12,
+                  padding: "6px 12px",
                 }}
               >
-                {deleting ? "Removing..." : "Yes, remove"}
+                {testing ? (
+                  <Loader2 className="animate-spin" size={13} />
+                ) : (
+                  <BadgeCheck size={13} />
+                )}
+                <span>{testing ? "Testing…" : "Test key"}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(false)}
+              {testResult && (
+                <span
+                  role="status"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 12,
+                    color: testResult.valid
+                      ? "var(--color-success-text)"
+                      : "var(--color-error-text)",
+                  }}
+                >
+                  {testResult.valid ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                  <span>
+                    {testResult.valid
+                      ? "Key verified — it works!"
+                      : validationMessage(testResult.reason)}
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="pf-label" htmlFor="api-model">
+              Model
+            </label>
+            <select
+              id="api-model"
+              className="pf-select"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              style={{ marginBottom: 0 }}
+            >
+              <option value="">Use provider default</option>
+              {provider === "openrouter"
+                ? getOpenRouterGroups().map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.models.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))
+                : MODEL_CATALOG[provider].map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+              <option value={CUSTOM_MODEL_SENTINEL}>Custom model id...</option>
+            </select>
+            {model === CUSTOM_MODEL_SENTINEL && (
+              <input
+                type="text"
+                className="pf-input"
+                placeholder="Enter a model id"
+                value={customModel}
+                onChange={(e) => setCustomModel(e.target.value)}
+                style={{ marginTop: 8, marginBottom: 0 }}
+              />
+            )}
+            {provider === "openrouter" && model.endsWith(":free") && (
+              <div
                 style={{
-                  background: "transparent",
-                  color: "#5a5753",
-                  border: "1px solid #d6d3d1",
-                  borderRadius: "6px",
-                  padding: "4px 10px",
                   fontSize: "11px",
-                  cursor: "pointer",
+                  color: "var(--color-text-secondary)",
+                  marginTop: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
                 }}
               >
-                Cancel
-              </button>
+                <Info size={11} /> {OPENROUTER_FREE_RATE_LIMIT_NOTE}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "6px 0" }}>
+            <input
+              id="use-own-key"
+              type="checkbox"
+              checked={useOwnKey}
+              onChange={(e) => setUseOwnKeyVal(e.target.checked)}
+              style={{
+                width: "16px",
+                height: "16px",
+                accentColor: "var(--color-primary)",
+                cursor: "pointer",
+              }}
+            />
+            <label
+              htmlFor="use-own-key"
+              style={{
+                fontSize: "13px",
+                color: "var(--color-text)",
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
+              Enable custom API key
+            </label>
+          </div>
+
+          {useOwnKey && (
+            <div>
+              <label className="pf-label" htmlFor="key-mode">
+                Key usage mode
+                <span className={`pf-mode-badge ${keyMode === "always" ? "active" : "standby"}`}>
+                  {keyMode === "always" ? "Active" : "Standby"}
+                </span>
+              </label>
+              <div data-mode={keyMode === "always" ? "always" : undefined}>
+                <select
+                  id="key-mode"
+                  className="pf-select"
+                  value={keyMode}
+                  onChange={(e) => setKeyMode(e.target.value as "fallback" | "always")}
+                  style={{ marginBottom: 0 }}
+                >
+                  <option value="fallback">
+                    Fallback only — use my key when platform is unavailable
+                  </option>
+                  <option value="always">Always — use my key for all content generation</option>
+                </select>
+              </div>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "var(--color-text-secondary)",
+                  marginTop: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Info size={11} />
+                {keyMode === "always"
+                  ? "Your key will be used directly. Platform credits are not consumed."
+                  : "Your key activates only if the platform is rate-limited or unavailable."}
+              </div>
             </div>
           )}
-        </div>
-      </form>
-    </div>
 
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginTop: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              type="submit"
+              className="pf-btn"
+              disabled={loading}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              {loading ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+              <span>{loading ? "Saving..." : "Save API configuration"}</span>
+            </button>
+
+            {savedKeyPreview && !confirmDelete && (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: "13px",
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  background: "var(--color-error-bg)",
+                  border: "1px solid var(--color-error-border)",
+                  color: "var(--color-error-text)",
+                  cursor: "pointer",
+                }}
+              >
+                <Trash2 size={13} />
+                <span>Remove Key</span>
+              </button>
+            )}
+
+            {confirmDelete && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  background: "var(--color-error-bg)",
+                  border: "1px solid var(--color-error-border)",
+                  fontSize: "12px",
+                  color: "var(--color-error-text)",
+                }}
+              >
+                <AlertCircle size={13} />
+                <span>Are you sure? This cannot be undone.</span>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  style={{
+                    background: "var(--color-error)",
+                    color: "var(--color-surface)",
+                    border: "none",
+                    borderRadius: "6px",
+                    padding: "4px 10px",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                  }}
+                >
+                  {deleting ? "Removing..." : "Yes, remove"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  style={{
+                    background: "transparent",
+                    color: "var(--color-text-secondary)",
+                    border: "1px solid var(--color-border-strong)",
+                    borderRadius: "6px",
+                    padding: "4px 10px",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        </form>
+      </div>
     </>
   );
 }

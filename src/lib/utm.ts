@@ -17,14 +17,20 @@ export function utmSource(platform?: string | null): string {
 }
 
 export function utmCampaignSlug(s: string): string {
-  return (s || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60) || "calendar";
+  return (
+    (s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "calendar"
+  );
 }
 
-export function buildTrackingUrl(base: string | null | undefined, platform?: string | null, campaign?: string | null): string {
+export function buildTrackingUrl(
+  base: string | null | undefined,
+  platform?: string | null,
+  campaign?: string | null
+): string {
   const trimmed = String(base || "").trim();
   if (!trimmed) return "";
   let url: URL;

@@ -44,7 +44,7 @@ function corsHeadersFor(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") || "";
   const allowOrigin = isAllowedOrigin(origin) ? origin : "";
   return {
-    ...(allowOrigin ? { "Access-Control-Allow-Origin": allowOrigin, "Vary": "Origin" } : {}),
+    ...(allowOrigin ? { "Access-Control-Allow-Origin": allowOrigin, Vary: "Origin" } : {}),
     "Access-Control-Allow-Headers":
       "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -97,7 +97,10 @@ export async function handle(req: Request): Promise<Response> {
 
     // Per-IP rate limit: anonymous/pre-login events have no user id to key on.
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
-    const rateLimitCheck = await checkRateLimit(ip, "telemetry", { maxRequests: 30, windowMs: 60 * 1000 });
+    const rateLimitCheck = await checkRateLimit(ip, "telemetry", {
+      maxRequests: 30,
+      windowMs: 60 * 1000,
+    });
     if (!rateLimitCheck.allowed) {
       return new Response(JSON.stringify({ ok: false, error: "rate limited" }), {
         status: 429,

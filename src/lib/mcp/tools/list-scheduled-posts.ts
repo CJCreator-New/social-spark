@@ -12,10 +12,20 @@ function supabaseForUser(ctx: ToolContext) {
 export default defineTool({
   name: "list_scheduled_posts",
   title: "List scheduled posts",
-  description: "List the signed-in user's upcoming scheduled ContentForge posts, ordered by scheduled_at.",
+  description:
+    "List the signed-in user's upcoming scheduled ContentForge posts, ordered by scheduled_at.",
   inputSchema: {
-    status: z.enum(["scheduled", "published", "failed", "draft"]).optional().describe("Filter by status."),
-    limit: z.number().int().min(1).max(100).optional().describe("Max posts to return (default 25)."),
+    status: z
+      .enum(["scheduled", "published", "failed", "draft"])
+      .optional()
+      .describe("Filter by status."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe("Max posts to return (default 25)."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ status, limit }, ctx) => {
@@ -24,7 +34,9 @@ export default defineTool({
     }
     let query = supabaseForUser(ctx)
       .from("scheduled_posts")
-      .select("id, calendar_id, platform, scheduled_at, status, workflow_status, copy_text, published_at")
+      .select(
+        "id, calendar_id, platform, scheduled_at, status, workflow_status, copy_text, published_at"
+      )
       .order("scheduled_at", { ascending: true })
       .limit(limit ?? 25);
     if (status) query = query.eq("status", status);

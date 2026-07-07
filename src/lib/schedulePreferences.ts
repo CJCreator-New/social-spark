@@ -1,7 +1,7 @@
-const STORAGE_PREFIX = 'social-spark:schedule:view-timezone';
+const STORAGE_PREFIX = "social-spark:schedule:view-timezone";
 
 function storageKey(userId?: string) {
-  return `${STORAGE_PREFIX}:${userId || 'anonymous'}`;
+  return `${STORAGE_PREFIX}:${userId || "anonymous"}`;
 }
 
 export function loadScheduleTimezone(userId?: string): string | null {
@@ -21,6 +21,10 @@ export function saveScheduleTimezone(userId: string | undefined, timezone: strin
   }
 }
 
-export function resolveScheduleTimezone(userId: string | undefined, profileTimezone: string | null | undefined, browserTimezone: string) {
+export function resolveScheduleTimezone(
+  userId: string | undefined,
+  profileTimezone: string | null | undefined,
+  browserTimezone: string
+) {
   return loadScheduleTimezone(userId) || profileTimezone || browserTimezone;
 }

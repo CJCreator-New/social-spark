@@ -18,32 +18,82 @@ function analyzeTone(text: string): { formality: number; positivity: number; ent
   const lowerText = text.toLowerCase();
 
   // Formality indicators
-  const formalWords = ["therefore", "furthermore", "consequently", "moreover", "hence", "thus", "accordingly", "subsequently"];
-  const casualWords = ["hey", "guys", "kinda", "sorta", "wanna", "gonna", "ain't", "y'all", "cool", "awesome"];
+  const formalWords = [
+    "therefore",
+    "furthermore",
+    "consequently",
+    "moreover",
+    "hence",
+    "thus",
+    "accordingly",
+    "subsequently",
+  ];
+  const casualWords = [
+    "hey",
+    "guys",
+    "kinda",
+    "sorta",
+    "wanna",
+    "gonna",
+    "ain't",
+    "y'all",
+    "cool",
+    "awesome",
+  ];
 
   let formality = 5; // Baseline
-  const formalCount = formalWords.filter(word => lowerText.includes(word)).length;
-  const casualCount = casualWords.filter(word => lowerText.includes(word)).length;
+  const formalCount = formalWords.filter((word) => lowerText.includes(word)).length;
+  const casualCount = casualWords.filter((word) => lowerText.includes(word)).length;
 
   formality += formalCount * 1.5;
   formality -= casualCount * 1.2;
 
   // Positivity indicators
-  const positiveWords = ["excellent", "amazing", "fantastic", "wonderful", "brilliant", "outstanding", "superb", "great", "good", "best"];
-  const negativeWords = ["terrible", "awful", "horrible", "bad", "worst", "disappointing", "frustrating", "problematic", "issue"];
+  const positiveWords = [
+    "excellent",
+    "amazing",
+    "fantastic",
+    "wonderful",
+    "brilliant",
+    "outstanding",
+    "superb",
+    "great",
+    "good",
+    "best",
+  ];
+  const negativeWords = [
+    "terrible",
+    "awful",
+    "horrible",
+    "bad",
+    "worst",
+    "disappointing",
+    "frustrating",
+    "problematic",
+    "issue",
+  ];
 
   let positivity = 5;
-  const posCount = positiveWords.filter(word => lowerText.includes(word)).length;
-  const negCount = negativeWords.filter(word => lowerText.includes(word)).length;
+  const posCount = positiveWords.filter((word) => lowerText.includes(word)).length;
+  const negCount = negativeWords.filter((word) => lowerText.includes(word)).length;
 
   positivity += posCount * 1.2;
   positivity -= negCount * 1.5;
 
   // Enthusiasm indicators
-  const enthusiasticMarkers = ["!", "excited", "thrilled", "passionate", "love", "amazing", "incredible", "unbelievable"];
+  const enthusiasticMarkers = [
+    "!",
+    "excited",
+    "thrilled",
+    "passionate",
+    "love",
+    "amazing",
+    "incredible",
+    "unbelievable",
+  ];
   let enthusiasm = 5;
   const exclamationCount = (text.match(/!/g) || []).length;
-  const enthWordCount = enthusiasticMarkers.filter(marker => lowerText.includes(marker)).length;
+  const enthWordCount = enthusiasticMarkers.filter((marker) => lowerText.includes(marker)).length;
 
   enthusiasm += exclamationCount * 0.5;
   enthusiasm += enthWordCount * 1.0;
@@ -55,18 +105,21 @@ function analyzeTone(text: string): { formality: number; positivity: number; ent
   };
 }
 
-function calculateConsistency(analyses: { formality: number; positivity: number; enthusiasm: number }[]): number {
+function calculateConsistency(
+  analyses: { formality: number; positivity: number; enthusiasm: number }[]
+): number {
   if (analyses.length < 2) return 10;
 
   const avgFormality = analyses.reduce((sum, a) => sum + a.formality, 0) / analyses.length;
   const avgPositivity = analyses.reduce((sum, a) => sum + a.positivity, 0) / analyses.length;
   const avgEnthusiasm = analyses.reduce((sum, a) => sum + a.enthusiasm, 0) / analyses.length;
 
-  const variances = analyses.map(a => (
-    Math.abs(a.formality - avgFormality) +
-    Math.abs(a.positivity - avgPositivity) +
-    Math.abs(a.enthusiasm - avgEnthusiasm)
-  ));
+  const variances = analyses.map(
+    (a) =>
+      Math.abs(a.formality - avgFormality) +
+      Math.abs(a.positivity - avgPositivity) +
+      Math.abs(a.enthusiasm - avgEnthusiasm)
+  );
 
   const avgVariance = variances.reduce((sum, v) => sum + v, 0) / variances.length;
 
@@ -75,13 +128,15 @@ function calculateConsistency(analyses: { formality: number; positivity: number;
   return Math.round(consistency);
 }
 
-function generateIssuesAndSuggestions(analyses: { formality: number; positivity: number; enthusiasm: number }[]): { issues: string[]; suggestions: string[] } {
+function generateIssuesAndSuggestions(
+  analyses: { formality: number; positivity: number; enthusiasm: number }[]
+): { issues: string[]; suggestions: string[] } {
   const issues: string[] = [];
   const suggestions: string[] = [];
 
-  const formalities = analyses.map(a => a.formality);
-  const positivities = analyses.map(a => a.positivity);
-  const enthusiasms = analyses.map(a => a.enthusiasm);
+  const formalities = analyses.map((a) => a.formality);
+  const positivities = analyses.map((a) => a.positivity);
+  const enthusiasms = analyses.map((a) => a.enthusiasm);
 
   const formalityRange = Math.max(...formalities) - Math.min(...formalities);
   const positivityRange = Math.max(...positivities) - Math.min(...positivities);
@@ -89,7 +144,9 @@ function generateIssuesAndSuggestions(analyses: { formality: number; positivity:
 
   if (formalityRange > 4) {
     issues.push("Tone formality varies significantly across posts");
-    suggestions.push("Standardize formality level - choose either consistently formal or consistently conversational");
+    suggestions.push(
+      "Standardize formality level - choose either consistently formal or consistently conversational"
+    );
   }
 
   if (positivityRange > 4) {
@@ -129,7 +186,7 @@ function generateIssuesAndSuggestions(analyses: { formality: number; positivity:
 
 export const ToneConsistencyChecker: React.FC<ToneConsistencyCheckerProps> = ({ posts }) => {
   const analysis = useMemo((): ToneAnalysis => {
-    const postAnalyses = posts.map(post => {
+    const postAnalyses = posts.map((post) => {
       const fullText = `${post.title} ${post.hook} ${post.body} ${post.cta}`;
       return analyzeTone(fullText);
     });
@@ -138,9 +195,12 @@ export const ToneConsistencyChecker: React.FC<ToneConsistencyCheckerProps> = ({ 
     const { issues, suggestions } = generateIssuesAndSuggestions(postAnalyses);
 
     // Calculate averages
-    const avgFormality = postAnalyses.reduce((sum, a) => sum + a.formality, 0) / postAnalyses.length;
-    const avgPositivity = postAnalyses.reduce((sum, a) => sum + a.positivity, 0) / postAnalyses.length;
-    const avgEnthusiasm = postAnalyses.reduce((sum, a) => sum + a.enthusiasm, 0) / postAnalyses.length;
+    const avgFormality =
+      postAnalyses.reduce((sum, a) => sum + a.formality, 0) / postAnalyses.length;
+    const avgPositivity =
+      postAnalyses.reduce((sum, a) => sum + a.positivity, 0) / postAnalyses.length;
+    const avgEnthusiasm =
+      postAnalyses.reduce((sum, a) => sum + a.enthusiasm, 0) / postAnalyses.length;
 
     return {
       formality: Math.round(avgFormality),
@@ -168,7 +228,11 @@ export const ToneConsistencyChecker: React.FC<ToneConsistencyCheckerProps> = ({ 
             <div className="tc-score-inner">{analysis.consistency}</div>
           </div>
           <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 500 }}>
-            {analysis.consistency >= 8 ? "Excellent" : analysis.consistency >= 6 ? "Good" : "Needs Work"}
+            {analysis.consistency >= 8
+              ? "Excellent"
+              : analysis.consistency >= 6
+                ? "Good"
+                : "Needs Work"}
           </span>
         </div>
       </div>
@@ -194,7 +258,9 @@ export const ToneConsistencyChecker: React.FC<ToneConsistencyCheckerProps> = ({ 
             Issues to Address:
           </div>
           {analysis.issues.map((issue, i) => (
-            <div key={i} className="tc-issue">⚠️ {issue}</div>
+            <div key={i} className="tc-issue">
+              ⚠️ {issue}
+            </div>
           ))}
         </div>
       )}
@@ -205,7 +271,9 @@ export const ToneConsistencyChecker: React.FC<ToneConsistencyCheckerProps> = ({ 
             Suggestions:
           </div>
           {analysis.suggestions.map((suggestion, i) => (
-            <div key={i} className="tc-suggestion">💡 {suggestion}</div>
+            <div key={i} className="tc-suggestion">
+              💡 {suggestion}
+            </div>
           ))}
         </div>
       )}

@@ -61,7 +61,7 @@ export const PersonaCompare: React.FC<PersonaCompareProps> = ({
   const handlePersonaChange = (name: string) => {
     setSelectedPersonaName(name);
     if (name === "custom") return;
-    const found = personas.find(p => p.name === name);
+    const found = personas.find((p) => p.name === name);
     if (found) {
       setSelectedVoice(found.voice);
       setSelectedStyle(found.style);
@@ -135,7 +135,14 @@ export const PersonaCompare: React.FC<PersonaCompareProps> = ({
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: 20, fontWeight: 500, fontFamily: "var(--font-display)" }}>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: 20,
+                fontWeight: 500,
+                fontFamily: "var(--font-display)",
+              }}
+            >
               Multi-Persona Comparison
             </h3>
             <p style={{ margin: "4px 0 0 0", fontSize: 12, color: "var(--text3)" }}>
@@ -273,10 +280,26 @@ export const PersonaCompare: React.FC<PersonaCompareProps> = ({
         </div>
 
         {/* Side-by-Side Content Columns */}
-        <div style={{ flex: 1, overflowY: "auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 20,
+          }}
+        >
           {/* Current Post */}
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ fontSize: 11, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--text3)", fontWeight: 500 }}>
+            <div
+              style={{
+                fontSize: 11,
+                letterSpacing: ".14em",
+                textTransform: "uppercase",
+                color: "var(--text3)",
+                fontWeight: 500,
+              }}
+            >
               Original Draft
             </div>
             <div
@@ -292,27 +315,80 @@ export const PersonaCompare: React.FC<PersonaCompareProps> = ({
             >
               {post.title && (
                 <div>
-                  <div style={{ fontSize: 9, color: "var(--text3)", textTransform: "uppercase", marginBottom: 3 }}>Title</div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: "var(--text3)",
+                      textTransform: "uppercase",
+                      marginBottom: 3,
+                    }}
+                  >
+                    Title
+                  </div>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{post.title}</div>
                 </div>
               )}
               {post.hook && (
                 <div>
-                  <div style={{ fontSize: 9, color: "var(--text3)", textTransform: "uppercase", marginBottom: 3 }}>Hook</div>
-                  <div style={{ fontStyle: "italic", fontSize: 13, color: "var(--text2)", borderLeft: "2px solid rgba(200,240,154,0.28)", paddingLeft: 10 }}>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: "var(--text3)",
+                      textTransform: "uppercase",
+                      marginBottom: 3,
+                    }}
+                  >
+                    Hook
+                  </div>
+                  <div
+                    style={{
+                      fontStyle: "italic",
+                      fontSize: 13,
+                      color: "var(--text2)",
+                      borderLeft: "2px solid rgba(200,240,154,0.28)",
+                      paddingLeft: 10,
+                    }}
+                  >
                     {post.hook}
                   </div>
                 </div>
               )}
               {post.body && (
                 <div>
-                  <div style={{ fontSize: 9, color: "var(--text3)", textTransform: "uppercase", marginBottom: 3 }}>Body</div>
-                  <div style={{ fontSize: 12, color: "var(--text2)", whiteSpace: "pre-line", lineHeight: 1.6 }}>{post.body}</div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: "var(--text3)",
+                      textTransform: "uppercase",
+                      marginBottom: 3,
+                    }}
+                  >
+                    Body
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text2)",
+                      whiteSpace: "pre-line",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {post.body}
+                  </div>
                 </div>
               )}
               {post.cta && (
                 <div>
-                  <div style={{ fontSize: 9, color: "var(--text3)", textTransform: "uppercase", marginBottom: 3 }}>CTA</div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: "var(--text3)",
+                      textTransform: "uppercase",
+                      marginBottom: 3,
+                    }}
+                  >
+                    CTA
+                  </div>
                   <div style={{ fontSize: 12, color: "var(--accent)" }}>{post.cta}</div>
                 </div>
               )}
@@ -321,7 +397,17 @@ export const PersonaCompare: React.FC<PersonaCompareProps> = ({
 
           {/* Alternate Persona Compare Column */}
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ fontSize: 11, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", fontWeight: 500, display: "flex", justifyContent: "space-between" }}>
+            <div
+              style={{
+                fontSize: 11,
+                letterSpacing: ".14em",
+                textTransform: "uppercase",
+                color: "var(--accent)",
+                fontWeight: 500,
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
               <span>Alternate Persona Draft</span>
               {comparedPost && (
                 <span style={{ fontSize: 10, textTransform: "none", color: "var(--text3)" }}>
@@ -344,27 +430,80 @@ export const PersonaCompare: React.FC<PersonaCompareProps> = ({
               >
                 {comparedPost.title && (
                   <div>
-                    <div style={{ fontSize: 9, color: "var(--text3)", textTransform: "uppercase", marginBottom: 3 }}>Title</div>
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: "var(--text3)",
+                        textTransform: "uppercase",
+                        marginBottom: 3,
+                      }}
+                    >
+                      Title
+                    </div>
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{comparedPost.title}</div>
                   </div>
                 )}
                 {comparedPost.hook && (
                   <div>
-                    <div style={{ fontSize: 9, color: "var(--text3)", textTransform: "uppercase", marginBottom: 3 }}>Hook</div>
-                    <div style={{ fontStyle: "italic", fontSize: 13, color: "var(--text)", borderLeft: "2px solid var(--accent)", paddingLeft: 10 }}>
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: "var(--text3)",
+                        textTransform: "uppercase",
+                        marginBottom: 3,
+                      }}
+                    >
+                      Hook
+                    </div>
+                    <div
+                      style={{
+                        fontStyle: "italic",
+                        fontSize: 13,
+                        color: "var(--text)",
+                        borderLeft: "2px solid var(--accent)",
+                        paddingLeft: 10,
+                      }}
+                    >
                       {comparedPost.hook}
                     </div>
                   </div>
                 )}
                 {comparedPost.body && (
                   <div>
-                    <div style={{ fontSize: 9, color: "var(--text3)", textTransform: "uppercase", marginBottom: 3 }}>Body</div>
-                    <div style={{ fontSize: 12, color: "var(--text)", whiteSpace: "pre-line", lineHeight: 1.6 }}>{comparedPost.body}</div>
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: "var(--text3)",
+                        textTransform: "uppercase",
+                        marginBottom: 3,
+                      }}
+                    >
+                      Body
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text)",
+                        whiteSpace: "pre-line",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {comparedPost.body}
+                    </div>
                   </div>
                 )}
                 {comparedPost.cta && (
                   <div>
-                    <div style={{ fontSize: 9, color: "var(--text3)", textTransform: "uppercase", marginBottom: 3 }}>CTA</div>
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: "var(--text3)",
+                        textTransform: "uppercase",
+                        marginBottom: 3,
+                      }}
+                    >
+                      CTA
+                    </div>
                     <div style={{ fontSize: 12, color: "var(--accent)" }}>{comparedPost.cta}</div>
                   </div>
                 )}
@@ -385,14 +524,24 @@ export const PersonaCompare: React.FC<PersonaCompareProps> = ({
                   padding: 24,
                 }}
               >
-                {regeneratePostMutation.isPending ? "Generating persona comparison..." : "Click 'Compare & Rewrite' above to generate the side-by-side comparison"}
+                {regeneratePostMutation.isPending
+                  ? "Generating persona comparison..."
+                  : "Click 'Compare & Rewrite' above to generate the side-by-side comparison"}
               </div>
             )}
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 16, borderTop: "1px solid var(--border2)" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 10,
+            paddingTop: 16,
+            borderTop: "1px solid var(--border2)",
+          }}
+        >
           <button type="button" className="cpbtn" onClick={onClose}>
             Close
           </button>

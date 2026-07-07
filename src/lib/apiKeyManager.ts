@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getE2EAuthFlag } from "@/lib/e2eFixtures";
 import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
 
-export type ApiProvider = 'openai' | 'anthropic' | 'openrouter' | 'gemini' | 'kimi' | 'glm';
+export type ApiProvider = "openai" | "anthropic" | "openrouter" | "gemini" | "kimi" | "glm";
 
 function getSupabaseRuntimeConfig(): { url: string; key: string } {
   const url = (import.meta.env.VITE_SUPABASE_URL as string) || "";
@@ -48,11 +48,17 @@ async function getAccessToken(): Promise<string | null> {
   if (import.meta.env.DEV && window.localStorage.getItem(getE2EAuthFlag()) === "true") {
     return "e2e-access-token";
   }
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   return session?.access_token ?? null;
 }
 
-export async function saveUserApiKey(apiKey: string, provider: ApiProvider, model?: string): Promise<void> {
+export async function saveUserApiKey(
+  apiKey: string,
+  provider: ApiProvider,
+  model?: string
+): Promise<void> {
   // Validate format client-side before any network call
   if (!validateApiKeyFormat(apiKey, provider)) {
     throw new Error("INVALID_KEY_FORMAT");
@@ -137,7 +143,7 @@ export async function validateUserApiKey(
     body: JSON.stringify({ action: "validate", apiKey, provider, model: model || undefined }),
   });
 
-  const data = await res.json().catch(() => ({} as { valid?: boolean; reason?: string }));
+  const data = await res.json().catch(() => ({}) as { valid?: boolean; reason?: string });
 
   if (res.status === 429) {
     return { valid: false, reason: "Too many checks. Please wait a moment and try again." };
@@ -189,13 +195,21 @@ export async function getUserApiKey(): Promise<{
   provider: ApiProvider | null;
   apiModel?: string | null;
   useOwnKey: boolean;
-  keyMode: 'fallback' | 'always';
+  keyMode: "fallback" | "always";
   last4?: string | null;
   settingsError?: boolean;
 }> {
   const token = await getAccessToken();
   if (!token) {
-    return { apiKey: null, hasKey: false, provider: null, apiModel: null, useOwnKey: false, keyMode: 'fallback', settingsError: false };
+    return {
+      apiKey: null,
+      hasKey: false,
+      provider: null,
+      apiModel: null,
+      useOwnKey: false,
+      keyMode: "fallback",
+      settingsError: false,
+    };
   }
 
   const { url: SUPABASE_URL, key: SUPABASE_KEY } = getSupabaseRuntimeConfig();
@@ -206,7 +220,9 @@ export async function getUserApiKey(): Promise<{
     const provider = localStorage.getItem("social_spark_user_api_provider") as ApiProvider | null;
     const apiModel = localStorage.getItem("social_spark_user_api_model");
     const useOwnKey = localStorage.getItem("social_spark_use_own_key") === "true";
-    const keyMode = (localStorage.getItem("social_spark_key_mode") === "always" ? "always" : "fallback") as 'fallback' | 'always';
+    const keyMode = (
+      localStorage.getItem("social_spark_key_mode") === "always" ? "always" : "fallback"
+    ) as "fallback" | "always";
     return {
       apiKey,
       hasKey: !!apiKey,
@@ -220,14 +236,17 @@ export async function getUserApiKey(): Promise<{
   }
 
   // Call the Edge Function to decrypt the key (which now returns metadata only)
-  const decPromise = fetch(`${resolveFunctionsBaseUrl(SUPABASE_URL)}/functions/v1/decrypt-api-key`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${token}`,
-    },
-  }).then(async (res) => {
+  const decPromise = fetch(
+    `${resolveFunctionsBaseUrl(SUPABASE_URL)}/functions/v1/decrypt-api-key`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  ).then(async (res) => {
     if (!res.ok) {
       if (res.status === 404) {
         throw new Error("Edge function 'decrypt-api-key' not found (404)");
@@ -235,25 +254,35 @@ export async function getUserApiKey(): Promise<{
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.error || `Failed to retrieve API key (${res.status})`);
     }
-    return res.json() as Promise<{ hasKey: boolean; provider: ApiProvider | null; apiModel?: string | null; last4?: string | null }>;
+    return res.json() as Promise<{
+      hasKey: boolean;
+      provider: ApiProvider | null;
+      apiModel?: string | null;
+      last4?: string | null;
+    }>;
   });
 
   // Query the user_settings table for use_own_key and key_mode
-  const settingsPromise = (supabase.from as unknown as (table: string) => ReturnType<typeof supabase.from>)("user_settings")
+  const settingsPromise = (
+    supabase.from as unknown as (table: string) => ReturnType<typeof supabase.from>
+  )("user_settings")
     .select("use_own_key, key_mode")
     .maybeSingle()
-    .then(({ data, error }: { data: unknown; error: unknown }) => {
-      if (error) throw error;
-      const row = data as unknown as { use_own_key: boolean; key_mode?: string } | null;
-      return {
-        useOwnKey: row?.use_own_key || false,
-        keyMode: (row?.key_mode === 'always' ? 'always' : 'fallback') as 'fallback' | 'always',
-        settingsError: false,
-      };
-    }, (err: unknown) => {
-      console.warn("USER_SETTINGS_SCHEMA_ERROR: Failed to query user_settings table.", err);
-      return { useOwnKey: false, keyMode: 'fallback' as const, settingsError: true };
-    });
+    .then(
+      ({ data, error }: { data: unknown; error: unknown }) => {
+        if (error) throw error;
+        const row = data as unknown as { use_own_key: boolean; key_mode?: string } | null;
+        return {
+          useOwnKey: row?.use_own_key || false,
+          keyMode: (row?.key_mode === "always" ? "always" : "fallback") as "fallback" | "always",
+          settingsError: false,
+        };
+      },
+      (err: unknown) => {
+        console.warn("USER_SETTINGS_SCHEMA_ERROR: Failed to query user_settings table.", err);
+        return { useOwnKey: false, keyMode: "fallback" as const, settingsError: true };
+      }
+    );
 
   try {
     const [decrypted, settings] = await Promise.all([decPromise, settingsPromise]);
@@ -270,7 +299,9 @@ export async function getUserApiKey(): Promise<{
     };
   } catch (err) {
     if (err instanceof TypeError && /Failed to fetch/i.test(err.message)) {
-      console.warn("getUserApiKey: Supabase edge function is unreachable. Falling back to safe defaults.");
+      console.warn(
+        "getUserApiKey: Supabase edge function is unreachable. Falling back to safe defaults."
+      );
     } else {
       console.error("getUserApiKey failed:", err);
     }
@@ -280,7 +311,7 @@ export async function getUserApiKey(): Promise<{
       provider: null,
       apiModel: null,
       useOwnKey: false,
-      keyMode: 'fallback',
+      keyMode: "fallback",
       settingsError: true,
     };
   }
@@ -290,10 +321,16 @@ export async function getQuotaStatus(): Promise<{
   used: number;
   limit: number;
   useOwnKey: boolean;
-  keyMode: 'fallback' | 'always';
+  keyMode: "fallback" | "always";
   planPeriodEnd: string | null;
 }> {
-  const DEFAULT = { used: 0, limit: 10, useOwnKey: false, keyMode: 'fallback' as const, planPeriodEnd: null as string | null };
+  const DEFAULT = {
+    used: 0,
+    limit: 10,
+    useOwnKey: false,
+    keyMode: "fallback" as const,
+    planPeriodEnd: null as string | null,
+  };
 
   const token = await getAccessToken();
   if (!token) return DEFAULT;
@@ -304,23 +341,35 @@ export async function getQuotaStatus(): Promise<{
   if (!SUPABASE_URL || SUPABASE_URL.includes("mock.supabase.co")) {
     const used = Number(localStorage.getItem("social_spark_generation_count") || "0");
     const useOwnKey = localStorage.getItem("social_spark_use_own_key") === "true";
-    const keyMode = (localStorage.getItem("social_spark_key_mode") === "always" ? "always" : "fallback") as 'fallback' | 'always';
+    const keyMode = (
+      localStorage.getItem("social_spark_key_mode") === "always" ? "always" : "fallback"
+    ) as "fallback" | "always";
     const now = new Date();
-    const firstOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+    const firstOfNextMonth = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
+    ).toISOString();
     return { used, limit: 10, useOwnKey, keyMode, planPeriodEnd: firstOfNextMonth };
   }
 
   try {
-    const { data, error } = await (supabase.from as unknown as (table: string) => ReturnType<typeof supabase.from>)("user_settings")
+    const { data, error } = await (
+      supabase.from as unknown as (table: string) => ReturnType<typeof supabase.from>
+    )("user_settings")
       .select("generation_count, quota_limit, use_own_key, key_mode, plan_period_end")
       .maybeSingle();
     if (error) throw error;
-    const row = data as unknown as { generation_count?: number; quota_limit?: number; use_own_key?: boolean; key_mode?: string; plan_period_end?: string | null } | null;
+    const row = data as unknown as {
+      generation_count?: number;
+      quota_limit?: number;
+      use_own_key?: boolean;
+      key_mode?: string;
+      plan_period_end?: string | null;
+    } | null;
     return {
       used: row?.generation_count ?? 0,
       limit: row?.quota_limit ?? 50,
       useOwnKey: row?.use_own_key || false,
-      keyMode: (row?.key_mode === 'always' ? 'always' : 'fallback'),
+      keyMode: row?.key_mode === "always" ? "always" : "fallback",
       planPeriodEnd: row?.plan_period_end ?? null,
     };
   } catch (err) {
@@ -329,7 +378,10 @@ export async function getQuotaStatus(): Promise<{
   }
 }
 
-export async function setUseOwnKey(enabled: boolean, keyMode: 'fallback' | 'always' = 'fallback'): Promise<void> {
+export async function setUseOwnKey(
+  enabled: boolean,
+  keyMode: "fallback" | "always" = "fallback"
+): Promise<void> {
   const token = await getAccessToken();
   if (!token) {
     throw new Error("User session not found");

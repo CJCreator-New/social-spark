@@ -20,7 +20,7 @@ function readPersistedE2E<T>(key: string): T[] | null {
     const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed as T[] : null;
+    return Array.isArray(parsed) ? (parsed as T[]) : null;
   } catch {
     return null;
   }
@@ -38,11 +38,15 @@ function writePersistedE2E<T>(key: string, value: T[]): void {
 function seedE2EStores() {
   if (e2eCalendars.length === 0) {
     const persistedCalendars = readPersistedE2E<E2ECalendar>(E2E_CALENDARS_KEY);
-    e2eCalendars = persistedCalendars && persistedCalendars.length > 0 ? persistedCalendars : [clone(E2E_CALENDAR)];
+    e2eCalendars =
+      persistedCalendars && persistedCalendars.length > 0
+        ? persistedCalendars
+        : [clone(E2E_CALENDAR)];
   }
   if (e2eScheduleRows.length === 0) {
     const persistedRows = readPersistedE2E<E2EScheduleRow>(E2E_SCHEDULE_ROWS_KEY);
-    e2eScheduleRows = persistedRows && persistedRows.length > 0 ? persistedRows : clone(E2E_SCHEDULE_ROWS);
+    e2eScheduleRows =
+      persistedRows && persistedRows.length > 0 ? persistedRows : clone(E2E_SCHEDULE_ROWS);
   }
   writePersistedE2E(E2E_CALENDARS_KEY, e2eCalendars);
   writePersistedE2E(E2E_SCHEDULE_ROWS_KEY, e2eScheduleRows);
@@ -69,7 +73,9 @@ export function findE2ECalendar(id: string) {
 
 export function updateE2ECalendar(id: string, patch: Partial<E2ECalendar>) {
   seedE2EStores();
-  e2eCalendars = e2eCalendars.map((calendar) => (calendar.id === id ? { ...calendar, ...patch } : calendar));
+  e2eCalendars = e2eCalendars.map((calendar) =>
+    calendar.id === id ? { ...calendar, ...patch } : calendar
+  );
   writePersistedE2E(E2E_CALENDARS_KEY, e2eCalendars);
 }
 

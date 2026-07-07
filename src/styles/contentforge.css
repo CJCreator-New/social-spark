@@ -12,21 +12,23 @@
 
 .cf-app {
   /* ── Warm Editorial token overrides ── */
-  --bg:       #faf8f4;   /* warm off-white page */
-  --surface:  #ffffff;   /* card surfaces */
-  --surface2: #f5f0e8;   /* secondary panels */
-  --surface3: #ebe6de;   /* dropdown / tertiary */
-  --border:   #e7e5e4;   /* default border */
-  --border2:  #d6d3d1;   /* stronger border */
-  --border3:  #a8a29e;   /* strongest border */
-  --accent:   #c2410c;   /* warm orange */
-  --adim:     rgba(194, 65, 12, 0.08);
-  --adim2:    rgba(194, 65, 12, 0.04);
-  --text:     #1c1917;   /* primary text */
-  --text2:    #57534e;   /* secondary text */
-  --text3:    #5a5753;   /* tertiary text — kept in sync with Index.css's .cf-app override; a stale value here previously raced Index.css's fix for load-order-dependent cascade wins */
-  --err:      #ef4444;
-  --err-bg:   rgba(239, 68, 68, 0.06);
+  --bg: var(--color-bg); /* warm off-white page */
+  --surface: var(--color-surface); /* card surfaces */
+  --surface2: var(--color-surface-muted); /* secondary panels */
+  --surface3: var(--color-surface-hover); /* dropdown / tertiary */
+  --border: var(--color-border); /* default border */
+  --border2: var(--color-border-strong); /* stronger border */
+  --border3: var(--color-text-disabled); /* strongest border */
+  --accent: var(--color-primary); /* warm orange */
+  --adim: rgba(194, 65, 12, 0.08);
+  --adim2: rgba(194, 65, 12, 0.04);
+  --text: var(--color-text); /* primary text */
+  --text2: var(--color-text-secondary); /* secondary text */
+  --text3: var(
+    --color-text-tertiary
+  ); /* tertiary text — kept in sync with Index.css's .cf-app override; a stale value here previously raced Index.css's fix for load-order-dependent cascade wins */
+  --err: var(--color-error-text);
+  --err-bg: rgba(239, 68, 68, 0.06);
   --r-sm: 8px;
   --r-md: 12px;
   --r-lg: 16px;
@@ -102,7 +104,7 @@
 }
 
 .cf-app .brand-eyebrow::before {
-  content: '';
+  content: "";
   display: block;
   width: 22px;
   height: 1px;
@@ -167,7 +169,7 @@
 }
 
 .cf-app .sdot.done {
-  background: #ffedd5;
+  background: var(--color-primary-xlight);
   border-color: rgba(194, 65, 12, 0.4);
   color: var(--accent);
 }
@@ -175,12 +177,14 @@
 .cf-app .sdot.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(194, 65, 12, 0.12), 0 0 12px rgba(194, 65, 12, 0.20);
+  color: var(--color-surface);
+  box-shadow:
+    0 0 0 4px rgba(194, 65, 12, 0.12),
+    0 0 12px rgba(194, 65, 12, 0.2);
 }
 
 .cf-app .sdot.done::after {
-  content: '✓';
+  content: "✓";
   font-size: 11px;
   font-weight: 700;
   color: var(--accent);
@@ -258,7 +262,7 @@
 
 /* Top-edge accent line on hover */
 .cf-app .card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -274,7 +278,7 @@
 }
 
 .cf-app .card:hover {
-  box-shadow: 0 8px 24px rgba(120, 113, 108, 0.10);
+  box-shadow: 0 8px 24px rgba(120, 113, 108, 0.1);
 }
 
 .cf-app .csect {
@@ -327,7 +331,9 @@
   font-family: var(--font-body);
   font-weight: 300;
   line-height: 1.7;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
   resize: vertical;
   outline: none;
   display: block;
@@ -336,7 +342,9 @@
 .cf-app textarea:focus,
 .cf-app .ti:focus {
   border-color: rgba(194, 65, 12, 0.32);
-  box-shadow: 0 0 0 3px rgba(194, 65, 12, 0.09), 0 0 0 1px rgba(194, 65, 12, 0.32);
+  box-shadow:
+    0 0 0 3px rgba(194, 65, 12, 0.09),
+    0 0 0 1px rgba(194, 65, 12, 0.32);
 }
 
 .cf-app textarea::placeholder,
@@ -420,13 +428,17 @@
 .cf-app .ind-card.on {
   border-color: rgba(194, 65, 12, 0.45);
   background: var(--adim);
-  box-shadow: 0 0 12px rgba(194, 65, 12, 0.08), inset 0 1px 0 rgba(194, 65, 12, 0.12);
+  box-shadow:
+    0 0 12px rgba(194, 65, 12, 0.08),
+    inset 0 1px 0 rgba(194, 65, 12, 0.12);
 }
 
 .cf-app .ind-card.on::before {
-  content: '';
+  content: "";
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 2px;
   background: linear-gradient(90deg, transparent, rgba(194, 65, 12, 0.6), transparent);
 }
@@ -486,22 +498,28 @@
 .cf-app .plat-card.on {
   border-color: rgba(194, 65, 12, 0.45);
   background: var(--adim);
-  box-shadow: 0 0 12px rgba(194, 65, 12, 0.08), inset 0 1px 0 rgba(194, 65, 12, 0.12);
+  box-shadow:
+    0 0 12px rgba(194, 65, 12, 0.08),
+    inset 0 1px 0 rgba(194, 65, 12, 0.12);
 }
 
 .cf-app .plat-card.on::before {
-  content: '';
+  content: "";
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 2px;
   background: linear-gradient(90deg, transparent, rgba(194, 65, 12, 0.6), transparent);
 }
 
 .cf-app .plat-card.on::after {
-  content: '';
+  content: "";
   position: absolute;
-  top: 8px; right: 8px;
-  width: 6px; height: 6px;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 6px rgba(194, 65, 12, 0.4);
@@ -559,7 +577,9 @@
 
 .cf-app .sel:focus {
   border-color: rgba(194, 65, 12, 0.32);
-  box-shadow: 0 0 0 3px rgba(194, 65, 12, 0.09), 0 0 0 1px rgba(194, 65, 12, 0.32);
+  box-shadow:
+    0 0 0 3px rgba(194, 65, 12, 0.09),
+    0 0 0 1px rgba(194, 65, 12, 0.32);
 }
 
 .cf-app .sarrow {
@@ -725,7 +745,7 @@
 
 /* Shimmer sweep pseudo-element */
 .cf-app .btn-p::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: -100%;
@@ -747,7 +767,7 @@
 }
 
 .cf-app .btn-p:hover {
-  background: #d4f7aa;
+  background: var(--color-highlight-lime);
   transform: translateY(-1px);
   box-shadow: 0 4px 18px rgba(194, 65, 12, 0.35);
 }
@@ -856,7 +876,9 @@
   align-items: center;
   justify-content: center;
   margin: 0 auto 24px;
-  animation: cfSpin 4s linear infinite, cfOrbPulse 2s ease-in-out infinite;
+  animation:
+    cfSpin 4s linear infinite,
+    cfOrbPulse 2s ease-in-out infinite;
 }
 
 @keyframes cfSpin {
@@ -866,11 +888,17 @@
 }
 
 @keyframes cfOrbPulse {
-  0%, 100% {
-    box-shadow: 0 0 8px rgba(194, 65, 12, 0.2), 0 0 24px rgba(194, 65, 12, 0.08);
+  0%,
+  100% {
+    box-shadow:
+      0 0 8px rgba(194, 65, 12, 0.2),
+      0 0 24px rgba(194, 65, 12, 0.08);
   }
   50% {
-    box-shadow: 0 0 18px rgba(194, 65, 12, 0.5), 0 0 44px rgba(194, 65, 12, 0.22), 0 0 60px rgba(194, 65, 12, 0.08);
+    box-shadow:
+      0 0 18px rgba(194, 65, 12, 0.5),
+      0 0 44px rgba(194, 65, 12, 0.22),
+      0 0 60px rgba(194, 65, 12, 0.08);
   }
 }
 
@@ -1016,7 +1044,7 @@
 }
 
 .cf-app .dtab.locked::after {
-  content: '📌';
+  content: "📌";
   position: absolute;
   top: 3px;
   right: 4px;
@@ -1144,7 +1172,7 @@
 
 .cf-app .body-text {
   font-size: 13px;
-  color: #57534e;
+  color: var(--color-text-secondary);
   line-height: 1.85;
   white-space: pre-line;
   font-weight: 300;
@@ -1382,7 +1410,7 @@
 }
 
 .cf-app .budget.warn {
-  color: #92400e;
+  color: var(--color-chip-amber);
   border-color: rgba(240, 212, 154, 0.32);
   background: rgba(240, 212, 154, 0.06);
 }
@@ -1690,7 +1718,7 @@
 }
 
 .cf-app .sample-cta:hover {
-  background: #d4f7aa;
+  background: var(--color-highlight-lime);
 }
 
 .cf-app .sample-link {
@@ -1768,7 +1796,7 @@
 
 .cf-app .vsp-tail {
   font-size: 12px;
-  color: #57534e;
+  color: var(--color-text-secondary);
   line-height: 1.7;
   font-weight: 300;
   white-space: pre-line;
@@ -1832,10 +1860,22 @@
     padding: 36px 16px 80px;
   }
   /* Slightly improved calendar responsiveness: allow grid to wrap and larger touch targets */
-  .recent-list { display: flex; flex-direction: column; gap: 12px; }
-  .gen-wrap { padding: 18px; min-height: 260px; }
-  .stepper { overflow-x: auto; padding-bottom: 8px; }
-  .slabel { font-size: 12px; }
+  .recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .gen-wrap {
+    padding: 18px;
+    min-height: 260px;
+  }
+  .stepper {
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .slabel {
+    font-size: 12px;
+  }
 
   .cf-app .brand-title {
     font-size: 30px;
@@ -1874,14 +1914,19 @@
 }
 
 .cf-app .dtab.on::before {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 10%;
   right: 10%;
   height: 3px;
   border-radius: 3px 3px 0 0;
-  background: linear-gradient(90deg, rgba(194, 65, 12, 0.45) 0%, var(--accent) 50%, rgba(194, 65, 12, 0.45) 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(194, 65, 12, 0.45) 0%,
+    var(--accent) 50%,
+    rgba(194, 65, 12, 0.45) 100%
+  );
 }
 
 .cf-app .dtab.on .dtab-n {
@@ -1890,7 +1935,7 @@
 
 /* Done/locked: replace emoji with a clean lime dot indicator */
 .cf-app .dtab.locked::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 5px;
   right: 5px;
@@ -1926,11 +1971,7 @@
 
 /* Body text: subtle reading-mode gradient at the top edge */
 .cf-app .body-text {
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.012) 0%,
-    transparent 28px
-  );
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.012) 0%, transparent 28px);
   padding-top: 3px;
 }
 
@@ -1943,7 +1984,7 @@
 }
 
 .cf-app .cta-block::before {
-  content: 'CTA';
+  content: "CTA";
   position: absolute;
   top: -1px;
   left: 12px;
@@ -2006,7 +2047,9 @@
   -webkit-backdrop-filter: blur(14px);
   background: rgba(22, 24, 36, 0.93);
   border-color: rgba(194, 65, 12, 0.15);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(194, 65, 12, 0.06);
+  box-shadow:
+    0 10px 36px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(194, 65, 12, 0.06);
 }
 
 @keyframes cfMenuItemIn {
@@ -2022,15 +2065,30 @@
 
 .cf-app .tweak-opt {
   animation: cfMenuItemIn 0.2s ease both;
-  transition: background 0.15s, color 0.15s, padding-left 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    padding-left 0.15s;
 }
 
-.cf-app .tweak-opt:nth-child(1) { animation-delay: 0ms; }
-.cf-app .tweak-opt:nth-child(2) { animation-delay: 35ms; }
-.cf-app .tweak-opt:nth-child(3) { animation-delay: 70ms; }
-.cf-app .tweak-opt:nth-child(4) { animation-delay: 105ms; }
-.cf-app .tweak-opt:nth-child(5) { animation-delay: 140ms; }
-.cf-app .tweak-opt:nth-child(6) { animation-delay: 175ms; }
+.cf-app .tweak-opt:nth-child(1) {
+  animation-delay: 0ms;
+}
+.cf-app .tweak-opt:nth-child(2) {
+  animation-delay: 35ms;
+}
+.cf-app .tweak-opt:nth-child(3) {
+  animation-delay: 70ms;
+}
+.cf-app .tweak-opt:nth-child(4) {
+  animation-delay: 105ms;
+}
+.cf-app .tweak-opt:nth-child(5) {
+  animation-delay: 140ms;
+}
+.cf-app .tweak-opt:nth-child(6) {
+  animation-delay: 175ms;
+}
 
 .cf-app .tweak-opt:hover {
   background: rgba(194, 65, 12, 0.08);
@@ -2057,7 +2115,9 @@
   padding: 7px 0 7px 10px;
   border-left: 2px solid transparent;
   font-size: 13px;
-  transition: border-color 0.2s, background 0.2s;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
   border-radius: 0 3px 3px 0;
 }
 
@@ -2146,9 +2206,18 @@
    ───────────────────────────────────────────────────────────────────────── */
 
 @keyframes cfSavedPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(194, 65, 12, 0.55); background: rgba(194, 65, 12, 0.16); }
-  55%  { box-shadow: 0 0 0 7px rgba(194, 65, 12, 0); background: rgba(194, 65, 12, 0.24); }
-  100% { box-shadow: 0 0 0 0 rgba(194, 65, 12, 0); background: rgba(194, 65, 12, 0.1); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(194, 65, 12, 0.55);
+    background: rgba(194, 65, 12, 0.16);
+  }
+  55% {
+    box-shadow: 0 0 0 7px rgba(194, 65, 12, 0);
+    background: rgba(194, 65, 12, 0.24);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(194, 65, 12, 0);
+    background: rgba(194, 65, 12, 0.1);
+  }
 }
 
 .cf-app .autosave {
@@ -2164,7 +2233,9 @@
   color: rgba(194, 65, 12, 0.65);
   font-family: var(--font-body);
   font-weight: 400;
-  transition: color 0.3s, border-color 0.3s;
+  transition:
+    color 0.3s,
+    border-color 0.3s;
 }
 
 .cf-app .autosave.saved {
@@ -2180,7 +2251,7 @@
 }
 
 .cf-app .autosave::before {
-  content: '';
+  content: "";
   width: 5px;
   height: 5px;
   border-radius: 50%;

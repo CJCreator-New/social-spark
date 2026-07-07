@@ -30,13 +30,17 @@ import {
 } from "../_shared/promptHelpers.ts";
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
+  if (req.method === "OPTIONS")
+    return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
   try {
     const body = await req.json();
     const payload = cleanPayload(body);
     if (!payload.topic) {
-      console.info("generate-single-post: no topic provided; AI may infer topic from core idea or industry.", { industry: payload.industry, industryLabel: payload.industryLabel });
+      console.info(
+        "generate-single-post: no topic provided; AI may infer topic from core idea or industry.",
+        { industry: payload.industry, industryLabel: payload.industryLabel }
+      );
     }
 
     // Validate required fields (topic is optional — AI can infer a topic from core idea)
@@ -64,25 +68,39 @@ Deno.serve(async (req: Request) => {
 
     const usingSharedKey = !payload.userApiKey && !(quota.useOwnKey && quota.keyMode === "always");
     if (usingSharedKey && !quota.allowed) {
-      return jsonResponse({
-        error: "QUOTA_EXCEEDED",
-        message: quotaExceededMessage(quota.tier),
-        quota: { used: quota.used, limit: quota.limit },
-      }, 402);
+      return jsonResponse(
+        {
+          error: "QUOTA_EXCEEDED",
+          message: quotaExceededMessage(quota.tier),
+          quota: { used: quota.used, limit: quota.limit },
+        },
+        402
+      );
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets.");
-      return jsonResponse({
-        error: "AI is not configured.",
-        message: "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets."
-      }, 500);
+      console.error(
+        "LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets."
+      );
+      return jsonResponse(
+        {
+          error: "AI is not configured.",
+          message:
+            "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets.",
+        },
+        500
+      );
     }
 
     const lengthInstr = LENGTH_GUIDE[payload.length] || LENGTH_GUIDE.medium;
     const structureInstr = STRUCTURE_GUIDE[payload.structure] || STRUCTURE_GUIDE.mixed;
-    const hashtagInstr = buildHashtagInstr(payload.platform, payload.bannedHashtags, payload.requiredHashtags, { every: false });
+    const hashtagInstr = buildHashtagInstr(
+      payload.platform,
+      payload.bannedHashtags,
+      payload.requiredHashtags,
+      { every: false }
+    );
 
     const dateNote = payload.date ? ` (${payload.date})` : "";
 
@@ -109,12 +127,12 @@ Deno.serve(async (req: Request) => {
             topic: { type: "string" },
             format: { type: "string" },
             title: { type: "string" },
-              hook: { type: "string" },
-              hook_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
+            hook: { type: "string" },
+            hook_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
             body: { type: "string" },
-              cta: { type: "string" },
-              cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
-              image_prompt: { type: "string" },
+            cta: { type: "string" },
+            cta_options: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
+            image_prompt: { type: "string" },
             // New plan + variants + self-check schema (Phase A additions)
             plan: {
               type: "object",
@@ -141,22 +159,40 @@ Deno.serve(async (req: Request) => {
             forbidden: { type: "array", items: { type: "string" } },
             hashtags: {
               type: "string",
-              description: isLongFormPlatform(payload.platform) ? "MUST be empty for Newsletter/Blog." : "3–6 hashtags, space-separated.",
+              description: isLongFormPlatform(payload.platform)
+                ? "MUST be empty for Newsletter/Blog."
+                : "3–6 hashtags, space-separated.",
             },
             rationale: { type: "string" },
           },
-          required: ["day", "dow", "topic", "format", "title", "hook", "body", "cta", "hashtags", "rationale", "image_prompt"],
+          required: [
+            "day",
+            "dow",
+            "topic",
+            "format",
+            "title",
+            "hook",
+            "body",
+            "cta",
+            "hashtags",
+            "rationale",
+            "image_prompt",
+          ],
           additionalProperties: false,
         },
       },
     };
 
     // Choose defaults for model and temperature per route (Phase A)
-    const model = payload.quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+    const model =
+      payload.quality === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
     const temperature = payload.quality === "polished" ? 0.6 : 0.8;
 
     const aiRes = await callAIGateway(
-      [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }],
+      [
+        { role: "system", content: systemMsg },
+        { role: "user", content: userMsg },
+      ],
       tool,
       LOVABLE_API_KEY,
       {
@@ -167,15 +203,19 @@ Deno.serve(async (req: Request) => {
         quality: payload.quality,
         userToken: token || null,
         userIp: ipAddress,
-        max_tokens: 8192
+        max_tokens: 8192,
       }
     );
     if (aiRes.status !== 200) {
       if (aiRes.status === 503) {
-        return jsonResponse({
-          error: "PLATFORM_UNAVAILABLE",
-          message: "Our AI providers are temporarily overloaded. Please try again in a moment, or add your own API key in Profile → API Keys to generate without platform limits.",
-        }, 503);
+        return jsonResponse(
+          {
+            error: "PLATFORM_UNAVAILABLE",
+            message:
+              "Our AI providers are temporarily overloaded. Please try again in a moment, or add your own API key in Profile → API Keys to generate without platform limits.",
+          },
+          503
+        );
       }
       return jsonResponse({ error: aiRes.error }, aiRes.status);
     }
@@ -194,7 +234,7 @@ Deno.serve(async (req: Request) => {
     // Task 4: LLM-as-judge scoring if variants exist
     const candidates = [String(parsed.body || "")];
     if (Array.isArray(parsed.body_variants)) {
-      candidates.push(...parsed.body_variants.map(v => String(v || "")));
+      candidates.push(...parsed.body_variants.map((v) => String(v || "")));
     }
 
     if (candidates.length > 1) {
@@ -218,11 +258,16 @@ Deno.serve(async (req: Request) => {
     // If user requested a polished output, do a concise self-critique + rewrite pass on the pro model
     if (payload.quality === "polished") {
       try {
-        const polishSystem = systemMsg + "\n\nPOLISHING RUBRIC:\n- Remove any filler or vague language. \n- Strengthen hooks for curiosity and specificity.\n- Improve readability: shorter sentences, clearer verbs.\n- Ensure CTA is actionable and tied to the goal.\n- Preserve the core angle and facts.\n- Keep platform-native formatting.\n";
+        const polishSystem =
+          systemMsg +
+          "\n\nPOLISHING RUBRIC:\n- Remove any filler or vague language. \n- Strengthen hooks for curiosity and specificity.\n- Improve readability: shorter sentences, clearer verbs.\n- Ensure CTA is actionable and tied to the goal.\n- Preserve the core angle and facts.\n- Keep platform-native formatting.\n";
         const polishUser = `Please polish the following single post JSON to a higher-quality, publication-ready version using the rubric above. Return using the same function schema (return_post).\n\nCURRENT_POST_JSON:\n${JSON.stringify(parsed, null, 2)}`;
 
         const polishRes = await callAIGateway(
-          [{ role: "system", content: polishSystem }, { role: "user", content: polishUser }],
+          [
+            { role: "system", content: polishSystem },
+            { role: "user", content: polishUser },
+          ],
           tool,
           LOVABLE_API_KEY,
           {
@@ -233,7 +278,7 @@ Deno.serve(async (req: Request) => {
             quality: payload.quality,
             userToken: token || null,
             userIp: ipAddress,
-            max_tokens: 8192
+            max_tokens: 8192,
           }
         );
         if (polishRes.status === 200) {

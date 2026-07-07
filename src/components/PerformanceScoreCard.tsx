@@ -8,7 +8,7 @@ import {
   getRegenerationGuidance,
   getWeakestMetrics,
   suggestBetterCta,
-  PerformanceFocusMetric
+  PerformanceFocusMetric,
 } from "@/lib/postPerformanceScore";
 
 interface PerformanceScoreCardProps {
@@ -51,7 +51,16 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
   return (
     <div className="performance-card">
       <div className="perf-header">
-        <h3 style={{ margin: 0, fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+        <h3
+          style={{
+            margin: 0,
+            fontSize: 13,
+            fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
           <span>Performance Score</span>
           {keySource === "user" && (
             <span
@@ -61,9 +70,13 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
                 fontWeight: "600",
                 padding: "2px 6px",
                 borderRadius: "4px",
-                border: "1px solid hsl(var(--primary) / 0.2)"
+                border: "1px solid hsl(var(--primary) / 0.2)",
               }}
-              title={keyMode === "always" ? "Your API key is set as the primary provider" : "Your API key was used as a fallback"}
+              title={
+                keyMode === "always"
+                  ? "Your API key is set as the primary provider"
+                  : "Your API key was used as a fallback"
+              }
             >
               {keyMode === "always" ? "Your key · Always" : "Your key · Fallback"}
             </span>
@@ -90,7 +103,10 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
         <div className="perf-metric">
           <div className="perf-metric-label">
             <span>Hook Strength</span>
-            <span className="perf-metric-value tabular-nums" style={{ color: getScoreColor(score.hookStrength) }}>
+            <span
+              className="perf-metric-value tabular-nums"
+              style={{ color: getScoreColor(score.hookStrength) }}
+            >
               {score.hookStrength}/10
             </span>
           </div>
@@ -108,7 +124,10 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
         <div className="perf-metric">
           <div className="perf-metric-label">
             <span>CTA Effectiveness</span>
-            <span className="perf-metric-value tabular-nums" style={{ color: getScoreColor(score.ctaEffectiveness) }}>
+            <span
+              className="perf-metric-value tabular-nums"
+              style={{ color: getScoreColor(score.ctaEffectiveness) }}
+            >
               {score.ctaEffectiveness}/10
             </span>
           </div>
@@ -130,7 +149,11 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
                 title="Click to apply this suggestion"
                 type="button"
               >
-                "{suggestedCtaText.length > 50 ? suggestedCtaText.slice(0, 50) + "..." : suggestedCtaText}" →
+                "
+                {suggestedCtaText.length > 50
+                  ? suggestedCtaText.slice(0, 50) + "..."
+                  : suggestedCtaText}
+                " →
               </button>
             </div>
           )}
@@ -139,7 +162,10 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
         <div className="perf-metric">
           <div className="perf-metric-label">
             <span>Hashtag Relevance</span>
-            <span className="perf-metric-value tabular-nums" style={{ color: getScoreColor(score.hashtagRelevance / 10) }}>
+            <span
+              className="perf-metric-value tabular-nums"
+              style={{ color: getScoreColor(score.hashtagRelevance / 10) }}
+            >
               {score.hashtagRelevance}%
             </span>
           </div>
@@ -158,22 +184,32 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
           <div className="perf-metric-label">
             <span>Readability</span>
             <span className="perf-metric-value" style={{ color: "rgba(200,240,154,.7)" }}>
-              {getReadabilityLabel(score.readability)} (<span className="tabular-nums">Grade {score.readability}</span>)
+              {getReadabilityLabel(score.readability)} (
+              <span className="tabular-nums">Grade {score.readability}</span>)
             </span>
           </div>
           <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>
             {score.readability < 8
               ? "Easy to follow"
               : score.readability < 12
-              ? "Well-balanced"
-              : "May need simplification"}
+                ? "Well-balanced"
+                : "May need simplification"}
           </div>
         </div>
       </div>
 
       {score.feedback.length > 0 && (
         <div className="perf-feedback">
-          <div style={{ fontSize: 10, fontWeight: 500, color: "var(--text3)", marginBottom: 8, textTransform: "uppercase", letterSpacing: ".06em" }}>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 500,
+              color: "var(--text3)",
+              marginBottom: 8,
+              textTransform: "uppercase",
+              letterSpacing: ".06em",
+            }}
+          >
             Suggestions
           </div>
           <div className="perf-tips">
@@ -190,7 +226,10 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
         💡 Tip: Higher scores mean better engagement potential. Aim for 7+.
       </div>
 
-      <div className="perf-actions" style={{ marginTop: 12, display: "flex", gap: 8, flexDirection: "column" }}>
+      <div
+        className="perf-actions"
+        style={{ marginTop: 12, display: "flex", gap: 8, flexDirection: "column" }}
+      >
         {typeof onEnhance === "function" && (
           <button className="cpbtn" onClick={onEnhance} style={{ fontSize: 13, width: "100%" }}>
             ✨ Enhance for performance
@@ -200,13 +239,15 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
         {score.overallScore < 7 && weakestMetric && onFocusedRegenerate && (
           <button
             className="cpbtn font-mono"
-            onClick={() => onFocusedRegenerate(weakestMetric, getRegenerationGuidance(weakestMetric))}
+            onClick={() =>
+              onFocusedRegenerate(weakestMetric, getRegenerationGuidance(weakestMetric))
+            }
             style={{
               fontSize: 12,
               width: "100%",
               borderColor: "var(--text-accent)",
               background: "rgba(200, 240, 154, 0.05)",
-              color: "var(--text-accent)"
+              color: "var(--text-accent)",
             }}
           >
             🎯 Fix: {METRIC_LABELS[weakestMetric]}

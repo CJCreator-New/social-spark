@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,12 +17,34 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarClock, CheckCircle2, Clipboard, ExternalLink, MoreHorizontal, RotateCcw, Timer, XCircle } from "lucide-react";
+import {
+  CalendarClock,
+  CheckCircle2,
+  Clipboard,
+  ExternalLink,
+  MoreHorizontal,
+  RotateCcw,
+  Timer,
+  XCircle,
+} from "lucide-react";
 import { writeToClipboard, niceLabelFor } from "@/lib/platformCopy";
-import { browserTimezone, fmtDateInTz, fmtTimeInTz, listTimezones, tzLabel, zonedToUtcIso } from "@/lib/timezones";
+import {
+  browserTimezone,
+  fmtDateInTz,
+  fmtTimeInTz,
+  listTimezones,
+  tzLabel,
+  zonedToUtcIso,
+} from "@/lib/timezones";
 import { downloadScheduleCsv } from "@/lib/exportSchedule";
 import { buildTrackingUrl } from "@/lib/utm";
-import { useCancelScheduledPostMutation, useProfileQuery, useScheduleInfiniteQuery, useUpdateScheduledPostStatusMutation, useUpdateScheduledPostTimeMutation } from "@/hooks/useAppQueries";
+import {
+  useCancelScheduledPostMutation,
+  useProfileQuery,
+  useScheduleInfiniteQuery,
+  useUpdateScheduledPostStatusMutation,
+  useUpdateScheduledPostTimeMutation,
+} from "@/hooks/useAppQueries";
 import { resolveScheduleTimezone, saveScheduleTimezone } from "@/lib/schedulePreferences";
 import "@/styles/pages.css";
 
@@ -68,7 +90,10 @@ const STATUS_LABEL: Record<WorkflowStatus, string> = {
 };
 
 const STATUS_RANK: Record<WorkflowStatus, number> = {
-  failed: 0, drafted: 1, approved: 2, published: 3,
+  failed: 0,
+  drafted: 1,
+  approved: 2,
+  published: 3,
 };
 
 export default function Schedule() {
@@ -83,15 +108,26 @@ export default function Schedule() {
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [pendingCancel, setPendingCancel] = useState<ScheduledRow | null>(null);
-  const [pendingConflict, setPendingConflict] = useState<{ row: ScheduledRow; newIso: string } | null>(null);
+  const [pendingConflict, setPendingConflict] = useState<{
+    row: ScheduledRow;
+    newIso: string;
+  } | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const tzList = listTimezones();
-  const log = createScopedLogger('Schedule');
+  const log = createScopedLogger("Schedule");
   const updateStatusMutation = useUpdateScheduledPostStatusMutation();
   const cancelScheduledPostMutation = useCancelScheduledPostMutation();
   const updateScheduledTimeMutation = useUpdateScheduledPostTimeMutation();
 
-  const { data: scheduleData, isLoading: loading, error: scheduleError, refetch: refetchSchedule, fetchNextPage, hasNextPage, isFetchingNextPage } = useScheduleInfiniteQuery(user?.id, PAGE_SIZE);
+  const {
+    data: scheduleData,
+    isLoading: loading,
+    error: scheduleError,
+    refetch: refetchSchedule,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useScheduleInfiniteQuery(user?.id, PAGE_SIZE);
   const { data: profileData } = useProfileQuery(user?.id);
 
   const mergedCalendars = useMemo(() => {
@@ -114,7 +150,11 @@ export default function Schedule() {
   useEffect(() => {
     if (!scheduleData) return;
     const pages = scheduleData.pages;
-    setRows(pages.flatMap(page => page.rows) as ScheduledRow[]);
+    const next = pages.flatMap((page) => page.rows) as ScheduledRow[];
+    setRows((prev) => {
+      if (prev.length === next.length && prev.every((r, i) => r.id === next[i].id)) return prev;
+      return next;
+    });
     setCalendars(mergedCalendars);
   }, [scheduleData, mergedCalendars]);
 
@@ -126,11 +166,14 @@ export default function Schedule() {
     if (!hasNextPage || isFetchingNextPage) return;
     const el = loadMoreRef.current;
     if (!el) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        void fetchNextPage();
-      }
-    }, { rootMargin: "400px" });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: "400px" }
+    );
     observer.observe(el);
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, rows.length]);
@@ -142,9 +185,20 @@ export default function Schedule() {
   const sorted = useMemo(() => {
     const arr = [...rows];
     if (sortBy === "date-asc") arr.sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
-    else if (sortBy === "date-desc") arr.sort((a, b) => b.scheduled_at.localeCompare(a.scheduled_at));
-    else if (sortBy === "platform") arr.sort((a, b) => (a.platform || "").localeCompare(b.platform || "") || a.scheduled_at.localeCompare(b.scheduled_at));
-    else if (sortBy === "status") arr.sort((a, b) => STATUS_RANK[a.workflow_status] - STATUS_RANK[b.workflow_status] || a.scheduled_at.localeCompare(b.scheduled_at));
+    else if (sortBy === "date-desc")
+      arr.sort((a, b) => b.scheduled_at.localeCompare(a.scheduled_at));
+    else if (sortBy === "platform")
+      arr.sort(
+        (a, b) =>
+          (a.platform || "").localeCompare(b.platform || "") ||
+          a.scheduled_at.localeCompare(b.scheduled_at)
+      );
+    else if (sortBy === "status")
+      arr.sort(
+        (a, b) =>
+          STATUS_RANK[a.workflow_status] - STATUS_RANK[b.workflow_status] ||
+          a.scheduled_at.localeCompare(b.scheduled_at)
+      );
     return arr;
   }, [rows, sortBy]);
 
@@ -159,15 +213,18 @@ export default function Schedule() {
     }
     return g;
   }, [sorted, sortBy, viewTz]);
-  const summary = useMemo(() => ({
-    total: rows.length,
-    drafted: rows.filter((row) => row.workflow_status === "drafted").length,
-    approved: rows.filter((row) => row.workflow_status === "approved").length,
-    published: rows.filter((row) => row.workflow_status === "published").length,
-  }), [rows]);
+  const summary = useMemo(
+    () => ({
+      total: rows.length,
+      drafted: rows.filter((row) => row.workflow_status === "drafted").length,
+      approved: rows.filter((row) => row.workflow_status === "approved").length,
+      published: rows.filter((row) => row.workflow_status === "published").length,
+    }),
+    [rows]
+  );
 
   async function setStatus(row: ScheduledRow, status: WorkflowStatus) {
-    const log = createScopedLogger('Schedule-SetStatus');
+    const log = createScopedLogger("Schedule-SetStatus");
     const patch: Record<string, unknown> = { workflow_status: status };
     if (status === "published") patch.published_at = new Date().toISOString();
     if (status !== "failed") patch.failure_reason = null;
@@ -177,7 +234,11 @@ export default function Schedule() {
       log.error(`Failed to set status`, error, { postId: row.id, newStatus: status });
       return toast.error(error instanceof Error ? error.message : "Failed to set status");
     }
-    setRows(p => p.map(r => r.id === row.id ? { ...r, ...patch, workflow_status: status } as ScheduledRow : r));
+    setRows((p) =>
+      p.map((r) =>
+        r.id === row.id ? ({ ...r, ...patch, workflow_status: status } as ScheduledRow) : r
+      )
+    );
     log.info(`Post status updated`, { postId: row.id, newStatus: status });
     toast.success(`Marked ${STATUS_LABEL[status].toLowerCase()}`);
   }
@@ -187,14 +248,14 @@ export default function Schedule() {
   }
 
   async function confirmCancelRow(row: ScheduledRow) {
-    const log = createScopedLogger('Schedule-Cancel');
+    const log = createScopedLogger("Schedule-Cancel");
     try {
       await cancelScheduledPostMutation.mutateAsync(row.id);
     } catch (error) {
       log.error(`Failed to cancel post`, error, { postId: row.id });
       return toast.error(error instanceof Error ? error.message : "Failed to cancel post");
     }
-    setRows(p => p.filter(r => r.id !== row.id));
+    setRows((p) => p.filter((r) => r.id !== row.id));
     setPendingCancel(null);
     log.info(`Post cancelled`, { postId: row.id });
     toast.success("Cancelled");
@@ -239,14 +300,14 @@ export default function Schedule() {
   }
 
   async function commitEdit(row: ScheduledRow, newIso: string) {
-    const log = createScopedLogger('Schedule-SaveEdit');
+    const log = createScopedLogger("Schedule-SaveEdit");
     try {
       await updateScheduledTimeMutation.mutateAsync({ id: row.id, scheduledAt: newIso });
     } catch (error) {
       log.error(`Failed to save edit`, error, { postId: row.id, newTime: newIso });
       return toast.error(error instanceof Error ? error.message : "Failed to save edit");
     }
-    setRows(p => p.map(r => r.id === row.id ? { ...r, scheduled_at: newIso } : r));
+    setRows((p) => p.map((r) => (r.id === row.id ? { ...r, scheduled_at: newIso } : r)));
     setEditId(null);
     log.info(`Post time updated`, { postId: row.id, newTime: newIso });
     toast.success("Time updated");
@@ -254,7 +315,7 @@ export default function Schedule() {
 
   function exportCsv() {
     const tz = viewTz;
-    const enriched = sorted.map(r => {
+    const enriched = sorted.map((r) => {
       const cal = calendars[r.calendar_id];
       return {
         ...r,
@@ -266,15 +327,152 @@ export default function Schedule() {
     toast.success(`Exported ${enriched.length} rows ✓`);
   }
 
+  const renderRow = useCallback(
+    (row: ScheduledRow) => {
+      const cal = calendars[row.calendar_id];
+      const tz = viewTz;
+      const isEditing = editId === row.id;
+      return (
+        <div key={row.id} className="sc-row">
+          <div className="sc-time tabular-nums">
+            <span>{fmtTimeInTz(row.scheduled_at, tz)}</span>
+            {sortBy !== "date-asc" && sortBy !== "date-desc" && (
+              <span className="sc-time-tz">{fmtDateInTz(row.scheduled_at, tz)}</span>
+            )}
+            <span className="sc-time-tz">{tz.split("/").pop()}</span>
+          </div>
+          <div className="sc-meta">
+            <div className="sc-meta-title">
+              {row.post_snapshot?.title || row.post_snapshot?.topic || `Day ${row.post_day}`}
+            </div>
+            <div className="sc-meta-sub">
+              {row.platform && <span className="sc-tag">{row.platform}</span>}
+              <span className={`sc-status ${row.workflow_status}`}>
+                ● {STATUS_LABEL[row.workflow_status]}
+              </span>
+              <span>Day {row.post_day}</span>
+              {cal && <span>· {cal.title}</span>}
+              {row.workflow_status === "failed" && row.failure_reason && (
+                <span style={{ color: "var(--color-error-text)" }}>· {row.failure_reason}</span>
+              )}
+            </div>
+            {isEditing && (
+              <div className="sc-edit">
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: "var(--color-text-secondary)",
+                    letterSpacing: ".1em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Reschedule
+                </span>
+                <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+                <input type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} />
+                <button className="sc-act sc-act-p" onClick={() => saveEdit(row)}>
+                  Save
+                </button>
+                <button className="sc-act" onClick={() => setEditId(null)}>
+                  Cancel
+                </button>
+                <span style={{ fontSize: 10, color: "var(--color-text-secondary)", marginLeft: 4 }}>
+                  in {cal?.timezone || profileTz || browserTimezone()}
+                </span>
+              </div>
+            )}
+          </div>
+          {row.workflow_status === "drafted" && (
+            <button className="sc-act" onClick={() => void setStatus(row, "approved")}>
+              Approve
+            </button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="sc-act sc-menu-trigger"
+                aria-label={`Actions for day ${row.post_day}`}
+              >
+                <MoreHorizontal size={16} aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="sc-menu-content">
+              <DropdownMenuItem className="sc-menu-item" onSelect={() => void copyRow(row)}>
+                <Clipboard size={14} aria-hidden="true" /> Copy post text
+              </DropdownMenuItem>
+              {!isEditing && (
+                <DropdownMenuItem className="sc-menu-item" onSelect={() => startEdit(row)}>
+                  <CalendarClock size={14} aria-hidden="true" /> Reschedule
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator className="sc-menu-sep" />
+              {row.workflow_status === "drafted" && (
+                <DropdownMenuItem
+                  className="sc-menu-item"
+                  onSelect={() => void setStatus(row, "approved")}
+                >
+                  <CheckCircle2 size={14} aria-hidden="true" /> Approve
+                </DropdownMenuItem>
+              )}
+              {row.workflow_status === "approved" && (
+                <DropdownMenuItem
+                  className="sc-menu-item"
+                  onSelect={() => void setStatus(row, "published")}
+                >
+                  <CheckCircle2 size={14} aria-hidden="true" /> Mark published
+                </DropdownMenuItem>
+              )}
+              {row.workflow_status === "published" && (
+                <DropdownMenuItem
+                  className="sc-menu-item"
+                  onSelect={() => void setStatus(row, "approved")}
+                >
+                  <RotateCcw size={14} aria-hidden="true" /> Re-open
+                </DropdownMenuItem>
+              )}
+              {row.workflow_status !== "failed" && row.workflow_status !== "published" && (
+                <DropdownMenuItem
+                  className="sc-menu-item danger"
+                  onSelect={() => void setStatus(row, "failed")}
+                >
+                  <XCircle size={14} aria-hidden="true" /> Mark failed
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator className="sc-menu-sep" />
+              <DropdownMenuItem
+                className="sc-menu-item"
+                onSelect={() => navigate(`/calendar/${row.calendar_id}`)}
+              >
+                <ExternalLink size={14} aria-hidden="true" /> Open calendar
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="sc-menu-item danger"
+                onSelect={() => requestCancelRow(row)}
+              >
+                <XCircle size={14} aria-hidden="true" /> Cancel scheduled post
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      );
+    },
+    [calendars, viewTz, sortBy, editId, editDate, editTime, profileTz]
+  );
+
   return (
     <>
       <Helmet>
         <title>Publishing schedule queue — ContentForge</title>
-        <meta name="description" content="Manage your publishing queue, review scheduled posts, edit posting times, select time zones, and export calendars." />
+        <meta
+          name="description"
+          content="Manage your publishing queue, review scheduled posts, edit posting times, select time zones, and export calendars."
+        />
       </Helmet>
       <WorkspacePage size="wide">
         <div className="sc-head">
-          <h1 className="sc-title">My <em>schedule</em></h1>
+          <h1 className="sc-title">
+            My <em>schedule</em>
+          </h1>
         </div>
 
         <div className="sc-summary" aria-label="Schedule summary">
@@ -303,17 +501,36 @@ export default function Schedule() {
         {!loading && rows.length > 0 && (
           <div className="sc-toolbar">
             <span className="sc-tool-label">Sort</span>
-            <select className="sc-sel" aria-label="Sort schedule" value={sortBy} onChange={e => setSortBy(e.target.value as SortKey)}>
+            <select
+              className="sc-sel"
+              aria-label="Sort schedule"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+            >
               <option value="date-asc">Date · soonest first</option>
               <option value="date-desc">Date · latest first</option>
               <option value="platform">Platform</option>
               <option value="status">Status</option>
             </select>
-            <span className="sc-tool-label" style={{ marginLeft: 8 }}>Timezone</span>
-            <select className="sc-sel" aria-label="Schedule timezone" value={viewTz} onChange={e => setViewTz(e.target.value)} style={{ maxWidth: 240 }}>
-              {tzList.map(tz => <option key={tz} value={tz}>{tzLabel(tz)}</option>)}
+            <span className="sc-tool-label" style={{ marginLeft: 8 }}>
+              Timezone
+            </span>
+            <select
+              className="sc-sel"
+              aria-label="Schedule timezone"
+              value={viewTz}
+              onChange={(e) => setViewTz(e.target.value)}
+              style={{ maxWidth: 240 }}
+            >
+              {tzList.map((tz) => (
+                <option key={tz} value={tz}>
+                  {tzLabel(tz)}
+                </option>
+              ))}
             </select>
-            <button className="sc-csv-btn" onClick={exportCsv} disabled={sorted.length === 0}>↓ Export CSV</button>
+            <button className="sc-csv-btn" onClick={exportCsv} disabled={sorted.length === 0}>
+              ↓ Export CSV
+            </button>
           </div>
         )}
 
@@ -322,17 +539,34 @@ export default function Schedule() {
         ) : scheduleError ? (
           <ErrorState
             title="Couldn't load your schedule"
-            description={scheduleError instanceof Error ? scheduleError.message : "Something went wrong while fetching your scheduled posts."}
+            description={
+              scheduleError instanceof Error
+                ? scheduleError.message
+                : "Something went wrong while fetching your scheduled posts."
+            }
             onRetry={() => refetchSchedule()}
           />
         ) : rows.length === 0 ? (
           <div className="sc-empty">
-            <div className="sc-empty-illus" aria-hidden="true"><Timer size={34} strokeWidth={1.6} /></div>
-            <div className="sc-empty-title">Nothing in the <em>queue</em> yet</div>
-            <p className="sc-empty-sub">Open a calendar and click <strong style={{ color: "#c2410c" }}>Schedule week</strong> to populate this view with draft and publish actions.</p>
-            <Link to="/app" className="sc-empty-cta">Create a calendar</Link>
+            <div className="sc-empty-illus" aria-hidden="true">
+              <Timer size={34} strokeWidth={1.6} />
+            </div>
+            <div className="sc-empty-title">
+              Nothing in the <em>queue</em> yet
+            </div>
+            <p className="sc-empty-sub">
+              Open a calendar and click{" "}
+              <strong style={{ color: "var(--color-primary)" }}>Schedule week</strong> to populate
+              this view with draft and publish actions.
+            </p>
+            <Link to="/app" className="sc-empty-cta">
+              Create a calendar
+            </Link>
             <div style={{ marginTop: 12 }}>
-              <Link to="/my-calendars" className="text-xs text-slate-500 hover:text-[#c2410c] transition-colors underline">
+              <Link
+                to="/my-calendars"
+                className="text-xs text-slate-500 hover:text-[var(--color-primary)] transition-colors underline"
+              >
                 Or schedule an existing calendar →
               </Link>
             </div>
@@ -341,7 +575,7 @@ export default function Schedule() {
           [...grouped.entries()].map(([date, list]) => (
             <div key={date} className="sc-group">
               <h2 className="sc-group-h">{date}</h2>
-              {list.map(row => renderRow(row))}
+              {list.map((row) => renderRow(row))}
             </div>
           ))
         ) : (
@@ -357,8 +591,15 @@ export default function Schedule() {
         )}
 
         {hasNextPage && (
-          <div ref={loadMoreRef} style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
-            <button className="sc-act" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+          <div
+            ref={loadMoreRef}
+            style={{ display: "flex", justifyContent: "center", marginTop: 18 }}
+          >
+            <button
+              className="sc-act"
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+            >
               {isFetchingNextPage ? "Loading more…" : "Load more"}
             </button>
           </div>
@@ -369,7 +610,10 @@ export default function Schedule() {
           title="Cancel this scheduled post?"
           message={`${pendingCancel.post_snapshot?.title || pendingCancel.post_snapshot?.topic || `Day ${pendingCancel.post_day}`} will be removed from the queue.`}
           onCancel={() => setPendingCancel(null)}
-          onConfirm={async () => { setPendingCancel(null); await confirmCancelRow(pendingCancel); }}
+          onConfirm={async () => {
+            setPendingCancel(null);
+            await confirmCancelRow(pendingCancel);
+          }}
         />
       )}
       {pendingConflict && (
@@ -378,114 +622,41 @@ export default function Schedule() {
           message={`Another post for ${niceLabelFor(pendingConflict.row.platform)} is already scheduled at this exact time. Schedule this one anyway?`}
           confirmLabel="Schedule anyway"
           onCancel={() => setPendingConflict(null)}
-          onConfirm={async () => { const c = pendingConflict; setPendingConflict(null); await commitEdit(c.row, c.newIso); }}
+          onConfirm={async () => {
+            const c = pendingConflict;
+            setPendingConflict(null);
+            await commitEdit(c.row, c.newIso);
+          }}
         />
       )}
     </>
   );
-
-  function renderRow(row: ScheduledRow) {
-    const cal = calendars[row.calendar_id];
-    const tz = viewTz;
-    const isEditing = editId === row.id;
-    return (
-      <div key={row.id} className="sc-row">
-        <div className="sc-time tabular-nums">
-          <span>{fmtTimeInTz(row.scheduled_at, tz)}</span>
-          {sortBy !== "date-asc" && sortBy !== "date-desc" && (
-            <span className="sc-time-tz">{fmtDateInTz(row.scheduled_at, tz)}</span>
-          )}
-          <span className="sc-time-tz">{tz.split("/").pop()}</span>
-        </div>
-        <div className="sc-meta">
-          <div className="sc-meta-title">{row.post_snapshot?.title || row.post_snapshot?.topic || `Day ${row.post_day}`}</div>
-          <div className="sc-meta-sub">
-            {row.platform && <span className="sc-tag">{row.platform}</span>}
-            <span className={`sc-status ${row.workflow_status}`}>● {STATUS_LABEL[row.workflow_status]}</span>
-            <span>Day {row.post_day}</span>
-            {cal && <span>· {cal.title}</span>}
-            {row.workflow_status === "failed" && row.failure_reason && (
-              <span style={{ color: "#b91c1c" }}>· {row.failure_reason}</span>
-            )}
-          </div>
-          {isEditing && (
-            <div className="sc-edit">
-              <span style={{ fontSize: 10, color: "#5a5753", letterSpacing: ".1em", textTransform: "uppercase" }}>Reschedule</span>
-              <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} />
-              <input type="time" value={editTime} onChange={e => setEditTime(e.target.value)} />
-              <button className="sc-act sc-act-p" onClick={() => saveEdit(row)}>Save</button>
-              <button className="sc-act" onClick={() => setEditId(null)}>Cancel</button>
-              <span style={{ fontSize: 10, color: "#5a5753", marginLeft: 4 }}>
-                in {(cal?.timezone || profileTz || browserTimezone())}
-              </span>
-            </div>
-          )}
-        </div>
-        {row.workflow_status === "drafted" && (
-          <button className="sc-act" onClick={() => void setStatus(row, "approved")}>
-            Approve
-          </button>
-        )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="sc-act sc-menu-trigger" aria-label={`Actions for day ${row.post_day}`}>
-              <MoreHorizontal size={16} aria-hidden="true" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="sc-menu-content">
-            <DropdownMenuItem className="sc-menu-item" onSelect={() => void copyRow(row)}>
-              <Clipboard size={14} aria-hidden="true" /> Copy post text
-            </DropdownMenuItem>
-            {!isEditing && (
-              <DropdownMenuItem className="sc-menu-item" onSelect={() => startEdit(row)}>
-                <CalendarClock size={14} aria-hidden="true" /> Reschedule
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator className="sc-menu-sep" />
-            {row.workflow_status === "drafted" && (
-              <DropdownMenuItem className="sc-menu-item" onSelect={() => void setStatus(row, "approved")}>
-                <CheckCircle2 size={14} aria-hidden="true" /> Approve
-              </DropdownMenuItem>
-            )}
-            {row.workflow_status === "approved" && (
-              <DropdownMenuItem className="sc-menu-item" onSelect={() => void setStatus(row, "published")}>
-                <CheckCircle2 size={14} aria-hidden="true" /> Mark published
-              </DropdownMenuItem>
-            )}
-            {row.workflow_status === "published" && (
-              <DropdownMenuItem className="sc-menu-item" onSelect={() => void setStatus(row, "approved")}>
-                <RotateCcw size={14} aria-hidden="true" /> Re-open
-              </DropdownMenuItem>
-            )}
-            {row.workflow_status !== "failed" && row.workflow_status !== "published" && (
-              <DropdownMenuItem className="sc-menu-item danger" onSelect={() => void setStatus(row, "failed")}>
-                <XCircle size={14} aria-hidden="true" /> Mark failed
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator className="sc-menu-sep" />
-            <DropdownMenuItem className="sc-menu-item" onSelect={() => navigate(`/calendar/${row.calendar_id}`)}>
-              <ExternalLink size={14} aria-hidden="true" /> Open calendar
-            </DropdownMenuItem>
-            <DropdownMenuItem className="sc-menu-item danger" onSelect={() => requestCancelRow(row)}>
-              <XCircle size={14} aria-hidden="true" /> Cancel scheduled post
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    );
-  }
 }
 
 // Helpers (kept inside file to avoid extra exports).
 function fmtInTzDateInput(iso: string, tz: string): string {
   try {
-    const dtf = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+    const dtf = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
     return dtf.format(new Date(iso));
-  } catch { return new Date(iso).toISOString().slice(0, 10); }
+  } catch {
+    return new Date(iso).toISOString().slice(0, 10);
+  }
 }
 function fmtInTzTimeInput(iso: string, tz: string): string {
   try {
-    const dtf = new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false });
+    const dtf = new Intl.DateTimeFormat("en-GB", {
+      timeZone: tz,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
     return dtf.format(new Date(iso));
-  } catch { return "08:00"; }
+  } catch {
+    return "08:00";
+  }
 }

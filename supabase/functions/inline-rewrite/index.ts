@@ -14,13 +14,15 @@ import {
 
 const INSTRUCTIONS: Record<string, string> = {
   punchier: "Rewrite the selected text to be punchier, tighter, and more memorable.",
-  "add-stat": "Rewrite the selected text by adding one plausible, clearly framed stat or metric. If no specific stat is known, use a careful benchmark-style phrase instead of fabricating a precise source.",
+  "add-stat":
+    "Rewrite the selected text by adding one plausible, clearly framed stat or metric. If no specific stat is known, use a careful benchmark-style phrase instead of fabricating a precise source.",
   question: "Rewrite the selected text as a crisp question that creates curiosity.",
   simpler: "Rewrite the selected text in simpler, clearer language while preserving the meaning.",
 };
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
+  if (req.method === "OPTIONS")
+    return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -48,11 +50,17 @@ Deno.serve(async (req: Request) => {
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets.");
-      return jsonResponse({
-        error: "AI is not configured.",
-        message: "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets."
-      }, 500);
+      console.error(
+        "LOVABLE_API_KEY environment variable is not set. Please set it in Supabase Dashboard → Edge Functions → Manage secrets."
+      );
+      return jsonResponse(
+        {
+          error: "AI is not configured.",
+          message:
+            "The LOVABLE_API_KEY environment variable is not set. Please configure it in Supabase Dashboard → Edge Functions → Manage secrets.",
+        },
+        500
+      );
     }
 
     const post = body.post || {};
@@ -98,7 +106,10 @@ ${text}`;
     };
 
     const aiRes = await callAIGateway(
-      [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }],
+      [
+        { role: "system", content: systemMsg },
+        { role: "user", content: userMsg },
+      ],
       tool,
       LOVABLE_API_KEY,
       {
@@ -114,10 +125,14 @@ ${text}`;
 
     if (aiRes.status !== 200) {
       if (aiRes.status === 503) {
-        return jsonResponse({
-          error: "PLATFORM_UNAVAILABLE",
-          message: "Our AI providers are temporarily overloaded. Please try again in a moment, or add your own API key in Profile → API Keys to generate without platform limits.",
-        }, 503);
+        return jsonResponse(
+          {
+            error: "PLATFORM_UNAVAILABLE",
+            message:
+              "Our AI providers are temporarily overloaded. Please try again in a moment, or add your own API key in Profile → API Keys to generate without platform limits.",
+          },
+          503
+        );
       }
       return jsonResponse({ error: aiRes.error }, aiRes.status);
     }

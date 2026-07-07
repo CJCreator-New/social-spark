@@ -3,12 +3,23 @@ import { zonedToUtcIso } from "./timezones";
 import { suggestedTimeForDay } from "./postingTimes";
 
 const DOW_TO_OFFSET: Record<string, number> = {
-  Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6,
+  Mon: 0,
+  Tue: 1,
+  Wed: 2,
+  Thu: 3,
+  Fri: 4,
+  Sat: 5,
+  Sun: 6,
 };
 
 const DOW_LABEL: Record<string, string> = {
-  Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday",
-  Fri: "Friday", Sat: "Saturday", Sun: "Sunday",
+  Mon: "Monday",
+  Tue: "Tuesday",
+  Wed: "Wednesday",
+  Thu: "Thursday",
+  Fri: "Friday",
+  Sat: "Saturday",
+  Sun: "Sunday",
 };
 
 /** Parse a YYYY-MM-DD string into a Date in local time (no TZ surprises). */
@@ -47,8 +58,10 @@ export function dateForDow(weekStart: Date, dow: string): Date {
 
 /** Pretty short label e.g. "Mon · Apr 22". */
 export function shortDateLabel(d: Date): string {
-  const dow = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
-  const mon = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
+  const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()];
+  const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][
+    d.getMonth()
+  ];
   return `${dow} · ${mon} ${d.getDate()}`;
 }
 
@@ -167,7 +180,13 @@ function triggerDownload(blob: Blob, filename: string) {
 }
 
 function fileSlug(s: string) {
-  return (s || "calendar").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "calendar";
+  return (
+    (s || "calendar")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "calendar"
+  );
 }
 
 export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
@@ -187,8 +206,12 @@ export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
 
   for (const p of posts) {
     const time = postTimes[String(p.day)] || suggestedTimeForDay(p.day, platform);
-    const dayOffset = (p.day && typeof p.day === "number") ? p.day - 1 : 0;
-    const localStart = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayOffset);
+    const dayOffset = p.day && typeof p.day === "number" ? p.day - 1 : 0;
+    const localStart = new Date(
+      weekStart.getFullYear(),
+      weekStart.getMonth(),
+      weekStart.getDate() + dayOffset
+    );
     const { hours, minutes } = parseTime(time);
     localStart.setHours(hours, minutes, 0, 0);
 
@@ -233,7 +256,7 @@ export function downloadIcs(opts: IcsOptions, posts: IcsPost[]) {
       "ACTION:DISPLAY",
       foldLine(`DESCRIPTION:${icsEscape(`Time to post: ${p.title || p.topic}`)}`),
       "END:VALARM",
-      "END:VEVENT",
+      "END:VEVENT"
     );
   }
 

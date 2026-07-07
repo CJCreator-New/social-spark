@@ -102,7 +102,12 @@ async function processJob(job: QueueJob & { id: string; lock_token?: string }) {
       throw new Error(`Unknown job type: ${job.job_type}`);
     }
 
-    await updateJob(job.id, { status: "completed", locked_at: null, lock_token: null, updated_at: new Date().toISOString() });
+    await updateJob(job.id, {
+      status: "completed",
+      locked_at: null,
+      lock_token: null,
+      updated_at: new Date().toISOString(),
+    });
     return { ok: true };
   } catch (error) {
     const attempts = Number(job.attempts || 0) + 1;
@@ -112,7 +117,9 @@ async function processJob(job: QueueJob & { id: string; lock_token?: string }) {
     await updateJob(job.id, {
       attempts,
       status: failed ? "failed" : "pending",
-      next_attempt_at: failed ? new Date().toISOString() : new Date(Date.now() + backoffMs).toISOString(),
+      next_attempt_at: failed
+        ? new Date().toISOString()
+        : new Date(Date.now() + backoffMs).toISOString(),
       last_error: String(error),
       locked_at: null,
       lock_token: null,
@@ -133,7 +140,8 @@ export async function handle(req: Request) {
 
     if (mode === "enqueue") {
       const job = body?.job || body;
-      if (!job?.job_type) return new Response(JSON.stringify({ ok: false, error: "no job_type" }), { status: 400 });
+      if (!job?.job_type)
+        return new Response(JSON.stringify({ ok: false, error: "no job_type" }), { status: 400 });
       const inserted = await insertJobToSupabase(job);
       return new Response(JSON.stringify({ ok: true, inserted }), { status: 200 });
     }
@@ -141,7 +149,9 @@ export async function handle(req: Request) {
     const claimed = body?.jobId ? null : await claimNextJob();
     if (!claimed) return new Response(JSON.stringify({ ok: true, processed: 0 }), { status: 200 });
     const processed = await processJob(claimed);
-    return new Response(JSON.stringify({ ok: true, processed: 1, result: processed }), { status: 200 });
+    return new Response(JSON.stringify({ ok: true, processed: 1, result: processed }), {
+      status: 200,
+    });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500 });
   }

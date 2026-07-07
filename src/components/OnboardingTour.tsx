@@ -13,22 +13,26 @@ export function OnboardingTour({ onSeeExample, onClose }: OnboardingTourProps) {
   const steps = [
     {
       title: "Welcome to Social Spark ✨",
-      description: "Social Spark is an AI-powered workspace that designs, writes, and schedules high-performance content calendars tailored to your specific industry, voice, and goals.",
+      description:
+        "Social Spark is an AI-powered workspace that designs, writes, and schedules high-performance content calendars tailored to your specific industry, voice, and goals.",
       icon: Sparkles,
     },
     {
       title: "1. Define Niche & Core Idea 🎯",
-      description: "Select your industry niche and type in your core idea. This serves as the north star for all content, guiding the AI to output exactly what your audience cares about.",
+      description:
+        "Select your industry niche and type in your core idea. This serves as the north star for all content, guiding the AI to output exactly what your audience cares about.",
       icon: Compass,
     },
     {
       title: "2. Tailor Your Voice & Brand 🗣️",
-      description: "Expand 'Tailor Voice & Brand Settings' to configure target language, audience segments, tone of voice, copy style, quality tier, and custom rules (banned/required words).",
+      description:
+        "Expand 'Tailor Voice & Brand Settings' to configure target language, audience segments, tone of voice, copy style, quality tier, and custom rules (banned/required words).",
       icon: Volume2,
     },
     {
       title: "3. Choose Topics & Generate 🚀",
-      description: "Pick from the suggested topics or add your own, then click 'Generate' to see your posts mapped out day-by-day. Review, refine, and export your week instantly!",
+      description:
+        "Pick from the suggested topics or add your own, then click 'Generate' to see your posts mapped out day-by-day. Review, refine, and export your week instantly!",
       icon: CalendarDays,
     },
   ];
