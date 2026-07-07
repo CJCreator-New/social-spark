@@ -106,6 +106,10 @@ function openRescheduleMenu() {
   fireEvent.click(trigger);
 }
 
+// The reschedule conflict prompt is the in-app <ConfirmDialog/> (role="dialog"), rendered
+// alongside the still-open inline edit row — both have their own "Cancel" button, so all
+// dialog interactions must be scoped with within(dialog) to avoid an ambiguous query.
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockConflictLimit.mockResolvedValue({ data: [], error: null });
@@ -127,15 +131,13 @@ describe("Schedule — conflict detection on reschedule", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
-    await waitFor(() => {
-      expect(screen.getByText(/already scheduled at this exact time/i)).toBeInTheDocument();
-    });
+    const dialog = await screen.findByRole("dialog", { name: /time slot already taken/i });
 
     // Cancel the conflict dialog — the edit must NOT be committed.
-    fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /^cancel$/i }));
 
     await waitFor(() => {
-      expect(screen.queryByText(/already scheduled at this exact time/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: /time slot already taken/i })).not.toBeInTheDocument();
     });
     expect(mockUpdateTimeMutateAsync).not.toHaveBeenCalled();
   });
@@ -151,11 +153,8 @@ describe("Schedule — conflict detection on reschedule", () => {
     fireEvent.change(dateInput, { target: { value: "2026-07-09" } });
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
-    await waitFor(() => {
-      expect(screen.getByText(/already scheduled at this exact time/i)).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: /schedule anyway/i }));
+    const dialog = await screen.findByRole("dialog", { name: /time slot already taken/i });
+    fireEvent.click(within(dialog).getByRole("button", { name: /schedule anyway/i }));
 
     await waitFor(() => {
       expect(mockUpdateTimeMutateAsync).toHaveBeenCalled();
@@ -181,6 +180,6 @@ describe("Schedule — conflict detection on reschedule", () => {
     await waitFor(() => {
       expect(mockUpdateTimeMutateAsync).toHaveBeenCalled();
     });
-    expect(screen.queryByText(/already scheduled at this exact time/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /time slot already taken/i })).not.toBeInTheDocument();
   });
 });

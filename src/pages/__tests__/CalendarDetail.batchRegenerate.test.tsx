@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Post } from "@/components/wizard/constants";
@@ -119,11 +119,9 @@ function renderCalendarDetail() {
 }
 
 const OLD_FETCH = global.fetch;
-let confirmSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
   vi.stubGlobal(
     "fetch",
     vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }))
@@ -132,9 +130,15 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  confirmSpy.mockRestore();
   vi.stubGlobal("fetch", OLD_FETCH);
 });
+
+// The component confirms bulk regenerate via the in-app <ConfirmDialog/> (role="dialog"),
+// not window.confirm — click its "Regenerate" button to proceed past the gate.
+async function confirmBulkRegenerateDialog() {
+  const dialog = await screen.findByRole("dialog", { name: /regenerate unlocked posts/i });
+  fireEvent.click(within(dialog).getByRole("button", { name: /^regenerate$/i }));
+}
 
 describe("CalendarDetail — bulk regenerate (regenerate all unlocked)", () => {
   it("isolates a single post's failure: other posts still regenerate and a partial-failure toast is shown", async () => {
@@ -153,8 +157,7 @@ describe("CalendarDetail — bulk regenerate (regenerate all unlocked)", () => {
 
     const bulkBtn = await screen.findByRole("button", { name: /regenerate all unlocked/i });
     fireEvent.click(bulkBtn);
-
-    expect(confirmSpy).toHaveBeenCalled();
+    await confirmBulkRegenerateDialog();
 
     // Bulk regenerate retries the failing post 3x with backoff sleeps (~1.2s) — allow generous time.
     await waitFor(
@@ -188,6 +191,7 @@ describe("CalendarDetail — bulk regenerate (regenerate all unlocked)", () => {
 
     const bulkBtn = await screen.findByRole("button", { name: /regenerate all unlocked/i });
     fireEvent.click(bulkBtn);
+    await confirmBulkRegenerateDialog();
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("Regenerated 3 posts"));
@@ -195,14 +199,18 @@ describe("CalendarDetail — bulk regenerate (regenerate all unlocked)", () => {
     expect(toast.warning).not.toHaveBeenCalled();
   });
 
-  it("does not call the regenerate endpoint at all when the user cancels the confirm prompt", async () => {
-    confirmSpy.mockReturnValue(false);
+  it("does not call the regenerate endpoint at all when the user dismisses the confirm dialog", async () => {
     renderCalendarDetail();
 
     const bulkBtn = await screen.findByRole("button", { name: /regenerate all unlocked/i });
     fireEvent.click(bulkBtn);
 
-    expect(confirmSpy).toHaveBeenCalled();
+    const dialog = await screen.findByRole("dialog", { name: /regenerate unlocked posts/i });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^cancel$/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /regenerate unlocked posts/i })).not.toBeInTheDocument();
+    });
     expect(mockRegenerateMutateAsync).not.toHaveBeenCalled();
   });
 });
