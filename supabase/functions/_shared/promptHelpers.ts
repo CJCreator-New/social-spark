@@ -122,6 +122,20 @@ export function stripMarkdownFormatting(value: unknown): string {
   text = text.replace(/`([^`]+)`/g, "$1");
   // Markdown links: [text](url) -> text
   text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  // Literal HTML tags some models emit instead of markdown (e.g. <b>, <br>) —
+  // strip regardless of open/close pairing since post copy should have none.
+  text = text.replace(
+    /<\/?(?:b|i|strong|em|u|br|p|div|span|ul|ol|li|h[1-6]|a|code|pre|mark|small|sub|sup|del|ins|blockquote)\b[^>]*>/gi,
+    ""
+  );
+  // Decode common HTML entities that leak through instead of raw characters.
+  text = text
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'");
   return text;
 }
 

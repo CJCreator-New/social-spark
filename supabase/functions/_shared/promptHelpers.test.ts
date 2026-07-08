@@ -61,6 +61,25 @@ describe("stripMarkdownFormatting", () => {
     expect(stripMarkdownFormatting(undefined)).toBe("");
     expect(stripMarkdownFormatting(null)).toBe("");
   });
+
+  it("strips literal HTML emphasis/structure tags, even unpaired ones", () => {
+    expect(stripMarkdownFormatting("This is <b>bold</b> and this is <i>italic</i>.")).toBe(
+      "This is bold and this is italic."
+    );
+    expect(stripMarkdownFormatting("Line one<br>Line two")).toBe("Line oneLine two");
+    expect(stripMarkdownFormatting("<strong>Unclosed tag stays clean")).toBe(
+      "Unclosed tag stays clean"
+    );
+  });
+
+  it("decodes common HTML entities", () => {
+    expect(stripMarkdownFormatting("Tom &amp; Jerry &lt;3 &quot;fun&quot;")).toBe(
+      'Tom & Jerry <3 "fun"'
+    );
+    expect(stripMarkdownFormatting("It&#39;s great&nbsp;&mdash;really")).toBe(
+      "It's great &mdash;really"
+    );
+  });
 });
 
 describe("promptHelpers engagement guidance", () => {
