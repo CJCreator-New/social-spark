@@ -24,7 +24,40 @@ const METRIC_LABELS: Record<PerformanceFocusMetric, string> = {
   ctaEffectiveness: "Weak CTA",
   hashtagRelevance: "Hashtags",
   readability: "Readability",
+  brandCompliance: "Brand Compliance",
 };
+
+/**
+ * Returns a short, context-specific explanation for a given metric score.
+ * Used to add inline guidance beneath each score bar.
+ */
+function getMetricExplanation(metric: string, score: number): string {
+  switch (metric) {
+    case "hookStrength":
+      if (score < 6) return "Your opening line doesn't create enough curiosity — try a question or stat";
+      if (score >= 8) return "Strong hook — it creates immediate curiosity";
+      return "Your hook is decent — a stronger opener could boost engagement";
+
+    case "ctaEffectiveness":
+      if (score < 6) return "Your CTA is too vague — ask a specific question or give a clear next step";
+      if (score >= 8) return "Effective CTA — it drives a specific, clear action";
+      return "Your CTA is ok — adding topic-relevance would improve it";
+
+    case "hashtagRelevance":
+      if (score < 50) return "Most hashtags don't match your topic — use more specific tags";
+      if (score >= 80) return "Hashtags are highly relevant to your topic";
+      return "Some hashtags match — refining them could improve reach";
+
+    case "readability":
+      // score here is the Flesch-Kincaid grade level
+      if (score > 12) return "Post may be hard to read — simplify sentences";
+      if (score < 6) return "Very easy to read — consider adding some depth";
+      return "Readability is in the ideal range for social";
+
+    default:
+      return "";
+  }
+}
 
 export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
   post,
@@ -35,8 +68,10 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
 }) => {
   const keySource = useWizardStore((state) => state.keySource);
   const keyMode = useWizardStore((state) => state.keyMode);
+  const form = useWizardStore((state) => state.form);
+  const bannedWords = form?.bannedWords || [];
 
-  const score = useMemo(() => calculatePerformanceScore(post, topic), [post, topic]);
+  const score = useMemo(() => calculatePerformanceScore(post, topic, post.platform, bannedWords, []), [post, topic, bannedWords]);
 
   const weakestMetrics = useMemo(() => getWeakestMetrics(score), [score]);
   const weakestMetric = weakestMetrics[0];
@@ -119,6 +154,9 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
               }}
             />
           </div>
+          <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3, fontStyle: 'italic' }}>
+            {getMetricExplanation('hookStrength', score.hookStrength)}
+          </div>
         </div>
 
         <div className="perf-metric">
@@ -139,6 +177,9 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
                 background: getScoreColor(score.ctaEffectiveness),
               }}
             />
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3, fontStyle: 'italic' }}>
+            {getMetricExplanation('ctaEffectiveness', score.ctaEffectiveness)}
           </div>
           {suggestedCtaText && onApplyCta && (
             <div className="cta-suggestion-container" style={{ marginTop: 6 }}>
@@ -178,6 +219,9 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
               }}
             />
           </div>
+          <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3, fontStyle: 'italic' }}>
+            {getMetricExplanation('hashtagRelevance', score.hashtagRelevance)}
+          </div>
         </div>
 
         <div className="perf-metric">
@@ -188,13 +232,40 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
               <span className="tabular-nums">Grade {score.readability}</span>)
             </span>
           </div>
-          <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>
-            {score.readability < 8
-              ? "Easy to follow"
-              : score.readability < 12
-                ? "Well-balanced"
-                : "May need simplification"}
+          <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3, fontStyle: 'italic' }}>
+            {getMetricExplanation('readability', score.readability)}
           </div>
+        </div>
+
+        <div className="perf-metric">
+          <div className="perf-metric-label">
+            <span>Brand Compliance</span>
+            <span
+              className="perf-metric-value tabular-nums"
+              style={{ color: getScoreColor(score.brandCompliance) }}
+            >
+              {score.brandCompliance}/10
+            </span>
+          </div>
+          <div className="perf-bar">
+            <div
+              className="perf-bar-fill"
+              style={{
+                width: `${(score.brandCompliance / 10) * 100}%`,
+                background: getScoreColor(score.brandCompliance),
+              }}
+            />
+          </div>
+          {score.brandViolations && score.brandViolations.length > 0 && (
+            <div style={{ marginTop: 4, fontSize: 10, color: '#dc2626', display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              <span style={{ fontWeight: 600 }}>🚫 Violations:</span>
+              {score.brandViolations.map((v, i) => (
+                <span key={i} style={{ background: 'rgba(220,38,38,0.1)', padding: '1px 5px', borderRadius: 4 }}>
+                  {v}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

@@ -230,3 +230,43 @@ export function useGenerateTrendsMutation() {
     },
   });
 }
+
+export function useGenerateSinglePostMutation() {
+  const setKeySource = useWizardStore((state) => state.setKeySource);
+  const setKeyMode = useWizardStore((state) => state.setKeyMode);
+  return useMutation({
+    mutationFn: async (payload: {
+      platform: string;
+      topic: string;
+      format: string;
+      coreIdea: string;
+      dow: string;
+      day: number;
+      quality?: "draft" | "polished";
+      extra?: string;
+    }): Promise<any> => {
+      if (isE2EMode()) {
+        return {
+          day: payload.day,
+          dow: payload.dow,
+          topic: payload.topic,
+          format: payload.format,
+          title: `Draft post for ${payload.topic}`,
+          hook: `E2E hook for ${payload.topic}`,
+          body: `E2E body for ${payload.topic} on ${payload.platform}`,
+          cta: `Learn more about ${payload.topic}`,
+          hashtags: `#${payload.topic.toLowerCase().replace(/\s+/g, "")}`,
+          rationale: "Generated matching the missing campaign theme.",
+        };
+      }
+      const { generateWithFallback } = await import("@/lib/brandMemory");
+      const { data, usedFallback, keyMode } = await generateWithFallback(
+        "generate-single-post",
+        payload
+      );
+      setKeySource(usedFallback ? "user" : "platform");
+      setKeyMode(keyMode);
+      return (data as GeneratedResponse<GeneratedPostPayload>).post || {};
+    },
+  });
+}

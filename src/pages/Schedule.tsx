@@ -465,7 +465,7 @@ export default function Schedule() {
         />
       </Helmet>
       <WorkspacePage size="wide">
-        <div className="sc-head" style={{ marginBottom: 12 }}>
+        <div className="sc-head sc-head--tight">
           <h1 className="sc-title">
             Publishing <em>queue</em>
           </h1>
@@ -561,7 +561,7 @@ export default function Schedule() {
             <Link to="/app" className="sc-empty-cta">
               Create a calendar
             </Link>
-            <div style={{ marginTop: 12 }}>
+            <div className="sc-empty-alt">
               <Link
                 to="/my-calendars"
                 className="text-xs text-slate-500 hover:text-[var(--color-primary)] transition-colors underline"
@@ -590,10 +590,7 @@ export default function Schedule() {
         )}
 
         {hasNextPage && (
-          <div
-            ref={loadMoreRef}
-            style={{ display: "flex", justifyContent: "center", marginTop: 18 }}
-          >
+          <div ref={loadMoreRef} className="sc-load-more">
             <button
               className="sc-act"
               onClick={() => fetchNextPage()}

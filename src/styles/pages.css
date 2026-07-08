@@ -252,8 +252,8 @@
    ========================================================================== */
 
 .ld-w-hero {
-  padding-top: 100px;
-  padding-bottom: 80px;
+  padding-top: 80px;
+  padding-bottom: 64px;
 }
 .ld-w-hero-grid {
   display: grid;
@@ -2895,6 +2895,12 @@
   line-height: 1.5;
 }
 
+/* Section heading preceded by a standalone divider/spacer rather than a
+   parent card boundary — needs a little extra top rhythm. */
+.pf-section-h--spaced {
+  margin-top: var(--space-3, 12px);
+}
+
 /* Avatar row */
 .pf-row {
   display: flex;
@@ -3173,6 +3179,39 @@
   line-height: 1.5;
 }
 
+/* Meta note directly under a form control (pulls up to hug the control,
+   adds a little breathing room below before the next element) */
+.pf-meta--tight {
+  margin-top: -8px;
+  margin-bottom: 8px;
+}
+
+/* Save action row: button + inline "Saved" confirmation */
+.pf-save-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  align-items: center;
+}
+
+.pf-save-badge {
+  font-size: 11px;
+  color: var(--color-success-text);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Vertical spacer utilities — used sparingly for standalone rhythm breaks
+   between sections that don't already carry a margin. */
+.pf-spacer-sm {
+  height: var(--space-2, 8px);
+}
+
+.pf-spacer-md {
+  height: var(--space-4, 16px);
+}
+
 /* Privacy / info notice box used in ApiKeySettings */
 .pf-notice {
   display: flex;
@@ -3274,6 +3313,11 @@
   gap: 16px;
   flex-wrap: wrap;
 }
+/* Tighter variant used when the header sits directly above the summary
+   stat row rather than a looser block of content. */
+.sc-head--tight {
+  margin-bottom: var(--space-3, 12px);
+}
 .sc-title {
   font-family: var(--font-display), serif;
   font-size: 32px;
@@ -3374,6 +3418,17 @@
 }
 .sc-empty-cta:hover {
   transform: translateY(-1px);
+}
+/* Secondary link row below the primary empty-state CTA */
+.sc-empty-alt {
+  margin-top: var(--space-3, 12px);
+}
+
+/* "Load more" pagination trigger row */
+.sc-load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-5, 20px);
 }
 .sc-toolbar {
   display: flex;

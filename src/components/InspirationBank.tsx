@@ -50,12 +50,14 @@ interface InspirationBankProps {
   industry: string;
   platform?: string;
   onTopicClick: (topic: string) => void;
+  onDraftFromTrend?: (topic: string) => void;
 }
 
 export const InspirationBank: React.FC<InspirationBankProps> = ({
   industry,
   platform,
   onTopicClick,
+  onDraftFromTrend,
 }) => {
   const staticTopics = useMemo(
     () => getTrendingTopicsForIndustry(industry, platform),
@@ -391,6 +393,21 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
                   ? "✓ Remove from Trends"
                   : "Use This Trend"}
               </button>
+
+              {onDraftFromTrend && (
+                <button
+                  type="button"
+                  className="cpbtn done"
+                  onClick={() => {
+                    onDraftFromTrend(reviewingTopic.topic);
+                    setReviewingTopic(null);
+                    toast.success(`Drafting post from trend: "${reviewingTopic.topic}" ✓`);
+                  }}
+                  style={{ fontSize: 11, padding: "5px 12px" }}
+                >
+                  ✍️ Draft from this trend
+                </button>
+              )}
 
               <button
                 type="button"

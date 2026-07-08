@@ -612,24 +612,16 @@ export default function Profile() {
                     </option>
                   ))}
                 </select>
-                <div className="pf-meta" style={{ marginTop: -8, marginBottom: 8 }}>
+                <div className="pf-meta pf-meta--tight">
                   Used as the fallback when scheduling. Each calendar can override this.
                 </div>
 
-                <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
+                <div className="pf-save-row">
                   <button className="pf-btn" onClick={wrappedHandleSave} disabled={saving}>
                     {saving ? "Saving…" : "Save changes"}
                   </button>
                   {savedOnce && !saving && (
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: "var(--color-success-text)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
-                    >
+                    <span className="pf-save-badge">
                       <svg
                         width="12"
                         height="12"
@@ -825,7 +817,7 @@ export default function Profile() {
             </div>
 
             {/* Brand Memory & Style Lock */}
-            <div style={{ height: 16 }} />
+            <div className="pf-spacer-md" />
             <h3 className="pf-section-h" style={{ fontSize: 14 }}>
               Style Lock & Brand Memory
             </h3>
@@ -992,10 +984,8 @@ export default function Profile() {
               </button>
             </div>
 
-            <div style={{ height: 8 }} />
-            <h2 className="pf-section-h" style={{ marginTop: 14 }}>
-              Hashtag policy
-            </h2>
+            <div className="pf-spacer-sm" />
+            <h2 className="pf-section-h pf-section-h--spaced">Hashtag policy</h2>
             <div className="pf-section-sub">
               Banned tags are stripped from every generated post. Required tags are appended
               automatically (up to each platform's natural limit).

@@ -22,8 +22,8 @@ export function WorkspacePage({ children, size = "medium", className }: Workspac
   return (
     <div className={cn("page-shell", className)}>
       <div
-        className="relative z-10 mx-auto w-full px-4 py-[52px] sm:px-6"
-        style={{ maxWidth: MAX_WIDTHS[size], paddingBottom: "100px" }}
+        className="relative z-10 mx-auto w-full px-4 py-8 sm:px-6"
+        style={{ maxWidth: MAX_WIDTHS[size], paddingBottom: "var(--space-16, 64px)" }}
       >
         {children}
       </div>

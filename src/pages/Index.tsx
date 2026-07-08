@@ -3163,6 +3163,12 @@ const Index = () => {
                             upd("topics", updated);
                           }
                         }}
+                        onDraftFromTrend={(topic) => {
+                          upd("topics", [topic]);
+                          upd("mode", "day");
+                          toast.success("Drafting post from trend: " + topic);
+                          generate(false);
+                        }}
                       />
                     </div>
                   ) : (

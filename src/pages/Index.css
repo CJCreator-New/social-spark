@@ -43,7 +43,7 @@
 }
 
 .cf-app .brand {
-  margin-bottom: 52px;
+  margin-bottom: var(--cf-brand-mb, 40px);
 }
 .cf-app .brand-eyebrow {
   font-size: 11px;
@@ -218,7 +218,7 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 36px;
+  margin-bottom: 24px;
 }
 .cf-app .snode {
   display: flex;
@@ -306,8 +306,8 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: 26px;
-  margin-bottom: 14px;
+  padding: var(--cf-card-padding, 24px);
+  margin-bottom: var(--cf-card-mb, 12px);
   position: relative;
   overflow: hidden;
   transition: box-shadow 0.2s;
@@ -316,7 +316,7 @@
   box-shadow: var(--shadow-card-hover);
 }
 .cf-app .csect {
-  margin-bottom: 26px;
+  margin-bottom: var(--cf-csect-mb, 20px);
 }
 .cf-app .csect:last-child {
   margin-bottom: 0;

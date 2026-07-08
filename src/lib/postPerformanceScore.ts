@@ -6,13 +6,15 @@ export interface PerformanceScore {
   ctaEffectiveness: number; // 1-10: Specific question or vague?
   hashtagRelevance: number; // 0-100: % of hashtags related to topic
   readability: number; // Flesch-Kincaid grade level (lower is better, 8-12 ideal)
+  brandCompliance: number; // 1-10: absence of forbidden terms and hashtag violations
+  brandViolations: string[]; // List of found forbidden phrases/terms
   overallScore: number; // 1-10: Average of all metrics (rounded, for display)
   rawOverallScore?: number; // 1-10: Unrounded average, used for bucketing thresholds
   feedback: string[]; // Actionable suggestions
 }
 
 export type PerformanceFocusMetric =
-  "hookStrength" | "ctaEffectiveness" | "hashtagRelevance" | "readability";
+  "hookStrength" | "ctaEffectiveness" | "hashtagRelevance" | "readability" | "brandCompliance";
 
 /**
  * Detect if a hook creates curiosity (starts with stat, question, or strong verb)
@@ -259,9 +261,20 @@ function generateFeedback(scores: Partial<PerformanceScore>, post: Post): string
     feedback.push(
       `📖 Readability: Grade ${scores.readability} is complex. Use shorter sentences and simpler words.`
     );
-  } else if (scores.readability !== undefined && scores.readability < 6) {
+  } else  if (scores.readability !== undefined && scores.readability < 6) {
     feedback.push(
       `📖 Readability: Grade ${scores.readability} might be too basic. Add depth or complexity.`
+    );
+  }
+
+  if (
+    "brandViolations" in scores &&
+    Array.isArray((scores as any).brandViolations) &&
+    (scores as any).brandViolations.length > 0
+  ) {
+    const violations = (scores as any).brandViolations as string[];
+    feedback.push(
+      "🚫 Brand: Forbidden term(s) found: " + violations.join(", ") + ". Remove before publishing."
     );
   }
 
@@ -286,12 +299,42 @@ function scoreReadability(grade: number): number {
 }
 
 /**
+ * Score brand compliance: checks for forbidden phrases and hashtags
+ */
+export function scoreBrandCompliance(
+  postText: string,
+  hashtags: string,
+  forbiddenPhrases: string[],
+  forbiddenHashtags: string[]
+): { score: number; violations: string[] } {
+  const violations: string[] = [];
+  const textLower = (postText || "").toLowerCase();
+  const hashtagsLower = (hashtags || "").toLowerCase();
+
+  for (const phrase of forbiddenPhrases) {
+    if (phrase && textLower.includes(phrase.toLowerCase())) {
+      violations.push(phrase);
+    }
+  }
+
+  for (const tag of forbiddenHashtags) {
+    if (tag && hashtagsLower.includes(tag.toLowerCase())) {
+      violations.push(tag);
+    }
+  }
+
+  return { score: Math.max(0, 10 - violations.length * 2), violations };
+}
+
+/**
  * Calculate complete performance score for a post
  */
 export function calculatePerformanceScore(
   post: Post,
   topic: string = "",
-  platform?: string
+  platform?: string,
+  forbiddenPhrases: string[] = [],
+  forbiddenHashtags: string[] = []
 ): PerformanceScore {
   const plat = platform || post.platform || "";
   const hookStrength = scoreHookStrength(post.hook, plat);
@@ -300,16 +343,24 @@ export function calculatePerformanceScore(
   const readability = estimateReadability(post.body);
   const readabilityScoreVal = scoreReadability(readability);
 
-  // Weight formula: hook 35%, CTA 30%, hashtags 20%, readability 15%
+  const { score: brandCompliance, violations: brandViolations } = scoreBrandCompliance(
+    (post.hook || "") + " " + (post.body || "") + " " + (post.cta || ""),
+    post.hashtags || "",
+    forbiddenPhrases,
+    forbiddenHashtags
+  );
+
+  // Weight formula: hook 30%, CTA 25%, hashtags 20%, readability 15%, brandCompliance 10%
   const rawOverallScore =
-    hookStrength * 0.35 +
-    ctaEffectiveness * 0.3 +
+    hookStrength * 0.3 +
+    ctaEffectiveness * 0.25 +
     (hashtagRelevance / 10) * 0.2 +
-    readabilityScoreVal * 0.15;
+    readabilityScoreVal * 0.15 +
+    brandCompliance * 0.1;
   const overallScore = Math.round(rawOverallScore);
 
   const feedback = generateFeedback(
-    { hookStrength, ctaEffectiveness, hashtagRelevance, readability },
+    { hookStrength, ctaEffectiveness, hashtagRelevance, readability, brandViolations } as any,
     post
   );
 
@@ -318,6 +369,8 @@ export function calculatePerformanceScore(
     ctaEffectiveness,
     hashtagRelevance,
     readability,
+    brandCompliance,
+    brandViolations,
     overallScore,
     rawOverallScore,
     feedback,
@@ -331,6 +384,7 @@ export function getWeakestPerformanceMetric(score: PerformanceScore): Performanc
     { metric: "ctaEffectiveness", gap: 10 - score.ctaEffectiveness },
     { metric: "hashtagRelevance", gap: 10 - score.hashtagRelevance / 10 },
     { metric: "readability", gap: 10 - readabilityScoreVal },
+    { metric: "brandCompliance", gap: 10 - score.brandCompliance },
   ];
 
   return candidates.sort((a, b) => b.gap - a.gap)[0]?.metric || "hookStrength";
@@ -371,6 +425,8 @@ export function getRegenerationGuidance(metric: PerformanceFocusMetric): string 
       return "Optimize the hashtags to be highly relevant to the core topic. Remove generic tags and include standard, search-friendly terms matching the subject matter.";
     case "readability":
       return "Improve readability by using shorter sentences, simpler words, and clear formatting (bullet points, line breaks). Aim for an accessible Flesch-Kincaid style.";
+    case "brandCompliance":
+      return "Remove any forbidden terms, phrases, or hashtags flagged by the brand compliance check before publishing.";
     default:
       return "";
   }
@@ -397,6 +453,7 @@ export function getWeakestMetrics(
       scoreVal: score.hashtagRelevance / 10,
     },
     { metric: "readability", gap: 10 - readabilityScoreVal, scoreVal: readabilityScoreVal },
+    { metric: "brandCompliance", gap: 10 - score.brandCompliance, scoreVal: score.brandCompliance },
   ];
 
   return candidates
