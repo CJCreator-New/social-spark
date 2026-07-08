@@ -18,6 +18,7 @@ import { SkeletonList } from "@/components/SkeletonList";
 import { ErrorState } from "@/components/ErrorState";
 import telemetry from "@/lib/telemetry";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ApiKeyStatusRow {
   user_id: string;
