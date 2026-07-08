@@ -1,75 +1,78 @@
-# Full-App Audit Plan — 2026-07-07
+# Complete the Live AI Generation Fix
 
-## Objective
-Produce an exhaustive, evidence-grounded technical audit of ContentForge across all 9 domains defined in the audit prompt, with per-finding file:line citations. Deliverable persisted to `.scratch/audit-2026-07-07/`. No fixes, no refactors, no unrequested abstractions.
+Verified against the live database — three backend pieces from the previous plan are still missing, which is why generation is still falling back to the local template.
 
-## Approach
+## Evidence
 
-### Phase 0 — Repository traversal
-- Parallel `list_dir` on all top-level dirs (`src/`, `supabase/`, `e2e/`, `scripts/`, `dashboard-deploy/`, `migrations/`, `docs/`, `public/`, `.github/`, config roots).
-- Recursive listing of `src/components/`, `src/pages/`, `src/lib/`, `src/hooks/`, `src/stores/`, `supabase/functions/`, `supabase/migrations/`.
-- Parallel `view` batches (10–20 files per round) covering: every `.ts`/`.tsx` source file, every migration, every edge function, every test, every config (`vite.config.ts`, `tailwind.config.ts`, `tsconfig*.json`, `eslint.config.js`, `playwright.config.ts`, `vitest.config.ts`, `package.json`, `.env.example`), CI workflows, and infra manifests.
-- Progress line emitted after each batch: `[TRAVERSAL] Batch N complete — X files read, Y queued`.
-- Unreadable files flagged inline.
+1. **`get_decrypted_api_key` — no EXECUTE grant**
+   `has_function_privilege` check returned `auth_exec:false, anon_exec:false, svc_exec:true`. BYOK decryption still fails with 42501 for logged-in users; the waterfall then falls back to the shared gateway (or to local generation when that also errors).
 
-### Phase 1 — Evidence collection
-Every finding carries either a direct quote or a `path:line` citation. Unverifiable claims marked `[UNVERIFIED — requires manual check]` with a note of what was sought and where.
+2. **`telemetry_events` table — missing**
+   `information_schema.tables` returns no row for `public.telemetry_events`. The `telemetry` function keeps logging `PGRST205 Could not find the table 'public.telemetry_events' in the schema cache`.
 
-### Phase 2 — Full-coverage finding pass
-Sweep all 9 domains (Architecture, Frontend Components, User Journeys, Functional Correctness, Performance, Backend/DB, Security, DevOps/Testing, UI/UX) across every file. Each candidate tagged `[confidence: high/medium/low]` and `[severity: critical/high/medium/low]`. No filtering at this stage.
+3. **`rate_limit_events` table — missing**
+   `supabase/functions/_shared/promptHelpers.ts` was already rewritten to query `public.rate_limit_events` (lines 768–830), but the table doesn't exist. Every rate-limit check now throws → the catch returns `allowed: true`, but the deployed function still has the old `Deno.openKv` code path. Either way, rate limiting is not working.
 
-Backend/security pass augmented with:
-- `security--run_security_scan` and `security--get_scan_results`
-- `security--get_table_schema` for RLS/grant verification
-- `supabase--read_query` to confirm policies, grants, indexes on `pg_catalog`/`pg_policies`
-- `supabase--linter` for advisor findings
-- `code--dependency_scan` for CVE/outdated deps
+## Fix
 
-### Phase 3 — Self-verification
-Checklist run before writing final files: every finding cited or `[UNVERIFIED]`; no inferred content; all 9 domains present (or explicit `[NO FINDINGS]`); no pre-filtering.
+### Step 1 — One migration for the three DB gaps
 
-### Phase 4 — Report output
-Written to `.scratch/audit-2026-07-07/`:
+```sql
+-- (a) Grant EXECUTE on get_decrypted_api_key to authenticated
+REVOKE ALL ON FUNCTION public.get_decrypted_api_key() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_decrypted_api_key() TO authenticated, service_role;
 
-```text
-.scratch/audit-2026-07-07/
-├── README.md                       Executive summary + scores + index
-├── findings-register.md            Full structured findings (all severities)
-├── workflows.md                    Per-workflow happy/failure/recovery paths
-├── interactive-components.md       Per-element correctness/a11y/keyboard/states
-├── thematic/
-│   ├── architecture.md
-│   ├── security.md
-│   ├── performance.md
-│   ├── accessibility.md
-│   ├── technical-debt.md
-│   ├── missing-tests.md
-│   ├── code-duplication.md
-│   ├── dead-code.md
-│   └── quick-wins.md
-├── roadmap.md                      P0/P1/P2/P3, each item referencing a finding ID
-└── traversal-log.md                Batch log + any unreadable files
+-- (b) Rate limit events table (used by checkRateLimit)
+CREATE TABLE IF NOT EXISTS public.rate_limit_events (
+  id bigserial PRIMARY KEY,
+  user_id text NOT NULL,           -- text so we can key by IP for anon telemetry
+  endpoint text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_rate_limit_events_lookup
+  ON public.rate_limit_events (user_id, endpoint, created_at DESC);
+
+GRANT ALL ON public.rate_limit_events TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.rate_limit_events_id_seq TO service_role;
+ALTER TABLE public.rate_limit_events ENABLE ROW LEVEL SECURITY;
+-- Service-role only; no policies for anon/authenticated (edge fn uses SR key).
+
+-- (c) Telemetry events table
+CREATE TABLE IF NOT EXISTS public.telemetry_events (
+  id bigserial PRIMARY KEY,
+  event_name text NOT NULL,
+  user_id uuid NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+  props jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_telemetry_events_created_at
+  ON public.telemetry_events (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_telemetry_events_user
+  ON public.telemetry_events (user_id, created_at DESC);
+
+GRANT ALL ON public.telemetry_events TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.telemetry_events_id_seq TO service_role;
+ALTER TABLE public.telemetry_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admins read telemetry"
+  ON public.telemetry_events FOR SELECT
+  TO authenticated
+  USING (public.is_admin());
 ```
 
-Each finding uses a stable ID (`F-001`, `F-002`, …) so the roadmap and thematic reports reference back to the register instead of duplicating text.
+### Step 2 — Redeploy affected edge functions
 
-## Scope guardrails
-- Read-only: no code edits, no migrations, no config changes.
-- No speculative refactors — recommendations scoped strictly to the defect they address.
-- Excluded from re-audit (per standing prompt): `src/components/brand/`, `src/constants/branding.ts`, `public/brand/`.
-- Prior audit artifacts (`.scratch/audit-2026-07-02/`, `docs/agents/full-app-audit.md`, `memory/`) read for context but findings re-verified against current source, not carried forward blindly.
+Deploy so the freshly-granted RPC and the rewritten `checkRateLimit` are actually running:
+`generate-calendar`, `generate-single-post`, `regenerate-post`, `repurpose-post`, `inline-rewrite`, `generate-post-image`, `generate-trends`, `extract-ideas`, `decrypt-api-key`, `encrypt-api-key`, `telemetry`.
 
-## Technical details
-- Batch size target: 15 parallel `view` calls per round to stay within tool-call limits while minimizing round-trips.
-- Line-number citations use current file contents at read time; if a file changes mid-audit, re-read and update citation.
-- Severity rubric: Security/RLS/BYOK and AI reliability defects weighted one tier higher than the same defect elsewhere (per `docs/agents/full-app-audit.md`).
-- Confidence rubric: `high` = defect reproducible from quoted code alone; `medium` = defect requires a plausible runtime assumption; `low` = pattern-smell without a concrete failure scenario.
+### Step 3 — Verify
 
-## Out of scope
-- Implementing any fix.
-- Re-auditing branding assets.
-- Load testing, live pentest, or anything requiring production traffic.
-- Design/UX redesign proposals beyond fixing cited defects.
+- `curl_edge_functions` on `decrypt-api-key` as the preview user → expect 200 with `hasKey`, no 42501 in logs.
+- Trigger a calendar generation from the UI → confirm no "local fallback" banner and a `telemetry_events` row appears.
+- Fire 12 rapid `extract-ideas` calls (limit 10/min) → confirm a 429 on the 11th.
 
-## Deliverable
-Once approved and switched to build mode, I will execute Phases 0–4 and write the report files above. Final chat reply will link the report and summarize the top P0/P1 findings only.
+## Scope
+- One SQL migration.
+- No code changes (helpers and telemetry function already match the new schema).
+- No UI changes.
+
+Approve to switch to build mode and apply the migration + redeploys.

@@ -176,6 +176,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_events: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       saved_calendars: {
         Row: {
           core_idea: string | null
@@ -294,6 +315,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      telemetry_events: {
+        Row: {
+          created_at: string
+          event_name: string
+          id: number
+          props: Json
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_name: string
+          id?: number
+          props?: Json
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_name?: string
+          id?: number
+          props?: Json
+          user_id?: string | null
+        }
+        Relationships: []
       }
       templates: {
         Row: {
