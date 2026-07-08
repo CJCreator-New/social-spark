@@ -97,6 +97,130 @@
           }
         },
         "outputSchema": null
+      },
+      {
+        "name": "extract_ideas",
+        "title": "Extract post ideas from source material",
+        "description": "Analyze pasted long-form source material (an article, transcript, or notes) and extract distinct, high-potential social post ideas mapped to proven engagement formats, for the signed-in user. Calls the same `extract-ideas` pipeline the app UI uses, so per-user rate limits and generation quota apply.",
+        "annotations": {
+          "readOnlyHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "minLength": 200,
+              "maxLength": 20000,
+              "description": "The long-form source text to extract ideas from."
+            },
+            "count": {
+              "description": "How many distinct ideas to extract (default 5).",
+              "type": "integer",
+              "minimum": 3,
+              "maximum": 10
+            },
+            "platform": {
+              "description": "Target platform for the ideas, e.g. LinkedIn, X, Instagram (default LinkedIn).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "source"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "repurpose_post",
+        "title": "Repurpose a post for another platform",
+        "description": "Rewrite an existing post for a different target platform (e.g. take a LinkedIn post and rewrite it for X or Instagram), preserving the strategic angle. Calls the same `repurpose-post` pipeline the app UI uses, so per-user rate limits and generation quota apply.",
+        "annotations": {
+          "readOnlyHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "post": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "hook": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "cta": {
+                  "type": "string"
+                },
+                "hashtags": {
+                  "type": "string"
+                },
+                "topic": {
+                  "type": "string"
+                },
+                "format": {
+                  "type": "string"
+                },
+                "dow": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": {},
+              "description": "The source post to repurpose. Provide at minimum a hook or body."
+            },
+            "targetPlatform": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Platform to rewrite the post for, e.g. X, Instagram, Facebook, Newsletter."
+            },
+            "platform": {
+              "description": "The post's current/source platform (default LinkedIn).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "post",
+            "targetPlatform"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_trends",
+        "title": "List trending topics",
+        "description": "List recent trending keywords from the `trends` table populated by the trends-ingest pipeline (supabase/functions/trends-ingest), ordered by volume. This is shared, non-personal data readable by any signed-in user — the same table src/components/InspirationBank.tsx reads.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "category": {
+              "description": "Filter to trends whose category matches this text (case-insensitive substring match, e.g. an industry name).",
+              "type": "string"
+            },
+            "limit": {
+              "description": "Max trends to return (default 20).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        },
+        "outputSchema": null
       }
     ]
   }
