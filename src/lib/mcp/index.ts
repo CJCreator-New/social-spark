@@ -2,6 +2,9 @@ import { auth, defineMcp } from "@lovable.dev/mcp-js";
 import listCalendarsTool from "./tools/list-calendars";
 import getCalendarTool from "./tools/get-calendar";
 import listScheduledPostsTool from "./tools/list-scheduled-posts";
+import extractIdeasTool from "./tools/extract-ideas";
+import repurposePostTool from "./tools/repurpose-post";
+import listTrendsTool from "./tools/list-trends";
 
 // Direct supabase.co issuer (not the .lovable.cloud proxy). Built from the
 // project ref that Vite inlines at build time so this module stays import-safe.
@@ -40,17 +43,36 @@ export default defineMcp({
   title: "ContentForge",
   version: "0.1.0",
   instructions:
-    "Tools for ContentForge — an AI-powered social media content planner. Use `list_calendars` to browse the user's saved weekly content calendars, `get_calendar` to fetch one calendar and its posts by ID, and `list_scheduled_posts` to see upcoming scheduled posts.",
+    "Tools for ContentForge — an AI-powered social media content planner. Use `list_calendars` to browse the user's saved weekly content calendars, `get_calendar` to fetch one calendar and its posts by ID, `list_scheduled_posts` to see upcoming scheduled posts, `extract_ideas` to pull distinct post ideas out of pasted long-form source material, `repurpose_post` to rewrite an existing post for a different target platform, and `list_trends` to browse recent trending keywords.",
   // Scope vocabulary for this server: `read:calendars` (list_calendars,
-  // get_calendar) and `read:scheduled_posts` (list_scheduled_posts). The SDK's
-  // per-issuer `requiredScopes` gates ALL tools on the same scope set, which
-  // would force every client to hold both scopes even if it only needs one —
-  // so scopes are declared here for documentation and enforced per-tool
-  // instead, via `ctx.getScopes()` in each handler (see get-calendar.ts,
-  // list-calendars.ts, list-scheduled-posts.ts).
+  // get_calendar), `read:scheduled_posts` (list_scheduled_posts),
+  // `generate:ideas` (extract_ideas), `generate:repurpose` (repurpose_post),
+  // and `read:trends` (list_trends). The SDK's per-issuer `requiredScopes`
+  // gates ALL tools on the same scope set, which would force every client to
+  // hold every scope even if it only needs one — so scopes are declared here
+  // for documentation and enforced per-tool instead, via `ctx.getScopes()` in
+  // each handler (see get-calendar.ts, list-calendars.ts,
+  // list-scheduled-posts.ts, extract-ideas.ts, repurpose-post.ts,
+  // list-trends.ts).
+  //
+  // extract_ideas and repurpose_post call the SAME `extract-ideas` /
+  // `repurpose-post` Supabase Edge Functions the app UI calls, forwarding the
+  // caller's verified bearer token (`ctx.getToken()`) as the Authorization
+  // header. Those functions do their own auth (getVerifiedUserId), per-user
+  // rate limiting (checkRateLimit), and generation quota gating (checkQuota)
+  // exactly as they do for browser clients — the MCP tools do not (and must
+  // not) duplicate or bypass that logic; they only add the OAuth-scope check
+  // above it.
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",
   }),
-  tools: [listCalendarsTool, getCalendarTool, listScheduledPostsTool],
+  tools: [
+    listCalendarsTool,
+    getCalendarTool,
+    listScheduledPostsTool,
+    extractIdeasTool,
+    repurposePostTool,
+    listTrendsTool,
+  ],
 });

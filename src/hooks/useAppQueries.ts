@@ -3,3 +3,6 @@ export * from "./queries/useCalendarQueries";
 export * from "./queries/useScheduleQueries";
 export * from "./queries/useRepurposeQueries";
 export * from "./queries/useImageQueries";
+export * from "./queries/useIdeaBacklogQueries";
+export * from "./queries/useBrandSlotQueries";
+export * from "./queries/useEnsureDefaultBrandSlot";

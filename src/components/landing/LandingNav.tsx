@@ -8,9 +8,9 @@ import { Logo } from "@/components/brand/Logo";
 gsap.registerPlugin(ScrollTrigger);
 
 const NAV_LINKS = [
-  { label: "Features", href: "#features" },
-  { label: "Pricing", href: "#pricing" },
-  { label: "Docs", href: "#" },
+  { label: "Features", href: "/#features" },
+  { label: "Pricing", href: "/#pricing" },
+  { label: "Docs", href: "/docs" },
 ];
 
 export default function LandingNav() {

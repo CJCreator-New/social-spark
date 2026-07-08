@@ -22,17 +22,45 @@ const SmoothScroll = lazy(() => import("@/components/landing/SmoothScroll"));
 
 const PAGE_TITLE = "ContentForge — AI-powered weekly content calendars";
 const PAGE_DESC =
-  "Turn one brief into a week of on-brand posts for LinkedIn, X, Instagram, and more. Schedule, refine, and publish — all in one place.";
+  "Turn one brief into a week of on-brand posts for LinkedIn, X, Instagram, Facebook, newsletters, and blogs. Schedule, refine, and publish — all in one place.";
 const CANONICAL = "https://contentforged.lovable.app/";
 
 const JSON_LD = JSON.stringify({
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "ContentForge",
-  description: "AI-powered content calendar generator for social platforms.",
-  applicationCategory: "BusinessApplication",
-  operatingSystem: "Web",
-  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  "name": "ContentForge",
+  "description": "Turn one brief into a week of on-brand posts for LinkedIn, X, Instagram, Facebook, newsletters, and blogs.",
+  "applicationCategory": "BusinessApplication",
+  "applicationSubCategory": "AI Content Generator & Scheduler",
+  "operatingSystem": "Web",
+  "browserRequirements": "Requires JavaScript. Requires HTML5.",
+  "screenshot": "https://contentforged.lovable.app/brand/logo-horizontal.png",
+  "publisher": {
+    "@type": "Organization",
+    "name": "ContentForge",
+    "url": "https://contentforged.lovable.app/"
+  },
+  "offers": {
+    "@type": "AggregateOffer",
+    "priceCurrency": "USD",
+    "lowPrice": "0",
+    "highPrice": "49",
+    "offerCount": "2",
+    "offers": [
+      {
+        "@type": "Offer",
+        "name": "Free Tier",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      {
+        "@type": "Offer",
+        "name": "Pro Tier",
+        "price": "49",
+        "priceCurrency": "USD"
+      }
+    ]
+  }
 });
 
 export default function Landing() {
@@ -56,9 +84,11 @@ export default function Landing() {
         <meta property="og:description" content={PAGE_DESC} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={CANONICAL} />
+        <meta property="og:image" content={`${CANONICAL}brand/logo-horizontal.png`} />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={PAGE_TITLE} />
         <meta name="twitter:description" content={PAGE_DESC} />
+        <meta name="twitter:image" content={`${CANONICAL}brand/logo-horizontal.png`} />
         <script type="application/ld+json">{JSON_LD}</script>
       </Helmet>
 

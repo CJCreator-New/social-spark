@@ -1,7 +1,6 @@
 import {
   formatForPlatform,
   writeToClipboard,
-  resolvePlatform,
   niceLabelFor,
   buildRawMarkdown,
   PLATFORM_LABELS,
@@ -23,6 +22,10 @@ import {
   useGeneratePostImageMutation,
   useInlineRewriteMutation,
   useGenerateSinglePostMutation,
+  useIdeaBacklogQuery,
+  useMarkIdeaUsedMutation,
+  useRemoveIdeaFromBacklogMutation,
+  useBrandSlotsQuery,
 } from "@/hooks/useAppQueries";
 import { toast } from "sonner";
 import { createScopedLogger } from "@/lib/logger";
@@ -55,6 +58,7 @@ import { insightFor } from "@/lib/postInsights";
 import PostInsights from "@/components/PostInsights";
 import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
 import { TopicGapBadge } from "@/components/TopicGapBadge";
+import { IdeaBacklogPanel } from "@/components/IdeaBacklogPanel";
 import {
   PerformanceFocusMetric,
   calculatePerformanceScore,
@@ -64,8 +68,14 @@ import {
   ENGAGEMENT_BADGE,
 } from "@/lib/postPerformanceScore";
 import { buildBrandMemoryPrompt } from "@/lib/brandMemory";
+import { resolveActiveBrandSlot } from "@/lib/brandSlots";
 import { createSeedFromPost, storeSeed } from "@/lib/seedFromPost";
 import { isEnabled } from "@/lib/featureFlags";
+import { unwrapPost, aspectRatioForPlatform, repurposeOnePost } from "@/lib/repurposePost";
+import { useBulkRepurpose, mergeRepurposedResults } from "@/hooks/useBulkRepurpose";
+import { BulkRepurposeModal } from "@/components/BulkRepurposeModal";
+import { BulkRepurposePanel } from "@/components/BulkRepurposePanel";
+import { sendEvent } from "@/lib/telemetry";
 import {
   browserTimezone,
   fmtDateInTz,
@@ -103,16 +113,6 @@ const EMPTY_POST: Post = {
   hashtags: "",
   rationale: "",
 };
-
-function unwrapPost(value: unknown): Post | null {
-  if (!value || typeof value !== "object") return null;
-  const candidate = "post" in value ? (value as { post?: unknown }).post : value;
-  if (!candidate || typeof candidate !== "object") return null;
-  const post = candidate as Partial<Post>;
-  return typeof post.day === "number" && typeof post.dow === "string"
-    ? { ...EMPTY_POST, ...post }
-    : null;
-}
 
 interface FormPayload {
   industry?: string;
@@ -157,14 +157,6 @@ function calculateScore(scores: Record<string, number>): number {
   if (keys.length === 0) return 0;
   const sum = keys.reduce((acc, k) => acc + scores[k], 0);
   return Number((sum / keys.length).toFixed(1));
-}
-
-function aspectRatioForPlatform(platform?: string): string {
-  const normalized = resolvePlatform(platform || "");
-  if (normalized === "instagram") return "4:5";
-  if (normalized === "twitter") return "16:9";
-  if (normalized === "facebook") return "1.91:1";
-  return "1.91:1";
 }
 
 function cssAspectRatioForPlatform(platform?: string): string {
@@ -315,6 +307,13 @@ export default function CalendarDetail() {
     "" | "rewriting" | "scoring" | "illustrating"
   >("");
   const repurposeMutation = useRepurposePostMutation();
+  // 3.2 telemetry: per-slot (day) tracking of "last generated-but-unsaved AI variant"
+  // for the single-post regenerate/repurpose flows only. Deliberately simple — not
+  // meant to be perfectly rigorous, just directionally correct for the insights view.
+  // Scoped OUTSIDE the bulk repurpose flow (which has its own bulk-specific events).
+  const slotVariantRef = useRef<
+    Record<number, { source: "regenerate" | "repurpose"; saved: boolean } | undefined>
+  >({});
   const generateImageMutation = useGeneratePostImageMutation();
   const inlineRewriteMutation = useInlineRewriteMutation();
   const [imageGeneratingDay, setImageGeneratingDay] = useState<number | null>(null);
@@ -328,6 +327,34 @@ export default function CalendarDetail() {
   const [pastPostText, setPastPostText] = useState<string[]>([]);
   const tzList = listTimezones();
 
+  // 3.1 Bulk calendar repurposing
+  const [bulkRepurposeModalOpen, setBulkRepurposeModalOpen] = useState(false);
+  const [bulkRepurposeSaving, setBulkRepurposeSaving] = useState(false);
+  const bulkRepurposeTargetRef = useRef("");
+  const bulkRepurpose = useBulkRepurpose({
+    calendarId: id,
+    platform: platform || formPayload.platform || "LinkedIn",
+    formPayload,
+    repurposeMutateAsync: (payload) => repurposeMutation.mutateAsync(payload),
+    generateImageMutateAsync: (payload) => generateImageMutation.mutateAsync(payload),
+    onPostSuccess: ({ day }) => {
+      void sendEvent("repurpose_bulk_post_success", {
+        calendarId: id,
+        day,
+        targetPlatform: bulkRepurposeTargetRef.current,
+      });
+    },
+    onPostFailure: ({ day, error, blocked }) => {
+      void sendEvent("repurpose_bulk_post_failed", {
+        calendarId: id,
+        day,
+        error,
+        blocked,
+        targetPlatform: bulkRepurposeTargetRef.current,
+      });
+    },
+  });
+
   const {
     data: calendarData,
     isLoading: calendarLoading,
@@ -339,9 +366,27 @@ export default function CalendarDetail() {
   const updateCalendarMutation = useUpdateSavedCalendarMutation(id);
   const updateProfileMutation = useProfileUpdateMutation(user?.id);
 
+  // 3.3 Brand slots — resolve which brand identity (forbidden phrases, proof
+  // points, CTA preferences, preferred structures) applies to this calendar.
+  // Falls back through: calendar's own brand_slot_id -> account default slot
+  // -> first slot -> null (no brand memory at all) via resolveActiveBrandSlot.
+  const brandSlotsQuery = useBrandSlotsQuery(user?.id);
+  const calendarBrandSlotId = (calendarData as { brand_slot_id?: string | null } | undefined)
+    ?.brand_slot_id;
+  const activeBrandSlot = useMemo(
+    () => resolveActiveBrandSlot(brandSlotsQuery.data, calendarBrandSlotId),
+    [brandSlotsQuery.data, calendarBrandSlotId]
+  );
+
   const [trends, setTrends] = useState<any[]>([]);
   const [generatingTopic, setGeneratingTopic] = useState<string | null>(null);
   const generateSinglePostMutation = useGenerateSinglePostMutation();
+
+  // 2.1 Persistent idea backlog — saved ideas surfaced as fill candidates here.
+  const backlogQuery = useIdeaBacklogQuery(user?.id);
+  const markIdeaUsedMutation = useMarkIdeaUsedMutation(user?.id);
+  const removeIdeaFromBacklogMutation = useRemoveIdeaFromBacklogMutation(user?.id);
+  const [removingBacklogId, setRemovingBacklogId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -396,7 +441,7 @@ export default function CalendarDetail() {
   }, [formPayload?.topics, posts, trends]);
 
   const handleGenerateForMissingTheme = useCallback(
-    async (topic: string) => {
+    async (topic: string, coreIdeaOverride?: string) => {
       if (!id || generatingTopic) return;
       setGeneratingTopic(topic);
       const toastId = toast.loading(`Generating draft for: ${topic}...`);
@@ -406,7 +451,7 @@ export default function CalendarDetail() {
         while (existingDays.has(nextDay)) {
           nextDay++;
         }
-        
+
         const dows = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
         const nextDow = dows[(nextDay - 1) % 7];
 
@@ -414,7 +459,7 @@ export default function CalendarDetail() {
           platform: platform || "LinkedIn",
           topic,
           format: "Balanced mix",
-          coreIdea: calendarData?.core_idea || "",
+          coreIdea: coreIdeaOverride || calendarData?.core_idea || "",
           dow: nextDow,
           day: nextDay,
           quality: (calendarData?.form_payload as any)?.quality || "polished",
@@ -436,6 +481,29 @@ export default function CalendarDetail() {
       }
     },
     [id, posts, platform, calendarData, generateSinglePostMutation, updateCalendarMutation, generatingTopic]
+  );
+
+  const handleDraftBacklogIdea = useCallback(
+    (item: { id: string; angle: string; key_points: string | null }) => {
+      // Mark used immediately (optimistic, fire-and-forget) so a double-click
+      // can't double-draft the same idea — mirrors this file's convention of
+      // updating state immediately before awaiting async work (see toggleFavorite).
+      markIdeaUsedMutation.mutate(item.id);
+      void handleGenerateForMissingTheme(item.angle, item.key_points || item.angle);
+    },
+    [markIdeaUsedMutation, handleGenerateForMissingTheme]
+  );
+
+  const handleRemoveBacklogIdea = useCallback(
+    (ideaId: string) => {
+      setRemovingBacklogId(ideaId);
+      removeIdeaFromBacklogMutation.mutate(ideaId, {
+        onSettled: () => {
+          setRemovingBacklogId((prev) => (prev === ideaId ? null : prev));
+        },
+      });
+    },
+    [removeIdeaFromBacklogMutation]
   );
 
   const handleTweakClickOutside = useCallback((e: MouseEvent) => {
@@ -541,6 +609,7 @@ export default function CalendarDetail() {
             extra: formPayload.extra || "",
             bannedWords: formPayload.bannedWords || [],
             requiredWords: formPayload.requiredWords || [],
+            brandMemory: isEnabled("brandMemory") ? buildBrandMemoryPrompt(activeBrandSlot) : "",
             post: posts[i],
             siblings: next,
           }),
@@ -948,10 +1017,7 @@ export default function CalendarDetail() {
         extra: formPayload.extra || "",
         bannedWords: formPayload.bannedWords || [],
         requiredWords: formPayload.requiredWords || [],
-        brandMemory:
-          isEnabled("brandMemory") && profileData
-            ? buildBrandMemoryPrompt(profileData as Database["public"]["Tables"]["profiles"]["Row"])
-            : "",
+        brandMemory: isEnabled("brandMemory") ? buildBrandMemoryPrompt(activeBrandSlot) : "",
         post: target,
         siblings: posts,
         tweak,
@@ -988,6 +1054,18 @@ export default function CalendarDetail() {
         toast.error("Regenerate failed: no post returned");
         return;
       }
+
+      // 3.2 telemetry: if a previous generated-but-unsaved variant existed for this
+      // slot, the new generation supersedes it before it was ever saved.
+      const priorSlot = slotVariantRef.current[target.day];
+      if (priorSlot && !priorSlot.saved) {
+        void sendEvent("post_regenerated_again", {
+          platform: platform || formPayload.platform || "LinkedIn",
+          source: priorSlot.source,
+        });
+      }
+      slotVariantRef.current[target.day] = { source: "regenerate", saved: false };
+
       const updated = posts.map((p, i) => (i === active ? regeneratedPost : p));
       try {
         await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
@@ -996,6 +1074,11 @@ export default function CalendarDetail() {
         toast.error(updErr instanceof Error ? updErr.message : "Failed to save updated post");
         return;
       }
+      slotVariantRef.current[target.day] = { source: "regenerate", saved: true };
+      void sendEvent("post_kept", {
+        platform: platform || formPayload.platform || "LinkedIn",
+        source: "regenerate",
+      });
       setPosts(updated);
       const tweakLabel = tweak ? ` (${tweak.replace("-", " ")})` : "";
       log.info(`Day ${target.day} regenerated successfully`, { day: target.day, tweak });
@@ -1031,74 +1114,41 @@ export default function CalendarDetail() {
 
     setRepurposing(true);
     setRepurposeOpen(false);
-    setRepurposeStage("rewriting");
     try {
-      const payload = {
-        post: sourcePost,
-        targetPlatform,
+      const result = await repurposeOnePost(sourcePost, targetPlatform, {
+        calendarId: id,
         platform: platform || formPayload.platform || "LinkedIn",
-        context: {
-          industry: formPayload.industry || "",
-          voice: formPayload.voice || "",
-          style: formPayload.style || "",
-          goals: formPayload.goals || [],
-        },
-      };
-      const data = await repurposeMutation.mutateAsync(payload);
-      const result = unwrapPost(data);
-      if (!result) {
-        toast.error("Failed to parse repurposed post");
-        return;
-      }
-
-      const repurposed: Post = {
-        ...result,
-        day: sourcePost.day,
-        dow: sourcePost.dow,
-        image_url: undefined,
-        image_storage_path: undefined,
-        image_generated_at: undefined,
-      };
-
-      // Step 2: score the repurposed variant (client-side, instant; PerformanceScoreCard recomputes on render).
-      setRepurposeStage("scoring");
-
-      setRepurposedPost(repurposed);
-      setRepurposedTarget(targetPlatform);
-
-      // Step 3: generate an illustrative image for the repurposed variant, best-effort.
-      if (id && repurposed.image_prompt) {
-        setRepurposeStage("illustrating");
-        try {
-          const aspectRatio = aspectRatioForPlatform(targetPlatform);
-          const imgResult = await generateImageMutation.mutateAsync({
-            calendarId: id,
-            postDay: sourcePost.day,
-            post: repurposed,
-            prompt: repurposed.image_prompt,
-            platform: targetPlatform,
-            aspectRatio,
-          });
-          if (imgResult?.publicUrl) {
-            setRepurposedPost((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    image_url: String(imgResult.publicUrl || ""),
-                    image_storage_path: String(imgResult.storagePath || ""),
-                    image_aspect_ratio: String(imgResult.aspectRatio || aspectRatio),
-                    image_generated_at: String(imgResult.generatedAt || new Date().toISOString()),
-                  }
-                : prev
-            );
-          }
-        } catch (imgErr) {
+        formPayload,
+        repurposeMutateAsync: (payload) => repurposeMutation.mutateAsync(payload),
+        generateImageMutateAsync: (payload) => generateImageMutation.mutateAsync(payload),
+        onStageChange: setRepurposeStage,
+        onImageError: (imgErr) => {
           // Image generation is an enhancement, not a blocker — surface a soft warning only.
           log.error("Repurpose image generation failed", imgErr);
           toast.message(
             "Repurposed text is ready. Visual generation failed — you can retry it after saving."
           );
+        },
+      });
+
+      if (result.error) {
+        log.error("Repurpose failed", new Error(result.error));
+        toast.error(result.error);
+        return;
+      }
+      if (result.post) {
+        // 3.2 telemetry: repurposing this slot again before the previous repurposed
+        // (or regenerated) variant was ever saved supersedes it.
+        const priorSlot = slotVariantRef.current[sourcePost.day];
+        if (priorSlot && !priorSlot.saved) {
+          void sendEvent("post_regenerated_again", {
+            platform: targetPlatform,
+            source: priorSlot.source,
+          });
         }
+        slotVariantRef.current[sourcePost.day] = { source: "repurpose", saved: false };
+        setRepurposedPost(result.post);
+        setRepurposedTarget(targetPlatform);
       }
     } catch (e) {
       log.error("Repurpose failed", e);
@@ -1112,10 +1162,16 @@ export default function CalendarDetail() {
   async function saveRepurposedPost() {
     if (!repurposedPost || !id) return;
     const previous = posts;
+    const day = posts[active]?.day ?? repurposedPost.day;
     const updated = posts.map((post, index) => (index === active ? repurposedPost : post));
     setPosts(updated);
     try {
       await updateCalendarMutation.mutateAsync({ posts: updated as unknown as never });
+      slotVariantRef.current[day] = { source: "repurpose", saved: true };
+      void sendEvent("post_kept", {
+        platform: repurposedTarget || platform || formPayload.platform || "LinkedIn",
+        source: "repurpose",
+      });
       setRepurposedPost(null);
       setRepurposedTarget("");
       toast.success("Repurposed version saved");
@@ -1123,6 +1179,57 @@ export default function CalendarDetail() {
       setPosts(previous);
       toast.error(error instanceof Error ? error.message : "Failed to save repurposed version");
     }
+  }
+
+  function startBulkRepurpose(selectedDays: number[], targetPlatform: string) {
+    const selected = posts
+      .filter((p) => selectedDays.includes(p.day))
+      .map((p) => ({ day: p.day, dow: p.dow, sourcePost: p }));
+    if (selected.length === 0) return;
+    bulkRepurposeTargetRef.current = targetPlatform;
+    setBulkRepurposeModalOpen(false);
+    void sendEvent("repurpose_bulk_start", {
+      calendarId: id,
+      targetPlatform,
+      count: selected.length,
+    });
+    bulkRepurpose.start(selected, targetPlatform);
+  }
+
+  async function saveBulkRepurposeResults() {
+    if (!id) return;
+    const includedCount = bulkRepurpose.items.filter(
+      (it) => it.status === "success" && it.included
+    ).length;
+    if (includedCount === 0) return;
+    setBulkRepurposeSaving(true);
+    try {
+      const merged = mergeRepurposedResults(posts, bulkRepurpose.items);
+      await updateCalendarMutation.mutateAsync({ posts: merged as unknown as never });
+      setPosts(merged);
+      void sendEvent("repurpose_bulk_review_saved", {
+        calendarId: id,
+        targetPlatform: bulkRepurposeTargetRef.current,
+        count: includedCount,
+      });
+      toast.success(`Saved ${includedCount} repurposed post${includedCount === 1 ? "" : "s"} ✓`);
+      bulkRepurpose.reset();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save repurposed posts");
+    } finally {
+      setBulkRepurposeSaving(false);
+    }
+  }
+
+  function closeBulkRepurposePanel() {
+    if (bulkRepurpose.items.length > 0 && bulkRepurpose.settled) {
+      void sendEvent("repurpose_bulk_review_discarded", {
+        calendarId: id,
+        targetPlatform: bulkRepurposeTargetRef.current,
+        count: bulkRepurpose.items.length,
+      });
+    }
+    bulkRepurpose.reset();
   }
 
   async function generateVisualForPost(post: Post) {
@@ -1246,6 +1353,16 @@ export default function CalendarDetail() {
       await updateCalendarMutation.mutateAsync({ timezone: tz || null });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update timezone");
+    }
+  }
+
+  async function updateBrandSlot(nextSlotId: string) {
+    if (!id) return;
+    try {
+      await updateCalendarMutation.mutateAsync({ brand_slot_id: nextSlotId || null } as never);
+      toast.success(nextSlotId ? "Brand voice updated ✓" : "Reverted to account default brand ✓");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update brand voice");
     }
   }
 
@@ -1921,6 +2038,31 @@ export default function CalendarDetail() {
                 onBlur={(e) => updateTrackingUrl(e.target.value.trim())}
               />
             </div>
+            <div className="cd-toolbar-row">
+              <span className="cd-reformat-label">Brand</span>
+              <select
+                className="cd-tz-sel"
+                aria-label="Brand voice"
+                value={calendarBrandSlotId || ""}
+                onChange={(e) => updateBrandSlot(e.target.value)}
+                disabled={brandSlotsQuery.isLoading || (brandSlotsQuery.data?.length ?? 0) === 0}
+                style={{ maxWidth: 240 }}
+                title="Choose which brand voice (forbidden phrases, proof points, CTA style) applies when regenerating or reformatting this calendar"
+              >
+                <option value="">Account default</option>
+                {(brandSlotsQuery.data || []).map((slot) => (
+                  <option key={slot.id} value={slot.id}>
+                    {slot.name}
+                    {slot.is_default ? " (default)" : ""}
+                  </option>
+                ))}
+              </select>
+              {brandSlotsQuery.isLoading && (
+                <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
+                  Loading brand slots…
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="cd-toolbar-card">
@@ -1970,6 +2112,20 @@ export default function CalendarDetail() {
                 title="Compare this post with another persona side-by-side"
               >
                 👥 Compare Personas
+              </button>
+              <button
+                type="button"
+                className="cd-reformat-btn"
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--color-border-strong)",
+                  color: "var(--color-primary)",
+                }}
+                disabled={posts.length === 0}
+                onClick={() => setBulkRepurposeModalOpen(true)}
+                title="Repurpose all (or selected) days of this week for another platform, reviewed before saving"
+              >
+                ♻️ Repurpose week to…
               </button>
             </div>
             <div className="cd-toolbar-row">
@@ -2044,6 +2200,28 @@ export default function CalendarDetail() {
                 </div>
               </div>
             )}
+
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "var(--text3)",
+                  textTransform: "uppercase",
+                  letterSpacing: ".05em",
+                  marginBottom: 4,
+                }}
+              >
+                Saved ideas ready to draft
+              </div>
+              <IdeaBacklogPanel
+                items={backlogQuery.data?.filter((i) => !i.used_at) ?? []}
+                loading={backlogQuery.isLoading}
+                onDraftIdea={handleDraftBacklogIdea}
+                onRemoveIdea={handleRemoveBacklogIdea}
+                removingId={removingBacklogId}
+              />
+            </div>
 
             <div
               className="cd-strip"
@@ -3450,6 +3628,31 @@ export default function CalendarDetail() {
           </div>
         </div>
       )}
+
+      <BulkRepurposeModal
+        open={bulkRepurposeModalOpen}
+        posts={posts}
+        currentPlatform={platform}
+        onClose={() => setBulkRepurposeModalOpen(false)}
+        onStart={startBulkRepurpose}
+      />
+
+      {bulkRepurpose.items.length > 0 && (
+        <BulkRepurposePanel
+          items={bulkRepurpose.items}
+          targetPlatform={bulkRepurpose.targetPlatform}
+          running={bulkRepurpose.running}
+          settled={bulkRepurpose.settled}
+          counts={bulkRepurpose.counts}
+          topic={formPayload.coreIdea}
+          saving={bulkRepurposeSaving}
+          onToggleIncluded={bulkRepurpose.toggleIncluded}
+          onRetryFailed={bulkRepurpose.retryFailed}
+          onSave={saveBulkRepurposeResults}
+          onClose={closeBulkRepurposePanel}
+        />
+      )}
+
       {pendingReformatTarget && (
         <ConfirmDialog
           title="Reformat all 7 posts?"

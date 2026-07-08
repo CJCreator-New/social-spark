@@ -114,13 +114,13 @@ function StickyHowItWorks() {
   }, [scrollYProgress]);
 
   return (
-    <section id="how-it-works" aria-labelledby="hiw-heading" className="ld-w-hiw-section">
+    <section id="how-it-works" aria-labelledby="hiw-heading-sticky" className="ld-w-hiw-section">
       <div ref={containerRef} className="ld-w-hiw-scroller">
         <div className="ld-w-hiw-pin">
           <div className="ld-w-wrap">
             <div className="ld-w-hiw-head">
               <span className="ld-w-eyebrow">How It Works</span>
-              <h2 id="hiw-heading" className="ld-w-h2">
+              <h2 id="hiw-heading-sticky" className="ld-w-h2">
                 From brief to published <em>in minutes</em>
               </h2>
             </div>
@@ -203,14 +203,14 @@ function StackedHowItWorks() {
   return (
     <section
       id="how-it-works"
-      aria-labelledby="hiw-heading"
+      aria-labelledby="hiw-heading-stacked"
       ref={sectionRef}
       className="ld-w-hiw-section ld-w-section"
     >
       <div className="ld-w-wrap">
         <div className="ld-w-hiw-head">
           <span className="ld-w-eyebrow">How It Works</span>
-          <h2 id="hiw-heading" className="ld-w-h2">
+          <h2 id="hiw-heading-stacked" className="ld-w-h2">
             From brief to published <em>in minutes</em>
           </h2>
         </div>

@@ -133,6 +133,15 @@ vi.mock("@/hooks/useAppQueries", () => ({
   useRepurposePostMutation: () => ({ mutateAsync: vi.fn() }),
   useGeneratePostImageMutation: () => ({ mutateAsync: vi.fn() }),
   useInlineRewriteMutation: () => ({ mutateAsync: vi.fn() }),
+  useGenerateSinglePostMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useIdeaBacklogQuery: () => ({ data: [], isLoading: false }),
+  useMarkIdeaUsedMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+  useRemoveIdeaFromBacklogMutation: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useBrandSlotsQuery: () => ({ data: [], isLoading: false }),
 }));
 
 import { toast } from "sonner";

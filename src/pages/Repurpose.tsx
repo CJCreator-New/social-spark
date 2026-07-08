@@ -1,16 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { toast } from "sonner";
-import { Loader2, Sparkles, Clipboard, RotateCcw } from "lucide-react";
+import { Loader2, Sparkles, Clipboard, RotateCcw, BookmarkPlus, Link2 } from "lucide-react";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import { APP_NAME } from "@/constants/branding";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   useExtractIdeasMutation,
   useGenerateFromIdeaMutation,
 } from "@/hooks/queries/useRepurposeQueries";
-import type { ExtractedIdea, GeneratedPostPayload } from "@/hooks/queries/shared";
+import {
+  useIdeaBacklogQuery,
+  useAddIdeasToBacklogMutation,
+  useMarkIdeaUsedMutation,
+  useRemoveIdeaFromBacklogMutation,
+} from "@/hooks/useAppQueries";
+import { useFetchUrlContent } from "@/hooks/useFetchUrlContent";
+import { IdeaBacklogPanel } from "@/components/IdeaBacklogPanel";
+import type {
+  ExtractedIdea,
+  GeneratedPostPayload,
+  IdeaBacklogRow,
+} from "@/hooks/queries/shared";
 import { formatForPlatform, writeToClipboard } from "@/lib/platformCopy";
 import "@/styles/pages.css";
+
+const URL_FETCH_MIN_WORDS = 40;
 
 const SOURCE_MIN_CHARS = 200;
 const SOURCE_MAX_CHARS = 20000;
@@ -41,9 +56,27 @@ export default function Repurpose() {
   const [ideas, setIdeas] = useState<ExtractedIdea[] | null>(null);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [cards, setCards] = useState<Record<number, CardState>>({});
+  const [savedIdeaKeys, setSavedIdeaKeys] = useState<Set<string>>(new Set());
+
+  const [sourceMode, setSourceMode] = useState<"paste" | "url">("paste");
+  const [urlInput, setUrlInput] = useState("");
+  const [urlMeta, setUrlMeta] = useState<{ title: string; wordCount: number } | null>(null);
+  const [removingBacklogId, setRemovingBacklogId] = useState<string | null>(null);
 
   const extractMutation = useExtractIdeasMutation();
   const generateMutation = useGenerateFromIdeaMutation();
+
+  const { user } = useAuth();
+  const backlogQuery = useIdeaBacklogQuery(user?.id);
+  const addToBacklogMutation = useAddIdeasToBacklogMutation(user?.id);
+  const markIdeaUsedMutation = useMarkIdeaUsedMutation(user?.id);
+  const removeIdeaMutation = useRemoveIdeaFromBacklogMutation(user?.id);
+  const { fetchUrl, loading: urlFetchLoading, error: urlFetchError } = useFetchUrlContent();
+
+  const unusedBacklogIdeas = useMemo(
+    () => (backlogQuery.data || []).filter((item) => !item.used_at),
+    [backlogQuery.data]
+  );
 
   // Draft recovery: keep the pasted source for the session so navigating
   // away and back does not lose it.
@@ -66,6 +99,7 @@ export default function Repurpose() {
     setExtractError(null);
     setIdeas(null);
     setCards({});
+    setSavedIdeaKeys(new Set());
     try {
       const result = await extractMutation.mutateAsync({
         source: source.trim(),
@@ -107,6 +141,85 @@ export default function Repurpose() {
     }
   };
 
+  const handleSaveIdeaToBacklog = async (idea: ExtractedIdea, index: number) => {
+    if (!user?.id) {
+      toast.error("Sign in to save ideas to your backlog.");
+      return;
+    }
+    try {
+      await addToBacklogMutation.mutateAsync({ ideas: [idea], sourceText: source, platform });
+      setSavedIdeaKeys((prev) => new Set(prev).add(`${idea.title}-${index}`));
+      toast.success("Saved to your idea backlog.");
+    } catch (e) {
+      toast.error(
+        e instanceof Error && e.message ? e.message : "Could not save this idea. Please try again."
+      );
+    }
+  };
+
+  const handleSaveAllIdeasToBacklog = async () => {
+    if (!user?.id) {
+      toast.error("Sign in to save ideas to your backlog.");
+      return;
+    }
+    if (!ideas || ideas.length === 0) return;
+    try {
+      await addToBacklogMutation.mutateAsync({ ideas, sourceText: source, platform });
+      setSavedIdeaKeys(new Set(ideas.map((idea, index) => `${idea.title}-${index}`)));
+      toast.success(`Saved ${ideas.length} idea${ideas.length === 1 ? "" : "s"} to your backlog.`);
+    } catch (e) {
+      toast.error(
+        e instanceof Error && e.message ? e.message : "Could not save these ideas. Please try again."
+      );
+    }
+  };
+
+  const handleDraftFromBacklog = async (item: IdeaBacklogRow) => {
+    try {
+      await markIdeaUsedMutation.mutateAsync(item.id);
+    } catch {
+      // Non-fatal — still let the user draft the post even if the "used" flag
+      // didn't persist; they can retry marking it used later.
+    }
+    const idea: ExtractedIdea = {
+      title: item.angle,
+      format: item.format || "",
+      rationale: item.rationale || "",
+      key_points: item.key_points || "",
+    };
+    const newIndex = ideas?.length ?? 0;
+    setIdeas((prev) => [...(prev || []), idea]);
+    await handleGenerate(idea, newIndex);
+  };
+
+  const handleRemoveBacklogIdea = async (id: string) => {
+    setRemovingBacklogId(id);
+    try {
+      await removeIdeaMutation.mutateAsync(id);
+    } catch (e) {
+      toast.error(
+        e instanceof Error && e.message ? e.message : "Could not remove this idea. Please try again."
+      );
+    } finally {
+      setRemovingBacklogId(null);
+    }
+  };
+
+  const handleFetchUrl = async () => {
+    const trimmedUrl = urlInput.trim();
+    if (!trimmedUrl) return;
+    const result = await fetchUrl(trimmedUrl);
+    if (result) {
+      setSource(result.text);
+      setUrlMeta({ title: result.title, wordCount: result.wordCount });
+      if (result.wordCount < URL_FETCH_MIN_WORDS) {
+        toast.info(
+          "This page may require JavaScript to render — try pasting the text manually."
+        );
+      }
+    }
+  };
+
   const handleCopy = async (post: GeneratedPostPayload) => {
     const formatted = formatForPlatform(
       {
@@ -139,9 +252,88 @@ export default function Repurpose() {
           distinct, platform-ready posts.
         </p>
 
+        <IdeaBacklogPanel
+          items={unusedBacklogIdeas}
+          loading={backlogQuery.isLoading}
+          onDraftIdea={handleDraftFromBacklog}
+          onRemoveIdea={handleRemoveBacklogIdea}
+          removingId={removingBacklogId}
+        />
+
         <section className="rp-card" aria-label="Source material">
+          <div className="rp-mode-tabs" role="tablist" aria-label="Source input mode">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sourceMode === "paste"}
+              className={`rp-mode-tab ${sourceMode === "paste" ? "on" : ""}`}
+              onClick={() => setSourceMode("paste")}
+            >
+              Paste text
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sourceMode === "url"}
+              className={`rp-mode-tab ${sourceMode === "url" ? "on" : ""}`}
+              onClick={() => setSourceMode("url")}
+            >
+              <Link2 size={12} aria-hidden style={{ marginRight: 4 }} />
+              From URL
+            </button>
+          </div>
+
+          {sourceMode === "url" && (
+            <>
+              <div className="rp-url-row">
+                <input
+                  type="url"
+                  className="rp-url-input"
+                  aria-label="Source URL"
+                  placeholder="https://example.com/article"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="rp-primary-btn"
+                  onClick={handleFetchUrl}
+                  disabled={!urlInput.trim() || urlFetchLoading}
+                >
+                  {urlFetchLoading ? (
+                    <>
+                      <Loader2 size={14} className="rp-spin" aria-hidden />
+                      Fetching…
+                    </>
+                  ) : (
+                    "Fetch"
+                  )}
+                </button>
+              </div>
+              {urlFetchError && (
+                <div className="rp-error" role="alert">
+                  <span>{urlFetchError}</span>
+                  <button type="button" className="rp-retry-btn" onClick={handleFetchUrl}>
+                    <RotateCcw size={12} aria-hidden /> Retry
+                  </button>
+                </div>
+              )}
+              {urlMeta && (
+                <p className="rp-url-meta">
+                  Fetched "{urlMeta.title || "Untitled page"}" — {urlMeta.wordCount.toLocaleString()}{" "}
+                  words.
+                </p>
+              )}
+              {urlMeta && urlMeta.wordCount < URL_FETCH_MIN_WORDS && (
+                <p className="rp-url-warning" role="alert">
+                  This page may require JavaScript to render — try pasting the text manually.
+                </p>
+              )}
+            </>
+          )}
+
           <label className="rp-label" htmlFor="rp-source">
-            Paste your source material
+            {sourceMode === "url" ? "Review and edit the fetched text" : "Paste your source material"}
           </label>
           <textarea
             id="rp-source"
@@ -236,42 +428,65 @@ export default function Repurpose() {
 
         {ideas && (
           <section className="rp-ideas" aria-label="Extracted ideas">
-            <h2 className="rp-section-title">
-              {ideas.length} idea{ideas.length === 1 ? "" : "s"} for {platform}
-            </h2>
+            <div className="rp-idea-actions" style={{ marginBottom: 12 }}>
+              <h2 className="rp-section-title" style={{ margin: 0 }}>
+                {ideas.length} idea{ideas.length === 1 ? "" : "s"} for {platform}
+              </h2>
+              <button
+                type="button"
+                className="rp-secondary-btn"
+                onClick={handleSaveAllIdeasToBacklog}
+                disabled={addToBacklogMutation.isPending}
+              >
+                <BookmarkPlus size={12} aria-hidden /> Save all to backlog
+              </button>
+            </div>
             {ideas.map((idea, index) => {
               const card = cards[index] || { status: "idle" };
+              const ideaKey = `${idea.title}-${index}`;
+              const isSaved = savedIdeaKeys.has(ideaKey);
               return (
-                <article key={`${idea.title}-${index}`} className="rp-idea-card">
+                <article key={ideaKey} className="rp-idea-card">
                   <div className="rp-idea-head">
                     <div>
                       <span className="rp-format-badge">{idea.format}</span>
                       <h3 className="rp-idea-title">{idea.title}</h3>
                       <p className="rp-idea-rationale">{idea.rationale}</p>
                     </div>
-                    <button
-                      type="button"
-                      className="rp-primary-btn"
-                      onClick={() => handleGenerate(idea, index)}
-                      disabled={card.status === "loading"}
-                    >
-                      {card.status === "loading" ? (
-                        <>
-                          <Loader2 size={14} className="rp-spin" aria-hidden />
-                          Generating…
-                        </>
-                      ) : card.status === "done" ? (
-                        <>
-                          <RotateCcw size={14} aria-hidden />
-                          Regenerate
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={14} aria-hidden />
-                          Generate post
-                        </>
-                      )}
-                    </button>
+                    <div className="rp-idea-actions">
+                      <button
+                        type="button"
+                        className="rp-secondary-btn"
+                        onClick={() => handleSaveIdeaToBacklog(idea, index)}
+                        disabled={isSaved || addToBacklogMutation.isPending}
+                      >
+                        <BookmarkPlus size={12} aria-hidden />
+                        {isSaved ? "Saved" : "Save to backlog"}
+                      </button>
+                      <button
+                        type="button"
+                        className="rp-primary-btn"
+                        onClick={() => handleGenerate(idea, index)}
+                        disabled={card.status === "loading"}
+                      >
+                        {card.status === "loading" ? (
+                          <>
+                            <Loader2 size={14} className="rp-spin" aria-hidden />
+                            Generating…
+                          </>
+                        ) : card.status === "done" ? (
+                          <>
+                            <RotateCcw size={14} aria-hidden />
+                            Regenerate
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={14} aria-hidden />
+                            Generate post
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   {card.status === "error" && (

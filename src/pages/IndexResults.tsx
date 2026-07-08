@@ -1,6 +1,7 @@
 import React, { Suspense, useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { formatForPlatform, niceLabelFor, stripMarkdown } from "@/lib/platformCopy";
+import type { PerformanceFocusMetric } from "@/lib/postPerformanceScore";
 import { suggestedTimeForDay } from "@/lib/postingTimes";
 import { shortDateLabel, dateForDow } from "@/lib/calendarSchedule";
 import { WeekStrip } from "@/components/wizard/WeekStrip";
@@ -95,7 +96,12 @@ interface IndexResultsProps {
   handleDrop: (e: React.DragEvent<HTMLElement>, targetIndex: number) => number | null;
   onHashtagsChange?: (idx: number, newHashtags: string) => void;
   onToneShift?: (idx: number, level: number) => void;
-  regenerateDay: (idx: number, tweak?: string) => void | Promise<void>;
+  regenerateDay: (
+    idx: number,
+    tweak?: string,
+    focusMetric?: PerformanceFocusMetric,
+    guidance?: string
+  ) => void | Promise<void>;
 }
 
 export function IndexResults({
@@ -1051,7 +1057,15 @@ export function IndexResults({
               📊 Post Quality Audit
             </h3>
 
-            <PerformanceScoreCard post={p} topic={form.coreIdea} onEnhance={enhanceCurrentPost} />
+            <PerformanceScoreCard
+              post={p}
+              topic={form.coreIdea}
+              onEnhance={enhanceCurrentPost}
+              onFocusedRegenerate={(metric, guidance) =>
+                regenerateDay(activeDay, "focused-fix", metric, guidance)
+              }
+              onApplyCta={(newCta) => handleFieldChange("cta", newCta)}
+            />
             <div style={{ marginTop: 12 }}>
               <PostInsights post={p} platform={form.platform} topic={form.coreIdea} />
             </div>

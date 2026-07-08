@@ -4,7 +4,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 declare const Deno: {
   env: { get(key: string): string | undefined };
   serve(handler: (req: Request) => Response | Promise<Response>): void;
-  openKv(): Promise<any>;
 };
 import {
   checkRateLimit,

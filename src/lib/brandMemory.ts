@@ -1,12 +1,24 @@
-import { Database } from "@/integrations/supabase/types";
 import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
 
-type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+/**
+ * Minimal shape shared by anything that can act as a "brand identity" source
+ * for prompt assembly — currently satisfied structurally by both
+ * `ProfileRow` (legacy single-brand-per-user fields) and `BrandSlotRow`
+ * (see src/hooks/queries/shared.ts, part of the brand-slots feature). Keeping
+ * this interface minimal (rather than importing either concrete row type)
+ * lets both call sites pass their row directly with no mapping step.
+ */
+export interface BrandIdentityFields {
+  forbidden_phrases?: string[] | null;
+  proof_points?: string[] | null;
+  cta_preferences?: string[] | null;
+  preferred_structures?: string[] | null;
+}
 
 /**
  * Checks if the user has configured any brand memory elements in their profile.
  */
-export function hasBrandMemory(profile?: Partial<ProfileRow> | null): boolean {
+export function hasBrandMemory(profile?: BrandIdentityFields | null): boolean {
   if (!profile) return false;
 
   const hasForbidden =
@@ -22,7 +34,7 @@ export function hasBrandMemory(profile?: Partial<ProfileRow> | null): boolean {
 /**
  * Builds a prompt snippet enforcing brand identity based on profile settings.
  */
-export function buildBrandMemoryPrompt(profile?: Partial<ProfileRow> | null): string {
+export function buildBrandMemoryPrompt(profile?: BrandIdentityFields | null): string {
   if (!profile || !hasBrandMemory(profile)) return "";
 
   const sections: string[] = ["### BRAND MEMORY & IDENTITY CONSTRAINTS"];

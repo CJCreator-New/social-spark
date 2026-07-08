@@ -378,35 +378,37 @@ export default function MyCalendars() {
           </div>
         </div>
 
-        <div className="mc-summary" aria-label="Calendar summary">
-          <div className="mc-summary-card">
-            <div className="mc-summary-label">Visible calendars</div>
-            {isLoading ? (
-              <div className="animate-pulse bg-muted h-8 w-16 rounded my-1"></div>
-            ) : (
-              <div className="mc-summary-value tabular-nums">{visibleCount}</div>
-            )}
-            <div className="mc-summary-sub">{visibleSubtitle}</div>
+        {!isLoading && items.length > 0 && (
+          <div className="mc-summary" aria-label="Calendar summary">
+            <div className="mc-summary-card">
+              <div className="mc-summary-label">Visible calendars</div>
+              {isLoading ? (
+                <div className="animate-pulse bg-muted h-8 w-16 rounded my-1"></div>
+              ) : (
+                <div className="mc-summary-value tabular-nums">{visibleCount}</div>
+              )}
+              <div className="mc-summary-sub">{visibleSubtitle}</div>
+            </div>
+            <div className="mc-summary-card">
+              <div className="mc-summary-label">Starred</div>
+              {isLoading ? (
+                <div className="animate-pulse bg-muted h-8 w-16 rounded my-1"></div>
+              ) : (
+                <div className="mc-summary-value tabular-nums">{favoriteCount}</div>
+              )}
+              <div className="mc-summary-sub">Quick access to the calendars you reuse most.</div>
+            </div>
+            <div className="mc-summary-card">
+              <div className="mc-summary-label">Posts stored</div>
+              {isLoading ? (
+                <div className="animate-pulse bg-muted h-8 w-16 rounded my-1"></div>
+              ) : (
+                <div className="mc-summary-value tabular-nums">{totalPosts}</div>
+              )}
+              <div className="mc-summary-sub">Across all saved calendars in this account.</div>
+            </div>
           </div>
-          <div className="mc-summary-card">
-            <div className="mc-summary-label">Starred</div>
-            {isLoading ? (
-              <div className="animate-pulse bg-muted h-8 w-16 rounded my-1"></div>
-            ) : (
-              <div className="mc-summary-value tabular-nums">{favoriteCount}</div>
-            )}
-            <div className="mc-summary-sub">Quick access to the calendars you reuse most.</div>
-          </div>
-          <div className="mc-summary-card">
-            <div className="mc-summary-label">Posts stored</div>
-            {isLoading ? (
-              <div className="animate-pulse bg-muted h-8 w-16 rounded my-1"></div>
-            ) : (
-              <div className="mc-summary-value tabular-nums">{totalPosts}</div>
-            )}
-            <div className="mc-summary-sub">Across all saved calendars in this account.</div>
-          </div>
-        </div>
+        )}
 
         {!isLoading && items.length > 0 && (
           <div className="mc-filter-row">

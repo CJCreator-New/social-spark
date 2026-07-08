@@ -94,11 +94,33 @@ const mockProfileData: Record<string, unknown> = {
   default_goals: [],
 };
 
+const mockBrandSlots = [
+  {
+    id: "slot-default",
+    user_id: "user-1",
+    name: "Default",
+    is_default: true,
+    forbidden_phrases: [],
+    proof_points: [],
+    cta_preferences: [],
+    preferred_structures: [],
+    brand_examples: null,
+    default_framework: null,
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+  },
+];
+
 vi.mock("@/hooks/useAppQueries", () => ({
   useProfileQuery: () => ({ data: mockProfileData, isLoading: false, error: null }),
   useProfileUpdateMutation: () => ({ mutateAsync: mockProfileUpdateMutateAsync }),
   useTemplatesQuery: () => ({ data: [], isLoading: false }),
   useDeleteTemplateMutation: () => ({ mutateAsync: vi.fn() }),
+  useEnsureDefaultBrandSlot: () => ({ data: mockBrandSlots, isLoading: false, isSuccess: true }),
+  useCreateBrandSlotMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateBrandSlotMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteBrandSlotMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useSetDefaultBrandSlotMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 import { toast } from "sonner";

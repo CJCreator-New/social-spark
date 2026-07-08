@@ -12,6 +12,7 @@ import {
   LogOut,
   ShieldCheck,
   Recycle,
+  BarChart3,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/brand/Logo";
@@ -35,6 +36,7 @@ export function AppShell({ children }: AppShellProps) {
     { label: "My calendars", path: "/my-calendars", icon: CalendarDays },
     { label: "Repurpose", path: "/repurpose", icon: Recycle },
     { label: "Schedule", path: "/schedule", icon: Clock },
+    { label: "Insights", path: "/insights", icon: BarChart3 },
     { label: "Profile", path: "/profile", icon: UserCircle },
     ...(isAdmin ? [{ label: "Admin", path: "/admin", icon: ShieldCheck }] : []),
   ];

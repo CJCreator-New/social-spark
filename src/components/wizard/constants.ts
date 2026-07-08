@@ -48,6 +48,7 @@ export interface WizardForm {
   mode: "week" | "day";
   targetDate: string;
   quality?: "draft" | "polished";
+  brandSlotId?: string | null;
 }
 
 export interface BrandMemory {
@@ -493,6 +494,7 @@ export const INITIAL_FORM: WizardForm = {
   mode: "week",
   targetDate: toDateInputValue(nextMonday()),
   quality: "draft",
+  brandSlotId: null,
 };
 
 export const DRAFT_VERSION = 1;

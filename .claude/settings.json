@@ -21,7 +21,11 @@
       "Bash(mv supabase/migrations/RUN_ME_combined_catchup.sql .scratch/dead-migrations/RUN_ME_combined_catchup.sql)",
       "Bash(node scripts/inline-edge-functions.mjs)",
       "Bash(xargs -I{} basename {})",
-      "Bash(grep -i \"audit\\\\|\\\\.md$\")"
+      "Bash(grep -i \"audit\\\\|\\\\.md$\")",
+      "Bash(npx supabase *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(head -20 /tmp_types_test.ts)",
+      "Bash(rm -f /tmp_types_test.ts)"
     ],
     "additionalDirectories": [
       "C:\\Users\\HP\\AppData\\Local\\Temp\\claude"

@@ -24,6 +24,9 @@ verify_jwt = false
 [functions.extract-ideas]
 verify_jwt = false
 
+[functions.fetch-url-content]
+verify_jwt = false
+
 # API-key functions self-authenticate via the bearer token (supabase.auth.getUser),
 # so the platform JWT gate is disabled to avoid double-validation / E2E-token rejection.
 [functions.encrypt-api-key]

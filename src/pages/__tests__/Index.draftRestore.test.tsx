@@ -61,6 +61,16 @@ vi.mock("sonner", () => ({
   },
 }));
 
+vi.mock("@/hooks/useAppQueries", () => ({
+  useCreateCalendarMutation: () => ({ mutateAsync: vi.fn() }),
+  useProfileQuery: () => ({ data: null }),
+  useProfileUpdateMutation: () => ({ mutateAsync: vi.fn() }),
+  useRegeneratePostMutation: () => ({ mutateAsync: vi.fn() }),
+  useGeneratePostImageMutation: () => ({ mutateAsync: vi.fn() }),
+  useBrandSlotsQuery: () => ({ data: [] }),
+  useEnsureDefaultBrandSlot: () => ({ data: [] }),
+}));
+
 // ---------------------------------------------------------------------------
 // KNOWN BUG (found while writing this test, not fixed here — out of scope):
 // storageService.cleanupExpiredDrafts() calls JSON.parse(raw) directly on the

@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Post } from "@/lib/calendarSchedule";
 import { useWizardStore } from "@/stores/useWizardStore";
+import { sendEvent } from "@/lib/telemetry";
 import {
   calculatePerformanceScore,
   getScoreColor,
@@ -186,7 +187,13 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
               <span style={{ fontSize: 10, color: "var(--text3)" }}>Suggested CTA:</span>
               <button
                 className="cta-suggestion-chip"
-                onClick={() => onApplyCta(suggestedCtaText)}
+                onClick={() => {
+                  void sendEvent("cta_suggestion_applied", {
+                    platform: post.platform,
+                    priorCtaScore: score.ctaEffectiveness,
+                  });
+                  onApplyCta(suggestedCtaText);
+                }}
                 title="Click to apply this suggestion"
                 type="button"
               >
@@ -310,9 +317,20 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
         {score.overallScore < 7 && weakestMetric && onFocusedRegenerate && (
           <button
             className="cpbtn font-mono"
-            onClick={() =>
-              onFocusedRegenerate(weakestMetric, getRegenerationGuidance(weakestMetric))
-            }
+            onClick={() => {
+              if (weakestMetric === "hookStrength") {
+                void sendEvent("hook_regenerate_clicked", {
+                  platform: post.platform,
+                  priorHookScore: score.hookStrength,
+                });
+              } else if (weakestMetric === "ctaEffectiveness") {
+                void sendEvent("cta_regenerate_clicked", {
+                  platform: post.platform,
+                  priorCtaScore: score.ctaEffectiveness,
+                });
+              }
+              onFocusedRegenerate(weakestMetric, getRegenerationGuidance(weakestMetric));
+            }}
             style={{
               fontSize: 12,
               width: "100%",

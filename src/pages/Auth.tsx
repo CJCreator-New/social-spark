@@ -13,7 +13,10 @@ import { PASSWORD_MIN_LENGTH, validatePassword } from "@/lib/passwordPolicy";
 import "@/styles/pages.css";
 
 export default function AuthPage() {
-  const [tab, setTab] = useState<"signin" | "signup" | "forgot">("signin");
+  const routerLocation = useLocation();
+  const queryParams = new URLSearchParams(routerLocation.search);
+  const initialTab = (queryParams.get("tab") as "signin" | "signup" | "forgot") || "signin";
+  const [tab, setTab] = useState<"signin" | "signup" | "forgot">(initialTab);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -22,12 +25,10 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const navigate = useNavigate();
-  const routerLocation = useLocation();
   const { user } = useAuth();
 
   // Preserve a same-origin relative `?next=` (e.g. /.lovable/oauth/consent?...) so
   // the OAuth consent flow returns the user to the consent screen after login.
-  const queryParams = new URLSearchParams(routerLocation.search);
   const rawNext = queryParams.get("next");
   const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
   const plan = queryParams.get("plan");

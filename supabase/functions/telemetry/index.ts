@@ -1,5 +1,5 @@
 declare const Deno: any;
-import { checkRateLimit } from "../_shared/promptHelpers.ts";
+import { checkRateLimit, getVerifiedUserId } from "../_shared/promptHelpers.ts";
 
 // Telemetry receiver function for fire-and-forget client events.
 // Expects SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars and a table `telemetry_events`.
@@ -16,6 +16,16 @@ const ALLOWED_EVENT_NAMES = new Set([
   "generate_success",
   "generate_error",
   "enhance_clicked",
+  "repurpose_bulk_start",
+  "repurpose_bulk_post_success",
+  "repurpose_bulk_post_failed",
+  "repurpose_bulk_review_saved",
+  "repurpose_bulk_review_discarded",
+  "hook_regenerate_clicked",
+  "cta_regenerate_clicked",
+  "cta_suggestion_applied",
+  "post_kept",
+  "post_regenerated_again",
 ]);
 const MAX_PROPS_BYTES = 2000;
 const MAX_BODY_BYTES = 8000;
@@ -127,7 +137,19 @@ export async function handle(req: Request): Promise<Response> {
       });
     }
 
-    const row = { event_name: eventName, props, ts: new Date().toISOString() };
+    // Attribution is optional: this function accepts anonymous, pre-login events
+    // (verify_jwt is disabled), so a missing/invalid bearer token must not block
+    // the write — it just means user_id stays null. When a valid session token
+    // is present, resolve it so telemetry rows are attributable to a user.
+    const authHeader = req.headers.get("authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim() || null;
+    const userId = token ? await getVerifiedUserId(token) : null;
+
+    const row: { event_name: string; props: unknown; user_id?: string } = {
+      event_name: eventName,
+      props,
+    };
+    if (userId) row.user_id = userId;
     // Insert via REST
     const res = await fetch(`${SUPABASE_URL}/rest/v1/telemetry_events`, {
       method: "POST",

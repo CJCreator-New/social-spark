@@ -156,6 +156,11 @@ export function AdminDashboard() {
   const handleCompGrant = async () => {
     const target = compUserId.trim();
     if (!target) return;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(target)) {
+      toast.error("Please enter a valid UUID for the User ID.");
+      return;
+    }
     setCompBusy(true);
     try {
       // Quota mirrors the server plan catalogue: starter 1000, pro 300.
@@ -175,6 +180,7 @@ export function AdminDashboard() {
         .limit(100);
       if (rows) setPayments(rows as unknown as PaymentRow[]);
       setCompUserId("");
+      toast.success("Tier successfully granted.");
     } catch (err) {
       console.error("Comp grant failed:", err);
       setError(err instanceof Error ? err.message : "Comp grant failed");

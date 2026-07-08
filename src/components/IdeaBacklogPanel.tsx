@@ -1,10 +1,6 @@
-import React, { useState, useMemo, useCallback } from "react";
-import {
-  readIdeaBacklog,
-  markIdeaAsUsed,
-  removeIdeaFromBacklog,
-  type IdeaBacklogItem,
-} from "@/lib/ideaBacklog";
+import React, { useState } from "react";
+import { Loader2 } from "lucide-react";
+import type { IdeaBacklogRow } from "@/hooks/queries/shared";
 
 // ============================================================================
 // HELPERS
@@ -31,12 +27,16 @@ function timeAgo(isoString: string): string {
 // ============================================================================
 
 interface IdeaBacklogPanelProps {
-  /** The authenticated user's ID — used as the localStorage namespace key */
-  userId: string;
-  /** Optional platform filter label shown in the panel header */
-  platform?: string;
-  /** Called with the idea angle text when the user clicks "Draft →" */
-  onDraftIdea: (idea: string) => void;
+  /** Unused backlog rows to render. This component performs no data-fetching. */
+  items: IdeaBacklogRow[];
+  /** True while the backlog list is loading for the first time. */
+  loading?: boolean;
+  /** Called with the full row when the user clicks "Draft this". */
+  onDraftIdea: (item: IdeaBacklogRow) => void;
+  /** Called with the row id when the user clicks "Remove". */
+  onRemoveIdea: (id: string) => void;
+  /** Id of the row currently being removed, so its button can show a spinner. */
+  removingId?: string | null;
 }
 
 // ============================================================================
@@ -44,43 +44,13 @@ interface IdeaBacklogPanelProps {
 // ============================================================================
 
 export const IdeaBacklogPanel: React.FC<IdeaBacklogPanelProps> = ({
-  userId,
-  platform,
+  items,
+  loading = false,
   onDraftIdea,
+  onRemoveIdea,
+  removingId = null,
 }) => {
   const [open, setOpen] = useState(false);
-  // Version counter: incrementing forces a re-read from localStorage
-  const [version, setVersion] = useState(0);
-
-  const backlog = useMemo(
-    () => readIdeaBacklog(userId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [userId, version]
-  );
-
-  const unusedIdeas = useMemo(
-    () => backlog.filter((item) => !item.usedAt),
-    [backlog]
-  );
-
-  const refresh = useCallback(() => setVersion((v) => v + 1), []);
-
-  const handleDraft = useCallback(
-    (item: IdeaBacklogItem) => {
-      markIdeaAsUsed(userId, item.id);
-      refresh();
-      onDraftIdea(item.angle);
-    },
-    [userId, onDraftIdea, refresh]
-  );
-
-  const handleRemove = useCallback(
-    (ideaId: string) => {
-      removeIdeaFromBacklog(userId, ideaId);
-      refresh();
-    },
-    [userId, refresh]
-  );
 
   return (
     <div
@@ -96,6 +66,7 @@ export const IdeaBacklogPanel: React.FC<IdeaBacklogPanelProps> = ({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
         style={{
           width: "100%",
           display: "flex",
@@ -112,19 +83,7 @@ export const IdeaBacklogPanel: React.FC<IdeaBacklogPanelProps> = ({
         }}
       >
         <span>
-          💡 Idea Backlog ({unusedIdeas.length})
-          {platform && (
-            <span
-              style={{
-                marginLeft: 6,
-                fontSize: 10,
-                color: "var(--text3)",
-                fontWeight: 400,
-              }}
-            >
-              · {platform}
-            </span>
-          )}
+          Idea Backlog ({items.length})
         </span>
         <span style={{ fontSize: 11, color: "var(--text3)" }}>
           {open ? "▲" : "▼"}
@@ -139,7 +98,21 @@ export const IdeaBacklogPanel: React.FC<IdeaBacklogPanelProps> = ({
             padding: "8px 12px 12px",
           }}
         >
-          {unusedIdeas.length === 0 ? (
+          {loading ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12,
+                color: "var(--text3)",
+              }}
+              role="status"
+            >
+              <Loader2 size={14} className="rp-spin" aria-hidden />
+              Loading saved ideas…
+            </div>
+          ) : items.length === 0 ? (
             <p
               style={{
                 margin: 0,
@@ -148,7 +121,8 @@ export const IdeaBacklogPanel: React.FC<IdeaBacklogPanelProps> = ({
                 fontStyle: "italic",
               }}
             >
-              No saved ideas yet. Ideas from Source-to-Post will appear here.
+              No saved ideas yet. Extract ideas above and save the ones you want to keep for
+              later.
             </p>
           ) : (
             <ul
@@ -161,7 +135,7 @@ export const IdeaBacklogPanel: React.FC<IdeaBacklogPanelProps> = ({
                 gap: 8,
               }}
             >
-              {unusedIdeas.map((item) => (
+              {items.map((item) => (
                 <li
                   key={item.id}
                   style={{
@@ -185,6 +159,10 @@ export const IdeaBacklogPanel: React.FC<IdeaBacklogPanelProps> = ({
                     {item.angle}
                   </span>
 
+                  {item.format && (
+                    <span style={{ fontSize: 10, color: "var(--text3)" }}>{item.format}</span>
+                  )}
+
                   {/* Meta row: timestamp + actions */}
                   <div
                     style={{
@@ -196,7 +174,7 @@ export const IdeaBacklogPanel: React.FC<IdeaBacklogPanelProps> = ({
                     }}
                   >
                     <span style={{ fontSize: 10, color: "var(--text3)" }}>
-                      {timeAgo(item.createdAt)}
+                      {timeAgo(item.created_at)}
                     </span>
 
                     <div style={{ display: "flex", gap: 6 }}>
@@ -205,9 +183,9 @@ export const IdeaBacklogPanel: React.FC<IdeaBacklogPanelProps> = ({
                         type="button"
                         className="cpbtn done"
                         style={{ fontSize: 10 }}
-                        onClick={() => handleDraft(item)}
+                        onClick={() => onDraftIdea(item)}
                       >
-                        Draft →
+                        Draft this
                       </button>
 
                       {/* Remove button */}
@@ -223,10 +201,15 @@ export const IdeaBacklogPanel: React.FC<IdeaBacklogPanelProps> = ({
                           borderRadius: 4,
                           lineHeight: 1,
                         }}
-                        title="Remove idea"
-                        onClick={() => handleRemove(item.id)}
+                        aria-label="Remove idea"
+                        disabled={removingId === item.id}
+                        onClick={() => onRemoveIdea(item.id)}
                       >
-                        ✕
+                        {removingId === item.id ? (
+                          <Loader2 size={10} className="rp-spin" aria-hidden />
+                        ) : (
+                          "Remove"
+                        )}
                       </button>
                     </div>
                   </div>

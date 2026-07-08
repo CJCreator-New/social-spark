@@ -171,6 +171,8 @@ describe("postPerformanceScore tests", () => {
         readability: 8,
         overallScore: 6,
         feedback: [],
+        brandCompliance: 100,
+        brandViolations: [],
       };
       const weakest = getWeakestPerformanceMetric(scores);
       expect(weakest).toBe("hookStrength");
@@ -186,6 +188,8 @@ describe("postPerformanceScore tests", () => {
         readability: 8,
         overallScore: 6,
         feedback: [],
+        brandCompliance: 100,
+        brandViolations: [],
       };
       const weakestList = getWeakestMetrics(scores);
       expect(weakestList[0]).toBe("ctaEffectiveness");

@@ -152,7 +152,18 @@ export default function Schedule() {
     const pages = scheduleData.pages;
     const next = pages.flatMap((page) => page.rows) as ScheduledRow[];
     setRows((prev) => {
-      if (prev.length === next.length && prev.every((r, i) => r.id === next[i].id)) return prev;
+      if (
+        prev.length === next.length &&
+        prev.every(
+          (r, i) =>
+            r.id === next[i].id &&
+            r.workflow_status === next[i].workflow_status &&
+            r.status === next[i].status &&
+            r.scheduled_at === next[i].scheduled_at
+        )
+      ) {
+        return prev;
+      }
       return next;
     });
     setCalendars(mergedCalendars);
@@ -474,28 +485,30 @@ export default function Schedule() {
           </p>
         </div>
 
-        <div className="sc-summary" aria-label="Schedule summary">
-          <div className="sc-summary-card">
-            <div className="sc-summary-label">Scheduled</div>
-            <div className="sc-summary-value">{summary.total}</div>
-            <div className="sc-summary-sub">Rows currently in your queue.</div>
+        {!loading && rows.length > 0 && (
+          <div className="sc-summary" aria-label="Schedule summary">
+            <div className="sc-summary-card">
+              <div className="sc-summary-label">Scheduled</div>
+              <div className="sc-summary-value">{summary.total}</div>
+              <div className="sc-summary-sub">Rows currently in your queue.</div>
+            </div>
+            <div className="sc-summary-card">
+              <div className="sc-summary-label">Drafted</div>
+              <div className="sc-summary-value">{summary.drafted}</div>
+              <div className="sc-summary-sub">Needs approval or a second look.</div>
+            </div>
+            <div className="sc-summary-card">
+              <div className="sc-summary-label">Approved</div>
+              <div className="sc-summary-value">{summary.approved}</div>
+              <div className="sc-summary-sub">Ready to publish or reschedule.</div>
+            </div>
+            <div className="sc-summary-card">
+              <div className="sc-summary-label">Published</div>
+              <div className="sc-summary-value">{summary.published}</div>
+              <div className="sc-summary-sub">Completed and archived in the schedule.</div>
+            </div>
           </div>
-          <div className="sc-summary-card">
-            <div className="sc-summary-label">Drafted</div>
-            <div className="sc-summary-value">{summary.drafted}</div>
-            <div className="sc-summary-sub">Needs approval or a second look.</div>
-          </div>
-          <div className="sc-summary-card">
-            <div className="sc-summary-label">Approved</div>
-            <div className="sc-summary-value">{summary.approved}</div>
-            <div className="sc-summary-sub">Ready to publish or reschedule.</div>
-          </div>
-          <div className="sc-summary-card">
-            <div className="sc-summary-label">Published</div>
-            <div className="sc-summary-value">{summary.published}</div>
-            <div className="sc-summary-sub">Completed and archived in the schedule.</div>
-          </div>
-        </div>
+        )}
 
         {!loading && rows.length > 0 && (
           <div className="sc-toolbar">

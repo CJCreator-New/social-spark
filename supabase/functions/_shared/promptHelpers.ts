@@ -770,52 +770,79 @@ export async function checkRateLimit(
   endpoint: string,
   config: RateLimitConfig
 ): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
-  const MAX_CAS_ATTEMPTS = 5;
   try {
-    const kv = await Deno.openKv();
-    const key = ["ratelimit", endpoint, userId];
-    const now = Date.now();
-    const windowStart = now - config.windowMs;
-
-    try {
-      // Compare-and-swap loop: re-read + re-check + versioned write so concurrent
-      // requests can't all observe the same pre-increment count and all pass.
-      for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt++) {
-        const entry = await kv.get<number[]>(key);
-        const requests = (entry.value || []).filter((ts) => ts > windowStart);
-
-        if (requests.length >= config.maxRequests) {
-          const resetAt = requests[0] + config.windowMs;
-          return { allowed: false, remaining: 0, resetAt };
-        }
-
-        requests.push(now);
-        const res = await kv
-          .atomic()
-          .check(entry)
-          .set(key, requests, { expireIn: config.windowMs })
-          .commit();
-
-        if (res.ok) {
-          return {
-            allowed: true,
-            remaining: config.maxRequests - requests.length,
-            resetAt: now + config.windowMs,
-          };
-        }
-        // Another concurrent request won the CAS race; retry with a fresh read.
-      }
-
-      // Exhausted retries under heavy contention: fail closed rather than let an
-      // unbounded number of concurrent requests all slip through unaccounted for.
-      return { allowed: false, remaining: 0, resetAt: now + config.windowMs };
-    } finally {
-      await kv.close();
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      console.warn("Missing supabase env for rate limiting, allowing request");
+      return { allowed: true, remaining: config.maxRequests, resetAt: Date.now() + config.windowMs };
     }
+
+    // @ts-ignore - Deno ESM import resolved at runtime
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - config.windowMs);
+
+    // Get current count of events in the window
+    const { count, error: countError } = await supabase
+      .from("rate_limit_events")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("endpoint", endpoint)
+      .gte("created_at", windowStart.toISOString());
+
+    if (countError) throw countError;
+
+    const currentCount = count || 0;
+    if (currentCount >= config.maxRequests) {
+      // Find the oldest event in the current window to estimate reset time
+      const { data: oldestEvent } = await supabase
+        .from("rate_limit_events")
+        .select("created_at")
+        .eq("user_id", userId)
+        .eq("endpoint", endpoint)
+        .gte("created_at", windowStart.toISOString())
+        .order("created_at", { ascending: true })
+        .limit(1);
+
+      const oldestTime = oldestEvent && oldestEvent[0]
+        ? new Date(oldestEvent[0].created_at).getTime()
+        : now.getTime();
+      const resetAt = oldestTime + config.windowMs;
+
+      return { allowed: false, remaining: 0, resetAt };
+    }
+
+    // Insert new event
+    const { error: insertError } = await supabase
+      .from("rate_limit_events")
+      .insert({
+        user_id: userId,
+        endpoint,
+        created_at: now.toISOString(),
+      });
+
+    if (insertError) throw insertError;
+
+    // Fire-and-forget prune expired rate limit events
+    supabase
+      .from("rate_limit_events")
+      .delete()
+      .lt("created_at", windowStart.toISOString())
+      .then(({ error }) => {
+        if (error) console.warn("Failed to prune expired rate limit events", error);
+      });
+
+    return {
+      allowed: true,
+      remaining: config.maxRequests - (currentCount + 1),
+      resetAt: now.getTime() + config.windowMs,
+    };
   } catch (e) {
     console.warn("Rate limit check failed, allowing request", e);
-    // Deno KV itself unavailable (not a contention issue) — fail open so a KV
-    // outage doesn't take down unrelated functionality.
+    // Fail open so database outages do not block operations
     return { allowed: true, remaining: config.maxRequests, resetAt: Date.now() + config.windowMs };
   }
 }

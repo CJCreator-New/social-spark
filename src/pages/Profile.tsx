@@ -8,7 +8,13 @@ import {
   useProfileQuery,
   useProfileUpdateMutation,
   useTemplatesQuery,
+  useCreateBrandSlotMutation,
+  useDeleteBrandSlotMutation,
+  useEnsureDefaultBrandSlot,
+  useSetDefaultBrandSlotMutation,
+  useUpdateBrandSlotMutation,
 } from "@/hooks/useAppQueries";
+import type { BrandSlotRow } from "@/hooks/queries/shared";
 import { toast } from "sonner";
 import { normalizeTag, displayTag, parsePolicyList } from "@/lib/hashtagPolicy";
 import { listTimezones, browserTimezone, tzLabel } from "@/lib/timezones";
@@ -198,6 +204,12 @@ export default function Profile() {
   const [uploading, setUploading] = useState(false);
   const tzList = listTimezones();
 
+  // Brand slots (roadmap 3.3): multiple named brand profiles per account.
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const [showNewSlotInput, setShowNewSlotInput] = useState(false);
+  const [newSlotName, setNewSlotName] = useState("");
+  const [pendingDeleteSlot, setPendingDeleteSlot] = useState<BrandSlotRow | null>(null);
+
   function getAvatarPathFromPublicUrl(publicUrl: string) {
     try {
       const path = new URL(publicUrl).pathname;
@@ -217,6 +229,17 @@ export default function Profile() {
   } = useProfileQuery(user?.id);
   const updateProfile = useProfileUpdateMutation(user?.id);
 
+  // Brand slots (roadmap 3.3): backfills a "Default" slot from legacy
+  // `profiles` brand columns on first load, then serves as the source of
+  // truth for the brand-memory fields below (forbidden phrases, proof
+  // points, CTAs, structures, brand examples, default framework).
+  const brandSlotsQuery = useEnsureDefaultBrandSlot(user?.id, profileData ?? null);
+  const brandSlots = brandSlotsQuery.data ?? [];
+  const createBrandSlot = useCreateBrandSlotMutation(user?.id);
+  const updateBrandSlot = useUpdateBrandSlotMutation(user?.id);
+  const deleteBrandSlot = useDeleteBrandSlotMutation(user?.id);
+  const setDefaultBrandSlot = useSetDefaultBrandSlotMutation(user?.id);
+
   useEffect(() => {
     if (!profileData) return;
     setDisplayName(profileData.display_name || "");
@@ -229,22 +252,10 @@ export default function Profile() {
       banned_hashtags?: string[] | null;
       required_hashtags?: string[] | null;
       default_timezone?: string | null;
-      brand_examples?: string[] | null;
-      default_framework?: string | null;
-      forbidden_phrases?: string[] | null;
-      proof_points?: string[] | null;
-      cta_preferences?: string[] | null;
-      preferred_structures?: string[] | null;
     } | null;
     setBannedHashtags(parsePolicyList(d?.banned_hashtags));
     setRequiredHashtags(parsePolicyList(d?.required_hashtags));
     setDefaultTimezone(d?.default_timezone || browserTimezone());
-    setBrandExamples(d?.brand_examples || []);
-    setDefaultFramework(d?.default_framework || "Auto");
-    setForbiddenPhrases(d?.forbidden_phrases || []);
-    setProofPoints(d?.proof_points || []);
-    setCtaPreferences(d?.cta_preferences || []);
-    setPreferredStructures(d?.preferred_structures || []);
   }, [profileData]);
 
   useEffect(() => {
@@ -252,6 +263,30 @@ export default function Profile() {
       toast.error(profileError.message);
     }
   }, [profileError]);
+
+  // Default the selected slot to whichever one is marked `is_default`, and
+  // keep the selection valid if the currently selected slot disappears
+  // (e.g. after a delete).
+  useEffect(() => {
+    if (brandSlots.length === 0) return;
+    if (selectedSlotId && brandSlots.some((s) => s.id === selectedSlotId)) return;
+    const fallback = brandSlots.find((s) => s.is_default) || brandSlots[0];
+    setSelectedSlotId(fallback.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brandSlots, selectedSlotId]);
+
+  // Hydrate the brand-memory form fields from whichever slot is selected.
+  useEffect(() => {
+    const slot = brandSlots.find((s) => s.id === selectedSlotId);
+    if (!slot) return;
+    setBrandExamples(slot.brand_examples || []);
+    setDefaultFramework(slot.default_framework || "Auto");
+    setForbiddenPhrases(slot.forbidden_phrases || []);
+    setProofPoints(slot.proof_points || []);
+    setCtaPreferences(slot.cta_preferences || []);
+    setPreferredStructures(slot.preferred_structures || []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSlotId, brandSlots]);
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -402,33 +437,97 @@ export default function Profile() {
     else setRequiredHashtags((p) => p.filter((t) => t !== tag));
   }
 
+  async function persistProfileFields() {
+    if (!user) return;
+    const updates: Record<string, unknown> = {
+      avatar_url: avatarUrl,
+      default_voice: defaultVoice || null,
+      default_style: defaultStyle || null,
+      default_audiences: defaultAudiences.length ? defaultAudiences : null,
+      default_goals: defaultGoals.length ? defaultGoals : null,
+      banned_hashtags: bannedHashtags.length ? bannedHashtags : null,
+      required_hashtags: requiredHashtags.length ? requiredHashtags : null,
+      default_timezone: defaultTimezone || null,
+    };
+    if (displayName.trim()) updates.display_name = displayName.trim();
+    await updateProfile.mutateAsync(updates);
+  }
+
   async function handleSave() {
     if (!user) return;
     setSaving(true);
     try {
-      const updates: Record<string, unknown> = {
-        avatar_url: avatarUrl,
-        default_voice: defaultVoice || null,
-        default_style: defaultStyle || null,
-        default_audiences: defaultAudiences.length ? defaultAudiences : null,
-        default_goals: defaultGoals.length ? defaultGoals : null,
-        banned_hashtags: bannedHashtags.length ? bannedHashtags : null,
-        required_hashtags: requiredHashtags.length ? requiredHashtags : null,
-        default_timezone: defaultTimezone || null,
-        forbidden_phrases: forbiddenPhrases.length ? forbiddenPhrases : null,
-        proof_points: proofPoints.length ? proofPoints : null,
-        cta_preferences: ctaPreferences.length ? ctaPreferences : null,
-        preferred_structures: preferredStructures.length ? preferredStructures : null,
-      };
-      if (brandExamples.length) updates.brand_examples = brandExamples;
-      if (defaultFramework) updates.default_framework = defaultFramework;
-      if (displayName.trim()) updates.display_name = displayName.trim();
-      await updateProfile.mutateAsync(updates);
+      await persistProfileFields();
       toast.success("Profile updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update profile");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Brand tab save: persists the non-slot profile fields (voice, style,
+  // audiences, goals, hashtag policy, timezone) plus the currently selected
+  // brand slot's memory fields (forbidden phrases, proof points, CTAs,
+  // structures, brand examples, default framework).
+  async function handleSaveBrandTab() {
+    if (!user) return;
+    setSaving(true);
+    try {
+      await persistProfileFields();
+      if (selectedSlotId) {
+        await updateBrandSlot.mutateAsync({
+          id: selectedSlotId,
+          patch: {
+            brand_examples: brandExamples.length ? brandExamples : null,
+            default_framework: defaultFramework || null,
+            forbidden_phrases: forbiddenPhrases,
+            proof_points: proofPoints,
+            cta_preferences: ctaPreferences,
+            preferred_structures: preferredStructures,
+          },
+        });
+      }
+      toast.success("Brand settings updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update brand settings");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCreateSlot() {
+    if (!user) return;
+    const name = newSlotName.trim() || "New brand";
+    try {
+      const created = await createBrandSlot.mutateAsync({ name });
+      setSelectedSlotId(created.id);
+      setShowNewSlotInput(false);
+      setNewSlotName("");
+      toast.success("Brand profile created");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create brand profile");
+    }
+  }
+
+  async function handleSetDefaultSlot(slot: BrandSlotRow) {
+    try {
+      await setDefaultBrandSlot.mutateAsync(slot.id);
+      toast.success(`"${slot.name}" set as default brand`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to set default brand");
+    }
+  }
+
+  async function handleDeleteSlot(slot: BrandSlotRow) {
+    try {
+      await deleteBrandSlot.mutateAsync(slot.id);
+      if (selectedSlotId === slot.id) setSelectedSlotId(null);
+      toast.success("Brand profile deleted");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete brand profile");
+    } finally {
+      setPendingDeleteSlot(null);
     }
   }
 
@@ -441,6 +540,10 @@ export default function Profile() {
 
   const wrappedHandleSave = async () => {
     await handleSave();
+    setSavedOnce(true);
+  };
+  const wrappedHandleSaveBrand = async () => {
+    await handleSaveBrandTab();
     setSavedOnce(true);
   };
   const tabLabels = {
@@ -651,6 +754,117 @@ export default function Profile() {
               change them per calendar.
             </div>
 
+            <div className="pf-label" id="pf-brand-slots-label">
+              Brand profile
+            </div>
+            {brandSlotsQuery.isLoading ? (
+              <div
+                style={{ color: "var(--color-text-secondary)", fontSize: 13, marginBottom: 16 }}
+              >
+                Loading brand profiles…
+              </div>
+            ) : (
+              <div
+                className="pf-chips"
+                role="tablist"
+                aria-labelledby="pf-brand-slots-label"
+                style={{ alignItems: "center" }}
+              >
+                {brandSlots.map((slot) => (
+                  <div key={slot.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={slot.id === selectedSlotId}
+                      className={`pf-chip ${slot.id === selectedSlotId ? "on" : ""}`}
+                      onClick={() => setSelectedSlotId(slot.id)}
+                    >
+                      {slot.name}
+                      {slot.is_default ? " ★" : ""}
+                    </button>
+                    {!slot.is_default && (
+                      <button
+                        type="button"
+                        className="pf-add-btn"
+                        title="Set as default"
+                        aria-label={`Set ${slot.name} as default brand`}
+                        onClick={() => handleSetDefaultSlot(slot)}
+                        disabled={setDefaultBrandSlot.isPending}
+                      >
+                        ☆
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="pf-add-btn"
+                      title={
+                        slot.is_default
+                          ? "Set another brand as default before deleting this one"
+                          : "Delete brand profile"
+                      }
+                      aria-label={`Delete ${slot.name}`}
+                      disabled={slot.is_default}
+                      onClick={() => setPendingDeleteSlot(slot)}
+                    >
+                      🗑
+                    </button>
+                  </div>
+                ))}
+                {showNewSlotInput ? (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <input
+                      className="pf-input"
+                      style={{ width: 160 }}
+                      autoFocus
+                      placeholder="Brand name"
+                      value={newSlotName}
+                      onChange={(e) => setNewSlotName(e.target.value)}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && (e.preventDefault(), handleCreateSlot())
+                      }
+                      aria-label="New brand name"
+                    />
+                    <button
+                      type="button"
+                      className="pf-add-btn"
+                      onClick={handleCreateSlot}
+                      disabled={createBrandSlot.isPending}
+                    >
+                      {createBrandSlot.isPending ? "…" : "Create"}
+                    </button>
+                    <button
+                      type="button"
+                      className="pf-add-btn"
+                      onClick={() => {
+                        setShowNewSlotInput(false);
+                        setNewSlotName("");
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="pf-add-btn"
+                    onClick={() => setShowNewSlotInput(true)}
+                  >
+                    + New brand
+                  </button>
+                )}
+              </div>
+            )}
+            {pendingDeleteSlot && (
+              <ConfirmDialog
+                title={`Delete "${pendingDeleteSlot.name}"?`}
+                message="This brand profile will be permanently deleted. Any calendars using it will fall back to your account's default brand profile. This can't be undone."
+                confirmLabel="Delete"
+                onConfirm={() => handleDeleteSlot(pendingDeleteSlot)}
+                onCancel={() => setPendingDeleteSlot(null)}
+              />
+            )}
+            <div className="pf-spacer-sm" />
+
             <label className="pf-label" htmlFor="pf-voice">
               Default voice / tone
             </label>
@@ -758,6 +972,17 @@ export default function Profile() {
               ))}
             </div>
 
+            {brandSlots.length === 0 ? (
+              <div
+                className="pf-section-sub"
+                style={{ marginBottom: 16 }}
+                role="status"
+                aria-live="polite"
+              >
+                Setting up your brand profile…
+              </div>
+            ) : (
+              <>
             <label className="pf-label" htmlFor="pf-framework">
               Default prompt framework
             </label>
@@ -983,6 +1208,8 @@ export default function Profile() {
                 Add
               </button>
             </div>
+              </>
+            )}
 
             <div className="pf-spacer-sm" />
             <h2 className="pf-section-h pf-section-h--spaced">Hashtag policy</h2>
@@ -1103,7 +1330,7 @@ export default function Profile() {
 
             <div style={{ display: "flex", gap: 8, flexDirection: "column" }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <button className="pf-btn" onClick={wrappedHandleSave} disabled={saving}>
+                <button className="pf-btn" onClick={wrappedHandleSaveBrand} disabled={saving}>
                   {saving ? "Saving…" : "Save changes"}
                 </button>
                 {savedOnce && !saving && (

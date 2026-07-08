@@ -97,9 +97,12 @@ export default function ResetPassword() {
             </div>
           </div>
           {linkExpired && (
-            <div className="rp-link-row">
+            <div className="rp-link-row" style={{ display: "flex", gap: 10 }}>
               <button className="rp-btn" onClick={() => navigate("/auth")}>
                 Back to sign in
+              </button>
+              <button className="rp-btn rp-btn--secondary" onClick={() => navigate("/auth?tab=forgot")}>
+                Request new link
               </button>
             </div>
           )}

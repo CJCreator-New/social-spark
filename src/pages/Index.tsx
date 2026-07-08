@@ -40,7 +40,10 @@ import {
   useRegeneratePostMutation,
   useProfileQuery,
   useProfileUpdateMutation,
+  useBrandSlotsQuery,
+  useEnsureDefaultBrandSlot,
 } from "@/hooks/useAppQueries";
+import { resolveActiveBrandSlot } from "@/lib/brandSlots";
 import { swapItems, handleDragStart, handleDragOver, handleDrop } from "@/lib/dragDrop";
 import {
   calculatePerformanceScore,
@@ -923,6 +926,23 @@ const Index = () => {
   const { data: profileData } = useProfileQuery(user?.id);
   const profileUpdateMutation = useProfileUpdateMutation(user?.id);
 
+  // Brand slots (roadmap 3.3): load the account's brand slots and ensure a
+  // "Default" slot exists (auto-migrating legacy profile-level brand memory)
+  // in case the user never visits the Profile settings page first.
+  const brandSlotsQuery = useBrandSlotsQuery(user?.id);
+  useEnsureDefaultBrandSlot(user?.id, profileData || null);
+  const activeBrandSlot = resolveActiveBrandSlot(brandSlotsQuery.data, form.brandSlotId);
+
+  // Initialize the wizard's brand-slot selection to the account default once
+  // slots have loaded — but never clobber a user's in-progress selection.
+  useEffect(() => {
+    if (form.brandSlotId) return;
+    const defaultSlot = brandSlotsQuery.data?.find((s) => s.is_default) || brandSlotsQuery.data?.[0];
+    if (defaultSlot) {
+      setForm((f) => (f.brandSlotId ? f : { ...f, brandSlotId: defaultSlot.id }));
+    }
+  }, [brandSlotsQuery.data, form.brandSlotId]);
+
   // Fetch recent calendars with React Query
   const { data: recentCalendarsData } = useQuery({
     queryKey: ["recent-calendars", user?.id],
@@ -1416,7 +1436,7 @@ const Index = () => {
           seedTimes[String(r.day)] = suggestedTimeForDay(Number(r.day) || 1, form.platform);
         setPostTimes(seedTimes);
 
-        const saved = await createCalendarMutation.mutateAsync({
+        const e2eCreatePayload = {
           user_id: user?.id || E2E_USER_ID,
           title:
             form.coreIdea.slice(0, 80) ||
@@ -1429,7 +1449,9 @@ const Index = () => {
           posts: result as unknown as Json,
           week_start_date: form.weekStart || null,
           post_times: seedTimes,
-        });
+          brand_slot_id: form.brandSlotId ?? null,
+        };
+        const saved = await createCalendarMutation.mutateAsync(e2eCreatePayload);
 
         cleanup();
         setGenerationMeta(null);
@@ -1480,12 +1502,12 @@ const Index = () => {
         extra: form.extra,
         bannedWords: form.bannedWords,
         requiredWords: form.requiredWords,
-        brand_examples: profileData?.brand_examples || [],
-        framework: profileData?.default_framework || "Auto",
+        brand_examples: activeBrandSlot?.brand_examples || [],
+        framework: activeBrandSlot?.default_framework || "Auto",
         quality: form.quality || "polished",
         brandMemory: [
           brandMemoryToPrompt(brandMemory),
-          isEnabled("brandMemory") && profileData ? buildBrandMemoryPrompt(profileData as any) : "",
+          isEnabled("brandMemory") ? buildBrandMemoryPrompt(activeBrandSlot) : "",
         ]
           .filter(Boolean)
           .join("\n\n"),
@@ -1723,9 +1745,7 @@ const Index = () => {
             requiredWords: form.requiredWords,
             brandMemory: [
               brandMemoryToPrompt(brandMemory),
-              isEnabled("brandMemory") && profileData
-                ? buildBrandMemoryPrompt(profileData as any)
-                : "",
+              isEnabled("brandMemory") ? buildBrandMemoryPrompt(activeBrandSlot) : "",
             ]
               .filter(Boolean)
               .join("\n\n"),
@@ -1868,7 +1888,12 @@ const Index = () => {
             extra: form.extra,
             bannedWords: form.bannedWords,
             requiredWords: form.requiredWords,
-            brandMemory: brandMemoryToPrompt(brandMemory),
+            brandMemory: [
+              brandMemoryToPrompt(brandMemory),
+              isEnabled("brandMemory") ? buildBrandMemoryPrompt(activeBrandSlot) : "",
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
             post: target,
             siblings: next,
           };
@@ -1960,7 +1985,12 @@ const Index = () => {
               extra: form.extra,
               bannedWords: form.bannedWords,
               requiredWords: form.requiredWords,
-              brandMemory: brandMemoryToPrompt(brandMemory),
+              brandMemory: [
+                brandMemoryToPrompt(brandMemory),
+                isEnabled("brandMemory") ? buildBrandMemoryPrompt(activeBrandSlot) : "",
+              ]
+                .filter(Boolean)
+                .join("\n\n"),
               post: posts[i],
               siblings: next,
             };
@@ -1974,7 +2004,7 @@ const Index = () => {
           // Save as new calendar
           const title = `${form.coreIdea.slice(0, 60) || selectedIndustry?.label || "Calendar"} — ${targetPlatform}`;
           const newForm = { ...form, platform: targetPlatform };
-          const ins = await createCalendarMutation.mutateAsync({
+          const reformatCreatePayload = {
             user_id: user.id,
             title,
             industry: form.industry,
@@ -1985,7 +2015,9 @@ const Index = () => {
             posts: next as unknown as Json,
             week_start_date: form.weekStart || null,
             post_times: postTimes,
-          });
+            brand_slot_id: form.brandSlotId ?? null,
+          };
+          const ins = await createCalendarMutation.mutateAsync(reformatCreatePayload);
           if (!ins?.id) throw new Error("Reformat save failed");
           for (const url of extractMediaUrlsFromPosts(next)) {
             mediaManager.addMediaRef(String(ins.id), url);
@@ -2204,6 +2236,7 @@ const Index = () => {
         posts: posts as unknown as Json,
         week_start_date: (isDay ? form.targetDate : form.weekStart) || null,
         post_times: postTimes,
+        brand_slot_id: form.brandSlotId ?? null,
       };
 
       const data = await createCalendarMutation.mutateAsync(payload);
@@ -2799,6 +2832,20 @@ const Index = () => {
                     aria-labelledby="advanced-brand-button"
                   >
                     <div className="accordion-content-inner">
+                      <div className="csect">
+                        <SelectField
+                          label="Brand slot"
+                          options={(brandSlotsQuery.data || []).map((slot) => ({
+                            value: slot.id,
+                            label: slot.is_default ? `${slot.name} (default)` : slot.name,
+                          }))}
+                          value={form.brandSlotId || ""}
+                          onChange={(v) => upd("brandSlotId", v || null)}
+                          placeholder={null}
+                          hint="(brand voice, forbidden phrases, and examples used for generation)"
+                        />
+                      </div>
+
                       <div className="csect">
                         <SelectField
                           label="Content language"

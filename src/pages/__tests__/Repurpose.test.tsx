@@ -30,6 +30,42 @@ vi.mock("@/hooks/queries/useRepurposeQueries", () => ({
   }),
 }));
 
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({ user: { id: "user-1" } }),
+}));
+
+const mockAddToBacklogMutateAsync = vi.fn();
+const mockMarkIdeaUsedMutateAsync = vi.fn();
+const mockRemoveIdeaMutateAsync = vi.fn();
+
+vi.mock("@/hooks/useAppQueries", () => ({
+  useIdeaBacklogQuery: () => ({ data: [], isLoading: false }),
+  useAddIdeasToBacklogMutation: () => ({
+    mutateAsync: mockAddToBacklogMutateAsync,
+    isPending: false,
+  }),
+  useMarkIdeaUsedMutation: () => ({
+    mutateAsync: mockMarkIdeaUsedMutateAsync,
+    isPending: false,
+  }),
+  useRemoveIdeaFromBacklogMutation: () => ({
+    mutateAsync: mockRemoveIdeaMutateAsync,
+    isPending: false,
+  }),
+}));
+
+const mockFetchUrl = vi.fn();
+let mockUrlFetchLoading = false;
+let mockUrlFetchError: string | null = null;
+
+vi.mock("@/hooks/useFetchUrlContent", () => ({
+  useFetchUrlContent: () => ({
+    fetchUrl: mockFetchUrl,
+    loading: mockUrlFetchLoading,
+    error: mockUrlFetchError,
+  }),
+}));
+
 import Repurpose from "../Repurpose";
 
 const LONG_SOURCE = "Repurposing long-form material into short posts. ".repeat(10).trim();
@@ -59,7 +95,13 @@ describe("Repurpose page", () => {
   beforeEach(() => {
     mockExtractMutateAsync.mockReset();
     mockGenerateMutateAsync.mockReset();
+    mockAddToBacklogMutateAsync.mockReset();
+    mockMarkIdeaUsedMutateAsync.mockReset();
+    mockRemoveIdeaMutateAsync.mockReset();
+    mockFetchUrl.mockReset();
     mockExtractPending = false;
+    mockUrlFetchLoading = false;
+    mockUrlFetchError = null;
     window.sessionStorage.clear();
   });
 

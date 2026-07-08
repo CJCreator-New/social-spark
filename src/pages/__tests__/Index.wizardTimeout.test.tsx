@@ -73,6 +73,8 @@ vi.mock("@/hooks/useAppQueries", () => ({
   useProfileUpdateMutation: () => ({ mutateAsync: vi.fn() }),
   useRegeneratePostMutation: () => ({ mutateAsync: vi.fn() }),
   useGeneratePostImageMutation: () => ({ mutateAsync: vi.fn() }),
+  useBrandSlotsQuery: () => ({ data: [] }),
+  useEnsureDefaultBrandSlot: () => ({ data: [] }),
 }));
 
 const mockFetch = vi.fn();
