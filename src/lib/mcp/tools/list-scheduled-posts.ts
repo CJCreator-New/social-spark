@@ -32,6 +32,10 @@ export default defineTool({
     if (!ctx.isAuthenticated()) {
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     }
+    const scopes = ctx.getScopes() || [];
+    if (!scopes.includes("read:scheduled_posts")) {
+      return { content: [{ type: "text", text: "Access denied: missing read:scheduled_posts scope" }], isError: true };
+    }
     let query = supabaseForUser(ctx)
       .from("scheduled_posts")
       .select(

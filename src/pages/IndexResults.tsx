@@ -447,8 +447,8 @@ export function IndexResults({
         <div
           className="action-block primary-action"
           style={{
-            background: "rgba(200, 240, 154, 0.08)",
-            border: "1px solid rgba(200, 240, 154, 0.3)",
+            background: "var(--surface)",
+            border: "1px solid var(--border2)",
             borderRadius: 16,
             padding: 18,
           }}
@@ -782,7 +782,7 @@ export function IndexResults({
               <button
                 type="button"
                 className="cpbtn w-full flex justify-center items-center gap-1.5"
-                style={{ borderColor: "rgba(200,240,154,0.2)" }}
+                style={{ borderColor: "var(--border2)" }}
                 onClick={() => setPersonaCompareOpen(true)}
               >
                 <Users size={12} />

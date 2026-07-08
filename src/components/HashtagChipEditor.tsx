@@ -88,9 +88,9 @@ export const HashtagChipEditor: React.FC<HashtagChipEditorProps> = ({
               gap: 4,
               padding: "3px 9px",
               borderRadius: 99,
-              background: "rgba(200,240,154,0.08)",
-              border: "1px solid rgba(200,240,154,0.22)",
-              color: "rgba(200,240,154,0.85)",
+              background: "var(--surface)",
+              border: "1px solid var(--border2)",
+              color: "var(--accent)",
               fontSize: 12,
               fontWeight: 400,
               cursor: "default",
@@ -105,7 +105,7 @@ export const HashtagChipEditor: React.FC<HashtagChipEditorProps> = ({
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                color: "rgba(200,240,154,0.4)",
+                color: "var(--text3)",
                 fontSize: 14,
                 lineHeight: 1,
                 padding: "0 0 0 2px",
@@ -113,8 +113,8 @@ export const HashtagChipEditor: React.FC<HashtagChipEditorProps> = ({
                 alignItems: "center",
                 transition: "color .12s",
               }}
-              onMouseOver={(e) => (e.currentTarget.style.color = "rgba(200,240,154,0.9)")}
-              onMouseOut={(e) => (e.currentTarget.style.color = "rgba(200,240,154,0.4)")}
+              onMouseOver={(e) => (e.currentTarget.style.color = "var(--accent)")}
+              onMouseOut={(e) => (e.currentTarget.style.color = "var(--text3)")}
             >
               ×
             </button>
@@ -152,8 +152,8 @@ export const HashtagChipEditor: React.FC<HashtagChipEditorProps> = ({
           style={{
             padding: "5px 12px",
             borderRadius: 6,
-            background: "rgba(200,240,154,0.1)",
-            border: "1px solid rgba(200,240,154,0.22)",
+            background: "var(--surface)",
+            border: "1px solid var(--border2)",
             color: "var(--accent)",
             fontSize: 11,
             cursor: "pointer",

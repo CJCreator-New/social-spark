@@ -6,7 +6,8 @@ export interface PerformanceScore {
   ctaEffectiveness: number; // 1-10: Specific question or vague?
   hashtagRelevance: number; // 0-100: % of hashtags related to topic
   readability: number; // Flesch-Kincaid grade level (lower is better, 8-12 ideal)
-  overallScore: number; // 1-10: Average of all metrics
+  overallScore: number; // 1-10: Average of all metrics (rounded, for display)
+  rawOverallScore?: number; // 1-10: Unrounded average, used for bucketing thresholds
   feedback: string[]; // Actionable suggestions
 }
 
@@ -300,12 +301,12 @@ export function calculatePerformanceScore(
   const readabilityScoreVal = scoreReadability(readability);
 
   // Weight formula: hook 35%, CTA 30%, hashtags 20%, readability 15%
-  const overallScore = Math.round(
+  const rawOverallScore =
     hookStrength * 0.35 +
-      ctaEffectiveness * 0.3 +
-      (hashtagRelevance / 10) * 0.2 +
-      readabilityScoreVal * 0.15
-  );
+    ctaEffectiveness * 0.3 +
+    (hashtagRelevance / 10) * 0.2 +
+    readabilityScoreVal * 0.15;
+  const overallScore = Math.round(rawOverallScore);
 
   const feedback = generateFeedback(
     { hookStrength, ctaEffectiveness, hashtagRelevance, readability },
@@ -318,6 +319,7 @@ export function calculatePerformanceScore(
     hashtagRelevance,
     readability,
     overallScore,
+    rawOverallScore,
     feedback,
   };
 }
@@ -462,8 +464,9 @@ export function getEngagementPrediction(
   platform: string = ""
 ): "High" | "Medium" | "Low" {
   const score = calculatePerformanceScore(post, post.topic || "", platform);
-  if (score.overallScore >= 7) return "High";
-  if (score.overallScore >= 5) return "Medium";
+  const bucketScore = score.rawOverallScore ?? score.overallScore;
+  if (bucketScore >= 7) return "High";
+  if (bucketScore >= 5) return "Medium";
   return "Low";
 }
 

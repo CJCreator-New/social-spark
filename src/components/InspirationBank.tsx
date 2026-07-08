@@ -1,8 +1,50 @@
-import React, { useState, useMemo } from "react";
-import { getTrendingTopicsForIndustry, getTrendingTopicsLastUpdated } from "@/lib/trendingTopics";
+import React, { useState, useMemo, useEffect } from "react";
+import {
+  getTrendingTopicsForIndustry,
+  getTrendingTopicsLastUpdated,
+  type TrendingTopic,
+} from "@/lib/trendingTopics";
 import { useGenerateTrendsMutation } from "@/hooks/useAppQueries";
 import { useWizardStore } from "@/stores/useWizardStore";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+// Row shape from the `trends` table populated by the trends-ingest cron
+// (see supabase/functions/trends-ingest/index.ts). Not present in the
+// generated Supabase types yet, so the table name is cast at the query site.
+// The table is read-only here; RLS ("authenticated can SELECT true") already
+// scopes access appropriately since this is shared, non-personal data.
+interface TrendsRow {
+  keyword: string;
+  category: string;
+  volume: number;
+  last_seen: string;
+}
+
+/** Fetch the live `trends` table, loosely scoped to the given industry via a
+ * case-insensitive category match, and adapt rows into the same shape the
+ * static curated topic list uses. Resolves to [] on any failure — this is a
+ * best-effort enhancement over the static fallback, never a hard dependency. */
+async function fetchLiveTrends(industry: string): Promise<TrendingTopic[]> {
+  try {
+    let query = (supabase.from("trends" as any) as any)
+      .select("keyword, category, volume, last_seen")
+      .order("volume", { ascending: false })
+      .limit(12);
+    if (industry) query = query.ilike("category", `%${industry}%`);
+    const { data, error } = await query;
+    if (error || !Array.isArray(data)) return [];
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    return (data as TrendsRow[]).map((row) => ({
+      topic: row.keyword,
+      category: row.category,
+      posts: row.volume,
+      trending: new Date(row.last_seen).getTime() >= oneDayAgo,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 interface InspirationBankProps {
   industry: string;
@@ -21,18 +63,25 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
   );
   const staticUpdated = getTrendingTopicsLastUpdated();
 
+  const [liveTrends, setLiveTrends] = useState<TrendingTopic[]>([]);
   const [customTrends, setCustomTrends] = useState<any[] | null>(null);
   const [reviewingTopic, setReviewingTopic] = useState<any | null>(null);
   const generateTrendsMutation = useGenerateTrendsMutation();
 
-  // TODO: Remove type cast once state_flow_keeper adds selectedTrendingTopics /
-  //       toggleTrendingTopic / clearTrendingTopics to WizardState.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const storeAny = useWizardStore() as any;
-  const selectedTrendingTopics: string[] = storeAny.selectedTrendingTopics ?? [];
-  // TODO: replace noop once state_flow_keeper lands the action
-  const toggleTrendingTopic: (keyword: string) => void =
-    storeAny.toggleTrendingTopic ?? (() => {});
+  const { selectedTrendingTopics, toggleTrendingTopic } = useWizardStore();
+
+  // Best-effort: blend in the real trends-ingest pipeline's data when there's
+  // a category match for this industry. Silently keeps the static curated
+  // list if the table is empty/unreachable — see fetchLiveTrends above.
+  useEffect(() => {
+    let cancelled = false;
+    fetchLiveTrends(industry).then((rows) => {
+      if (!cancelled) setLiveTrends(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [industry]);
 
   const loadAiTrending = async () => {
     try {
@@ -48,17 +97,23 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
     }
   };
 
-  // Use AI-generated topics if available, else fallback to local curated topics
+  // Priority: explicit AI-generated topics (user action) > live trends-ingest
+  // pipeline data (real, but only when it has a category match) > static
+  // curated fallback.
   const displayTopics = useMemo(() => {
     if (customTrends && customTrends.length > 0) {
       return customTrends.slice(0, 6);
     }
+    if (liveTrends.length > 0) {
+      return [...liveTrends].sort((a, b) => (b.trending ? 1 : 0) - (a.trending ? 1 : 0)).slice(0, 6);
+    }
     return [...staticTopics]
       .sort((a, b) => (b.trending ? 1 : 0) - (a.trending ? 1 : 0))
       .slice(0, 6);
-  }, [staticTopics, customTrends]);
+  }, [staticTopics, customTrends, liveTrends]);
 
   const isAiGenerated = !!customTrends;
+  const isLiveFromPipeline = !customTrends && liveTrends.length > 0;
   const selectionCount = selectedTrendingTopics.length;
 
   return (
@@ -75,7 +130,12 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
         <div>
           <div className="insp-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span>
-              💡 {isAiGenerated ? "AI Generated Trends" : "Curated Trends"}
+              💡{" "}
+              {isAiGenerated
+                ? "AI Generated Trends"
+                : isLiveFromPipeline
+                  ? "Live Trends"
+                  : "Curated Trends"}
               {platform ? ` on ${platform}` : ""}
             </span>
             {isAiGenerated && (
@@ -83,9 +143,9 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
                 style={{
                   fontSize: 9,
                   padding: "2px 6px",
-                  background: "rgba(200,240,154,0.12)",
+                  background: "var(--surface)",
                   color: "var(--accent)",
-                  border: "1px solid rgba(200,240,154,0.2)",
+                  border: "1px solid var(--border2)",
                   borderRadius: 99,
                 }}
               >
@@ -98,9 +158,9 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
                 style={{
                   fontSize: 9,
                   padding: "2px 7px",
-                  background: "rgba(200,240,154,0.08)",
+                  background: "var(--surface)",
                   color: "var(--accent)",
-                  border: "1px solid rgba(200,240,154,0.25)",
+                  border: "1px solid var(--border2)",
                   borderRadius: 99,
                   fontWeight: 600,
                   letterSpacing: ".03em",
@@ -147,7 +207,7 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
                 isSelected
                   ? {
                       borderColor: "var(--accent)",
-                      background: "rgba(200,240,154,0.07)",
+                      background: "var(--surface)",
                     }
                   : undefined
               }
@@ -173,7 +233,7 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
               </div>
               <div className="insp-topic-meta">
                 <span className="insp-category">{t.category}</span>
-                <span className="insp-count">{(t.posts / 100).toFixed(0)}k posts</span>
+                <span className="insp-count">{new Intl.NumberFormat("en", { notation: "compact" }).format(t.posts)} posts</span>
               </div>
             </button>
           );
@@ -256,8 +316,9 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
               }}
             >
               <div>
-                <strong>Weekly Volume:</strong> {(reviewingTopic.posts / 100).toFixed(0)}k posts
-                this week
+                <strong>Weekly Volume:</strong>{" "}
+                {new Intl.NumberFormat("en", { notation: "compact" }).format(reviewingTopic.posts)}{" "}
+                posts this week
               </div>
               <div
                 style={{

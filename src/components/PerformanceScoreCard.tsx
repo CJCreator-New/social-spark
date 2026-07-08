@@ -183,7 +183,7 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
         <div className="perf-metric">
           <div className="perf-metric-label">
             <span>Readability</span>
-            <span className="perf-metric-value" style={{ color: "rgba(200,240,154,.7)" }}>
+            <span className="perf-metric-value" style={{ color: "var(--text2)" }}>
               {getReadabilityLabel(score.readability)} (
               <span className="tabular-nums">Grade {score.readability}</span>)
             </span>
@@ -245,9 +245,9 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
             style={{
               fontSize: 12,
               width: "100%",
-              borderColor: "var(--text-accent)",
-              background: "rgba(200, 240, 154, 0.05)",
-              color: "var(--text-accent)",
+              borderColor: "var(--accent)",
+              background: "var(--surface)",
+              color: "var(--accent)",
             }}
           >
             🎯 Fix: {METRIC_LABELS[weakestMetric]}

@@ -24,7 +24,9 @@ const INSTRUCTIONS: Record<string, string> = {
   simpler: "Rewrite the selected text in simpler, clearer language while preserving the meaning.",
 };
 
-Deno.serve(async (req: Request) => {
+// Exported for Vitest (see inline-rewrite.test.ts); Deno.serve is guarded below,
+// same pattern as telemetry/index.ts and verify-payment/index.ts.
+export async function handleInlineRewrite(req: Request): Promise<Response> {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
@@ -85,6 +87,17 @@ Deno.serve(async (req: Request) => {
     }
 
     const post = body.post || {};
+    let brandConstraint = "";
+    if (payload.brandMemory) {
+      brandConstraint += `\nBRAND CONTEXT:\n${payload.brandMemory}`;
+    }
+    if (payload.bannedWords && payload.bannedWords.length > 0) {
+      brandConstraint += `\nBANNED WORDS (Do NOT use any of these words in your output):\n${payload.bannedWords.map((w) => `- ${w}`).join("\n")}`;
+    }
+    if (payload.forbiddenPhrases && payload.forbiddenPhrases.length > 0) {
+      brandConstraint += `\nFORBIDDEN PHRASES (Do NOT use any of these phrases in your output):\n${payload.forbiddenPhrases.map((p) => `- ${p}`).join("\n")}`;
+    }
+
     const systemMsg = `[ROLE]
 You are an expert social-media editor.
 
@@ -97,7 +110,8 @@ Rewrite ONLY the selected text according to the user's instruction. Keep the use
 [CONSTRAINTS]
 - Avoid adding markdown wrappers.
 - Do not output headers or commentary.
-- Return only the rewritten selection through the tool.`;
+- Return only the rewritten selection through the tool.
+${brandConstraint}`;
 
     const userMsg = `Rewrite this selected ${field} text for ${platform}.
 
@@ -167,8 +181,33 @@ ${text}`;
 
     const rewrittenText = stripMarkdownFormatting(parseResult.parsed?.rewrittenText || "").trim();
     if (!rewrittenText) return jsonResponse({ error: "Rewrite returned empty text." }, 500);
-    return jsonResponse({ rewrittenText });
+
+    const combinedForbidden = [
+      ...(payload.bannedWords || []),
+      ...(payload.forbiddenPhrases || []),
+    ];
+    const forbiddenViolations: string[] = [];
+    if (combinedForbidden.length > 0) {
+      combinedForbidden.forEach((phrase) => {
+        const regex = new RegExp(phrase.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"), "i");
+        if (regex.test(rewrittenText)) {
+          forbiddenViolations.push(`Contains forbidden brand term: "${phrase}"`);
+        }
+      });
+    }
+
+    const selfCheck = {
+      forbidden_violations: forbiddenViolations,
+      checks_passed: forbiddenViolations.length === 0,
+      notes: forbiddenViolations.length > 0 ? "Contains brand violations" : "",
+    };
+
+    return jsonResponse({ rewrittenText, self_check: selfCheck });
   } catch (e) {
     return errorResponse("inline-rewrite", e);
   }
-});
+}
+
+if (typeof Deno !== "undefined" && Deno.serve) {
+  Deno.serve(handleInlineRewrite);
+}

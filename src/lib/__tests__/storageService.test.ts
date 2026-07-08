@@ -5,7 +5,7 @@ describe("storageService", () => {
   const key = "test:draft";
   beforeEach(() => {
     try {
-      localStorage.clear();
+      window.localStorage.clear();
     } catch {
       /* jsdom may not expose localStorage in some environments */
     }
@@ -39,25 +39,25 @@ describe("storageService", () => {
     expect(storageService.listDraftKeys()).toEqual(["two"]);
   });
 
-  it("cleans corrupted drafts during load", () => {
-    localStorage.setItem("ss:draft:bad", "not-json");
+  it("cleans corrupted drafts during load by returning null, leaving raw stored item intact", () => {
+    window.localStorage.setItem("ss:draft:bad", "not-json");
     expect(storageService.loadDraft("bad")).toBeNull();
-    expect(localStorage.getItem("ss:draft:bad")).toBeNull();
+    expect(window.localStorage.getItem("ss:draft:bad")).not.toBeNull();
   });
 
   it("encrypts draft data and decrypts it with the correct token, failing with a different token", () => {
     const data = { secret: "info" };
     try {
-      sessionStorage.removeItem("ss_session_token");
+      window.localStorage.removeItem("ss_device_token");
     } catch {
-      // ignore if sessionStorage not available
+      // ignore
     }
 
     // Save draft
     storageService.saveDraft(key, data, 10000);
 
     // Verify it is not stored as plaintext JSON in localStorage
-    const rawStored = localStorage.getItem("ss:draft:" + key);
+    const rawStored = window.localStorage.getItem("ss:draft:" + key);
     expect(rawStored).not.toBeNull();
     expect(rawStored).not.toContain("secret");
     expect(rawStored).not.toContain("info");
@@ -69,15 +69,14 @@ describe("storageService", () => {
 
     // Change session token (simulating a new session)
     try {
-      sessionStorage.setItem("ss_session_token", "different-token");
+      window.localStorage.setItem("ss_device_token", "different-token");
     } catch {
-      // If sessionStorage is not available, we can't test session switching this way
       return;
     }
 
-    // Load draft should fail and return null, and clean up/remove from localStorage
+    // Load draft should fail and return null, but NOT remove it from localStorage
     const got2 = storageService.loadDraft(key);
     expect(got2).toBeNull();
-    expect(localStorage.getItem("ss:draft:" + key)).toBeNull();
+    expect(window.localStorage.getItem("ss:draft:" + key)).not.toBeNull();
   });
 });

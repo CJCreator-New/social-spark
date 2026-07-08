@@ -77,6 +77,20 @@ async function markDeleted(id: string) {
   });
 }
 
+async function deleteExpiredTrends() {
+  const { SUPABASE_URL, SUPABASE_KEY } = await getSupabaseConfig();
+  const limitDate = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/trends?last_seen=lt.${limitDate}`, {
+    method: "DELETE",
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+  });
+  if (!res.ok) {
+    console.error(`Failed to cleanup expired trends: ${res.status}`);
+  } else {
+    console.info("Successfully cleaned up trends older than 14 days");
+  }
+}
+
 export async function handle(req: Request) {
   try {
     if (req.method !== "POST") return new Response(null, { status: 405 });
@@ -96,6 +110,8 @@ export async function handle(req: Request) {
       await markDeleted(ref.id);
       deleted.push(ref);
     }
+
+    await deleteExpiredTrends().catch((err) => console.error("Error during trend cleanup:", err));
 
     return new Response(JSON.stringify({ ok: true, deletedCount: deleted.length, deleted }), {
       status: 200,

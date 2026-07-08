@@ -76,10 +76,6 @@ export default function MyCalendars() {
   const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useSavedCalendarsInfiniteQuery(user?.id, PAGE_SIZE);
 
-  useEffect(() => {
-    if (error instanceof Error) toast.error(error.message);
-  }, [error]);
-
   // Search/favorites filtering below only runs over already-loaded pages. Once the
   // user narrows the list, eagerly fetch the rest so results/counts aren't silently
   // limited to whatever happened to be paged in.

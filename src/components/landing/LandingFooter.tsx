@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Linkedin, Twitter, Github, ArrowUp } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { APP_NAME } from "@/constants/branding";
 
@@ -10,12 +10,6 @@ const NAV_LINKS = [
   { label: "Docs", href: "#" },
   { label: "Privacy", href: "/privacy" },
   { label: "Terms", href: "/terms" },
-];
-
-const SOCIALS = [
-  { icon: Linkedin, href: "#", label: "ContentForge on LinkedIn" },
-  { icon: Twitter, href: "#", label: "ContentForge on X (Twitter)" },
-  { icon: Github, href: "#", label: "ContentForge on GitHub" },
 ];
 
 export default function LandingFooter() {
@@ -53,27 +47,6 @@ export default function LandingFooter() {
               </a>
             ))}
           </nav>
-
-          {/* Social icons */}
-          <div
-            className="ld-w-footer-socials"
-            role="list"
-            aria-label="ContentForge on social media"
-          >
-            {SOCIALS.map(({ icon: Icon, href, label }) => (
-              <a
-                key={label}
-                href={href}
-                className="ld-w-footer-social"
-                aria-label={label}
-                role="listitem"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Icon size={17} aria-hidden="true" />
-              </a>
-            ))}
-          </div>
         </div>
 
         <hr className="ld-w-footer-divider" />

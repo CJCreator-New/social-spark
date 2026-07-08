@@ -153,6 +153,7 @@ export const useWizardStore = create<WizardState>()(
     }),
     {
       name: "cf:wizard",
+      version: 1,
       partialize: (state) => ({
         form: state.form,
         posts: state.posts,
@@ -161,6 +162,24 @@ export const useWizardStore = create<WizardState>()(
         activeDay: state.activeDay,
         step: state.step,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState || {}) as Partial<WizardState>;
+        // Drop any `undefined` values from the persisted form (e.g. a field added
+        // to WizardForm after this draft was saved) so they don't shadow the
+        // INITIAL_FORM defaults below.
+        const persistedForm = Object.fromEntries(
+          Object.entries(persisted.form || {}).filter(([, v]) => v !== undefined)
+        );
+        return {
+          ...currentState,
+          ...persisted,
+          form: {
+            ...INITIAL_FORM,
+            ...(currentState.form || {}),
+            ...persistedForm,
+          },
+        };
+      },
     }
   )
 );

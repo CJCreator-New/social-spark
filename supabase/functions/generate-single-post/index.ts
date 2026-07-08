@@ -109,7 +109,10 @@ Deno.serve(async (req: Request) => {
     const dateNote = payload.date ? ` (${payload.date})` : "";
 
     // Trend-aware generation: fetch top trending topics for this industry/platform
-    const trendingTopics = await getTrendingTopics(payload.industry, payload.platform);
+    const dbTrending = await getTrendingTopics(payload.industry, payload.platform);
+    const trendingTopics = (payload.trendingTopics && payload.trendingTopics.length > 0)
+      ? payload.trendingTopics
+      : dbTrending;
     const enrichedPayload = { ...payload, trendingTopics };
 
     // If no explicit topic was provided, allow the model to infer one from the core idea

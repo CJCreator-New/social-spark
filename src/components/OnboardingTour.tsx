@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Compass, Volume2, CalendarDays, ChevronRight, X } from "lucide-react";
 
+import { APP_NAME } from "@/constants/branding";
+
 interface OnboardingTourProps {
   onSeeExample: () => void;
   onClose: () => void;
@@ -12,9 +14,9 @@ export function OnboardingTour({ onSeeExample, onClose }: OnboardingTourProps) {
 
   const steps = [
     {
-      title: "Welcome to Social Spark ✨",
+      title: `Welcome to ${APP_NAME} ✨`,
       description:
-        "Social Spark is an AI-powered workspace that designs, writes, and schedules high-performance content calendars tailored to your specific industry, voice, and goals.",
+        `${APP_NAME} is an AI-powered workspace that designs, writes, and schedules high-performance content calendars tailored to your specific industry, voice, and goals.`,
       icon: Sparkles,
     },
     {

@@ -29,27 +29,11 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.cf-app .bg-grid {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-image:
-    linear-gradient(rgba(194, 65, 12, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(194, 65, 12, 0.02) 1px, transparent 1px);
-  background-size: 52px 52px;
-}
+/* Decorative grid/orb backdrops retired — flat editorial background.
+   Classes kept (hidden) so the markup in Index.tsx needs no changes. */
+.cf-app .bg-grid,
 .cf-app .bg-glow {
-  position: fixed;
-  width: 700px;
-  height: 700px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(194, 65, 12, 0.03) 0%, transparent 65%);
-  pointer-events: none;
-  top: -300px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 0;
+  display: none;
 }
 
 .cf-app .inner {
@@ -62,10 +46,10 @@
   margin-bottom: 52px;
 }
 .cf-app .brand-eyebrow {
-  font-size: 10px;
-  letter-spacing: 0.22em;
+  font-size: 11px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--text3);
   font-weight: 500;
   margin-bottom: 12px;
   display: flex;
@@ -77,7 +61,7 @@
   display: block;
   width: 22px;
   height: 1px;
-  background: var(--accent);
+  background: var(--border2);
 }
 .cf-app .brand-title {
   font-family: var(--font-display);
@@ -109,33 +93,20 @@
   margin: 18px 0 28px;
 }
 .cf-app .hero-panel {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--color-surface) 88%, transparent),
-    color-mix(in srgb, var(--surface3) 15%, transparent)
-  );
-  border: 1px solid color-mix(in srgb, var(--color-primary) 12%, var(--border));
-  border-radius: 26px;
+  background: var(--color-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
   padding: 24px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-card);
 }
 .cf-app .hero-panel.alt {
-  background: linear-gradient(
-    180deg,
-    color-mix(
-      in srgb,
-      var(--color-primary) 10%,
-      color-mix(in srgb, var(--surface3) 25%, transparent)
-    ),
-    color-mix(in srgb, var(--surface3) 10%, transparent)
-  );
+  background: var(--surface2);
 }
 .cf-app .hero-kicker {
-  font-size: 10px;
-  letter-spacing: 0.24em;
+  font-size: 11px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--text3);
   font-weight: 500;
   margin-bottom: 12px;
 }
@@ -183,7 +154,7 @@
 }
 .cf-app .hero-stat {
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--r-md);
   padding: 14px 15px;
   background: color-mix(in srgb, var(--surface) 60%, transparent);
   min-height: 88px;
@@ -193,7 +164,7 @@
 }
 .cf-app .hero-stat span {
   font-size: 10px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text3);
   font-weight: 500;
@@ -208,9 +179,9 @@
 .cf-app .hero-note {
   margin-top: 12px;
   padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(194, 65, 12, 0.06);
-  border: 1px solid rgba(194, 65, 12, 0.16);
+  border-radius: var(--r-md);
+  background: var(--surface2);
+  border: 1px solid var(--border);
   font-size: 12px;
   color: var(--text2);
   line-height: 1.6;
@@ -255,7 +226,7 @@
   gap: 10px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--r-md);
   background: var(--surface);
   min-width: 0;
 }
@@ -314,7 +285,7 @@
   display: none;
 }
 .cf-app .sline.done {
-  background: linear-gradient(90deg, rgba(194, 65, 12, 0.5), rgba(194, 65, 12, 0.2));
+  background: rgba(194, 65, 12, 0.35);
 }
 
 .cf-app .screen {
@@ -341,24 +312,8 @@
   overflow: hidden;
   transition: box-shadow 0.2s;
 }
-.cf-app .card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(194, 65, 12, 0.45), transparent);
-  opacity: 0;
-  transition: opacity 0.25s;
-}
-.cf-app .card:hover::before {
-  opacity: 1;
-}
 .cf-app .card:hover {
-  box-shadow:
-    0 4px 24px rgba(120, 113, 108, 0.12),
-    0 0 0 1px rgba(194, 65, 12, 0.06);
+  box-shadow: var(--shadow-card-hover);
 }
 .cf-app .csect {
   margin-bottom: 26px;
@@ -374,7 +329,7 @@
 
 .cf-app .flabel {
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text2);
   margin-bottom: 9px;
@@ -453,11 +408,10 @@
   color: var(--text);
 }
 .cf-app .chip.on {
-  background: linear-gradient(135deg, rgba(194, 65, 12, 0.18) 0%, rgba(194, 65, 12, 0.08) 100%);
+  background: var(--adim);
   border-color: rgba(194, 65, 12, 0.45);
   color: var(--accent);
-  font-weight: 300;
-  box-shadow: inset 0 0 0 1px rgba(194, 65, 12, 0.15);
+  font-weight: 400;
 }
 
 .cf-app .ind-grid {
@@ -481,24 +435,11 @@
 .cf-app .ind-card:hover {
   border-color: var(--border2);
   background: var(--surface2);
-  transform: scale(1.02);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--shadow-card-hover);
 }
 .cf-app .ind-card.on {
   border-color: rgba(194, 65, 12, 0.45);
   background: var(--adim);
-  box-shadow:
-    0 0 12px rgba(194, 65, 12, 0.1),
-    inset 0 1px 0 rgba(194, 65, 12, 0.2);
-}
-.cf-app .ind-card.on::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(194, 65, 12, 0.7), transparent);
 }
 .cf-app .ind-card:focus-visible {
   outline: 2px solid rgba(194, 65, 12, 0.7);
@@ -539,24 +480,11 @@
 }
 .cf-app .plat-card:hover {
   border-color: var(--border2);
-  transform: scale(1.02);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--shadow-card-hover);
 }
 .cf-app .plat-card.on {
   border-color: rgba(194, 65, 12, 0.45);
   background: var(--adim);
-  box-shadow:
-    0 0 12px rgba(194, 65, 12, 0.1),
-    inset 0 1px 0 rgba(194, 65, 12, 0.2);
-}
-.cf-app .plat-card.on::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(194, 65, 12, 0.7), transparent);
 }
 .cf-app .plat-card.on::after {
   content: "";
@@ -567,7 +495,6 @@
   height: 6px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 6px rgba(194, 65, 12, 0.6);
 }
 .cf-app .plat-card:focus-visible {
   outline: 2px solid rgba(194, 65, 12, 0.7);
@@ -764,30 +691,8 @@
   background: var(--accent);
   color: var(--color-surface);
 }
-.cf-app .btn-p::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 60%;
-  height: 100%;
-  background: linear-gradient(
-    105deg,
-    transparent 20%,
-    rgba(255, 255, 255, 0.35) 50%,
-    transparent 80%
-  );
-  transition: none;
-  pointer-events: none;
-}
-.cf-app .btn-p:hover::before {
-  left: 160%;
-  transition: left 0.45s ease;
-}
 .cf-app .btn-p:hover {
   background: var(--color-primary-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 18px rgba(194, 65, 12, 0.35);
 }
 .cf-app .btn-g {
   background: transparent;
@@ -1075,7 +980,7 @@
 }
 .cf-app .blabel {
   font-size: 9px;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text3);
   margin-bottom: 7px;
@@ -1182,7 +1087,7 @@
 }
 .cf-app .summary-stat span {
   font-size: 10px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text3);
   font-weight: 500;
@@ -1317,7 +1222,7 @@
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 18px;
-  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-card);
 }
 .cf-app .li-head {
   display: flex;
@@ -1329,7 +1234,7 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(194, 65, 12, 0.9), rgba(194, 65, 12, 0.3));
+  background: var(--accent);
   color: var(--color-surface);
   font-weight: 700;
   display: flex;
@@ -1356,7 +1261,6 @@
   border-radius: 50%;
   background: var(--accent);
   margin-left: auto;
-  box-shadow: 0 0 0 4px rgba(194, 65, 12, 0.1);
 }
 .cf-app .li-body {
   position: relative;
@@ -1378,7 +1282,8 @@
   right: 0;
   bottom: 0;
   height: 92px;
-  background: linear-gradient(180deg, rgba(13, 15, 24, 0) 0%, rgba(13, 15, 24, 0.92) 82%);
+  /* Truncation scrim: fade to the card surface (was a leftover dark-theme navy) */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, var(--color-surface) 82%);
   pointer-events: none;
 }
 .cf-app .li-more {
@@ -1584,7 +1489,7 @@
 }
 .cf-app .time-label {
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text2);
   font-weight: 500;
@@ -1698,7 +1603,7 @@
 }
 .cf-app .recent-eyebrow {
   font-size: 10px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text2);
   font-weight: 500;
@@ -1796,7 +1701,7 @@
 }
 .cf-app .vsp-eyebrow {
   font-size: 9px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text3);
   margin-bottom: 8px;
@@ -1948,7 +1853,7 @@
 }
 .cf-app .reformat-label {
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text2);
   font-weight: 500;

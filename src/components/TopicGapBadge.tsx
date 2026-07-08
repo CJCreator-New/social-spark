@@ -18,7 +18,7 @@ export const TopicGapBadge: React.FC<TopicGapBadgeProps> = ({ topic, rationale, 
       onMouseLeave={() => setShowPopover(false)}
     >
       <span className="topic-gap-badge" role="status">
-        🤖 AI-inferred
+        🤖 AI-inferred topic
       </span>
       {showPopover && rationale && (
         <div className="topic-gap-popover">

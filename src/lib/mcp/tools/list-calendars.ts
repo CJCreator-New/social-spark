@@ -27,6 +27,10 @@ export default defineTool({
     if (!ctx.isAuthenticated()) {
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     }
+    const scopes = ctx.getScopes() || [];
+    if (!scopes.includes("read:calendars")) {
+      return { content: [{ type: "text", text: "Access denied: missing read:calendars scope" }], isError: true };
+    }
     const { data, error } = await supabaseForUser(ctx)
       .from("saved_calendars")
       .select(

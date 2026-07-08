@@ -17,16 +17,16 @@ function getMemoryToken(): string {
 }
 
 export function getSessionToken(): string {
-  if (typeof window === "undefined" || !window.sessionStorage) {
+  if (typeof window === "undefined" || !window.localStorage) {
     return getMemoryToken();
   }
-  let token = window.sessionStorage.getItem("ss_session_token");
+  let token = window.localStorage.getItem("ss_device_token");
   if (!token) {
     token = Math.random().toString(36).substring(2) + Date.now().toString(36);
     try {
-      window.sessionStorage.setItem("ss_session_token", token);
+      window.localStorage.setItem("ss_device_token", token);
     } catch (e) {
-      console.warn("Failed to write to sessionStorage. Using transient in-memory token.", e);
+      console.warn("Failed to write to localStorage. Using transient in-memory token.", e);
       return getMemoryToken();
     }
   }
@@ -113,8 +113,7 @@ export function loadDraft<T>(key: string): T | null {
     }
     return env.data as T;
   } catch (err) {
-    // corrupted or wrong session — remove
-    window.localStorage.removeItem(storageKey(key));
+    // Decrypt / parse failed - do not delete here to allow stable TTL/multi-session resilience
     return null;
   }
 }
@@ -137,17 +136,29 @@ export function cleanupExpiredDrafts() {
       if (k && k.startsWith(PREFIX)) keys.push(k);
     }
     const now = Date.now();
+    const token = getSessionToken();
     for (const k of keys) {
       const raw = window.localStorage.getItem(k);
       if (!raw) continue;
       try {
-        const env = JSON.parse(raw) as DraftEnvelope<unknown>;
+        let decrypted = decryptDraftData(raw, token);
+        if (!decrypted) {
+          if (raw.trim().startsWith("{")) {
+            decrypted = raw;
+          } else {
+            // Decryption failed (e.g. wrong key context) - do not delete to avoid loss of drafts
+            continue;
+          }
+        }
+        const env = JSON.parse(decrypted) as DraftEnvelope<unknown>;
         if (env.expiresAt && now > env.expiresAt) {
           window.localStorage.removeItem(k);
         }
       } catch (e) {
-        // corrupted — remove
-        window.localStorage.removeItem(k);
+        // genuinely corrupt legacy JSON draft - safe to remove
+        if (raw.trim().startsWith("{")) {
+          window.localStorage.removeItem(k);
+        }
       }
     }
   } catch (err) {

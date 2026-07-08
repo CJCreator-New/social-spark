@@ -73,14 +73,7 @@ vi.mock("sonner", () => ({
 // one function so this test can exercise the *intended* restore behavior;
 // the underlying bug should be fixed in src/lib/storageService.ts separately.
 // ---------------------------------------------------------------------------
-vi.mock("@/lib/storageService", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/storageService")>();
-  return {
-    ...actual,
-    cleanupExpiredDrafts: vi.fn(),
-    default: { ...actual.default, cleanupExpiredDrafts: vi.fn() },
-  };
-});
+
 
 import Index from "../Index";
 

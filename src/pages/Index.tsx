@@ -378,10 +378,12 @@ async function upsertMediaReferences(params: {
   );
 }
 
-async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraftSnapshot> | null> {
+async function readServerDraft(
+  userId: string
+): Promise<{ envelope: DraftEnvelope<WizardDraftSnapshot>; updatedAt: number } | null> {
   if (!wizardDraftServerAvailable) return null;
   const { data, error } = await (supabase.from as any)(WIZARD_SERVER_DRAFT_TABLE)
-    .select("snapshot")
+    .select("snapshot, updated_at")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -391,7 +393,14 @@ async function readServerDraft(userId: string): Promise<DraftEnvelope<WizardDraf
   }
   wizardDraftServerAvailable = true;
   if (!data?.snapshot) return null;
-  return parseDraftEnvelope<WizardDraftSnapshot>((data as any).snapshot);
+  const envelope = parseDraftEnvelope<WizardDraftSnapshot>((data as any).snapshot);
+  if (!envelope) return null;
+  // Use the DB trigger-maintained updated_at (server clock) rather than the
+  // client-stamped envelope.savedAt, which is vulnerable to client clock skew.
+  const updatedAt = (data as any).updated_at
+    ? new Date((data as any).updated_at).getTime()
+    : envelope.savedAt;
+  return { envelope, updatedAt };
 }
 
 async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
@@ -957,10 +966,11 @@ const Index = () => {
       try {
         const localDraft = readDraftEnvelope<WizardDraftSnapshot>(wizardDraftKey);
         const serverDraft = user ? await readServerDraft(user.id) : null;
-        const newestDraft =
-          [localDraft, serverDraft]
-            .filter((item): item is DraftEnvelope<WizardDraftSnapshot> => !!item)
-            .sort((a, b) => b.savedAt - a.savedAt)[0] || null;
+        const candidates: { envelope: DraftEnvelope<WizardDraftSnapshot>; sortKey: number }[] = [];
+        if (localDraft) candidates.push({ envelope: localDraft, sortKey: localDraft.savedAt });
+        if (serverDraft)
+          candidates.push({ envelope: serverDraft.envelope, sortKey: serverDraft.updatedAt });
+        const newestDraft = candidates.sort((a, b) => b.sortKey - a.sortKey)[0]?.envelope || null;
 
         if (cancelled) return;
 
@@ -982,9 +992,8 @@ const Index = () => {
           if (!prompted) {
             setRecoveryDraft(newestDraft.data);
             setShowRecoveryDialog(true);
-            sessionStorage.setItem("ss_recovery_prompted", "true");
           }
-          if (user && localDraft && localDraft.savedAt >= (serverDraft?.savedAt || 0)) {
+          if (user && localDraft && localDraft.savedAt >= (serverDraft?.updatedAt || 0)) {
             void writeServerDraft(user.id, localDraft.data).catch((error) => {
               console.warn("Failed to sync local draft to server", error);
             });
@@ -1033,7 +1042,14 @@ const Index = () => {
 
   // Persist the active wizard snapshot, with a short debounce, so reloads can recover progress.
   useEffect(() => {
-    if (!draftReady.current || !wizardDraftKey || recoveryDraft || blockAutosaveRef.current) return;
+    if (
+      !draftReady.current ||
+      !wizardDraftKey ||
+      recoveryDraft ||
+      blockAutosaveRef.current ||
+      savedId
+    )
+      return;
     if (draftSaveTimer.current) {
       window.clearTimeout(draftSaveTimer.current);
     }
@@ -1127,7 +1143,18 @@ const Index = () => {
         window.clearTimeout(draftSaveTimer.current);
       }
     };
-  }, [wizardDraftKey, user, form, step, extraTopics, posts, activeDay, postTimes, recoveryDraft]);
+  }, [
+    wizardDraftKey,
+    user,
+    form,
+    step,
+    extraTopics,
+    posts,
+    activeDay,
+    postTimes,
+    recoveryDraft,
+    savedId,
+  ]);
 
   const clearDraft = () => {
     try {
@@ -1155,12 +1182,15 @@ const Index = () => {
     setShowRecoveryDialog(false);
     hydrated.current = true;
     blockAutosaveRef.current = false;
+    sessionStorage.setItem("ss_recovery_prompted", "true");
   };
 
   const discardDraft = () => {
     clearDraft();
+    reset();
     setRecoveryDraft(null);
     setShowRecoveryDialog(false);
+    sessionStorage.setItem("ss_recovery_prompted", "true");
     toast.success("Draft discarded. Start fresh below.");
   };
 
@@ -2292,7 +2322,7 @@ const Index = () => {
             padding: "10px 16px",
             textAlign: "center",
             fontSize: "12px",
-            color: "var(--color-warning-text)",
+            color: "#92400e",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
@@ -2307,7 +2337,7 @@ const Index = () => {
             style={{
               background: "color-mix(in srgb, var(--color-primary-light) 20%, transparent)",
               border: "1px solid color-mix(in srgb, var(--color-primary-light) 40%, transparent)",
-              color: "var(--color-warning-text)",
+              color: "#92400e",
               padding: "2px 8px",
               borderRadius: "4px",
               cursor: "pointer",
@@ -2701,7 +2731,7 @@ const Index = () => {
                       />
                       <div className="time-hint" style={{ marginTop: 6 }}>
                         Your post will be written for{" "}
-                        <strong style={{ color: "rgba(200,240,154,.85)" }}>
+                        <strong style={{ color: "var(--color-primary)" }}>
                           {shortDateLabel(parseLocalDate(form.targetDate) || nextMonday())}
                         </strong>
                         .
@@ -2721,7 +2751,7 @@ const Index = () => {
                       />
                       <div className="time-hint" style={{ marginTop: 6 }}>
                         Day 1 will be{" "}
-                        <strong style={{ color: "rgba(200,240,154,.85)" }}>
+                        <strong style={{ color: "var(--color-primary)" }}>
                           {shortDateLabel(weekStartDate)}
                         </strong>
                         . Each post gets a day-specific default time — you can adjust per post on
@@ -3409,12 +3439,12 @@ const Index = () => {
                           onMouseEnter={(e) => {
                             if (!isGenerating) {
                               (e.target as HTMLButtonElement).style.background =
-                                "rgba(200,240,154,.3)";
+                                "hsl(var(--primary) / 0.3)";
                             }
                           }}
                           onMouseLeave={(e) => {
                             (e.target as HTMLButtonElement).style.background =
-                              "rgba(200,240,154,.2)";
+                              "hsl(var(--primary) / 0.2)";
                           }}
                         >
                           {isGenerating ? "⏳ Retrying..." : "🔄 Try again"}
@@ -3570,7 +3600,7 @@ const Index = () => {
                           style={{
                             height: "16px",
                             width: "40px",
-                            background: "rgba(200, 240, 154, 0.15)",
+                            background: "var(--border2)",
                             borderRadius: "99px",
                           }}
                         />
@@ -3631,8 +3661,8 @@ const Index = () => {
                       style={{
                         height: "36px",
                         width: "100%",
-                        background: "rgba(200, 240, 154, 0.06)",
-                        border: "1px solid rgba(200, 240, 154, 0.12)",
+                        background: "var(--surface)",
+                        border: "1px solid var(--border2)",
                         borderRadius: "10px",
                       }}
                     />
@@ -3714,8 +3744,8 @@ const Index = () => {
                         height: 72,
                         borderRadius: "50%",
                         background:
-                          "radial-gradient(circle at 30% 30%, rgba(200,240,154,0.18), rgba(200,240,154,0.04) 65%, transparent 80%)",
-                        border: "1px solid rgba(200,240,154,0.18)",
+                          "radial-gradient(circle at 30% 30%, hsl(var(--primary) / 0.18), hsl(var(--primary) / 0.04) 65%, transparent 80%)",
+                        border: "1px solid hsl(var(--primary) / 0.18)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",

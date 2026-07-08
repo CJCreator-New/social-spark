@@ -161,7 +161,9 @@ async function verifyCalendarOwnership(params: {
   return Array.isArray(rows) && rows.length > 0;
 }
 
-Deno.serve(async (req: Request) => {
+// Exported for Vitest (see generate-post-image.test.ts); Deno.serve is guarded below,
+// same pattern as telemetry/index.ts and verify-payment/index.ts.
+export async function handleGeneratePostImage(req: Request): Promise<Response> {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
@@ -256,42 +258,135 @@ Deno.serve(async (req: Request) => {
       .filter(Boolean)
       .join("\n");
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    let imageRes: Response | undefined;
+    let lastError: any = null;
+    let successProvider = "";
 
-    let imageRes;
-    try {
-      imageRes = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
-        method: "POST",
+    const providers = [];
+    if (LOVABLE_API_KEY) {
+      providers.push({
+        name: "lovable-gateway",
+        url: "https://ai.gateway.lovable.dev/v1/images/generations",
         headers: {
           authorization: `Bearer ${LOVABLE_API_KEY}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({
+        body: {
           model: "google/gemini-2.5-flash-image",
           prompt: finalPrompt,
           n: 1,
           size: sizeForAspectRatio(aspectRatio),
           aspect_ratio: aspectRatio,
           response_format: "b64_json",
-        }),
-        signal: controller.signal,
+        }
       });
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        return jsonResponse({ error: "Image generation timed out after 45 seconds." }, 504);
-      }
-      throw err;
-    } finally {
-      clearTimeout(timeoutId);
     }
 
-    if (!imageRes.ok) {
-      const text = await imageRes.text().catch(() => "");
-      console.error(`Image gateway error ${imageRes.status}. Response body:`, sanitizeLogValue(text));
+    const openrouterKey = Deno.env.get("PLATFORM_OPENROUTER_KEY");
+    if (openrouterKey) {
+      providers.push({
+        name: "openrouter",
+        url: "https://openrouter.ai/api/v1/images/generations",
+        headers: {
+          authorization: `Bearer ${openrouterKey}`,
+          "content-type": "application/json",
+        },
+        body: {
+          model: "google/gemini-2.5-flash-image",
+          prompt: finalPrompt,
+          n: 1,
+          size: sizeForAspectRatio(aspectRatio),
+          aspect_ratio: aspectRatio,
+          response_format: "b64_json",
+        }
+      });
+    }
+
+    const openaiKey = Deno.env.get("PLATFORM_OPENAI_KEY");
+    if (openaiKey) {
+      let size = "1024x1024";
+      if (aspectRatio === "16:9" || aspectRatio === "1.91:1") {
+        size = "1792x1024";
+      } else if (aspectRatio === "9:16" || aspectRatio === "4:5") {
+        size = "1024x1792";
+      }
+      providers.push({
+        name: "openai",
+        url: "https://api.openai.com/v1/images/generations",
+        headers: {
+          authorization: `Bearer ${openaiKey}`,
+          "content-type": "application/json",
+        },
+        body: {
+          model: "dall-e-3",
+          prompt: finalPrompt,
+          n: 1,
+          size: size,
+          response_format: "b64_json",
+        }
+      });
+    }
+
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    if (geminiKey) {
+      providers.push({
+        name: "gemini-imagen",
+        url: `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:generateImages?key=${geminiKey}`,
+        headers: {
+          "content-type": "application/json",
+        },
+        body: {
+          numberOfImages: 1,
+          prompt: finalPrompt,
+          aspectRatio: aspectRatio === "1:1" ? "1:1" : aspectRatio === "16:9" ? "16:9" : aspectRatio === "9:16" ? "9:16" : aspectRatio === "4:5" ? "4:5" : aspectRatio === "3:4" ? "3:4" : "1:1",
+          outputMimeType: "image/png",
+        }
+      });
+    }
+
+    if (providers.length === 0) {
+      return jsonResponse({ error: "No image generation providers are configured." }, 500);
+    }
+
+    for (const provider of providers) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      try {
+        console.log(`[image-waterfall] Trying provider: ${provider.name}`);
+        const response = await fetch(provider.url, {
+          method: "POST",
+          headers: provider.headers,
+          body: JSON.stringify(provider.body),
+          signal: controller.signal,
+        });
+
+        if (response.ok) {
+          imageRes = response;
+          successProvider = provider.name;
+          clearTimeout(timeoutId);
+          break;
+        } else {
+          const errText = await response.text().catch(() => "");
+          console.error(`[image-waterfall] Provider ${provider.name} failed with status ${response.status}:`, sanitizeLogValue(errText));
+          lastError = { status: response.status, message: errText };
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          console.error(`[image-waterfall] Provider ${provider.name} timed out.`);
+          lastError = { status: 504, message: "Timeout" };
+        } else {
+          console.error(`[image-waterfall] Provider ${provider.name} encountered error:`, err);
+          lastError = { status: 500, message: err instanceof Error ? err.message : String(err) };
+        }
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    if (!imageRes) {
       return jsonResponse(
-        { error: `Image generation failed (${imageRes.status}).` },
-        imageRes.status || 500
+        { error: `Image generation failed. ${lastError?.message || ""}` },
+        lastError?.status || 500
       );
     }
 
@@ -309,7 +404,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const item = imageData?.data?.[0] || imageData?.images?.[0] || imageData;
-    const b64 = item?.b64_json || item?.base64 || item?.image;
+    let b64 = item?.b64_json || item?.base64 || item?.image;
+    if (successProvider === "gemini-imagen") {
+      const imgObj = imageData?.generatedImages?.[0]?.image;
+      b64 = imgObj?.imageBytes || b64;
+    }
     const url = item?.url || item?.public_url;
 
     let bytes: Uint8Array;
@@ -388,4 +487,8 @@ Deno.serve(async (req: Request) => {
   } catch (e) {
     return errorResponse("generate-post-image", e);
   }
-});
+}
+
+if (typeof Deno !== "undefined" && Deno.serve) {
+  Deno.serve(handleGeneratePostImage);
+}

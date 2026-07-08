@@ -131,7 +131,7 @@ export default function OAuthConsent() {
                 {details.scopes && details.scopes.length > 0 ? (
                   details.scopes.map((scope) => <li key={scope}>{scope}</li>)
                 ) : (
-                  <li>Read your saved calendars and scheduled posts.</li>
+                  <li>This app is requesting access to your account.</li>
                 )}
               </ul>
 

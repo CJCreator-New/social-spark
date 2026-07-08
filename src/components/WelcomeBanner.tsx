@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, X, Zap, ArrowRight } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
+import { APP_NAME } from "@/constants/branding";
 
 const SEEN_KEY = "social_spark_welcome_seen";
 
@@ -38,7 +39,7 @@ export function WelcomeBanner() {
   return (
     <div
       role="note"
-      aria-label="Welcome to Social Spark"
+      aria-label={`Welcome to ${APP_NAME}`}
       style={{
         position: "relative",
         marginBottom: 18,
@@ -74,7 +75,7 @@ export function WelcomeBanner() {
       >
         <Sparkles size={16} />
         <span style={{ fontWeight: 600, fontSize: 15 }} className="text-foreground">
-          Welcome to Social Spark
+          Welcome to {APP_NAME}
         </span>
       </div>
 

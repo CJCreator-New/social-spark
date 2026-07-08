@@ -25,7 +25,7 @@ beforeEach(() => {
 describe("WelcomeBanner", () => {
   it("shows for a new free user with remaining generations", () => {
     render(<WelcomeBanner />);
-    expect(screen.getByText(/welcome to social spark/i)).toBeInTheDocument();
+    expect(screen.getByText(/welcome to contentforge/i)).toBeInTheDocument();
     expect(screen.getByText(/7 free generations left/i)).toBeInTheDocument();
   });
 

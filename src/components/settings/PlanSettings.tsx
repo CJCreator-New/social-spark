@@ -2,12 +2,20 @@ import { CheckCircle2, Sparkles, Zap, Crown, AlertCircle } from "lucide-react";
 import { RazorpayCheckoutButton } from "@/components/RazorpayCheckoutButton";
 import { useSubscription } from "@/hooks/useSubscription";
 import { daysRemaining, type Tier } from "@/lib/subscription";
+import { PLAN_TIERS, type PlanTierId } from "@/constants/plans";
 
 /**
- * Display-only plan catalogue. Prices are ENFORCED server-side in
- * supabase/functions/_shared/plans.ts — these values are for presentation and
- * must be kept in sync with that source of truth.
+ * Display-only plan catalogue, sourced from the shared PLAN_TIERS constant.
+ * Prices are ENFORCED server-side in supabase/functions/_shared/plans.ts —
+ * these values are for presentation and must be kept in sync with that
+ * source of truth.
  */
+const TIER_META: Record<PlanTierId, { cadence: string; icon: typeof Sparkles; purchasable: boolean }> = {
+  free: { cadence: "", icon: Sparkles, purchasable: false },
+  starter: { cadence: "/ month", icon: Zap, purchasable: true },
+  pro: { cadence: "/ month", icon: Crown, purchasable: true },
+};
+
 const PLANS: Array<{
   id: Tier;
   name: string;
@@ -16,47 +24,7 @@ const PLANS: Array<{
   icon: typeof Sparkles;
   features: string[];
   purchasable: boolean;
-}> = [
-  {
-    id: "free",
-    name: "Free",
-    price: "₹0",
-    cadence: "",
-    icon: Sparkles,
-    features: [
-      "50 platform generations / month",
-      "BYOK (use your own API key)",
-      "Calendar + single posts",
-    ],
-    purchasable: false,
-  },
-  {
-    id: "starter",
-    name: "Starter",
-    price: "₹199",
-    cadence: "/ month",
-    icon: Zap,
-    features: [
-      "100 platform generations / month",
-      "BYOK — you control AI costs",
-      "Priority support",
-    ],
-    purchasable: true,
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: "₹499",
-    cadence: "/ month",
-    icon: Crown,
-    features: [
-      "500 platform generations / month",
-      "BYOK for unlimited generations",
-      "Premium features",
-    ],
-    purchasable: true,
-  },
-];
+}> = PLAN_TIERS.map((tier) => ({ ...tier, ...TIER_META[tier.id] }));
 
 export function PlanSettings() {
   const { status, loading, refresh } = useSubscription();

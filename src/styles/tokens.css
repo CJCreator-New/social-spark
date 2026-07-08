@@ -105,22 +105,23 @@
   /* Border radius */
   --radius-xs: 4px;
   --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --radius-2xl: 32px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
   --radius-pill: 9999px;
 
-  /* Shadows: warm neutral */
-  --shadow-card: 0 10px 30px rgba(120, 113, 108, 0.06), 0 1px 3px rgba(120, 113, 108, 0.02);
-  --shadow-card-hover: 0 12px 30px rgba(120, 113, 108, 0.1);
-  --shadow-stat: 0 4px 20px rgba(120, 113, 108, 0.04);
-  --shadow-btn: 0 4px 12px rgba(194, 65, 12, 0.15);
-  --shadow-btn-hover: 0 6px 16px rgba(194, 65, 12, 0.25);
+  /* Shadows: warm neutral — resting surfaces stay near-flat; real elevation
+     (modal/dropdown/toast) keeps --shadow-2/--shadow-toast below */
+  --shadow-card: 0 1px 2px rgba(120, 113, 108, 0.05);
+  --shadow-card-hover: 0 2px 8px rgba(120, 113, 108, 0.08);
+  --shadow-stat: 0 1px 2px rgba(120, 113, 108, 0.04);
+  --shadow-btn: none;
+  --shadow-btn-hover: none;
   --shadow-button: var(--shadow-btn);
   --shadow-button-hover: var(--shadow-btn-hover);
   --shadow-sm: 0 2px 8px rgba(120, 113, 108, 0.04);
-  --shadow-day-active: 0 4px 12px rgba(194, 65, 12, 0.08);
+  --shadow-day-active: 0 1px 2px rgba(120, 113, 108, 0.05);
   --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.15);
 
   /* Elevation: light-theme neutral */

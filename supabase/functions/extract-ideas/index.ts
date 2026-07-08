@@ -107,8 +107,18 @@ Deno.serve(async (req: Request) => {
     }
 
     const platform = payload.platform || "LinkedIn";
+    let brandConstraint = "";
+    if (payload.brandMemory) {
+      brandConstraint += `\nBRAND CONTEXT:\n${payload.brandMemory}`;
+    }
+    if (payload.bannedWords && payload.bannedWords.length > 0) {
+      brandConstraint += `\nBANNED WORDS (Do NOT use any of these words in your output):\n${payload.bannedWords.map((w) => `- ${w}`).join("\n")}`;
+    }
+    if (payload.forbiddenPhrases && payload.forbiddenPhrases.length > 0) {
+      brandConstraint += `\nFORBIDDEN PHRASES (Do NOT use any of these phrases in your output):\n${payload.forbiddenPhrases.map((p) => `- ${p}`).join("\n")}`;
+    }
 
-    const systemMsg = `You are a senior social media strategist. You extract distinct, high-potential post ideas from long-form source material for ${platform}. Every idea must be grounded ONLY in facts present in the source — never invent statistics, names, or claims that are not there. Ideas must not overlap: each must take a clearly different angle on the material. Do not use markdown bold or italic markers (** or *) in any output text.`;
+    const systemMsg = `You are a senior social media strategist. You extract distinct, high-potential post ideas from long-form source material for ${platform}. Every idea must be grounded ONLY in facts present in the source — never invent statistics, names, or claims that are not there. Ideas must not overlap: each must take a clearly different angle on the material. Do not use markdown bold or italic markers (** or *) in any output text.${brandConstraint}`;
 
     const userMsg = `SOURCE MATERIAL:
 """
@@ -138,26 +148,24 @@ Return the result using return_ideas.`;
             ideas: {
               type: "array",
               minItems: count,
-              maxItems: count,
               items: {
                 type: "object",
                 properties: {
                   title: {
                     type: "string",
-                    description: "One-line angle title for the post idea.",
+                    description: "High-impact specific hook title.",
                   },
                   format: {
                     type: "string",
-                    description: `The high-engagement format this idea maps to, one of: ${ENGAGEMENT_FORMATS.join(", ")}.`,
+                    description: "Form/angle chosen from list.",
                   },
                   rationale: {
                     type: "string",
-                    description: "One line on why this angle should perform well.",
+                    description: "Why this angle is strong.",
                   },
                   key_points: {
                     type: "string",
-                    description:
-                      "The supporting facts from the source needed to write this post, as short plain-text lines.",
+                    description: "Key fact bullets required to write the post.",
                   },
                 },
                 required: ["title", "format", "rationale", "key_points"],
@@ -169,69 +177,83 @@ Return the result using return_ideas.`;
       },
     };
 
-    const aiRes = await callAIGateway(
-      [
-        { role: "system", content: systemMsg },
-        { role: "user", content: userMsg },
-      ],
-      tool,
-      LOVABLE_API_KEY,
-      {
-        model: "google/gemini-2.5-flash",
-        temperature: 0.7,
-        userApiKey: payload.userApiKey,
-        userApiProvider: payload.userApiProvider,
-        quality: payload.quality,
-        userToken: token || null,
-        userIp: ipAddress,
-        max_tokens: 8192,
+    let ideas: any[] = [];
+    let attempts = 0;
+
+    while (attempts < 2 && ideas.length < 3) {
+      attempts++;
+      const aiRes = await callAIGateway(
+        [
+          { role: "system", content: systemMsg },
+          { role: "user", content: userMsg },
+        ],
+        tool,
+        LOVABLE_API_KEY,
+        {
+          provider: payload.userApiProvider || "lovable",
+          quality: payload.quality,
+          model: payload.userApiKey ? undefined : "google/gemini-2.5-flash",
+          userApiKey: payload.userApiKey,
+          userApiProvider: payload.userApiProvider,
+          temperature: 0.2, // Low temp for extraction precision
+        }
+      );
+
+      if (aiRes.status !== 200) {
+        if (attempts === 1) continue;
+        return jsonResponse({ error: aiRes.error }, aiRes.status);
       }
-    );
 
-    if (aiRes.status !== 200) {
-      if (aiRes.status === 503) {
-        return jsonResponse(
-          {
-            error: "PLATFORM_UNAVAILABLE",
-            message:
-              "Our AI providers are temporarily overloaded. Please try again in a moment, or add your own API key in Profile → API Keys to generate without platform limits.",
-          },
-          503
-        );
+      if (usingSharedKey && attempts === 1) {
+        await incrementGenerationCount(userId);
       }
-      return jsonResponse({ error: aiRes.error }, aiRes.status);
+
+      const parseResult = parseAIResponse(aiRes.data || {}, "return_ideas");
+      if (!parseResult.success) {
+        if (attempts === 1) continue;
+        return jsonResponse({ error: parseResult.error }, 500);
+      }
+
+      const parsed = parseResult.parsed as { ideas?: unknown };
+      const rawIdeas = Array.isArray(parsed.ideas) ? parsed.ideas : [];
+
+      const stripMarkdown = (s: unknown) => String(s || "").replace(/\*\*?/g, "").trim();
+      const seen = new Set<string>();
+
+      const combinedForbidden = [
+        ...(payload.bannedWords || []),
+        ...(payload.forbiddenPhrases || []),
+      ];
+      const hasBrandViolation = (text: string) => {
+        return combinedForbidden.some((phrase) => {
+          const regex = new RegExp(phrase.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"), "i");
+          return regex.test(text);
+        });
+      };
+
+      ideas = rawIdeas
+        .map((raw) => {
+          const idea = (raw || {}) as Record<string, unknown>;
+          return {
+            title: stripMarkdown(idea.title),
+            format: stripMarkdown(idea.format) || "Balanced mix",
+            rationale: stripMarkdown(idea.rationale),
+            key_points: stripMarkdown(idea.key_points),
+          };
+        })
+        .filter((idea) => {
+          if (!idea.title || !idea.key_points) return false;
+          if (hasBrandViolation(`${idea.title} ${idea.rationale} ${idea.key_points}`)) {
+            console.warn(`Filtering out extracted idea due to brand policy violation: ${idea.title}`);
+            return false;
+          }
+          const key = idea.title.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, count);
     }
-
-    if (usingSharedKey) {
-      await incrementGenerationCount(userId);
-    }
-
-    const parseResult = parseAIResponse(aiRes.data || {}, "return_ideas");
-    if (!parseResult.success) return jsonResponse({ error: parseResult.error }, 500);
-
-    const parsed = parseResult.parsed as { ideas?: unknown };
-    const rawIdeas = Array.isArray(parsed.ideas) ? parsed.ideas : [];
-
-    const stripMarkdown = (s: unknown) => String(s || "").replace(/\*\*?/g, "").trim();
-    const seen = new Set<string>();
-    const ideas = rawIdeas
-      .map((raw) => {
-        const idea = (raw || {}) as Record<string, unknown>;
-        return {
-          title: stripMarkdown(idea.title),
-          format: stripMarkdown(idea.format) || "Balanced mix",
-          rationale: stripMarkdown(idea.rationale),
-          key_points: stripMarkdown(idea.key_points),
-        };
-      })
-      .filter((idea) => {
-        if (!idea.title || !idea.key_points) return false;
-        const key = idea.title.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .slice(0, count);
 
     if (ideas.length === 0) {
       return jsonResponse(
@@ -240,7 +262,8 @@ Return the result using return_ideas.`;
       );
     }
 
-    return jsonResponse({ ideas, requested: count });
+    const partial = ideas.length < 3;
+    return jsonResponse({ ideas, requested: count, ...(partial ? { partial: true } : {}) });
   } catch (e) {
     return errorResponse("extract-ideas", e);
   }

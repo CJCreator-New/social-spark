@@ -138,6 +138,45 @@ describe("useWizardStore — localStorage persistence (F-010 offline recovery)",
   });
 });
 
+describe("useWizardStore — persist migration/merge (CF-19)", () => {
+  it("declares a persist version so future schema changes can migrate", () => {
+    const raw = window.localStorage.getItem("cf:wizard");
+    expect(raw).toBeTruthy();
+    const persisted = JSON.parse(raw!);
+    expect(persisted.version).toBe(1);
+  });
+
+  it("falls back to INITIAL_FORM defaults for form fields missing/undefined in persisted state", () => {
+    // Simulate an old persisted draft that predates a newly-added form field
+    // (represented here as `undefined`, which is how a missing key round-trips
+    // once JSON.parse'd back out of a hand-crafted envelope).
+    window.localStorage.setItem(
+      "cf:wizard",
+      JSON.stringify({
+        state: {
+          form: { industry: "tech", coreIdea: undefined },
+          posts: [],
+          postTimes: {},
+          lockedDays: [],
+          activeDay: 0,
+          step: 1,
+        },
+        version: 1,
+      })
+    );
+
+    act(() => {
+      useWizardStore.persist.rehydrate();
+    });
+
+    const form = useWizardStore.getState().form;
+    expect(form.industry).toBe("tech");
+    // coreIdea was undefined in the persisted blob — must fall back to default
+    // rather than surfacing as undefined (which would crash `.trim()` callers).
+    expect(typeof form.coreIdea).toBe("string");
+  });
+});
+
 describe("useWizardStore — lockedDays", () => {
   it("toggleLockedDay adds a day to the locked set", () => {
     act(() => {

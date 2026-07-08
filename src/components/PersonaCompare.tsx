@@ -345,7 +345,7 @@ export const PersonaCompare: React.FC<PersonaCompareProps> = ({
                       fontStyle: "italic",
                       fontSize: 13,
                       color: "var(--text2)",
-                      borderLeft: "2px solid rgba(200,240,154,0.28)",
+                      borderLeft: "2px solid var(--border2)",
                       paddingLeft: 10,
                     }}
                   >
@@ -419,8 +419,8 @@ export const PersonaCompare: React.FC<PersonaCompareProps> = ({
             {comparedPost ? (
               <div
                 style={{
-                  background: "rgba(200, 240, 154, 0.02)",
-                  border: "1px solid rgba(200, 240, 154, 0.2)",
+                  background: "var(--surface)",
+                  border: "1px solid var(--border2)",
                   borderRadius: 12,
                   padding: 16,
                   display: "flex",

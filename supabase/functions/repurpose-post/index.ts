@@ -20,7 +20,9 @@ import {
   quotaExceededMessage,
 } from "../_shared/promptHelpers.ts";
 
-Deno.serve(async (req: Request) => {
+// Exported for Vitest (see repurpose-post.test.ts); Deno.serve is guarded below,
+// same pattern as telemetry/index.ts and verify-payment/index.ts.
+export async function handleRepurposePost(req: Request): Promise<Response> {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
@@ -217,4 +219,8 @@ Return the result as a single post object using return_post.`;
   } catch (e) {
     return errorResponse("repurpose-post", e);
   }
-});
+}
+
+if (typeof Deno !== "undefined" && Deno.serve) {
+  Deno.serve(handleRepurposePost);
+}

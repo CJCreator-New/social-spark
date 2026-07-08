@@ -118,7 +118,7 @@ npm run test:run
 Notes:
 
 - Migration: `supabase/migrations/20260707000000_add_with_check_to_update_policies.sql` — recreates the UPDATE policy on `profiles`, `saved_calendars`, `templates`, `wizard_drafts`, `scheduled_posts`, `user_settings` with matching `USING`/`WITH CHECK` clauses.
-- Regression test: `supabase/tests/update_policy_ownership.test.sql` (pgTAP). Not executed locally — this sandbox has no Docker daemon, so `supabase test db` cannot start a local Postgres. Run in CI or a dev machine with Docker before release.
+- Regression test: `supabase/tests/update_policy_ownership.test.sql` (pgTAP). Not executed locally — this sandbox has no Docker daemon, so `supabase test db` cannot start a local Postgres (re-checked 2026-07-08: `docker` is not on PATH and no Docker Desktop install is present in this environment). Run in CI or a dev machine with Docker before release.
 
 ### P0-2 / F-002: Apply Quota Accounting to All AI-Cost Endpoints
 
@@ -151,7 +151,7 @@ Notes:
 
 - `repurpose-post`, `inline-rewrite`, `generate-trends`, `generate-post-image` now import `checkQuota`/`incrementGenerationCount`/`quotaExceededMessage` and gate/increment exactly like `generate-single-post`. `generate-post-image` counts as 1 unit (no weighted-increment support exists in `increment_generation_count` yet) — **follow-up owed**: consider a weighted `p_amount` param for image generation, given it's the most expensive unit per the audit.
 - While restoring quota accounting, discovered `increment_generation_count()` had regressed (see F-016 notes) to always reject service-role callers — fixed in the same pass so this quota gate actually persists usage in production, not just checks it.
-- Deferred: dedicated "quota exceeded" / "successful increment" unit tests per endpoint (owner: unassigned, date: unset, reason: time-boxed this pass to the security-critical ownership/RLS/CORS items; risk: low — the gating code is a direct copy of the already-covered `generate-single-post` pattern, and `supabase/tests/quota_reset.test.sql` covers the shared `increment_generation_count` RPC).
+- **Deferred item now closed (2026-07-08):** added the per-endpoint "quota exceeded" / "successful increment" tests. Each of the four handlers (`repurpose-post`, `inline-rewrite`, `generate-trends`, `generate-post-image`) was refactored to export a testable `handle*` function with `Deno.serve` guarded behind `typeof Deno !== "undefined" && Deno.serve` (same pattern already used by `telemetry/index.ts` and `verify-payment/index.ts`), then covered with a dedicated `*.test.ts` file: `repurpose-post/repurpose-post.test.ts`, `inline-rewrite/inline-rewrite.test.ts`, `generate-trends/generate-trends.test.ts`, `generate-post-image/generate-post-image.test.ts`. Each file asserts: 402 `QUOTA_EXCEEDED` with no provider call and no increment when shared-key quota is exhausted; exactly one increment after a successful shared-key generation; BYOK `key_mode: "always"` bypasses the gate with no increment; and no increment on a failed provider call. 16 new tests, all passing.
 
 ### P0-3 / F-004: Verify Calendar Ownership in `generate-post-image`
 
@@ -282,7 +282,7 @@ npm run test:e2e -- --project=chromium --reporter=line
 Notes:
 
 - `src/pages/Auth.tsx`: `handleGoogle()` now sends `redirect_uri: window.location.origin` (stable) and stashes `nextPath` in `localStorage["auth:oauth_next"]` before redirecting. The post-login effect resolves `from` as `nextPath ?? storedNext ?? location.state.from ?? "/app"` and clears the stored key once consumed. The auto-generated `lovable` client (`src/integrations/lovable/index.ts`, "Do not modify") has no `state` param, hence localStorage.
-- Chromium e2e not run in this pass (no browser available in this shell) — run before release.
+- **2026-07-08: Chromium e2e now run** (a browser is available in this environment — `npm run test:e2e -- --project=chromium --reporter=line`). Full suite: 33/33 passing, including the 4 accessibility (`axe-core`) scans that were previously untested. Running it surfaced and fixed 4 real WCAG AA color-contrast regressions unrelated to F-009 itself — see "Accessibility fixes found while running deferred e2e" below.
 
 ### P1-4 / F-020: Add Payment Verification Tests
 
@@ -582,6 +582,17 @@ Notes:
 
 - Found one remaining inline pattern: `"Admins read all payments"` policy on `public.payments` (from `20260616000000_subscription_tiers.sql`, which predates `is_admin()`'s definition in `20260617000000_admin_comp_grants.sql`). New migration `supabase/migrations/20260707030000_normalize_admin_checks.sql` recreates that one policy using `is_admin()`. Left all other admin-gated functions/policies as-is since they already use `is_admin()`.
 
+## Accessibility Fixes Found While Running Deferred e2e (2026-07-08)
+
+Not audit-register findings (no F-ID) — these surfaced from actually running the Chromium `axe-core` scans that P1-3/F-009 had left deferred. All four are genuine WCAG 2 AA `color-contrast` violations, confirmed with a direct `axe.run()` reproduction of each failing route before fixing:
+
+- **`.auth-divider`** (`src/styles/pages.css`) — the "or" divider on the sign-in page used `--color-text-disabled` (#a8a29e, 2.52:1 on white). Switched to `--color-text-muted` (4.80:1).
+- **Inline date `<strong>` highlights** (`src/pages/Index.tsx`, two occurrences) — leftover dark-theme lime green (`rgba(200,240,154,.85)`, ~1.4:1 against the light card) on the "Your post will be written for **{date}**" / "Day 1 will be **{date}**" hints. Switched to `var(--color-primary)`.
+- **Sandbox-mode banner text and button** (`src/pages/Index.tsx` and `src/pages/CalendarDetail.tsx`, same markup in both) — `var(--color-warning-text)` (#b45309) measured 4.15–4.50:1 against its own tinted background, under or right at the AA line. Switched both to `#92400e` (5.9–6.4:1 against the same backgrounds).
+- **Landing "How It Works" sticky steps** (`src/styles/pages.css`, `.ld-w-hiw-step-item`/`.ld-w-step-badge`) — the non-active scroll-linked steps were dimmed to `opacity: 0.4` for a storytelling effect, which is real body copy (not decorative, unlike the already-excluded `.ld-w-step-num-ghost`), so it fails AA when axe scans the static unscrolled page. Raised to `opacity: 0.85` and darkened the badge from `--color-primary` to `--color-primary-hover` (the *active* badge was also failing at 4.22:1 against its own tinted background even at full opacity, by itself). All three text roles now clear 4.5:1+ at the reduced opacity.
+
+Twelve more `color: var(--color-text-disabled)` call sites remain in `src/styles/pages.css` (lines ~1627, 2030, 2973, 3078, 3462, 3611, 3737, 3782, 3870, 3915, 3990, 4289) that were **not** touched — the e2e suite's four scanned routes didn't exercise them, so each needs its own contrast check before recoloring (some may legitimately be disabled-control text, which WCAG 1.4.3 exempts). Flagged here as a follow-up rather than blind-swept.
+
 ## Positive Verifications
 
 These audit entries require no remediation, but should be preserved by regression tests:
@@ -607,6 +618,6 @@ Use these audit files while resolving related items:
 - [x] `npm run lint` passes with no new warnings.
 - [x] `npm run test:run` completes.
 - [x] `npm run build` completes.
-- [x] Chromium e2e completes or has documented environment-only blocker.
+- [x] Chromium e2e completes (33/33 passing as of 2026-07-08, including the 4 accessibility scans).
 - [x] Supabase/RLS tests pass or have documented local environment blocker.
 - [x] This runbook has completion notes for every resolved item.

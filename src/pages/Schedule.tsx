@@ -178,10 +178,6 @@ export default function Schedule() {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, rows.length]);
 
-  useEffect(() => {
-    if (scheduleError instanceof Error) toast.error(scheduleError.message);
-  }, [scheduleError]);
-
   const sorted = useMemo(() => {
     const arr = [...rows];
     if (sortBy === "date-asc") arr.sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
@@ -469,10 +465,13 @@ export default function Schedule() {
         />
       </Helmet>
       <WorkspacePage size="wide">
-        <div className="sc-head">
+        <div className="sc-head" style={{ marginBottom: 12 }}>
           <h1 className="sc-title">
-            My <em>schedule</em>
+            Publishing <em>queue</em>
           </h1>
+          <p className="text-muted-foreground" style={{ fontSize: 13, marginTop: 4 }}>
+            Copy your posts, publish them manually to your social platforms at the scheduled times, and mark them completed below.
+          </p>
         </div>
 
         <div className="sc-summary" aria-label="Schedule summary">

@@ -19,11 +19,12 @@ const POSTED: Set<string> = new Set([
   "3-4",
 ]);
 
+// Illustrative example numbers only — not live or aggregated user analytics.
 const COUNTER_STATS = [
-  { label: "Avg. Reach", value: 12400, suffix: "" },
-  { label: "Posts Published", value: 284, suffix: "" },
-  { label: "Engagement Rate", value: 7.3, suffix: "%" },
-  { label: "Hours Saved / wk", value: 9, suffix: "h" },
+  { label: "Example: Avg. Reach", value: 12400, suffix: "" },
+  { label: "Example: Posts Published", value: 284, suffix: "" },
+  { label: "Example: Engagement Rate", value: 7.3, suffix: "%" },
+  { label: "Example: Hours Saved / wk", value: 9, suffix: "h" },
 ];
 
 function FeatureA() {
@@ -172,7 +173,12 @@ function FeatureC() {
   }, []);
 
   return (
-    <div ref={gridRef} className="ld-w-stat-grid" role="list" aria-label="Platform analytics">
+    <div
+      ref={gridRef}
+      className="ld-w-stat-grid"
+      role="list"
+      aria-label="Illustrative example results, not live analytics"
+    >
       {COUNTER_STATS.map((s) => (
         <div key={s.label} className="ld-w-stat-card" role="listitem">
           <div className="ld-w-stat-value" aria-live="polite">
@@ -181,6 +187,7 @@ function FeatureC() {
           <div className="ld-w-stat-label">{s.label}</div>
         </div>
       ))}
+      <p className="ld-w-stat-disclaimer">Illustrative example, not a tracked metric.</p>
     </div>
   );
 }
@@ -228,16 +235,16 @@ const FEATURES = [
     eyebrow: "Content Analytics",
     title: "Improve with every post",
     titleEm: "every post",
-    desc: "ContentForge tracks what resonates — which hooks get clicked, which CTAs convert, which platforms grow your audience — and feeds insights back into your next brief.",
+    desc: "ContentForge analyzes your content quality before you publish — providing instant performance predictions for hooks, CTAs, and readability to help you optimize every post.",
     bullets: [
       {
         strong: "Engagement scoring",
-        text: " — each post gets a hook, CTA, and readability score.",
+        text: " — each post gets a client-side hook, CTA, and readability score.",
       },
       { strong: "Trend awareness", text: " — surface trending topics relevant to your niche." },
       {
-        strong: "Historical benchmarks",
-        text: " — compare this week's output against your personal best.",
+        strong: "Optimization suggestions",
+        text: " — receive instant tips to refine your posts for maximum visibility.",
       },
     ],
     visual: <FeatureC />,

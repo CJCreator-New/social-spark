@@ -27,23 +27,35 @@ export default function AuthPage() {
 
   // Preserve a same-origin relative `?next=` (e.g. /.lovable/oauth/consent?...) so
   // the OAuth consent flow returns the user to the consent screen after login.
-  const rawNext = new URLSearchParams(routerLocation.search).get("next");
+  const queryParams = new URLSearchParams(routerLocation.search);
+  const rawNext = queryParams.get("next");
   const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
+  const plan = queryParams.get("plan");
+
+  if (plan && typeof window !== "undefined") {
+    window.localStorage.setItem("auth:pending_plan", plan);
+  }
+
   // Google's redirect_uri must exactly match a registered URI, so it cannot carry
   // `nextPath`. Stash the intended destination in localStorage before redirecting
   // and consume it here once the OAuth round-trip lands the user back on /auth.
   const OAUTH_NEXT_STORAGE_KEY = "auth:oauth_next";
   const storedNext =
     typeof window !== "undefined" ? window.localStorage.getItem(OAUTH_NEXT_STORAGE_KEY) : null;
+  const storedPlan =
+    typeof window !== "undefined" ? window.localStorage.getItem("auth:pending_plan") : null;
+
   const from =
     nextPath ||
     storedNext ||
+    (storedPlan ? "/profile?tab=plan" : null) ||
     (routerLocation.state as { from?: { pathname: string } } | null)?.from?.pathname ||
     "/app";
 
   useEffect(() => {
     if (user) {
       window.localStorage.removeItem(OAUTH_NEXT_STORAGE_KEY);
+      window.localStorage.removeItem("auth:pending_plan");
       navigate(from, { replace: true });
     }
   }, [user, navigate, from]);

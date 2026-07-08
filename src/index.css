@@ -43,20 +43,16 @@
     --input: 20 6% 90%;
     --ring: 18 89% 40%;
 
-    --radius: 1rem;
+    --radius: 0.625rem;
 
-    /* Custom design tokens */
-    --gradient-primary: linear-gradient(135deg, hsl(18 89% 40%) 0%, hsl(30 90% 50%) 100%);
-    --gradient-secondary: linear-gradient(
-      135deg,
-      hsl(18 89% 40% / 0.1) 0%,
-      hsl(30 90% 50% / 0.1) 100%
-    );
+    /* Custom design tokens — gradients retired for flat editorial surfaces */
+    --gradient-primary: none;
+    --gradient-secondary: none;
     --gradient-card: none;
-    --gradient-glow: radial-gradient(ellipse at center, hsl(18 89% 40% / 0.04) 0%, transparent 70%);
+    --gradient-glow: none;
 
-    --shadow-glow: 0 0 40px hsl(18 89% 40% / 0.05);
-    --shadow-card: 0 10px 30px rgba(120, 113, 108, 0.06), 0 1px 3px rgba(120, 113, 108, 0.02);
+    --shadow-glow: none;
+    --shadow-card: 0 1px 2px rgba(120, 113, 108, 0.05);
     --shadow-button: var(--shadow-btn);
 
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -118,9 +114,7 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: var(--font-body);
-    background:
-      radial-gradient(circle at 15% 15%, hsl(var(--primary) / 0.03), transparent 26%),
-      hsl(var(--background));
+    background: hsl(var(--background));
   }
 
   h1,
@@ -167,7 +161,7 @@
 
   /* ── Warm card surfaces ── */
   .page-surface {
-    @apply relative overflow-hidden rounded-2xl border border-border bg-card;
+    @apply relative overflow-hidden rounded-xl border border-border bg-card;
     box-shadow: var(--shadow-card);
   }
 
@@ -211,7 +205,7 @@
 
   /* ── Typography helpers ── */
   .section-kicker {
-    @apply text-[10px] font-semibold uppercase tracking-[0.12em] text-primary;
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground;
   }
 
   .section-hint {
@@ -235,7 +229,7 @@
 
   /* ── Warm primary CTA button ── */
   .control-button {
-    @apply inline-flex items-center justify-center rounded-full border-0 px-5 py-2.5 text-sm font-semibold text-primary-foreground;
+    @apply inline-flex items-center justify-center rounded-lg border-0 px-5 py-2.5 text-sm font-semibold text-primary-foreground;
     background-color: hsl(var(--primary));
     box-shadow: var(--shadow-btn);
     transition:
@@ -253,28 +247,14 @@
     transform: scale(0.97);
   }
 
-  /* ── Gradient text (brand accent) ── */
+  /* ── Brand accent text (formerly gradient-clipped; now flat editorial) ── */
   .gradient-text {
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: hsl(var(--primary));
   }
 
-  /* ── Warm hover-glow effect (subtle) ── */
+  /* ── Hover-glow retired; class kept as a no-op for existing markup ── */
   .glow-effect {
     @apply relative;
-  }
-
-  .glow-effect::after {
-    content: "";
-    @apply absolute -inset-1 rounded-xl opacity-0 transition-opacity duration-300 -z-10;
-    background: radial-gradient(ellipse at center, hsl(var(--primary) / 0.15), transparent 70%);
-    filter: blur(8px);
-  }
-
-  .glow-effect:hover::after {
-    @apply opacity-100;
   }
 
   /* ── Platform badge ── */
@@ -299,49 +279,12 @@ vite-error-overlay {
 }
 
 @layer utilities {
-  .animate-float {
-    animation: float 6s ease-in-out infinite;
-  }
-
-  @keyframes float {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-10px);
-    }
-  }
-
-  .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
-
-  @keyframes pulse-glow {
-    0%,
-    100% {
-      box-shadow: 0 0 20px hsl(199 89% 48% / 0.2);
-    }
-    50% {
-      box-shadow: 0 0 40px hsl(199 89% 48% / 0.4);
-    }
-  }
-
+  /* Ambient float/glow/gradient animations retired — classes kept as no-ops
+     so existing markup needs no changes. */
+  .animate-float,
+  .animate-pulse-glow,
   .animate-gradient {
-    background-size: 200% 200%;
-    animation: gradient-shift 8s ease infinite;
-  }
-
-  @keyframes gradient-shift {
-    0% {
-      background-position: 0% 50%;
-    }
-    50% {
-      background-position: 100% 50%;
-    }
-    100% {
-      background-position: 0% 50%;
-    }
+    animation: none;
   }
 
   .text-balance {
@@ -360,20 +303,5 @@ vite-error-overlay {
     position: relative;
     border: 1px solid var(--border);
     box-shadow: var(--shadow-card);
-  }
-
-  .glass-refraction::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.08), transparent);
-    -webkit-mask:
-      linear-gradient(var(--color-surface) 0 0) content-box,
-      linear-gradient(var(--color-surface) 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
   }
 }

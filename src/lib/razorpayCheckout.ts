@@ -1,3 +1,4 @@
+import { APP_NAME } from "@/constants/branding";
 import { supabase } from "@/integrations/supabase/client";
 import { WARM_PALETTE } from "@/lib/theme";
 import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
@@ -150,7 +151,7 @@ export async function startRazorpayCheckout(params: CheckoutParams): Promise<Che
       amount: order.amount,
       currency: order.currency,
       order_id: order.order_id,
-      name: params.name || "Social Spark",
+      name: params.name || APP_NAME,
       description: params.description || order.label,
       prefill: params.prefill,
       theme: { color: WARM_PALETTE.checkout },

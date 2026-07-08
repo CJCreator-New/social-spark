@@ -15,7 +15,9 @@ import {
   quotaExceededMessage,
 } from "../_shared/promptHelpers.ts";
 
-Deno.serve(async (req: Request) => {
+// Exported for Vitest (see generate-trends.test.ts); Deno.serve is guarded below,
+// same pattern as telemetry/index.ts and verify-payment/index.ts.
+export async function handleGenerateTrends(req: Request): Promise<Response> {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: getCorsHeaders(req.headers.get("origin")) });
 
@@ -146,4 +148,8 @@ Platform: ${platform}`;
   } catch (e) {
     return errorResponse("generate-trends", e);
   }
-});
+}
+
+if (typeof Deno !== "undefined" && Deno.serve) {
+  Deno.serve(handleGenerateTrends);
+}

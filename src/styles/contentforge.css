@@ -45,30 +45,11 @@
    BACKGROUND EFFECTS
    ───────────────────────────────────────────────────────────────────────── */
 
-.cf-app .bg-grid {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  /* Subtle warm grid texture */
-  background-image:
-    linear-gradient(rgba(120, 113, 108, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(120, 113, 108, 0.03) 1px, transparent 1px);
-  background-size: 52px 52px;
-}
-
+/* Decorative grid/orb backdrops retired — flat editorial background.
+   Classes kept (hidden) so existing markup needs no changes. */
+.cf-app .bg-grid,
 .cf-app .bg-glow {
-  position: fixed;
-  width: 700px;
-  height: 700px;
-  border-radius: 50%;
-  /* Warm orange glow replacing lime-green */
-  background: radial-gradient(circle, rgba(194, 65, 12, 0.03) 0%, transparent 65%);
-  pointer-events: none;
-  top: -300px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 0;
+  display: none;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -92,10 +73,10 @@
 }
 
 .cf-app .brand-eyebrow {
-  font-size: 10px;
-  letter-spacing: 0.22em;
+  font-size: 11px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--text3);
   font-weight: 500;
   margin-bottom: 12px;
   display: flex;
@@ -108,7 +89,7 @@
   display: block;
   width: 22px;
   height: 1px;
-  background: var(--accent);
+  background: var(--border2);
 }
 
 .cf-app .brand-title {
@@ -178,9 +159,7 @@
   background: var(--accent);
   border-color: var(--accent);
   color: var(--color-surface);
-  box-shadow:
-    0 0 0 4px rgba(194, 65, 12, 0.12),
-    0 0 12px rgba(194, 65, 12, 0.2);
+  box-shadow: 0 0 0 4px rgba(194, 65, 12, 0.12);
 }
 
 .cf-app .sdot.done::after {
@@ -219,7 +198,7 @@
 }
 
 .cf-app .sline.done {
-  background: linear-gradient(90deg, rgba(194, 65, 12, 0.4), rgba(194, 65, 12, 0.15));
+  background: rgba(194, 65, 12, 0.35);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -260,25 +239,8 @@
   transition: box-shadow 0.2s;
 }
 
-/* Top-edge accent line on hover */
-.cf-app .card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(194, 65, 12, 0.35), transparent);
-  opacity: 0;
-  transition: opacity 0.25s;
-}
-
-.cf-app .card:hover::before {
-  opacity: 1;
-}
-
 .cf-app .card:hover {
-  box-shadow: 0 8px 24px rgba(120, 113, 108, 0.1);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .cf-app .csect {
@@ -301,7 +263,7 @@
 
 .cf-app .flabel {
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text2);
   margin-bottom: 9px;
@@ -387,11 +349,10 @@
 }
 
 .cf-app .chip.on {
-  background: linear-gradient(135deg, rgba(194, 65, 12, 0.18) 0%, rgba(194, 65, 12, 0.08) 100%);
+  background: var(--adim);
   border-color: rgba(194, 65, 12, 0.45);
   color: var(--accent);
-  font-weight: 300;
-  box-shadow: inset 0 0 0 1px rgba(194, 65, 12, 0.15);
+  font-weight: 400;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -421,26 +382,12 @@
 .cf-app .ind-card:hover {
   border-color: var(--border2);
   background: var(--surface2);
-  transform: scale(1.02);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .cf-app .ind-card.on {
   border-color: rgba(194, 65, 12, 0.45);
   background: var(--adim);
-  box-shadow:
-    0 0 12px rgba(194, 65, 12, 0.08),
-    inset 0 1px 0 rgba(194, 65, 12, 0.12);
-}
-
-.cf-app .ind-card.on::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(194, 65, 12, 0.6), transparent);
 }
 
 .cf-app .ind-card:focus-visible {
@@ -491,26 +438,12 @@
 
 .cf-app .plat-card:hover {
   border-color: var(--border2);
-  transform: scale(1.02);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .cf-app .plat-card.on {
   border-color: rgba(194, 65, 12, 0.45);
   background: var(--adim);
-  box-shadow:
-    0 0 12px rgba(194, 65, 12, 0.08),
-    inset 0 1px 0 rgba(194, 65, 12, 0.12);
-}
-
-.cf-app .plat-card.on::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(194, 65, 12, 0.6), transparent);
 }
 
 .cf-app .plat-card.on::after {
@@ -522,7 +455,6 @@
   height: 6px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 6px rgba(194, 65, 12, 0.4);
 }
 
 .cf-app .plat-card:focus-visible {
@@ -743,33 +675,8 @@
   color: hsl(var(--primary-foreground));
 }
 
-/* Shimmer sweep pseudo-element */
-.cf-app .btn-p::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 60%;
-  height: 100%;
-  background: linear-gradient(
-    105deg,
-    transparent 20%,
-    rgba(255, 255, 255, 0.35) 50%,
-    transparent 80%
-  );
-  transition: none;
-  pointer-events: none;
-}
-
-.cf-app .btn-p:hover::before {
-  left: 160%;
-  transition: left 0.45s ease;
-}
-
 .cf-app .btn-p:hover {
-  background: var(--color-highlight-lime);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 18px rgba(194, 65, 12, 0.35);
+  background: var(--color-primary-hover);
 }
 
 .cf-app .btn-g {
@@ -1146,7 +1053,7 @@
 
 .cf-app .blabel {
   font-size: 9px;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text3);
   margin-bottom: 7px;
@@ -1312,7 +1219,7 @@
 
 .cf-app .time-label {
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text2);
   font-weight: 500;
@@ -1447,7 +1354,7 @@
 
 .cf-app .reformat-label {
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text2);
   font-weight: 500;
@@ -1572,7 +1479,7 @@
 
 .cf-app .recent-eyebrow {
   font-size: 10px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text2);
   font-weight: 500;
@@ -1777,7 +1684,7 @@
 
 .cf-app .vsp-eyebrow {
   font-size: 9px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text3);
   margin-bottom: 8px;
@@ -1902,15 +1809,13 @@
   overflow: hidden;
 }
 
-/* Subtle lift on hover */
 .cf-app .dtab:hover {
-  transform: translateY(-1px);
   background: var(--surface2);
 }
 
-/* Active tab: gradient bg, accent bottom bar, slightly larger number */
+/* Active tab: flat accent tint, solid bottom bar, slightly larger number */
 .cf-app .dtab.on {
-  background: linear-gradient(135deg, rgba(194, 65, 12, 0.1) 0%, rgba(194, 65, 12, 0.04) 100%);
+  background: var(--adim);
 }
 
 .cf-app .dtab.on::before {
@@ -1919,14 +1824,9 @@
   bottom: 0;
   left: 10%;
   right: 10%;
-  height: 3px;
-  border-radius: 3px 3px 0 0;
-  background: linear-gradient(
-    90deg,
-    rgba(194, 65, 12, 0.45) 0%,
-    var(--accent) 50%,
-    rgba(194, 65, 12, 0.45) 100%
-  );
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--accent);
 }
 
 .cf-app .dtab.on .dtab-n {
@@ -1943,7 +1843,6 @@
   height: 5px;
   border-radius: 50%;
   background: rgba(194, 65, 12, 0.55);
-  box-shadow: 0 0 5px rgba(194, 65, 12, 0.4);
   font-size: 0;
 }
 
@@ -1951,16 +1850,11 @@
    ENHANCEMENTS — POST BODY SECTIONS (hook, body, CTA)
    ───────────────────────────────────────────────────────────────────────── */
 
-/* Hook: thicker accent border, gradient bg, larger bolder text */
+/* Hook: thicker accent border, flat tint, larger bolder text */
 .cf-app .hook-block {
   border-left-width: 3px;
   border-left-color: rgba(194, 65, 12, 0.55);
-  background: linear-gradient(
-    to right,
-    rgba(194, 65, 12, 0.05) 0%,
-    rgba(194, 65, 12, 0.015) 55%,
-    transparent 100%
-  );
+  background: var(--adim2);
 }
 
 .cf-app .hook-text {
@@ -1969,15 +1863,13 @@
   font-weight: 400;
 }
 
-/* Body text: subtle reading-mode gradient at the top edge */
 .cf-app .body-text {
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.012) 0%, transparent 28px);
   padding-top: 3px;
 }
 
-/* CTA block: warmer lime tint + floating CTA label badge */
+/* CTA block: flat accent tint + floating CTA label badge */
 .cf-app .cta-block {
-  background: linear-gradient(135deg, rgba(194, 65, 12, 0.07) 0%, rgba(194, 65, 12, 0.028) 100%);
+  background: var(--adim2);
   border-color: rgba(194, 65, 12, 0.2);
   position: relative;
   padding-top: 24px;
@@ -1989,7 +1881,7 @@
   top: -1px;
   left: 12px;
   font-size: 8px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.08em;
   font-weight: 600;
   color: rgba(194, 65, 12, 0.65);
   background: rgba(194, 65, 12, 0.1);
@@ -2010,10 +1902,9 @@
 }
 
 .cf-app .cpbtn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface2);
   border-color: rgba(194, 65, 12, 0.42);
   color: var(--accent);
-  transform: translateY(-1px);
 }
 
 .cf-app .dlbtn {
@@ -2021,10 +1912,9 @@
 }
 
 .cf-app .dlbtn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface2);
   border-color: rgba(194, 65, 12, 0.42);
   color: var(--accent);
-  transform: translateY(-1px);
 }
 
 .cf-app .pin-btn {
@@ -2032,24 +1922,21 @@
 }
 
 .cf-app .pin-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface2);
   border-color: rgba(194, 65, 12, 0.48);
   color: var(--accent);
-  transform: translateY(-1px);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
    ENHANCEMENTS — TWEAK MENU
    ───────────────────────────────────────────────────────────────────────── */
 
+/* Dropdown = true elevation: light surface with a real (but restrained) shadow.
+   (Was a dark-glass override that put dark text on a near-black backdrop.) */
 .cf-app .tweak-menu {
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  background: rgba(22, 24, 36, 0.93);
-  border-color: rgba(194, 65, 12, 0.15);
-  box-shadow:
-    0 10px 36px rgba(0, 0, 0, 0.65),
-    0 0 0 1px rgba(194, 65, 12, 0.06);
+  background: var(--color-surface);
+  border-color: var(--border2);
+  box-shadow: var(--shadow-2);
 }
 
 @keyframes cfMenuItemIn {
@@ -2159,7 +2046,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: 12px 18px;
@@ -2180,7 +2067,7 @@
 
 .cf-app .week-sum-label {
   font-size: 9px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text2);
   font-weight: 500;

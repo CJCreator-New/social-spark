@@ -78,6 +78,7 @@ import e2eStore from "@/lib/e2eStore";
 const FeedbackModal = lazy(() => import("@/components/FeedbackModal"));
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import { ErrorState } from "@/components/ErrorState";
+import { SkeletonList } from "@/components/SkeletonList";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Database, Json } from "@/integrations/supabase/types";
 import type { Post } from "@/components/wizard/constants";
@@ -1750,7 +1751,9 @@ export default function CalendarDetail() {
   if (loading)
     return (
       <WorkspacePage size="wide">
-        <div className="cd-inner">Loading…</div>
+        <div className="cd-inner">
+          <SkeletonList rows={5} />
+        </div>
       </WorkspacePage>
     );
 
@@ -1769,7 +1772,7 @@ export default function CalendarDetail() {
             padding: "10px 16px",
             textAlign: "center",
             fontSize: "12px",
-            color: "var(--color-warning-text)",
+            color: "#92400e",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
@@ -1789,7 +1792,7 @@ export default function CalendarDetail() {
             style={{
               background: "color-mix(in srgb, var(--color-warning-text) 14%, transparent)",
               border: "1px solid color-mix(in srgb, var(--color-warning-text) 32%, transparent)",
-              color: "var(--color-warning-text)",
+              color: "#92400e",
               padding: "2px 8px",
               borderRadius: "4px",
               cursor: "pointer",
@@ -2606,7 +2609,7 @@ export default function CalendarDetail() {
                     marginTop: 10,
                     padding: "12px 14px",
                     background: "color-mix(in srgb, var(--color-surface) 2%, transparent)",
-                    border: "1px dashed rgba(200,240,154,0.2)",
+                    border: "1px dashed var(--border2)",
                     borderRadius: 10,
                   }}
                 >

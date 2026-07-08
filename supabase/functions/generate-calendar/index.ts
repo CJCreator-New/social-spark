@@ -100,7 +100,10 @@ Deno.serve(async (req: Request) => {
     }
 
     // Trend-aware generation: fetch top trending topics for this industry/platform
-    const trendingTopics = await getTrendingTopics(payload.industry, payload.platform);
+    const dbTrending = await getTrendingTopics(payload.industry, payload.platform);
+    const trendingTopics = (payload.trendingTopics && payload.trendingTopics.length > 0)
+      ? payload.trendingTopics
+      : dbTrending;
 
     // Phase D: Topic enrichment pre-call (calendar only)
     const enrichedPayload = { ...payload, trendingTopics };

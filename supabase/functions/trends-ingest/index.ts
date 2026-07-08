@@ -38,7 +38,16 @@ Deno.serve(async (req: Request) => {
       });
       const { data: { user } } = await tempClient.auth.getUser();
       if (user) {
-        isAuthorized = true;
+        // Non-cron callers must be admins — this is a full trend-table
+        // re-ingest, not a read, so any-authenticated-user was over-broad.
+        // Same has_role RPC pattern used by useIsAdmin/admin RLS policies.
+        const { data: isAdmin, error: roleError } = await tempClient.rpc("has_role", {
+          _user_id: user.id,
+          _role: "admin",
+        });
+        if (!roleError && isAdmin === true) {
+          isAuthorized = true;
+        }
       }
     }
 
@@ -68,21 +77,46 @@ Deno.serve(async (req: Request) => {
       { keyword: "Rust Web Frameworks", volume: 9500, category: "Software Development", source: "GitHub" },
     ];
 
-    // Perform the upsert to update existing or insert new keywords
-    const { data: insertedData, error: dbError } = await adminClient
-      .from("trends")
-      .upsert(simulatedTrends, { onConflict: "keyword,source" })
-      .select();
+    // Explicitly stamp last_seen on every row: DEFAULT now() only fires on
+    // INSERT, so without this, still-trending keywords that get re-upserted
+    // (UPDATE path) would keep a stale last_seen and be wrongly swept up by
+    // the 14-day TTL cleanup in cleanup-media's deleteExpiredTrends.
+    const now = new Date().toISOString();
+    const rowsToUpsert = simulatedTrends.map((t) => ({ ...t, last_seen: now }));
 
-    if (dbError) {
-      console.error("Database error in trends-ingest:", dbError);
-      return jsonResponse({ error: "Failed to store ingested trends." }, 500);
+    // Chunk the upsert per-source so one bad row in one source's batch
+    // doesn't fail the entire ingest with a single 500.
+    const bySource = new Map<string, typeof rowsToUpsert>();
+    for (const row of rowsToUpsert) {
+      const bucket = bySource.get(row.source) ?? [];
+      bucket.push(row);
+      bySource.set(row.source, bucket);
+    }
+
+    const insertedData: unknown[] = [];
+    const failures: { source: string; error: string }[] = [];
+    for (const [source, rows] of bySource) {
+      const { data, error } = await adminClient
+        .from("trends")
+        .upsert(rows, { onConflict: "keyword,source" })
+        .select();
+      if (error) {
+        console.error(`Database error in trends-ingest for source "${source}":`, error);
+        failures.push({ source, error: error.message });
+        continue;
+      }
+      if (data) insertedData.push(...data);
+    }
+
+    if (insertedData.length === 0 && failures.length > 0) {
+      return jsonResponse({ error: "Failed to store ingested trends.", failures }, 500);
     }
 
     return jsonResponse({
       success: true,
-      message: `Successfully ingested ${insertedData?.length || 0} trends.`,
+      message: `Successfully ingested ${insertedData.length} trends.`,
       data: insertedData,
+      ...(failures.length > 0 ? { failures } : {}),
     });
   } catch (e) {
     console.error("trends-ingest error:", e);

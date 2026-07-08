@@ -1,68 +1,39 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { PLAN_TIERS, type PlanTierId } from "@/constants/plans";
 
 gsap.registerPlugin(ScrollTrigger);
 
-const TIERS = [
-  {
-    id: "free",
-    name: "Free",
-    monthly: "Free",
-    annual: "Free",
+const TIER_META: Record<
+  PlanTierId,
+  { desc: string; cta: string; ctaTo: string; recommended: boolean }
+> = {
+  free: {
     desc: "Perfect for solo creators exploring AI content generation.",
-    features: ["3 posts per week", "2 social platforms", "Basic brand voice"],
     cta: "Get started",
     ctaTo: "/auth",
     recommended: false,
   },
-  {
-    id: "pro",
-    name: "Pro",
-    monthly: "$29",
-    annual: "$23",
-    desc: "For content creators who want a full week of posts, every week.",
-    features: [
-      "Unlimited posts",
-      "All 6 platforms",
-      "Advanced brand voice",
-      "Content calendar export",
-      "Performance analytics",
-      "Priority support",
-      "Custom brief templates",
-    ],
-    cta: "Start Pro free",
+  starter: {
+    desc: "For growing creators who want consistent platform updates.",
+    cta: "Choose Starter",
+    ctaTo: "/auth?plan=starter",
+    recommended: false,
+  },
+  pro: {
+    desc: "For content teams and creators with high-volume pipelines.",
+    cta: "Get Pro Now",
     ctaTo: "/auth?plan=pro",
     recommended: true,
   },
-  {
-    id: "team",
-    name: "Team",
-    monthly: "$79",
-    annual: "$63",
-    desc: "For agencies and teams managing multiple brands.",
-    features: [
-      "Everything in Pro",
-      "Up to 5 brand profiles",
-      "Team collaboration",
-      "Client export packs",
-      "API access",
-      "Dedicated onboarding",
-      "SLA support",
-      "Custom integrations",
-      "White-label exports",
-      "Advanced analytics",
-    ],
-    cta: "Contact sales",
-    ctaTo: "/auth?plan=team",
-    recommended: false,
-  },
-];
+};
+
+const TIERS = PLAN_TIERS.map((tier) => ({ ...tier, ...TIER_META[tier.id] }));
 
 export default function Pricing() {
   const sectionRef = useRef<HTMLElement>(null);
-  const [annual, setAnnual] = useState(false);
 
   useEffect(() => {
     if (!sectionRef.current) return;
@@ -110,19 +81,6 @@ export default function Pricing() {
     };
   }, []);
 
-  const toggleBilling = () => {
-    const noMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!noMotion) {
-      const amounts = document.querySelectorAll(".ld-w-price-big");
-      gsap.fromTo(
-        amounts,
-        { opacity: 0, y: 4 },
-        { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" }
-      );
-    }
-    setAnnual((prev) => !prev);
-  };
-
   return (
     <section
       ref={sectionRef}
@@ -137,21 +95,6 @@ export default function Pricing() {
             Simple, <em>transparent</em> pricing
           </h2>
           <p className="ld-w-pricing-sub">Start free. Upgrade when you need it. No hidden fees.</p>
-
-          {/* Billing toggle */}
-          <button
-            className={`ld-w-billing-toggle${annual ? " annual" : ""}`}
-            onClick={toggleBilling}
-            aria-pressed={annual}
-            aria-label={
-              annual ? "Switch to monthly billing" : "Switch to annual billing (save 20%)"
-            }
-          >
-            <span>Monthly</span>
-            <div className="ld-w-toggle-track" aria-hidden="true" />
-            <span>Annual</span>
-            {!annual && <span className="ld-w-save-badge">Save 20%</span>}
-          </button>
         </div>
 
         <div className="ld-w-pricing-grid" role="list">
@@ -175,7 +118,7 @@ export default function Pricing() {
 
               <div className="ld-w-price-amount">
                 <span className="ld-w-price-big">
-                  {tier.id === "free" ? "Free" : annual ? tier.annual : tier.monthly}
+                  {tier.price}
                 </span>
                 {tier.id !== "free" && <span className="ld-w-price-period">/ month</span>}
               </div>
