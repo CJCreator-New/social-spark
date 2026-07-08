@@ -778,37 +778,29 @@ export async function checkRateLimit(
       return { allowed: true, remaining: config.maxRequests, resetAt: Date.now() + config.windowMs };
     }
 
-    // @ts-ignore - Deno ESM import resolved at runtime
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-
     const now = new Date();
     const windowStart = new Date(now.getTime() - config.windowMs);
+    const baseUrl = SUPABASE_URL.replace(/\/$/, "");
 
-    // Get current count of events in the window
-    const { count, error: countError } = await supabase
-      .from("rate_limit_events")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("endpoint", endpoint)
-      .gte("created_at", windowStart.toISOString());
+    // Get current events in the window
+    const queryUrl = `${baseUrl}/rest/v1/rate_limit_events?select=created_at&user_id=eq.${encodeURIComponent(userId)}&endpoint=eq.${encodeURIComponent(endpoint)}&created_at=gte.${encodeURIComponent(windowStart.toISOString())}&order=created_at.asc`;
+    const queryRes = await fetch(queryUrl, {
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+      },
+    });
 
-    if (countError) throw countError;
+    if (!queryRes.ok) {
+      throw new Error(`Failed to query rate limit events (${queryRes.status})`);
+    }
 
-    const currentCount = count || 0;
+    const events = await queryRes.json();
+    const currentCount = Array.isArray(events) ? events.length : 0;
+
     if (currentCount >= config.maxRequests) {
-      // Find the oldest event in the current window to estimate reset time
-      const { data: oldestEvent } = await supabase
-        .from("rate_limit_events")
-        .select("created_at")
-        .eq("user_id", userId)
-        .eq("endpoint", endpoint)
-        .gte("created_at", windowStart.toISOString())
-        .order("created_at", { ascending: true })
-        .limit(1);
-
-      const oldestTime = oldestEvent && oldestEvent[0]
-        ? new Date(oldestEvent[0].created_at).getTime()
+      const oldestTime = events[0] && events[0].created_at
+        ? new Date(events[0].created_at).getTime()
         : now.getTime();
       const resetAt = oldestTime + config.windowMs;
 
@@ -816,24 +808,32 @@ export async function checkRateLimit(
     }
 
     // Insert new event
-    const { error: insertError } = await supabase
-      .from("rate_limit_events")
-      .insert({
+    const insertRes = await fetch(`${baseUrl}/rest/v1/rate_limit_events`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+      },
+      body: JSON.stringify({
         user_id: userId,
         endpoint,
         created_at: now.toISOString(),
-      });
+      }),
+    });
 
-    if (insertError) throw insertError;
+    if (!insertRes.ok) {
+      throw new Error(`Failed to insert rate limit event (${insertRes.status})`);
+    }
 
     // Fire-and-forget prune expired rate limit events
-    supabase
-      .from("rate_limit_events")
-      .delete()
-      .lt("created_at", windowStart.toISOString())
-      .then(({ error }) => {
-        if (error) console.warn("Failed to prune expired rate limit events", error);
-      });
+    fetch(`${baseUrl}/rest/v1/rate_limit_events?created_at=lt.${encodeURIComponent(windowStart.toISOString())}`, {
+      method: "DELETE",
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+      },
+    }).catch((err) => console.warn("Failed to prune expired rate limit events", err));
 
     return {
       allowed: true,
