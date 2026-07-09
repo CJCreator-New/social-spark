@@ -17,6 +17,8 @@ vi.mock("@/lib/insights/hookCtaInsights", () => ({
   fetchHookCtaInsights: (...args: unknown[]) => fetchHookCtaInsightsMock(...args),
 }));
 
+import { MemoryRouter } from "react-router-dom";
+
 import Insights from "../Insights";
 
 function renderInsights() {
@@ -25,7 +27,9 @@ function renderInsights() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <Insights />
+      <MemoryRouter>
+        <Insights />
+      </MemoryRouter>
     </QueryClientProvider>
   );
 }

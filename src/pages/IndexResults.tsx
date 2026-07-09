@@ -88,7 +88,7 @@ interface IndexResultsProps {
   setPostsWithHistory: (p: Post[] | ((prev: Post[]) => Post[])) => void;
   setLockedDays: (s: Set<number>) => void;
   setError: (err: string) => void;
-  generationMeta: { inferredTopics?: boolean } | null;
+  generationMeta: { inferredTopics?: boolean; source?: "ai" | "template_fallback" } | null;
   weekStartDate: Date;
   toggleLockedDay: (day: number) => void;
   handleDragStart: (e: React.DragEvent<HTMLElement>, index: number) => void;
@@ -274,6 +274,20 @@ export function IndexResults({
   return (
     <div className="step4-layout relative">
       <div className="step4-main" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {generationMeta?.source === "template_fallback" && !sampleMode && (
+          <div
+            className="sample-banner"
+            style={{ marginBottom: 0 }}
+            role="status"
+            data-testid="template-fallback-banner"
+          >
+            <div className="sample-banner-text">
+              <strong>Template fallback content.</strong> Live AI generation was unavailable, so
+              this calendar was generated locally from templates — not by the AI model. Results
+              may be lower quality; try regenerating once AI generation is available.
+            </div>
+          </div>
+        )}
         {generationMeta?.inferredTopics && !sampleMode && (
           <div className="sample-banner" style={{ marginBottom: 0 }}>
             <div className="sample-banner-text">

@@ -124,7 +124,7 @@ describe("Index — generation offline / network error", () => {
     await new Promise((resolve) => setTimeout(resolve, 400));
   });
 
-  it("falls back to the local generator when the AI service returns a 500", async () => {
+  it("falls back to the local generator when the AI service returns a 500 (unclassified error) and marks the result as template fallback", async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 500,
@@ -152,8 +152,115 @@ describe("Index — generation offline / network error", () => {
       { timeout: 5000 }
     );
 
+    // Persistent marker: the results screen should carry a non-dismissable
+    // "template fallback" banner distinguishing this from real AI content.
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("template-fallback-banner")).toBeInTheDocument();
+      },
+      { timeout: 5000 }
+    );
+
     // Drain the fallback's internal setStep(4) timeout before unmounting so it
     // can't fire against the wizard store during a later test.
     await new Promise((resolve) => setTimeout(resolve, 400));
+  });
+
+  it("does NOT fall back to local generation when the server reports 'AI is not configured.' (500) — surfaces a blocked banner instead", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: "AI is not configured." }),
+    });
+
+    renderIndex();
+    useWizardStore.getState().setStep(2);
+
+    await waitFor(
+      () => {
+        expect(screen.getByRole("button", { name: /generate/i })).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /generate/i }));
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("generation-blocked-banner")).toBeInTheDocument();
+      },
+      { timeout: 5000 }
+    );
+
+    expect(toast.warning).not.toHaveBeenCalledWith(
+      "Live AI generation is unavailable right now, so a local fallback version was generated."
+    );
+  });
+
+  it("does NOT fall back to local generation when the platform provider waterfall is exhausted (503) — surfaces a blocked banner instead", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: () =>
+        Promise.resolve({ error: "All platform AI providers are currently unavailable." }),
+    });
+
+    renderIndex();
+    useWizardStore.getState().setStep(2);
+
+    await waitFor(
+      () => {
+        expect(screen.getByRole("button", { name: /generate/i })).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /generate/i }));
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("generation-blocked-banner")).toBeInTheDocument();
+      },
+      { timeout: 5000 }
+    );
+
+    expect(toast.warning).not.toHaveBeenCalledWith(
+      "Live AI generation is unavailable right now, so a local fallback version was generated."
+    );
+  });
+
+  it("does NOT fall back to local generation on QUOTA_EXCEEDED (402)", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 402,
+      json: () =>
+        Promise.resolve({
+          error: "QUOTA_EXCEEDED",
+          message: "You have used all your free generations. Upgrade or add your own API key.",
+        }),
+    });
+
+    renderIndex();
+    useWizardStore.getState().setStep(2);
+
+    await waitFor(
+      () => {
+        expect(screen.getByRole("button", { name: /generate/i })).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /generate/i }));
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("generation-blocked-banner")).toBeInTheDocument();
+      },
+      { timeout: 5000 }
+    );
+
+    expect(toast.warning).not.toHaveBeenCalledWith(
+      "Live AI generation is unavailable right now, so a local fallback version was generated."
+    );
   });
 });

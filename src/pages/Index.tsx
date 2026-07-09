@@ -54,7 +54,11 @@ import {
 } from "@/lib/postPerformanceScore";
 import { createSeedFromPost, storeSeed, readAndClearSeed } from "@/lib/seedFromPost";
 import { isEnabled } from "@/lib/featureFlags";
-import { buildBrandMemoryPrompt, generateWithFallback } from "@/lib/brandMemory";
+import {
+  buildBrandMemoryPrompt,
+  generateWithFallback,
+  isNonFallbackError,
+} from "@/lib/brandMemory";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import { WelcomeBanner } from "@/components/WelcomeBanner";
 import type { Database, Json } from "@/integrations/supabase/types";
@@ -614,7 +618,14 @@ const Index = () => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showPerformance, setShowPerformance] = useState(false);
   const [brandMemory, setBrandMemory] = useState<BrandMemory | null>(null);
-  const [generationMeta, setGenerationMeta] = useState<{ inferredTopics?: boolean } | null>(null);
+  const [generationMeta, setGenerationMeta] = useState<{
+    inferredTopics?: boolean;
+    source?: "ai" | "template_fallback";
+  } | null>(null);
+  const [generationBlocked, setGenerationBlocked] = useState<{
+    reason: string;
+    message: string;
+  } | null>(null);
   const [showValidation, setShowValidation] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showFloatingButton, setShowFloatingButton] = useState(false);
@@ -1320,6 +1331,7 @@ const Index = () => {
     generatingRef.current = true;
     setIsGenerating(true);
     setLastGenerationError(null);
+    setGenerationBlocked(null);
     if (typeof telemetry?.sendEvent === "function")
       telemetry.sendEvent("generate_start", { user: user?.id, mode: form.mode });
     setStep(3);
@@ -1380,7 +1392,8 @@ const Index = () => {
         : fallbackPosts) as unknown as Post[];
       setGenStep(GEN_LABELS.length);
       setPostsWithHistory(result);
-      setGenerationMeta(null);
+      setGenerationMeta({ source: "template_fallback" });
+      setGenerationBlocked(null);
       setActiveDay(0);
       const seedTimes: Record<string, string> = {};
       for (const r of result)
@@ -1623,7 +1636,8 @@ const Index = () => {
       setGenStep(GEN_LABELS.length);
       setPostsWithHistory(result);
       setActiveDay(0);
-      setGenerationMeta({ inferredTopics });
+      setGenerationMeta({ inferredTopics, source: "ai" });
+      setGenerationBlocked(null);
       // Seed day-optimized default times per post (keyed by post.day)
       const seedTimes: Record<string, string> = {};
       for (const r of result)
@@ -1661,6 +1675,27 @@ const Index = () => {
             action: { label: "See plans", onClick: () => navigate("/profile?tab=plan") },
           });
         }
+
+        // Non-fallback errors (availability/configuration/quota) are terminal —
+        // do NOT silently substitute mock/template content. Surface a blocking
+        // banner instead so it's unmistakable that no post was generated.
+        if (isNonFallbackError(msg)) {
+          setLastGenerationError(err);
+          setGenerationBlocked({ reason: msg, message: msg });
+          log.error(`Generation blocked (non-fallback error)`, err, {
+            mode: form.mode,
+            reason: msg,
+          });
+          if (typeof telemetry?.sendEvent === "function")
+            telemetry.sendEvent("generate_blocked", {
+              user: user?.id,
+              mode: form.mode,
+              reason: msg,
+            });
+          setStep(2);
+          return;
+        }
+
         localFallback(msg);
         return;
       }
@@ -3469,6 +3504,34 @@ const Index = () => {
                   </div>
                 </div>
 
+                {generationBlocked && (
+                  <div className="err-box" role="alert" data-testid="generation-blocked-banner">
+                    <strong>No post was generated.</strong> Live AI generation is currently
+                    unavailable ({generationBlocked.reason}). We did not substitute local/template
+                    content for this request — please try again shortly, or contact support if
+                    this persists.
+                    <div style={{ marginTop: "10px", fontSize: "12px", opacity: 0.8 }}>
+                      <button
+                        onClick={() => generate(true)}
+                        disabled={isGenerating}
+                        style={{
+                          background: "hsl(var(--primary) / 0.1)",
+                          border: "1px solid hsl(var(--primary) / 0.3)",
+                          color: "hsl(var(--primary))",
+                          padding: "5px 10px",
+                          borderRadius: "4px",
+                          cursor: isGenerating ? "not-allowed" : "pointer",
+                          opacity: isGenerating ? 0.6 : 1,
+                          fontSize: "12px",
+                          fontFamily: "var(--font-body)",
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        {isGenerating ? "Retrying..." : "Try again"}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {error && (
                   <div className="err-box">
                     {error}

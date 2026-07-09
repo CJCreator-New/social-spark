@@ -12,22 +12,30 @@ declare const Deno: any;
 
 // ALLOWED_ORIGIN should be set to the production frontend origin (e.g.
 // "https://app.socialspark.com"; comma-separate to allow more than one, such
-// as a staging domain) to restrict CORS on these endpoints. Deno.deploy/
-// Supabase edge functions always set DENO_DEPLOYMENT_ID in deployed
-// environments; only fall back to "*" for local dev (`supabase functions
-// serve`), where DENO_DEPLOYMENT_ID is unset.
-const isDeployed = typeof Deno !== "undefined" && !!Deno.env.get("DENO_DEPLOYMENT_ID");
+// as a staging domain) to restrict CORS on these endpoints.
+//
+// IMPORTANT: correctness here must NOT depend on detecting whether we're
+// "deployed" — `DENO_DEPLOYMENT_ID` is a Deno Deploy-platform env var, not
+// something Supabase's own Edge Runtime is guaranteed to set. Deriving a
+// fail-closed/fail-open branch from it previously meant that if it was unset
+// in Supabase's actual production environment, the code fell straight
+// through to `Access-Control-Allow-Origin: *` with no error logged — a
+// silent CORS fail-open. Instead: if ALLOWED_ORIGIN is configured, enforce it
+// exactly. If it is NOT configured, warn loudly (always, unconditionally) and
+// fail closed to a fixed, explicit, known-safe default — the same localhost
+// dev origins the `telemetry` function's standalone CORS allowlist already
+// uses (see supabase/functions/telemetry/index.ts) — rather than "*". This
+// never silently opens CORS to arbitrary origins in any environment.
 const configuredOrigin = typeof Deno !== "undefined" ? Deno.env.get("ALLOWED_ORIGIN") : undefined;
-if (isDeployed && !configuredOrigin) {
-  // Fail closed, not crashed: a missing secret used to throw at module load,
-  // which made the entire function (including the OPTIONS preflight) return
-  // a non-200 and go completely unreachable. Log loudly and deny all origins
-  // instead so the function still serves requests once the secret is fixed.
+const LOCAL_DEV_ORIGINS = ["http://localhost:5173", "http://localhost:8080"];
+if (!configuredOrigin) {
   console.error(
-    "ALLOWED_ORIGIN is not set in this deployed environment. All cross-origin requests will be rejected until it is configured in Supabase Edge Functions secrets."
+    "ALLOWED_ORIGIN is not set. Cross-origin requests will be restricted to local dev origins only " +
+      `(${LOCAL_DEV_ORIGINS.join(", ")}) until ALLOWED_ORIGIN is configured in Supabase Edge Functions ` +
+      "secrets. This function will never fall back to '*'."
   );
 }
-const allowedOrigins = (configuredOrigin || (isDeployed ? "" : "*"))
+const allowedOrigins = (configuredOrigin || LOCAL_DEV_ORIGINS.join(","))
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
@@ -130,6 +138,20 @@ function stripMarkdownFormatting(value: unknown): string {
   text = text.replace(/`([^`]+)`/g, "$1");
   // Markdown links: [text](url) -> text
   text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  // Literal HTML tags some models emit instead of markdown (e.g. <b>, <br>) —
+  // strip regardless of open/close pairing since post copy should have none.
+  text = text.replace(
+    /<\/?(?:b|i|strong|em|u|br|p|div|span|ul|ol|li|h[1-6]|a|code|pre|mark|small|sub|sup|del|ins|blockquote)\b[^>]*>/gi,
+    ""
+  );
+  // Decode common HTML entities that leak through instead of raw characters.
+  text = text
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'");
   return text;
 }
 
@@ -156,7 +178,7 @@ function getAllowedAiEndpoint(url: string): string | null {
 interface ProviderEntry {
   name: string;
   envKey: string;
-  provider: "openai" | "anthropic" | "openrouter" | "lovable";
+  provider: "openai" | "anthropic" | "openrouter" | "lovable" | "gemini" | "kimi" | "glm";
   endpoint?: string; // only used for lovable (custom gateway URL)
   model: (quality: string) => string;
 }
@@ -186,6 +208,24 @@ const PLATFORM_PROVIDER_CHAIN: ProviderEntry[] = [
     envKey: "PLATFORM_ANTHROPIC_KEY",
     provider: "anthropic",
     model: (q) => (q === "polished" ? "claude-3-5-sonnet-latest" : "claude-3-5-haiku-latest"),
+  },
+  {
+    name: "gemini",
+    envKey: "PLATFORM_GEMINI_KEY",
+    provider: "gemini",
+    model: (q) => (q === "polished" ? "gemini-2.5-pro" : "gemini-2.5-flash"),
+  },
+  {
+    name: "kimi",
+    envKey: "PLATFORM_KIMI_KEY",
+    provider: "kimi",
+    model: (q) => (q === "polished" ? "kimi-k2-0905-preview" : "moonshot-v1-8k"),
+  },
+  {
+    name: "glm",
+    envKey: "PLATFORM_GLM_KEY",
+    provider: "glm",
+    model: (q) => (q === "polished" ? "glm-4.6" : "glm-4.5-air"),
   },
 ];
 
@@ -322,6 +362,16 @@ function bannedPhrasesBlock(): string {
 function buildRequiredWordsBlock(requiredWords?: string[]): string {
   if (!requiredWords || requiredWords.length === 0) return "";
   return `REQUIRED WORDS — you MUST include all of the following words/phrases in the generated post body:\n${requiredWords.map((w) => `- "${w}"`).join("\n")}`;
+}
+
+function buildBannedWordsBlock(bannedWords?: string[]): string {
+  if (!bannedWords || bannedWords.length === 0) return "";
+  return `BRAND-BANNED WORDS — do NOT use any of these words in your output:\n${bannedWords.map((w) => `- "${w}"`).join("\n")}`;
+}
+
+function buildForbiddenPhrasesBlock(forbiddenPhrases?: string[]): string {
+  if (!forbiddenPhrases || forbiddenPhrases.length === 0) return "";
+  return `BRAND-FORBIDDEN PHRASES — do NOT use any of these phrases in your output:\n${forbiddenPhrases.map((p) => `- "${p}"`).join("\n")}`;
 }
 
 function buildEngagementRules(platform: string): string {
@@ -736,52 +786,79 @@ async function checkRateLimit(
   endpoint: string,
   config: RateLimitConfig
 ): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
-  const MAX_CAS_ATTEMPTS = 5;
   try {
-    const kv = await Deno.openKv();
-    const key = ["ratelimit", endpoint, userId];
-    const now = Date.now();
-    const windowStart = now - config.windowMs;
-
-    try {
-      // Compare-and-swap loop: re-read + re-check + versioned write so concurrent
-      // requests can't all observe the same pre-increment count and all pass.
-      for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt++) {
-        const entry = await kv.get<number[]>(key);
-        const requests = (entry.value || []).filter((ts) => ts > windowStart);
-
-        if (requests.length >= config.maxRequests) {
-          const resetAt = requests[0] + config.windowMs;
-          return { allowed: false, remaining: 0, resetAt };
-        }
-
-        requests.push(now);
-        const res = await kv
-          .atomic()
-          .check(entry)
-          .set(key, requests, { expireIn: config.windowMs })
-          .commit();
-
-        if (res.ok) {
-          return {
-            allowed: true,
-            remaining: config.maxRequests - requests.length,
-            resetAt: now + config.windowMs,
-          };
-        }
-        // Another concurrent request won the CAS race; retry with a fresh read.
-      }
-
-      // Exhausted retries under heavy contention: fail closed rather than let an
-      // unbounded number of concurrent requests all slip through unaccounted for.
-      return { allowed: false, remaining: 0, resetAt: now + config.windowMs };
-    } finally {
-      await kv.close();
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      console.warn("Missing supabase env for rate limiting, allowing request");
+      return { allowed: true, remaining: config.maxRequests, resetAt: Date.now() + config.windowMs };
     }
+
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - config.windowMs);
+    const baseUrl = SUPABASE_URL.replace(/\/$/, "");
+
+    // Get current events in the window
+    const queryUrl = `${baseUrl}/rest/v1/rate_limit_events?select=created_at&user_id=eq.${encodeURIComponent(userId)}&endpoint=eq.${encodeURIComponent(endpoint)}&created_at=gte.${encodeURIComponent(windowStart.toISOString())}&order=created_at.asc`;
+    const queryRes = await fetch(queryUrl, {
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+      },
+    });
+
+    if (!queryRes.ok) {
+      throw new Error(`Failed to query rate limit events (${queryRes.status})`);
+    }
+
+    const events = await queryRes.json();
+    const currentCount = Array.isArray(events) ? events.length : 0;
+
+    if (currentCount >= config.maxRequests) {
+      const oldestTime = events[0] && events[0].created_at
+        ? new Date(events[0].created_at).getTime()
+        : now.getTime();
+      const resetAt = oldestTime + config.windowMs;
+
+      return { allowed: false, remaining: 0, resetAt };
+    }
+
+    // Insert new event
+    const insertRes = await fetch(`${baseUrl}/rest/v1/rate_limit_events`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        endpoint,
+        created_at: now.toISOString(),
+      }),
+    });
+
+    if (!insertRes.ok) {
+      throw new Error(`Failed to insert rate limit event (${insertRes.status})`);
+    }
+
+    // Fire-and-forget prune expired rate limit events
+    fetch(`${baseUrl}/rest/v1/rate_limit_events?created_at=lt.${encodeURIComponent(windowStart.toISOString())}`, {
+      method: "DELETE",
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+      },
+    }).catch((err) => console.warn("Failed to prune expired rate limit events", err));
+
+    return {
+      allowed: true,
+      remaining: config.maxRequests - (currentCount + 1),
+      resetAt: now.getTime() + config.windowMs,
+    };
   } catch (e) {
     console.warn("Rate limit check failed, allowing request", e);
-    // Deno KV itself unavailable (not a contention issue) — fail open so a KV
-    // outage doesn't take down unrelated functionality.
+    // Fail open so database outages do not block operations
     return { allowed: true, remaining: config.maxRequests, resetAt: Date.now() + config.windowMs };
   }
 }
@@ -941,9 +1018,9 @@ interface GenerationPayload {
   bannedHashtags: string[];
   requiredHashtags: string[];
   quality: "draft" | "polished"; // draft: single-call, polished: two-pass critique+rewrite
-  userApiKey?: string;
-  userApiProvider?: "openai" | "anthropic" | "openrouter" | "gemini" | "kimi" | "glm";
+  userApiProvider?: "openai" | "anthropic" | "openrouter" | "lovable" | "gemini" | "kimi" | "glm";
   trendingTopics?: string[];
+  forbiddenPhrases?: string[];
 }
 
 const BRITISH_TO_AMERICAN: Record<string, string> = {
@@ -1015,6 +1092,12 @@ function buildContentRules(platform: string, language?: string): string {
   } else if (platform === "Instagram") {
     platformGuidance =
       "\n- Use double-newline visual spacing for clean paragraph division. Cap hashtags to 3 to 8 (modern post-2024 algorithm best practice).";
+  } else if (platform === "Newsletter") {
+    platformGuidance =
+      "\n- REQUIRE a compelling subject-line-style title in the title field — treat it like an email subject line, not a headline.\n- Open with a short, personal introduction (1-2 sentences) before diving into the main content.\n- Structure the body with clear sections separated by blank lines, each built around one sub-point or takeaway; use plain-text section labels (e.g. 'What's happening:', 'Why it matters:') instead of markdown headings.\n- Pace the writing for long-form reading: longer paragraphs are acceptable, but keep each section focused and skimmable.\n- End with a specific CTA suited to email (e.g. 'Reply and let me know', 'Read the full breakdown here') rather than a social-style CTA.\n- Do NOT include hashtags anywhere in the body or CTA — hashtags are not native to newsletters.";
+  } else if (platform === "Blog") {
+    platformGuidance =
+      "\n- REQUIRE a clear, SEO-friendly title in the title field that states the article's core promise.\n- Structure the body into distinct sections, each introduced by a short plain-text heading line (no markdown '#' or '**' syntax) followed by 2-4 sentences of supporting content.\n- Open with a short introduction that frames the problem or question, and close with a concise summary or key-takeaways section before the CTA.\n- Use a long-form pace: fuller paragraphs and more developed examples are expected versus short-form social posts.\n- Do NOT include hashtags anywhere in the body — hashtags are not native to blog articles.";
   }
 
   return `\nCONTENT RULES:\n- Do not use markdown syntax in post text: no **bold**, *italic*, headings, or inline code.\n- Use plain-text bullets only (• or →). Do not combine bullets with markdown formatting.\n- Rotate CTA verbs across the week; do not repeat the same CTA verb on every post.\n- Stay tightly within the user's stated topic angle; do not introduce tangential sub-topics unless requested.\n- Keep the post platform-native: LinkedIn = insight-led, Instagram = visual/story-driven, X = concise/opinionated, Facebook = warm/community-first, TikTok = script-based/high-energy.\n- If the topic is India-specific, incorporate current Indian trends (Digital India, EV adoption, startup ecosystem), regional contexts (South/North/East/West differences), and cultural references (jugaad innovation, dharma/responsibility themes) where relevant.\n- Reference upcoming festivals (Diwali, Holi, Durga Puja) and national events (Republic Day) in seasonal content.\n${globalConstraints}${platformGuidance}\n${spellingRule}${buildEngagementRules(platform)}`;
@@ -1075,6 +1158,8 @@ function cleanPayload(body: unknown): GenerationPayload {
       )
         ? (String(payload.userApiProvider).trim() as any)
         : undefined,
+    trendingTopics: cleanList(payload.trendingTopics, 10),
+    forbiddenPhrases: cleanList(payload.forbiddenPhrases, 20),
   };
 }
 
@@ -1112,6 +1197,8 @@ function getPayloadDefaults(): GenerationPayload {
     requiredHashtags: [],
     userApiKey: undefined,
     userApiProvider: undefined,
+    trendingTopics: [],
+    forbiddenPhrases: [],
   };
 }
 
@@ -1244,6 +1331,8 @@ function buildSystemMessage(
   const stylePreset = getStylePreset(payload.style);
   const banned = bannedPhrasesBlock();
   const requiredWordsBlock = buildRequiredWordsBlock(payload.requiredWords);
+  const bannedWordsBlock = buildBannedWordsBlock(payload.bannedWords);
+  const forbiddenPhrasesBlock = buildForbiddenPhrasesBlock(payload.forbiddenPhrases);
 
   const antiMimicry =
     payload.brand_examples && payload.brand_examples.length > 0
@@ -1294,6 +1383,8 @@ ${stylePreset}
 ${banned}
 ${antiMimicry}
 ${requiredWordsBlock ? `- ${requiredWordsBlock}` : ""}
+${bannedWordsBlock ? `- ${bannedWordsBlock}` : ""}
+${forbiddenPhrasesBlock ? `- ${forbiddenPhrasesBlock}` : ""}
 - Never output markdown bold/italic formatting in the post copy.
 - Stay strictly on topic. Do not drift into generic summaries.
 
@@ -1415,7 +1506,8 @@ async function callOpenAiCompatibleDirect(
   apiKey: string,
   model: string,
   temperature: number,
-  max_tokens?: number
+  max_tokens?: number,
+  timeoutMs?: number
 ): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
   const hasTool = tool && Object.keys(tool).length > 0;
   const functionName = hasTool ? (((tool as any).function?.name || "") as string) : "";
@@ -1432,6 +1524,7 @@ async function callOpenAiCompatibleDirect(
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(timeoutMs ?? 30000),
       body: JSON.stringify({
         model,
         messages,
@@ -1454,6 +1547,10 @@ async function callOpenAiCompatibleDirect(
     const data = await res.json();
     return { status: 200, data };
   } catch (e) {
+    if (e instanceof Error && (e.name === "AbortError" || e.name === "TimeoutError" || e.message.includes("timeout") || e.message.includes("aborted"))) {
+      console.error(`Direct call to ${sanitizeLogValue(url)} timed out.`);
+      return { status: 504, error: "AI request timeout" };
+    }
     console.error(
       `Direct call to ${sanitizeLogValue(endpoint)} encountered network error:`,
       sanitizeLogValue(e)
@@ -1468,7 +1565,8 @@ async function callAnthropicDirect(
   apiKey: string,
   model: string,
   temperature: number,
-  max_tokens?: number
+  max_tokens?: number,
+  timeoutMs?: number
 ): Promise<{ status: number; data?: Record<string, unknown>; error?: string }> {
   const systemMessage = messages.find((m) => m.role === "system")?.content || "";
   const regularMessages = messages.filter((m) => m.role !== "system");
@@ -1497,6 +1595,7 @@ async function callAnthropicDirect(
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
       },
+      signal: AbortSignal.timeout(timeoutMs ?? 30000),
       body: JSON.stringify({
         model,
         messages: regularMessages,
@@ -1557,6 +1656,10 @@ async function callAnthropicDirect(
       return { status: 200, data: mappedData };
     }
   } catch (e) {
+    if (e instanceof Error && (e.name === "AbortError" || e.name === "TimeoutError" || e.message.includes("timeout") || e.message.includes("aborted"))) {
+      console.error("Anthropic direct call timed out.");
+      return { status: 504, error: "AI request timeout" };
+    }
     console.error("Anthropic direct call encountered network error:", e);
     return { status: 500, error: e instanceof Error ? e.message : "Network error" };
   }
@@ -1594,7 +1697,8 @@ async function callAI(
       apiKey,
       model,
       temperature,
-      maxTokens
+      maxTokens,
+      opts.timeoutMs
     );
   } else if (provider === "openrouter") {
     return callOpenAiCompatibleDirect(
@@ -1604,10 +1708,11 @@ async function callAI(
       apiKey,
       model,
       temperature,
-      maxTokens
+      maxTokens,
+      opts.timeoutMs
     );
   } else if (provider === "anthropic") {
-    return callAnthropicDirect(messages, tool, apiKey, model, temperature, maxTokens);
+    return callAnthropicDirect(messages, tool, apiKey, model, temperature, maxTokens, opts.timeoutMs);
   } else if (provider === "lovable") {
     // Lovable AI Gateway speaks the OpenAI-compatible wire protocol
     return callOpenAiCompatibleDirect(
@@ -1617,7 +1722,8 @@ async function callAI(
       apiKey,
       model,
       temperature,
-      maxTokens
+      maxTokens,
+      opts.timeoutMs
     );
   } else if (provider === "gemini") {
     // Gemini's OpenAI-compatible endpoint
@@ -1628,7 +1734,8 @@ async function callAI(
       apiKey,
       model,
       temperature,
-      maxTokens
+      maxTokens,
+      opts.timeoutMs
     );
   } else if (provider === "kimi") {
     // Moonshot Kimi — OpenAI-compatible chat completions
@@ -1639,7 +1746,8 @@ async function callAI(
       apiKey,
       model,
       temperature,
-      maxTokens
+      maxTokens,
+      opts.timeoutMs
     );
   } else if (provider === "glm") {
     // Zhipu GLM — OpenAI-compatible chat completions
@@ -1650,7 +1758,8 @@ async function callAI(
       apiKey,
       model,
       temperature,
-      maxTokens
+      maxTokens,
+      opts.timeoutMs
     );
   }
 
@@ -1711,21 +1820,14 @@ async function enrichTopics(payload: GenerationPayload, apiKey: string): Promise
         return padTopics(payload.topics, payload.coreIdea);
       }
     } else {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature: 0.8,
-        }),
+      const aiRes = await callAIGateway(messages, null, apiKey, {
+        model,
+        temperature: 0.8,
       });
-
-      if (!res.ok) return padTopics(payload.topics, payload.coreIdea);
-      data = await res.json();
+      if (aiRes.status !== 200) {
+        return padTopics(payload.topics, payload.coreIdea);
+      }
+      data = aiRes.data;
     }
 
     const content = data?.choices?.[0]?.message?.content || "";
@@ -1882,23 +1984,14 @@ ${variants.map((v, i) => `[Variant ${i}]: ${v.slice(0, 1000)}`).join("\n\n")}`;
         throw new Error(aiRes.error);
       }
     } else {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature: 0.1, // High precision
-        }),
+      const aiRes = await callAIGateway(messages, null, apiKey, {
+        model,
+        temperature: 0.1,
       });
-
-      if (res.ok) {
-        data = await res.json();
+      if (aiRes.status === 200) {
+        data = aiRes.data;
       } else {
-        throw new Error(`Status ${res.status}`);
+        throw new Error(`AI gateway call failed with status ${aiRes.status}`);
       }
     }
 
@@ -1906,10 +1999,29 @@ ${variants.map((v, i) => `[Variant ${i}]: ${v.slice(0, 1000)}`).join("\n\n")}`;
       const content = String(data?.choices?.[0]?.message?.content || "").trim();
       const parsed = extractJSONFromString(content);
 
-      if (parsed && parsed.results && Array.isArray(parsed.results)) {
+      if (parsed && parsed.results && Array.isArray(parsed.results) && parsed.results.length) {
+        const results = parsed.results as Record<string, number>[];
+        // Never trust the model's self-reported winner_index directly — recompute it
+        // server-side as the argmax of each variant's own summed scores, so a model
+        // that scores variant 2 highest but misreports winner_index can't skew results.
+        let winnerIndex = 0;
+        let bestTotal = -Infinity;
+        results.forEach((scoreObj, i) => {
+          const total = Object.values(scoreObj || {}).reduce(
+            (sum, v) => sum + (typeof v === "number" && Number.isFinite(v) ? v : 0),
+            0
+          );
+          if (total > bestTotal) {
+            bestTotal = total;
+            winnerIndex = i;
+          }
+        });
+        // Guard against an out-of-range index relative to the actual variants list.
+        if (winnerIndex < 0 || winnerIndex >= variants.length) winnerIndex = 0;
+
         return {
-          scores: parsed.results,
-          winner_index: typeof parsed.winner_index === "number" ? parsed.winner_index : 0,
+          scores: results,
+          winner_index: winnerIndex,
         };
       }
     }
@@ -2116,7 +2228,13 @@ async function callAIGatewayOnce(
       continue;
     }
 
-    const providerModel = opts.model || entry.model(quality);
+    let providerModel = opts.model || entry.model(quality);
+    // If the provider is not gemini/openrouter/lovable, and the model id is a google/gemini model,
+    // we must fall back to the provider's default model for that quality level to avoid a 400.
+    if (entry.provider !== "gemini" && entry.provider !== "openrouter" && entry.provider !== "lovable" &&
+        (providerModel.includes("google") || providerModel.includes("gemini"))) {
+      providerModel = entry.model(quality);
+    }
     console.info(
       `[waterfall] trying ${sanitizeLogValue(entry.name)} (model: ${sanitizeLogValue(providerModel)})`
     );
@@ -2355,6 +2473,80 @@ function normalizePost(
     }
   }
 
+  // Post-generation scan for brand-banned words & forbidden phrases
+  const forbiddenViolations: string[] = [];
+  const combinedForbidden = [
+    ...(payload?.bannedWords || []),
+    ...(payload?.forbiddenPhrases || []),
+  ];
+
+  if (combinedForbidden.length > 0) {
+    const fullText = `${hookOptions.join(" ")} ${body} ${ctaOptions.join(" ")}`;
+    combinedForbidden.forEach((phrase) => {
+      const regex = new RegExp(phrase.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"), "i");
+      if (regex.test(fullText)) {
+        forbiddenViolations.push(`Contains forbidden brand term: "${phrase}"`);
+      }
+    });
+
+    if (forbiddenViolations.length > 0) {
+      console.warn(`Post generation contains forbidden brand terms: ${forbiddenViolations.join(", ")}`);
+      const selfCheckBase =
+        p.self_check && typeof p.self_check === "object"
+          ? { ...(p.self_check as Record<string, unknown>) }
+          : { forbidden_violations: [] as string[], checks_passed: true, notes: "" };
+      const selfCheck = selfCheckBase as Record<string, unknown> & {
+        forbidden_violations: string[];
+        checks_passed: boolean;
+      };
+      selfCheck.forbidden_violations = [
+        ...(Array.isArray(selfCheck.forbidden_violations) ? selfCheck.forbidden_violations : []),
+        ...forbiddenViolations,
+      ];
+      selfCheck.checks_passed = false;
+      p.self_check = selfCheck;
+    }
+  }
+
+  // CF-10: check character limit for the platform (especially Twitter/X)
+  if (payload?.platform) {
+    const platKey = String(payload.platform).toLowerCase();
+    const platMap: Record<string, number> = {
+      facebook: 63206,
+      instagram: 2200,
+      linkedin: 3000,
+      x: 280,
+      twitter: 280,
+      tiktok: 2200,
+    };
+    const limit = platMap[platKey];
+    if (limit) {
+      const fullText = [hookOptions[0] || "", body, ctaOptions[0] || ""].filter(Boolean).join("\n\n");
+      if (fullText.length > limit) {
+        console.warn(
+          `Post length ${fullText.length} exceeds platform ${payload.platform} limit of ${limit}.`
+        );
+        const selfCheckBase =
+          p.self_check && typeof p.self_check === "object"
+            ? { ...(p.self_check as Record<string, unknown>) }
+            : { forbidden_violations: [] as string[], checks_passed: true, notes: "" };
+        const selfCheck = selfCheckBase as Record<string, unknown> & {
+          forbidden_violations: string[];
+          checks_passed: boolean;
+        };
+        const violations: string[] = Array.isArray(selfCheck.forbidden_violations)
+          ? [...(selfCheck.forbidden_violations as string[])]
+          : [];
+        violations.push(`Character limit exceeded: ${fullText.length} characters (limit: ${limit})`);
+        selfCheck.forbidden_violations = violations;
+        if (platKey === "x" || platKey === "twitter") {
+          selfCheck.checks_passed = false;
+        }
+        p.self_check = selfCheck;
+      }
+    }
+  }
+
   return {
     day: 1,
     dow: String(overrideDow || p.dow || "Mon"),
@@ -2407,6 +2599,16 @@ const ALLOWED_EVENT_NAMES = new Set([
   "generate_success",
   "generate_error",
   "enhance_clicked",
+  "repurpose_bulk_start",
+  "repurpose_bulk_post_success",
+  "repurpose_bulk_post_failed",
+  "repurpose_bulk_review_saved",
+  "repurpose_bulk_review_discarded",
+  "hook_regenerate_clicked",
+  "cta_regenerate_clicked",
+  "cta_suggestion_applied",
+  "post_kept",
+  "post_regenerated_again",
 ]);
 const MAX_PROPS_BYTES = 2000;
 const MAX_BODY_BYTES = 8000;
@@ -2518,7 +2720,19 @@ export async function handle(req: Request): Promise<Response> {
       });
     }
 
-    const row = { event_name: eventName, props, ts: new Date().toISOString() };
+    // Attribution is optional: this function accepts anonymous, pre-login events
+    // (verify_jwt is disabled), so a missing/invalid bearer token must not block
+    // the write — it just means user_id stays null. When a valid session token
+    // is present, resolve it so telemetry rows are attributable to a user.
+    const authHeader = req.headers.get("authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim() || null;
+    const userId = token ? await getVerifiedUserId(token) : null;
+
+    const row: { event_name: string; props: unknown; user_id?: string } = {
+      event_name: eventName,
+      props,
+    };
+    if (userId) row.user_id = userId;
     // Insert via REST
     const res = await fetch(`${SUPABASE_URL}/rest/v1/telemetry_events`, {
       method: "POST",

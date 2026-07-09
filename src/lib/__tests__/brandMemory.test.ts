@@ -1,6 +1,18 @@
-import { describe, it, expect } from "vitest";
-import { hasBrandMemory, buildBrandMemoryPrompt } from "../brandMemory";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { hasBrandMemory, buildBrandMemoryPrompt, generateWithFallback } from "../brandMemory";
 import type { BrandSlotRow } from "@/hooks/queries/shared";
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn(() => Promise.resolve({ data: { session: null } })),
+    },
+  },
+}));
+
+vi.mock("@/lib/aiClientResolver", () => ({
+  resolveAiClient: vi.fn(() => Promise.reject(new Error("no user key configured"))),
+}));
 
 describe("brandMemory library helpers", () => {
   it("should detect if a user has configured brand memory", () => {
@@ -62,5 +74,66 @@ describe("brandMemory library helpers", () => {
       preferred_structures: [],
     };
     expect(hasBrandMemory(emptySlot)).toBe(false);
+  });
+});
+
+describe("generateWithFallback error message fidelity", () => {
+  const OLD_FETCH = global.fetch;
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal("fetch", mockFetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    global.fetch = OLD_FETCH;
+  });
+
+  it("preserves the real server error message on a 500 and does not attempt a BYOK fallback", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: "AI is not configured." }),
+    });
+
+    await expect(
+      generateWithFallback("generate-calendar", { coreIdea: "test" })
+    ).rejects.toThrow("AI is not configured.");
+
+    // Only the initial platform call should have fired — no BYOK fallback attempt,
+    // since "AI is not configured." matches NON_FALLBACK_ERRORS.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the real server error message on a 503 (platform unavailable)", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: () => Promise.resolve({ error: "All platform AI providers are currently unavailable." }),
+    });
+
+    await expect(
+      generateWithFallback("generate-calendar", { coreIdea: "test" })
+    ).rejects.toThrow("All platform AI providers are currently unavailable.");
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("still attempts the BYOK fallback path for a genuine unclassified 500 error", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: "Internal server error" }),
+    });
+
+    await expect(
+      generateWithFallback("generate-calendar", { coreIdea: "test" })
+    ).rejects.toThrow("AI_UNAVAILABLE");
+
+    // Platform call, then the fallback path tries to resolve a user key (which
+    // rejects in this mock, short-circuiting before a second fetch happens).
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

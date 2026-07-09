@@ -4,22 +4,30 @@ declare const Deno: any;
 
 // ALLOWED_ORIGIN should be set to the production frontend origin (e.g.
 // "https://app.socialspark.com"; comma-separate to allow more than one, such
-// as a staging domain) to restrict CORS on these endpoints. Deno.deploy/
-// Supabase edge functions always set DENO_DEPLOYMENT_ID in deployed
-// environments; only fall back to "*" for local dev (`supabase functions
-// serve`), where DENO_DEPLOYMENT_ID is unset.
-const isDeployed = typeof Deno !== "undefined" && !!Deno.env.get("DENO_DEPLOYMENT_ID");
+// as a staging domain) to restrict CORS on these endpoints.
+//
+// IMPORTANT: correctness here must NOT depend on detecting whether we're
+// "deployed" — `DENO_DEPLOYMENT_ID` is a Deno Deploy-platform env var, not
+// something Supabase's own Edge Runtime is guaranteed to set. Deriving a
+// fail-closed/fail-open branch from it previously meant that if it was unset
+// in Supabase's actual production environment, the code fell straight
+// through to `Access-Control-Allow-Origin: *` with no error logged — a
+// silent CORS fail-open. Instead: if ALLOWED_ORIGIN is configured, enforce it
+// exactly. If it is NOT configured, warn loudly (always, unconditionally) and
+// fail closed to a fixed, explicit, known-safe default — the same localhost
+// dev origins the `telemetry` function's standalone CORS allowlist already
+// uses (see supabase/functions/telemetry/index.ts) — rather than "*". This
+// never silently opens CORS to arbitrary origins in any environment.
 const configuredOrigin = typeof Deno !== "undefined" ? Deno.env.get("ALLOWED_ORIGIN") : undefined;
-if (isDeployed && !configuredOrigin) {
-  // Fail closed, not crashed: a missing secret used to throw at module load,
-  // which made the entire function (including the OPTIONS preflight) return
-  // a non-200 and go completely unreachable. Log loudly and deny all origins
-  // instead so the function still serves requests once the secret is fixed.
+const LOCAL_DEV_ORIGINS = ["http://localhost:5173", "http://localhost:8080"];
+if (!configuredOrigin) {
   console.error(
-    "ALLOWED_ORIGIN is not set in this deployed environment. All cross-origin requests will be rejected until it is configured in Supabase Edge Functions secrets."
+    "ALLOWED_ORIGIN is not set. Cross-origin requests will be restricted to local dev origins only " +
+      `(${LOCAL_DEV_ORIGINS.join(", ")}) until ALLOWED_ORIGIN is configured in Supabase Edge Functions ` +
+      "secrets. This function will never fall back to '*'."
   );
 }
-const allowedOrigins = (configuredOrigin || (isDeployed ? "" : "*"))
+const allowedOrigins = (configuredOrigin || LOCAL_DEV_ORIGINS.join(","))
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);

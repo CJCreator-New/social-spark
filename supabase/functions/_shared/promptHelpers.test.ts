@@ -82,6 +82,67 @@ describe("stripMarkdownFormatting", () => {
   });
 });
 
+describe("CORS configuration (getCorsHeaders / corsHeaders)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("ALLOWED_ORIGIN set + matching Origin header -> allowed", async () => {
+    vi.resetModules();
+    vi.stubGlobal("Deno", {
+      env: {
+        get: (k: string) => (k === "ALLOWED_ORIGIN" ? "https://app.socialspark.com" : undefined),
+      },
+    });
+    const { getCorsHeaders } = await import("./promptHelpers.ts");
+    const headers = getCorsHeaders("https://app.socialspark.com");
+    expect(headers["Access-Control-Allow-Origin"]).toBe("https://app.socialspark.com");
+  });
+
+  it("ALLOWED_ORIGIN set + non-matching Origin -> denied (not echoed, not '*')", async () => {
+    vi.resetModules();
+    vi.stubGlobal("Deno", {
+      env: {
+        get: (k: string) => (k === "ALLOWED_ORIGIN" ? "https://app.socialspark.com" : undefined),
+      },
+    });
+    const { getCorsHeaders } = await import("./promptHelpers.ts");
+    const headers = getCorsHeaders("https://evil.example.com");
+    expect(headers["Access-Control-Allow-Origin"]).not.toBe("https://evil.example.com");
+    expect(headers["Access-Control-Allow-Origin"]).not.toBe("*");
+  });
+
+  it("ALLOWED_ORIGIN unset -> must NOT silently return '*', and must warn loudly", async () => {
+    vi.resetModules();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("Deno", { env: { get: () => undefined } });
+    const { getCorsHeaders, corsHeaders } = await import("./promptHelpers.ts");
+
+    // The static default export must never be "*".
+    expect(corsHeaders["Access-Control-Allow-Origin"]).not.toBe("*");
+
+    // An arbitrary cross-origin caller must not be reflected/allowed.
+    const headers = getCorsHeaders("https://random-attacker-site.com");
+    expect(headers["Access-Control-Allow-Origin"]).not.toBe("*");
+    expect(headers["Access-Control-Allow-Origin"]).not.toBe("https://random-attacker-site.com");
+
+    // Missing config must be logged loudly, unconditionally (not gated behind
+    // a "deployed" detection that may never trigger on Supabase's runtime).
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("ALLOWED_ORIGIN unset -> still allows known local-dev origins for local `supabase functions serve` ergonomics", async () => {
+    vi.resetModules();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("Deno", { env: { get: () => undefined } });
+    const { getCorsHeaders } = await import("./promptHelpers.ts");
+    const headers = getCorsHeaders("http://localhost:5173");
+    expect(headers["Access-Control-Allow-Origin"]).toBe("http://localhost:5173");
+  });
+});
+
 describe("promptHelpers engagement guidance", () => {
   it("adds a core-idea framework that locks the output to one angle", () => {
     const payload = cleanPayload({

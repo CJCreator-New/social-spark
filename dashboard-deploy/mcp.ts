@@ -2,7 +2,379 @@
 // To take ownership, delete this banner line; the plugin then leaves the file alone.
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
+// src/lib/mcp/index.ts
+import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.20.0";
+
+// src/lib/mcp/tools/list-calendars.ts
+import { createClient } from "npm:@supabase/supabase-js@^2.86.0";
+import { defineTool } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z } from "npm:zod@^4.4.3";
+function supabaseForUser(ctx) {
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var list_calendars_default = defineTool({
+  name: "list_calendars",
+  title: "List content calendars",
+  description: "List the signed-in user's saved ContentForge content calendars, newest first.",
+  inputSchema: {
+    limit: z.number().int().min(1).max(50).optional().describe("Max calendars to return (default 20).")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ limit }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const scopes = ctx.getScopes() || [];
+    if (!scopes.includes("read:calendars")) {
+      return { content: [{ type: "text", text: "Access denied: missing read:calendars scope" }], isError: true };
+    }
+    const { data, error } = await supabaseForUser(ctx).from("saved_calendars").select(
+      "id, title, platform, industry_label, week_start_date, is_favorite, created_at, updated_at"
+    ).order("created_at", { ascending: false }).limit(limit ?? 20);
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      structuredContent: { calendars: data ?? [] }
+    };
+  }
+});
+
+// src/lib/mcp/tools/get-calendar.ts
+import { createClient as createClient2 } from "npm:@supabase/supabase-js@^2.86.0";
+import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z2 } from "npm:zod@^4.4.3";
+function supabaseForUser2(ctx) {
+  return createClient2(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var get_calendar_default = defineTool2({
+  name: "get_calendar",
+  title: "Get a content calendar",
+  description: "Fetch one saved ContentForge calendar (including all posts) by its ID for the signed-in user.",
+  inputSchema: {
+    id: z2.string().uuid().describe("The calendar's UUID.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ id }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const scopes = ctx.getScopes() || [];
+    if (!scopes.includes("read:calendars")) {
+      return { content: [{ type: "text", text: "Access denied: missing read:calendars scope" }], isError: true };
+    }
+    const { data, error } = await supabaseForUser2(ctx).from("saved_calendars").select("*").eq("id", id).maybeSingle();
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    if (!data) return { content: [{ type: "text", text: "Calendar not found" }], isError: true };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      structuredContent: { calendar: data }
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-scheduled-posts.ts
+import { createClient as createClient3 } from "npm:@supabase/supabase-js@^2.86.0";
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z3 } from "npm:zod@^4.4.3";
+function supabaseForUser3(ctx) {
+  return createClient3(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var list_scheduled_posts_default = defineTool3({
+  name: "list_scheduled_posts",
+  title: "List scheduled posts",
+  description: "List the signed-in user's upcoming scheduled ContentForge posts, ordered by scheduled_at.",
+  inputSchema: {
+    status: z3.enum(["scheduled", "published", "failed", "draft"]).optional().describe("Filter by status."),
+    limit: z3.number().int().min(1).max(100).optional().describe("Max posts to return (default 25).")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ status, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const scopes = ctx.getScopes() || [];
+    if (!scopes.includes("read:scheduled_posts")) {
+      return { content: [{ type: "text", text: "Access denied: missing read:scheduled_posts scope" }], isError: true };
+    }
+    let query = supabaseForUser3(ctx).from("scheduled_posts").select(
+      "id, calendar_id, platform, scheduled_at, status, workflow_status, copy_text, published_at"
+    ).order("scheduled_at", { ascending: true }).limit(limit ?? 25);
+    if (status) query = query.eq("status", status);
+    const { data, error } = await query;
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      structuredContent: { posts: data ?? [] }
+    };
+  }
+});
+
+// src/lib/mcp/tools/extract-ideas.ts
+import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z4 } from "npm:zod@^4.4.3";
+var SOURCE_MIN_CHARS = 200;
+var SOURCE_MAX_CHARS = 2e4;
+async function callExtractIdeasFunction(body, ctx) {
+  const supabaseUrl = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
+  const res = await fetch(`${supabaseUrl}/functions/v1/extract-ideas`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
+      Authorization: `Bearer ${ctx.getToken() ?? ""}`
+    },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  return { status: res.status, data };
+}
+var extract_ideas_default = defineTool4({
+  name: "extract_ideas",
+  title: "Extract post ideas from source material",
+  description: "Analyze pasted long-form source material (an article, transcript, or notes) and extract distinct, high-potential social post ideas mapped to proven engagement formats, for the signed-in user. Calls the same `extract-ideas` pipeline the app UI uses, so per-user rate limits and generation quota apply.",
+  inputSchema: {
+    source: z4.string().min(SOURCE_MIN_CHARS, `Source material must be at least ${SOURCE_MIN_CHARS} characters.`).max(SOURCE_MAX_CHARS, `Source material must be under ${SOURCE_MAX_CHARS} characters.`).describe("The long-form source text to extract ideas from."),
+    count: z4.number().int().min(3).max(10).optional().describe("How many distinct ideas to extract (default 5)."),
+    platform: z4.string().optional().describe("Target platform for the ideas, e.g. LinkedIn, X, Instagram (default LinkedIn).")
+  },
+  annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async ({ source, count, platform }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const scopes = ctx.getScopes() || [];
+    if (!scopes.includes("generate:ideas")) {
+      return {
+        content: [{ type: "text", text: "Access denied: missing generate:ideas scope" }],
+        isError: true
+      };
+    }
+    try {
+      const { status, data } = await callExtractIdeasFunction({ source, count, platform }, ctx);
+      if (status !== 200) {
+        const message = typeof data.message === "string" && data.message || typeof data.error === "string" && data.error || `extract-ideas failed (${status})`;
+        return { content: [{ type: "text", text: message }], isError: true };
+      }
+      const ideas = Array.isArray(data.ideas) ? data.ideas : [];
+      return {
+        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+        structuredContent: {
+          ideas,
+          requested: data.requested,
+          partial: Boolean(data.partial)
+        }
+      };
+    } catch (e) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `extract-ideas request failed: ${e instanceof Error ? e.message : String(e)}`
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+});
+
+// src/lib/mcp/tools/repurpose-post.ts
+import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z5 } from "npm:zod@^4.4.3";
+var postSchema = z5.object({
+  title: z5.string().optional(),
+  hook: z5.string().optional(),
+  body: z5.string().optional(),
+  cta: z5.string().optional(),
+  hashtags: z5.string().optional(),
+  topic: z5.string().optional(),
+  format: z5.string().optional(),
+  dow: z5.string().optional()
+}).passthrough().describe("The source post to repurpose. Provide at minimum a hook or body.");
+async function callRepurposePostFunction(body, ctx) {
+  const supabaseUrl = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
+  const res = await fetch(`${supabaseUrl}/functions/v1/repurpose-post`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
+      Authorization: `Bearer ${ctx.getToken() ?? ""}`
+    },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  return { status: res.status, data };
+}
+var repurpose_post_default = defineTool5({
+  name: "repurpose_post",
+  title: "Repurpose a post for another platform",
+  description: "Rewrite an existing post for a different target platform (e.g. take a LinkedIn post and rewrite it for X or Instagram), preserving the strategic angle. Calls the same `repurpose-post` pipeline the app UI uses, so per-user rate limits and generation quota apply.",
+  inputSchema: {
+    post: postSchema,
+    targetPlatform: z5.string().min(1).describe("Platform to rewrite the post for, e.g. X, Instagram, Facebook, Newsletter."),
+    platform: z5.string().optional().describe("The post's current/source platform (default LinkedIn).")
+  },
+  annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async ({ post, targetPlatform, platform }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const scopes = ctx.getScopes() || [];
+    if (!scopes.includes("generate:repurpose")) {
+      return {
+        content: [{ type: "text", text: "Access denied: missing generate:repurpose scope" }],
+        isError: true
+      };
+    }
+    if (!post || !post.hook && !post.body && !post.title) {
+      return {
+        content: [
+          { type: "text", text: "Malformed input: post must include at least a title, hook, or body." }
+        ],
+        isError: true
+      };
+    }
+    try {
+      const { status, data } = await callRepurposePostFunction(
+        { post, targetPlatform, platform },
+        ctx
+      );
+      if (status !== 200) {
+        const message = typeof data.message === "string" && data.message || typeof data.error === "string" && data.error || `repurpose-post failed (${status})`;
+        return { content: [{ type: "text", text: message }], isError: true };
+      }
+      if (!data.post) {
+        return {
+          content: [{ type: "text", text: "repurpose-post returned no post." }],
+          isError: true
+        };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(data.post, null, 2) }],
+        structuredContent: { post: data.post }
+      };
+    } catch (e) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `repurpose-post request failed: ${e instanceof Error ? e.message : String(e)}`
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+});
+
+// src/lib/mcp/tools/list-trends.ts
+import { createClient as createClient4 } from "npm:@supabase/supabase-js@^2.86.0";
+import { defineTool as defineTool6 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z6 } from "npm:zod@^4.4.3";
+function supabaseForUser4(ctx) {
+  return createClient4(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var list_trends_default = defineTool6({
+  name: "list_trends",
+  title: "List trending topics",
+  description: "List recent trending keywords from the `trends` table populated by the trends-ingest pipeline (supabase/functions/trends-ingest), ordered by volume. This is shared, non-personal data readable by any signed-in user \u2014 the same table src/components/InspirationBank.tsx reads.",
+  inputSchema: {
+    category: z6.string().optional().describe(
+      "Filter to trends whose category matches this text (case-insensitive substring match, e.g. an industry name)."
+    ),
+    limit: z6.number().int().min(1).max(50).optional().describe("Max trends to return (default 20).")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ category, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const scopes = ctx.getScopes() || [];
+    if (!scopes.includes("read:trends")) {
+      return { content: [{ type: "text", text: "Access denied: missing read:trends scope" }], isError: true };
+    }
+    let query = supabaseForUser4(ctx).from("trends").select("keyword, category, volume, source, last_seen").order("volume", { ascending: false }).limit(limit ?? 20);
+    if (category) query = query.ilike("category", `%${category}%`);
+    const { data, error } = await query;
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      structuredContent: { trends: data ?? [] }
+    };
+  }
+});
+
+// src/lib/mcp/index.ts
+var projectRef = "mbxlvsftyifovbkpsvyw";
+function assertNotServiceRoleKey(key) {
+  if (!key) return;
+  const parts = key.split(".");
+  if (parts.length !== 3) return;
+  try {
+    const payloadJson = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
+    const payload = JSON.parse(payloadJson);
+    if (payload.role === "service_role") {
+      throw new Error(
+        "SUPABASE_PUBLISHABLE_KEY resolves to a service-role JWT. Refusing to start the MCP server: this key must be the anon/publishable key so RLS applies to every tool call."
+      );
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("SUPABASE_PUBLISHABLE_KEY resolves")) throw e;
+  }
+}
+assertNotServiceRoleKey(
+  typeof process !== "undefined" ? process.env?.SUPABASE_PUBLISHABLE_KEY : void 0
+);
+var mcp_default = defineMcp({
+  name: "contentforge-mcp",
+  title: "ContentForge",
+  version: "0.1.0",
+  instructions: "Tools for ContentForge \u2014 an AI-powered social media content planner. Use `list_calendars` to browse the user's saved weekly content calendars, `get_calendar` to fetch one calendar and its posts by ID, `list_scheduled_posts` to see upcoming scheduled posts, `extract_ideas` to pull distinct post ideas out of pasted long-form source material, `repurpose_post` to rewrite an existing post for a different target platform, and `list_trends` to browse recent trending keywords.",
+  // Scope vocabulary for this server: `read:calendars` (list_calendars,
+  // get_calendar), `read:scheduled_posts` (list_scheduled_posts),
+  // `generate:ideas` (extract_ideas), `generate:repurpose` (repurpose_post),
+  // and `read:trends` (list_trends). The SDK's per-issuer `requiredScopes`
+  // gates ALL tools on the same scope set, which would force every client to
+  // hold every scope even if it only needs one — so scopes are declared here
+  // for documentation and enforced per-tool instead, via `ctx.getScopes()` in
+  // each handler (see get-calendar.ts, list-calendars.ts,
+  // list-scheduled-posts.ts, extract-ideas.ts, repurpose-post.ts,
+  // list-trends.ts).
+  //
+  // extract_ideas and repurpose_post call the SAME `extract-ideas` /
+  // `repurpose-post` Supabase Edge Functions the app UI calls, forwarding the
+  // caller's verified bearer token (`ctx.getToken()`) as the Authorization
+  // header. Those functions do their own auth (getVerifiedUserId), per-user
+  // rate limiting (checkRateLimit), and generation quota gating (checkQuota)
+  // exactly as they do for browser clients — the MCP tools do not (and must
+  // not) duplicate or bypass that logic; they only add the OAuth-scope check
+  // above it.
+  auth: auth.oauth.issuer({
+    issuer: `https://${projectRef}.supabase.co/auth/v1`,
+    acceptedAudiences: "authenticated"
+  }),
+  tools: [
+    list_calendars_default,
+    get_calendar_default,
+    list_scheduled_posts_default,
+    extract_ideas_default,
+    repurpose_post_default,
+    list_trends_default
+  ]
+});
+
 // lovable-mcp-supabase-entry.ts
-import mcp from "npm:C:\\Users\\HP\\OneDrive\\Desktop\\Projects\\AntiGravity - Google - Projects\\social-spark\\src\\lib\\mcp\\index.ts";
 import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.20.0/stacks/supabase";
-Deno.serve(createSupabaseHandler(mcp, { functionName: "mcp" }));
+Deno.serve(createSupabaseHandler(mcp_default, { functionName: "mcp" }));

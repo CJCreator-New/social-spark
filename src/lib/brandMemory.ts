@@ -84,7 +84,7 @@ export interface AiGenerationRequestBody {
  * directly to the user and NOT trigger the user-key fallback path.
  * Fallback should only happen for infrastructure failures (network, 5xx, 429).
  */
-const NON_FALLBACK_ERRORS = [
+export const NON_FALLBACK_ERRORS = [
   "Missing core idea",
   "Missing core idea or topics",
   "Sign in required",
@@ -99,10 +99,24 @@ const NON_FALLBACK_ERRORS = [
   "All platform AI providers", // same error, string-prefix match
 ];
 
-function isNonFallbackError(message: string): boolean {
+export function isNonFallbackError(message: string): boolean {
   return NON_FALLBACK_ERRORS.some(
     (prefix) => message.startsWith(prefix) || message.includes(prefix)
   );
+}
+
+/**
+ * Error subclass that preserves the HTTP status code alongside the real
+ * server-provided error message, so callers that still want to branch on
+ * status (e.g. logging/telemetry) can, without losing message fidelity.
+ */
+export class AiGatewayHttpError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AiGatewayHttpError";
+    this.status = status;
+  }
 }
 
 export async function generateWithFallback<T = unknown>(
@@ -171,7 +185,11 @@ export async function generateWithFallback<T = unknown>(
     }
 
     if (!res.ok && (res.status === 429 || res.status >= 500)) {
-      throw new Error(`Platform failed with status ${res.status}`);
+      const errData = await res.json().catch(() => ({}));
+      throw new AiGatewayHttpError(
+        errData?.error || `Platform failed with status ${res.status}`,
+        res.status
+      );
     }
 
     const data = await res.json();
