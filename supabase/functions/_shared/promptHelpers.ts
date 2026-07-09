@@ -187,7 +187,9 @@ const PLATFORM_PROVIDER_CHAIN: ProviderEntry[] = [
     name: "openrouter",
     envKey: "PLATFORM_OPENROUTER_KEY",
     provider: "openrouter",
-    model: (q) => (q === "polished" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash"),
+    // Free-tier models — the shared platform key has no credits budget, so this
+    // must never resolve to a paid OpenRouter model (would 402 for every user).
+    model: (q) => (q === "polished" ? "qwen/qwen3-235b-a22b:free" : "deepseek/deepseek-chat-v3.1:free"),
   },
   {
     name: "openai",
@@ -2225,6 +2227,13 @@ async function callAIGatewayOnce(
     // we must fall back to the provider's default model for that quality level to avoid a 400.
     if (entry.provider !== "gemini" && entry.provider !== "openrouter" && entry.provider !== "lovable" &&
         (providerModel.includes("google") || providerModel.includes("gemini"))) {
+      providerModel = entry.model(quality);
+    }
+    // Callers pass opts.model tuned for the Lovable gateway's naming convention
+    // (e.g. "google/gemini-2.5-flash"), which on OpenRouter resolves to a PAID
+    // model and drains the shared platform key's credits for every user. Always
+    // force the free-tier model here regardless of what the caller requested.
+    if (entry.provider === "openrouter") {
       providerModel = entry.model(quality);
     }
     console.info(
