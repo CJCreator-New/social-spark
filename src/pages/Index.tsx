@@ -1,12 +1,14 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo, useCallback, lazy } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { getE2EAuthFlag, E2E_USER_ID, E2E_CALENDAR } from "@/lib/e2eFixtures";
 import e2eStore from "@/lib/e2eStore";
 import { toast } from "sonner";
 import storageService from "@/lib/storageService";
+import { resolveDraftConflict } from "@/lib/draftConflict";
+import { Button } from "@/components/ui/button";
 import mediaManager from "@/lib/mediaManager";
 import { SAMPLE_POSTS, SAMPLE_FORM, SAMPLE_POST_TIMES } from "@/lib/sampleCalendar";
 import type { BatchEditPayload } from "@/components/BatchEditModal";
@@ -54,16 +56,20 @@ import {
 } from "@/lib/postPerformanceScore";
 import { createSeedFromPost, storeSeed, readAndClearSeed } from "@/lib/seedFromPost";
 import { isEnabled } from "@/lib/featureFlags";
-import {
-  buildBrandMemoryPrompt,
-  generateWithFallback,
-  isNonFallbackError,
-} from "@/lib/brandMemory";
+import { generateWithFallback, isNonFallbackError } from "@/lib/brandMemory";
+import { buildBrandPrompt, mergeBrandSources } from "@/lib/brandPrompt";
+import { cacheToBrandInput } from "@/lib/brandCache";
+import { saveBrandFieldsToSlot } from "@/lib/brandSlotSave";
 import { WorkspacePage } from "@/components/layout/WorkspacePage";
 import { WelcomeBanner } from "@/components/WelcomeBanner";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { FontStyle, applyStyle } from "@/lib/unicodeFonts";
 import { useWizardStore } from "@/stores/useWizardStore";
+import {
+  classifyGenerationAbort,
+  allowsTemplateFallback,
+  generationAbortMessage,
+} from "@/lib/generationAbort";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Helmet } from "react-helmet-async";
 
@@ -239,21 +245,14 @@ function clearBrandMemory(userId: string | null | undefined) {
   }
 }
 
-function brandMemoryToPrompt(memory: BrandMemory | null): string {
-  if (!memory) return "";
-  const parts = [
-    memory.voice ? `Voice: ${memory.voice}` : "",
-    memory.style ? `Style: ${memory.style}` : "",
-    memory.copyStyle && memory.copyStyle !== "Keep plain text (recommended)"
-      ? `Copy style: ${memory.copyStyle}`
-      : "",
-    memory.cta ? `CTA style: ${memory.cta}` : "",
-    memory.audiences.length ? `Audience preferences: ${memory.audiences.join(", ")}` : "",
-    memory.goals.length ? `Goal preferences: ${memory.goals.join(", ")}` : "",
-    memory.bannedWords.length ? `Avoid these phrases: ${memory.bannedWords.join(", ")}` : "",
-    memory.requiredWords.length ? `Prefer these phrases: ${memory.requiredWords.join(", ")}` : "",
-  ].filter(Boolean);
-  return parts.join(" | ");
+// One builder for the whole brand block: the profile slot wins, the browser
+// cache (saved wizard memory) only fills fields the slot leaves empty.
+function brandPromptFor(
+  slot: Parameters<typeof mergeBrandSources>[0],
+  memory: BrandMemory | null
+): string {
+  if (!isEnabled("brandMemory")) return "";
+  return buildBrandPrompt(mergeBrandSources(slot, cacheToBrandInput(memory)));
 }
 
 function buildBrandMemorySnapshot(form: WizardForm): BrandMemory {
@@ -299,6 +298,7 @@ function makeDraftEnvelope<T>(data: T): DraftEnvelope<T> {
   return { version: DRAFT_VERSION, savedAt: Date.now(), data };
 }
 
+// Age is judged later by resolveDraftConflict so the UI can say a draft expired.
 function parseDraftEnvelope<T>(value: unknown): DraftEnvelope<T> | null {
   if (!value || typeof value !== "object") return null;
   const envelope = value as Partial<DraftEnvelope<T>>;
@@ -309,7 +309,7 @@ function parseDraftEnvelope<T>(value: unknown): DraftEnvelope<T> | null {
   ) {
     return null;
   }
-  if (envelope.version !== DRAFT_VERSION || Date.now() - envelope.savedAt > DRAFT_MAX_AGE_MS) {
+  if (envelope.version !== DRAFT_VERSION) {
     return null;
   }
   return envelope as DraftEnvelope<T>;
@@ -421,6 +421,9 @@ async function writeServerDraft(userId: string, snapshot: WizardDraftSnapshot) {
   );
   if (error) {
     markWizardDraftServerUnavailable(error);
+    // A missing table means server drafts are not set up: stay quiet.
+    // Any other failure is reported to the caller so the UI can show it and offer Retry.
+    if (wizardDraftServerAvailable) throw error;
   } else {
     wizardDraftServerAvailable = true;
   }
@@ -599,6 +602,17 @@ const Index = () => {
   const [reformatting, setReformatting] = useState(false);
   const [recoveryDraft, setRecoveryDraft] = useState<WizardDraftSnapshot | null>(null);
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const [recoverySource, setRecoverySource] = useState<"local" | "server">("local");
+  const [recoveryConflict, setRecoveryConflict] = useState<{
+    local: { savedAt: number; data: WizardDraftSnapshot };
+    server: { savedAt: number; data: WizardDraftSnapshot };
+  } | null>(null);
+  const [recoveryExpired, setRecoveryExpired] = useState(false);
+  const [serverSaveFailed, setServerSaveFailed] = useState(false);
+  // Newest draft time the user has already dealt with in this page session. A draft with a
+  // later savedAt (for example from another tab) prompts again.
+  const handledDraftAtRef = useRef(0);
+  const pendingServerSnapshotRef = useRef<WizardDraftSnapshot | null>(null);
   const autosaveClearTimer = useRef<number | null>(null);
   const [showRationale, setShowRationale] = useState(false);
   const [showSubtopicConfirm, setShowSubtopicConfirm] = useState(false);
@@ -799,13 +813,6 @@ const Index = () => {
   }, [step, canUndo, canRedo, undoChange, redoChange]);
 
   useEffect(() => {
-    const completed = localStorage.getItem("social_spark_onboarding_completed") === "true";
-    if (!completed) {
-      setShowOnboarding(true);
-    }
-  }, []);
-
-  useEffect(() => {
     window.scrollTo(0, 0);
   }, [step]);
 
@@ -941,6 +948,7 @@ const Index = () => {
   // "Default" slot exists (auto-migrating legacy profile-level brand memory)
   // in case the user never visits the Profile settings page first.
   const brandSlotsQuery = useBrandSlotsQuery(user?.id);
+  const brandQueryClient = useQueryClient();
   useEnsureDefaultBrandSlot(user?.id, profileData || null);
   const activeBrandSlot = resolveActiveBrandSlot(brandSlotsQuery.data, form.brandSlotId);
 
@@ -984,6 +992,8 @@ const Index = () => {
     let cancelled = false;
     draftReady.current = false;
     setRecoveryDraft(null);
+    setRecoveryConflict(null);
+    setRecoveryExpired(false);
     setShowRecoveryDialog(false);
 
     // Remove any expired local drafts early to avoid showing stale recovery
@@ -995,38 +1005,60 @@ const Index = () => {
 
     const hydrateDraft = async () => {
       try {
-        const localDraft = readDraftEnvelope<WizardDraftSnapshot>(wizardDraftKey);
-        const serverDraft = user ? await readServerDraft(user.id) : null;
-        const candidates: { envelope: DraftEnvelope<WizardDraftSnapshot>; sortKey: number }[] = [];
-        if (localDraft) candidates.push({ envelope: localDraft, sortKey: localDraft.savedAt });
-        if (serverDraft)
-          candidates.push({ envelope: serverDraft.envelope, sortKey: serverDraft.updatedAt });
-        const newestDraft = candidates.sort((a, b) => b.sortKey - a.sortKey)[0]?.envelope || null;
+        let localDraft = readDraftEnvelope<WizardDraftSnapshot>(wizardDraftKey);
+        let serverDraft = user ? await readServerDraft(user.id) : null;
 
         if (cancelled) return;
 
-        if (newestDraft) {
-          const shouldSkipRecovery =
-            newestDraft.data.step === 4 && newestDraft.data.posts.length === 0;
-          if (shouldSkipRecovery) {
-            if (user) {
-              void clearServerDraft(user.id).catch((error) => {
-                console.warn("Failed to clear empty server draft", error);
-              });
-            }
-            if (localDraft) {
-              storageService.removeDraft(wizardDraftKey);
-            }
-            return;
-          }
-          const prompted = sessionStorage.getItem("ss_recovery_prompted") === "true";
-          if (!prompted) {
-            setRecoveryDraft(newestDraft.data);
-            setShowRecoveryDialog(true);
-          }
-          if (user && localDraft && localDraft.savedAt >= (serverDraft?.updatedAt || 0)) {
-            void writeServerDraft(user.id, localDraft.data).catch((error) => {
+        // A step-4 draft with no posts has nothing worth recovering: drop that side.
+        const isEmptyReview = (d: WizardDraftSnapshot) => d.step === 4 && d.posts.length === 0;
+        if (localDraft && isEmptyReview(localDraft.data)) {
+          storageService.removeDraft(wizardDraftKey);
+          localDraft = null;
+        }
+        if (user && serverDraft && isEmptyReview(serverDraft.envelope.data)) {
+          void clearServerDraft(user.id).catch((error) => {
+            console.warn("Failed to clear empty server draft", error);
+          });
+          serverDraft = null;
+        }
+
+        const result = resolveDraftConflict<WizardDraftSnapshot>(
+          localDraft ? { savedAt: localDraft.savedAt, data: localDraft.data } : null,
+          serverDraft ? { savedAt: serverDraft.updatedAt, data: serverDraft.envelope.data } : null,
+          { maxAgeMs: DRAFT_MAX_AGE_MS }
+        );
+        setRecoveryExpired(result.expired.local || result.expired.server);
+
+        // Identical drafts need no choice, but the user still gets the normal recovery prompt.
+        const kind = result.identical ? "use-local" : result.kind;
+        if (kind === "none") return;
+
+        // Keyed on the draft's own time: only skip drafts the user has already handled.
+        const newestAt = Math.max(result.local?.savedAt ?? 0, result.server?.savedAt ?? 0);
+        if (newestAt <= handledDraftAtRef.current) return;
+
+        if (kind === "ask" && result.local && result.server) {
+          setRecoverySource("local");
+          setRecoveryConflict({ local: result.local, server: result.server });
+          // Pauses autosave until the user chooses; not used for restoring.
+          setRecoveryDraft(result.local.data);
+          setShowRecoveryDialog(true);
+        } else if (kind === "use-server" && result.server) {
+          setRecoverySource("server");
+          setRecoveryDraft(result.server.data);
+          setShowRecoveryDialog(true);
+        } else if (result.local) {
+          setRecoverySource("local");
+          setRecoveryDraft(result.local.data);
+          setShowRecoveryDialog(true);
+          if (user && kind === "use-local" && !result.server) {
+            // Only a local draft exists: back it up to the account.
+            void writeServerDraft(user.id, result.local.data).catch((error) => {
               console.warn("Failed to sync local draft to server", error);
+              pendingServerSnapshotRef.current = result.local!.data;
+              setServerSaveFailed(true);
+              setAutosaveStatus("error");
             });
           }
         }
@@ -1160,9 +1192,17 @@ const Index = () => {
           }, 3000);
         }
         if (user) {
-          void writeServerDraft(user.id, snapshot).catch((error) => {
-            console.warn("Failed to autosave wizard draft", error);
-          });
+          handledDraftAtRef.current = Date.now();
+          pendingServerSnapshotRef.current = snapshot;
+          void writeServerDraft(user.id, snapshot)
+            .then(() => setServerSaveFailed(false))
+            .catch((error) => {
+              console.warn("Failed to autosave wizard draft", error);
+              if (autosaveClearTimer.current) window.clearTimeout(autosaveClearTimer.current);
+              autosaveClearTimer.current = null;
+              setServerSaveFailed(true);
+              setAutosaveStatus("error");
+            });
         }
       } catch (e) {
         console.warn("Failed to persist wizard draft", e);
@@ -1200,29 +1240,50 @@ const Index = () => {
     }
   };
 
-  const restoreDraft = () => {
-    if (!recoveryDraft) return;
-    loadSnapshot(recoveryDraft);
-    setPostsWithHistory([...recoveryDraft.posts]);
+  const restoreSnapshot = (snap: WizardDraftSnapshot | null) => {
+    if (!snap) return;
+    loadSnapshot(snap);
+    setPostsWithHistory([...snap.posts]);
     setSavedId(null);
     setSampleMode(false);
     setError("");
     setGenMsg("");
     setGenStep(0);
     setRecoveryDraft(null);
+    setRecoveryConflict(null);
     setShowRecoveryDialog(false);
     hydrated.current = true;
     blockAutosaveRef.current = false;
-    sessionStorage.setItem("ss_recovery_prompted", "true");
+    handledDraftAtRef.current = Date.now();
   };
+
+  const restoreDraft = () => restoreSnapshot(recoveryDraft);
+  const restoreLocalDraft = () => restoreSnapshot(recoveryConflict?.local.data ?? null);
+  const restoreServerDraft = () => restoreSnapshot(recoveryConflict?.server.data ?? null);
 
   const discardDraft = () => {
     clearDraft();
     reset();
     setRecoveryDraft(null);
+    setRecoveryConflict(null);
     setShowRecoveryDialog(false);
-    sessionStorage.setItem("ss_recovery_prompted", "true");
+    handledDraftAtRef.current = Date.now();
     toast.success("Draft discarded. Start fresh below.");
+  };
+
+  const retryServerDraft = () => {
+    const snap = pendingServerSnapshotRef.current;
+    if (!user || !snap) return;
+    setAutosaveStatus("saving");
+    writeServerDraft(user.id, snap)
+      .then(() => {
+        setServerSaveFailed(false);
+        setAutosaveStatus("saved");
+      })
+      .catch((error) => {
+        console.warn("Retry of server draft save failed", error);
+        setAutosaveStatus("error");
+      });
   };
 
   const upd = useCallback(<K extends keyof typeof form>(k: K, v: (typeof form)[K]) => {
@@ -1308,7 +1369,14 @@ const Index = () => {
 
   const log = createScopedLogger("Index-Generate");
 
-  async function generate(isRetry: boolean = false, bypassSubtopicPreview: boolean = false) {
+  const currentWizardForm = form;
+  async function generate(
+    isRetry: boolean = false,
+    bypassSubtopicPreview: boolean = false,
+    overrides?: Partial<WizardForm>
+  ) {
+    // Use explicit overrides (e.g. a trend draft) instead of state set in the same tick.
+    const form: WizardForm = overrides ? { ...currentWizardForm, ...overrides } : currentWizardForm;
     if (generatingRef.current) return;
     if (!validate(2)) return;
 
@@ -1518,12 +1586,7 @@ const Index = () => {
         brand_examples: activeBrandSlot?.brand_examples || [],
         framework: activeBrandSlot?.default_framework || "Auto",
         quality: form.quality || "polished",
-        brandMemory: [
-          brandMemoryToPrompt(brandMemory),
-          isEnabled("brandMemory") ? buildBrandMemoryPrompt(activeBrandSlot) : "",
-        ]
-          .filter(Boolean)
-          .join("\n\n"),
+        brandMemory: brandPromptFor(activeBrandSlot, brandMemory),
       };
 
       let body: Record<string, unknown> = isDay
@@ -1662,8 +1725,17 @@ const Index = () => {
           error: String(err),
         });
       cleanup();
-      const aborted = err instanceof DOMException && err.name === "AbortError";
+      const abortKind = classifyGenerationAbort(ac.signal, err);
+      const aborted = abortKind !== "other";
       const reason = (ac.signal as AbortSignal & { reason?: unknown }).reason;
+      if (!allowsTemplateFallback(abortKind)) {
+        // Timeout or user cancel: show a clear error with Retry, never template posts.
+        setError(generationAbortMessage(abortKind) ?? getUserFriendlyMessage(err));
+        setLastGenerationError(err);
+        log.error(`Generation ${abortKind}`, err, { mode: form.mode, aborted, reason });
+        setStep(2);
+        return;
+      }
       if (!aborted) {
         const msg = err instanceof Error ? err.message : String(err);
         if (
@@ -1705,13 +1777,7 @@ const Index = () => {
       setLastGenerationError(err);
       log.error(`Generation error`, err, { mode: form.mode, aborted, reason });
 
-      if (aborted && reason === "timeout") {
-        setError("Generation timed out. Please try again.");
-      } else if (aborted) {
-        setError("Generation was cancelled.");
-      } else {
-        setError(userMessage);
-      }
+      setError(userMessage);
       setStep(2);
     }
   }
@@ -1778,12 +1844,7 @@ const Index = () => {
             extra: form.extra,
             bannedWords: form.bannedWords,
             requiredWords: form.requiredWords,
-            brandMemory: [
-              brandMemoryToPrompt(brandMemory),
-              isEnabled("brandMemory") ? buildBrandMemoryPrompt(activeBrandSlot) : "",
-            ]
-              .filter(Boolean)
-              .join("\n\n"),
+            brandMemory: brandPromptFor(activeBrandSlot, brandMemory),
             post: target,
             siblings: next,
             ...(tweak === "enhance" ? { focusMetric: targetFocusMetric } : {}),
@@ -1849,6 +1910,22 @@ const Index = () => {
     const snapshot = buildBrandMemorySnapshot(form);
     writeBrandMemory(user?.id, snapshot);
     setBrandMemory(snapshot);
+    // The profile brand slot is the source of truth; the browser copy above is a cache.
+    const slotId = activeBrandSlot?.id;
+    if (user?.id && slotId) {
+      const cacheInput = cacheToBrandInput(snapshot);
+      saveBrandFieldsToSlot(user.id, slotId, {
+        voice: cacheInput?.voice,
+        style: cacheInput?.style,
+        audiences: cacheInput?.audiences ?? [],
+        goals: cacheInput?.goals ?? [],
+        forbidden_phrases: cacheInput?.forbidden_phrases ?? [],
+        required_phrases: cacheInput?.required_phrases ?? [],
+        cta_preferences: cacheInput?.cta_preferences ?? [],
+      })
+        .then(() => brandQueryClient.invalidateQueries({ queryKey: ["brand-slots", user.id] }))
+        .catch(() => toast.error("Saved on this device, but could not update your brand profile"));
+    }
     toast.success("Brand memory saved");
   }
 
@@ -1923,12 +2000,7 @@ const Index = () => {
             extra: form.extra,
             bannedWords: form.bannedWords,
             requiredWords: form.requiredWords,
-            brandMemory: [
-              brandMemoryToPrompt(brandMemory),
-              isEnabled("brandMemory") ? buildBrandMemoryPrompt(activeBrandSlot) : "",
-            ]
-              .filter(Boolean)
-              .join("\n\n"),
+            brandMemory: brandPromptFor(activeBrandSlot, brandMemory),
             post: target,
             siblings: next,
           };
@@ -2020,12 +2092,7 @@ const Index = () => {
               extra: form.extra,
               bannedWords: form.bannedWords,
               requiredWords: form.requiredWords,
-              brandMemory: [
-                brandMemoryToPrompt(brandMemory),
-                isEnabled("brandMemory") ? buildBrandMemoryPrompt(activeBrandSlot) : "",
-              ]
-                .filter(Boolean)
-                .join("\n\n"),
+              brandMemory: brandPromptFor(activeBrandSlot, brandMemory),
               post: posts[i],
               siblings: next,
             };
@@ -2378,7 +2445,7 @@ const Index = () => {
       </Helmet>
       {showOnboarding && (
         <Suspense fallback={null}>
-          <OnboardingTour onSeeExample={loadSample} onClose={() => setShowOnboarding(false)} />
+          <OnboardingTour onClose={() => setShowOnboarding(false)} />
         </Suspense>
       )}
       {isE2EModeActive && (
@@ -2438,9 +2505,42 @@ const Index = () => {
               }
             : null
         }
+        source={recoverySource}
+        conflict={
+          recoveryConflict
+            ? {
+                local: {
+                  savedAt: recoveryConflict.local.savedAt,
+                  step: recoveryConflict.local.data.step,
+                  industry: recoveryConflict.local.data.form.industry,
+                  postCount: recoveryConflict.local.data.posts.length,
+                },
+                server: {
+                  savedAt: recoveryConflict.server.savedAt,
+                  step: recoveryConflict.server.data.step,
+                  industry: recoveryConflict.server.data.form.industry,
+                  postCount: recoveryConflict.server.data.posts.length,
+                },
+              }
+            : null
+        }
+        expiredNotice={recoveryExpired}
         onRestore={restoreDraft}
+        onRestoreLocal={restoreLocalDraft}
+        onRestoreServer={restoreServerDraft}
         onDiscard={discardDraft}
       />
+      {serverSaveFailed && autosaveStatus === "error" && (
+        <div
+          role="alert"
+          className="card mx-auto mb-4 flex max-w-[640px] items-center justify-between gap-3 text-sm"
+        >
+          <span>Could not save your draft to your account. It is still saved in this browser.</span>
+          <Button variant="outline" size="sm" onClick={retryServerDraft}>
+            Retry
+          </Button>
+        </div>
+      )}
       {confirm && (
         <ConfirmDialog
           title={confirm.title}
@@ -2467,7 +2567,7 @@ const Index = () => {
           </div>
 
           {/* FIRST-RUN WELCOME (new free users, step 1 only) */}
-          {step === 1 && <WelcomeBanner />}
+          {step === 1 && <WelcomeBanner onStart={() => setShowOnboarding(true)} />}
 
           {/* CONDENSED WIZARD STATUS SUMMARY */}
           {step < 4 && (
@@ -3192,6 +3292,11 @@ const Index = () => {
                         max={form.mode === "day" ? 1 : 7}
                         disabled={!form.industry}
                       />
+                      {form.industry && form.topics.length === 0 && (
+                        <div className="gated-lock-msg" data-testid="infer-topics-hint">
+                          <span>AI will infer topics from your core idea</span>
+                        </div>
+                      )}
                       {!form.industry && (
                         <div className="gated-lock-msg">
                           <span>
@@ -3249,7 +3354,7 @@ const Index = () => {
                           upd("topics", [topic]);
                           upd("mode", "day");
                           toast.success("Drafting post from trend: " + topic);
-                          generate(false);
+                          generate(false, true, { topics: [topic], mode: "day" });
                         }}
                       />
                     </div>

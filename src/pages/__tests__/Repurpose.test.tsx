@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 vi.mock("react-helmet-async", () => ({
@@ -232,7 +232,7 @@ describe("Repurpose page", () => {
     });
 
     mockGenerateMutateAsync.mockResolvedValueOnce({ body: "Recovered post body." });
-    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: /retry/i }));
     await waitFor(() => {
       expect(screen.getByText("Recovered post body.")).toBeInTheDocument();
     });

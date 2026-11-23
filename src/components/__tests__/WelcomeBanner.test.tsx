@@ -29,17 +29,40 @@ describe("WelcomeBanner", () => {
     expect(screen.getByText(/7 free generations left/i)).toBeInTheDocument();
   });
 
-  it("does not render for paid (pro) users", () => {
+  it("shows for paid users without the free-generation chip", () => {
     mockUseSubscription.mockReturnValue({
       status: { ...FREE, effectiveTier: "pro" },
       loading: false,
     });
-    const { container } = render(<WelcomeBanner />);
-    expect(container).toBeEmptyDOMElement();
+    render(<WelcomeBanner />);
+    expect(screen.getByText(/welcome to contentforge/i)).toBeInTheDocument();
+    expect(screen.queryByText(/free generation/i)).not.toBeInTheDocument();
   });
 
-  it("does not render while subscription is loading", () => {
+  it("hides the allowance chip while subscription is loading", () => {
     mockUseSubscription.mockReturnValue({ status: FREE, loading: true });
+    render(<WelcomeBanner />);
+    expect(screen.queryByText(/free generation/i)).not.toBeInTheDocument();
+  });
+
+  it("Start dismisses the card, stores the key and opens the tour", () => {
+    const onStart = vi.fn();
+    const { container } = render(<WelcomeBanner onStart={onStart} />);
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(container).toBeEmptyDOMElement();
+    expect(localStorage.getItem("social_spark_welcome_card_v2")).toBe("true");
+  });
+
+  it("Skip dismisses and stores the versioned key", () => {
+    const { container } = render(<WelcomeBanner />);
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    expect(container).toBeEmptyDOMElement();
+    expect(localStorage.getItem("social_spark_welcome_card_v2")).toBe("true");
+  });
+
+  it("does not show again when a legacy onboarding flag is set", () => {
+    localStorage.setItem("social_spark_onboarding_completed", "true");
     const { container } = render(<WelcomeBanner />);
     expect(container).toBeEmptyDOMElement();
   });
@@ -48,7 +71,7 @@ describe("WelcomeBanner", () => {
     const { container } = render(<WelcomeBanner />);
     fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
     expect(container).toBeEmptyDOMElement();
-    expect(localStorage.getItem("social_spark_welcome_seen")).toBe("true");
+    expect(localStorage.getItem("social_spark_welcome_card_v2")).toBe("true");
   });
 
   it("does not render if previously dismissed", () => {

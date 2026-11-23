@@ -16,6 +16,7 @@ import {
   useRemoveIdeaFromBacklogMutation,
 } from "@/hooks/useAppQueries";
 import { useFetchUrlContent } from "@/hooks/useFetchUrlContent";
+import { noticeForAngles, noticeForTruncation, MIN_ANGLES } from "@/lib/sourceToPost";
 import { IdeaBacklogPanel } from "@/components/IdeaBacklogPanel";
 import type {
   ExtractedIdea,
@@ -62,6 +63,8 @@ export default function Repurpose() {
   const [urlInput, setUrlInput] = useState("");
   const [urlMeta, setUrlMeta] = useState<{ title: string; wordCount: number } | null>(null);
   const [removingBacklogId, setRemovingBacklogId] = useState<string | null>(null);
+  const [urlTruncated, setUrlTruncated] = useState(false);
+  const [foundCount, setFoundCount] = useState<number | null>(null);
 
   const extractMutation = useExtractIdeasMutation();
   const generateMutation = useGenerateFromIdeaMutation();
@@ -97,6 +100,7 @@ export default function Repurpose() {
   const handleExtract = async () => {
     if (!canExtract) return;
     setExtractError(null);
+    setFoundCount(null);
     setIdeas(null);
     setCards({});
     setSavedIdeaKeys(new Set());
@@ -113,7 +117,8 @@ export default function Repurpose() {
         return;
       }
       setIdeas(result);
-      if (result.length < count) {
+      setFoundCount(result.length);
+      if (result.length >= MIN_ANGLES && result.length < count) {
         toast.info(
           `The source supported ${result.length} distinct ideas (you asked for ${count}).`
         );
@@ -212,6 +217,7 @@ export default function Repurpose() {
     if (result) {
       setSource(result.text);
       setUrlMeta({ title: result.title, wordCount: result.wordCount });
+      setUrlTruncated(Boolean(result.truncated));
       if (result.wordCount < URL_FETCH_MIN_WORDS) {
         toast.info(
           "This page may require JavaScript to render — try pasting the text manually."
@@ -324,6 +330,11 @@ export default function Repurpose() {
                   words.
                 </p>
               )}
+              {urlMeta && noticeForTruncation(urlTruncated) && (
+                <p className="rp-url-warning" role="status">
+                  {noticeForTruncation(urlTruncated)}
+                </p>
+              )}
               {urlMeta && urlMeta.wordCount < URL_FETCH_MIN_WORDS && (
                 <p className="rp-url-warning" role="alert">
                   This page may require JavaScript to render — try pasting the text manually.
@@ -419,6 +430,14 @@ export default function Repurpose() {
           {extractError && (
             <div className="rp-error" role="alert">
               <span>{extractError}</span>
+              <button type="button" className="rp-retry-btn" onClick={handleExtract}>
+                <RotateCcw size={12} aria-hidden /> Retry
+              </button>
+            </div>
+          )}
+          {foundCount !== null && noticeForAngles(foundCount).kind !== "ok" && (
+            <div className="rp-error" role="status">
+              <span>{noticeForAngles(foundCount).message}</span>
               <button type="button" className="rp-retry-btn" onClick={handleExtract}>
                 <RotateCcw size={12} aria-hidden /> Retry
               </button>

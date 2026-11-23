@@ -23,8 +23,7 @@ export function SkeletonList({ rows = 5 }: SkeletonListProps) {
               width: 18,
               height: 18,
               borderRadius: "50%",
-              background:
-                "linear-gradient(90deg, var(--color-primary-xlight), var(--color-primary-light), var(--color-primary-xlight))",
+              background: "var(--color-primary-xlight)",
               animation: "ssPulse 1.3s ease-in-out infinite",
               flexShrink: 0,
               marginTop: 2,
@@ -36,8 +35,7 @@ export function SkeletonList({ rows = 5 }: SkeletonListProps) {
                 height: 18,
                 width: "55%",
                 borderRadius: 6,
-                background:
-                  "linear-gradient(90deg, var(--color-surface-hover), var(--color-primary-xlight), var(--color-surface-hover))",
+                background: "var(--color-surface-hover)",
                 animation: "ssPulse 1.3s ease-in-out infinite",
                 marginBottom: 10,
               }}

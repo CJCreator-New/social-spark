@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { describeScope } from "@/lib/consentScopes";
 import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { LogoMark } from "@/components/brand/Logo";
@@ -45,11 +46,12 @@ export default function OAuthConsent() {
   const [details, setDetails] = useState<AuthorizationDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [incomplete, setIncomplete] = useState(false);
 
   useEffect(() => {
     let active = true;
     (async () => {
-      if (!authorizationId) return setError("Missing authorization_id");
+      if (!authorizationId) return setIncomplete(true);
       const { data: sess } = await supabase.auth.getSession();
       if (!sess.session) {
         const next = window.location.pathname + window.location.search;
@@ -112,7 +114,18 @@ export default function OAuthConsent() {
             </div>
           )}
 
-          {!details && !error && (
+          {incomplete && (
+            <div role="alert" className="oauth-consent-error">
+              <p>
+                This link is incomplete. Return to {APP_NAME} and start the connection again.
+              </p>
+              <Link to="/app" className="underline">
+                Back to {APP_NAME}
+              </Link>
+            </div>
+          )}
+
+          {!details && !error && !incomplete && (
             <p className="oauth-consent-loading" aria-busy="true">
               Loading authorization request…
             </p>
@@ -129,7 +142,15 @@ export default function OAuthConsent() {
               </p>
               <ul className="oauth-consent-scopes">
                 {details.scopes && details.scopes.length > 0 ? (
-                  details.scopes.map((scope) => <li key={scope}>{scope}</li>)
+                  details.scopes.map((scope) => {
+                    const { title, description } = describeScope(scope);
+                    return (
+                      <li key={scope}>
+                        <strong>{title}</strong>
+                        <span className="block text-muted-foreground">{description}</span>
+                      </li>
+                    );
+                  })
                 ) : (
                   <li>This app is requesting access to your account.</li>
                 )}

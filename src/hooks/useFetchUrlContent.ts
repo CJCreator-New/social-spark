@@ -4,6 +4,17 @@ export interface UrlFetchResult {
   text: string;
   title: string;
   wordCount: number;
+  truncated?: boolean;
+}
+
+/** Picks the server's real reason from an error body, else a generic message. */
+export function errorMessageFromBody(data: unknown, status: number): string {
+  if (data && typeof data === 'object') {
+    const body = data as { error?: unknown; message?: unknown };
+    if (typeof body.error === 'string' && body.error.trim()) return body.error;
+    if (typeof body.message === 'string' && body.message.trim()) return body.message;
+  }
+  return `Could not fetch that page (error ${status}). Please try again or paste the text instead.`;
 }
 
 export function useFetchUrlContent() {
@@ -29,9 +40,9 @@ export function useFetchUrlContent() {
         },
         body: JSON.stringify({ url }),
       });
-      if (!res.ok) throw new Error(`Failed: ${res.status}`);
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      const data = await res.json().catch(() => null);
+      if (!res.ok || data?.error) throw new Error(errorMessageFromBody(data, res.status));
+      if (!data) throw new Error(errorMessageFromBody(null, res.status));
       return data as UrlFetchResult;
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to fetch URL';

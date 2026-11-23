@@ -33,14 +33,14 @@
     --muted: 38 27% 94%;
     --muted-foreground: 30 4% 34%;
 
-    --accent: 48 95% 91%;
+    --accent-ui: 48 95% 91%; /* shadcn accent; page alias --accent lives in tokens.css */
     --accent-foreground: 18 89% 40%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 20 6% 90%;
-    --input: 20 6% 90%;
+    --input: 28 5% 52%; /* ~#8a837d, 3.5:1 on page bg (WCAG 1.4.11) */
     --ring: 18 89% 40%;
 
     --radius: 0.625rem;
@@ -141,14 +141,25 @@
       transform 160ms ease;
   }
 
-  button:focus-visible,
-  a:focus-visible,
-  input:focus-visible,
-  textarea:focus-visible,
-  select:focus-visible,
-  [role="button"]:focus-visible {
-    outline: 2px solid hsl(var(--primary) / 0.75);
+  /* One global keyboard focus ring (WCAG 2.4.7 / 1.4.11): --focus-outline is
+     4.9:1 on the page background and 5.2:1 on white surfaces. */
+  :focus-visible {
+    outline: 2px solid var(--focus-outline, #c2410c);
     outline-offset: 2px;
+  }
+}
+
+/* One global reduced-motion rule (WCAG 2.3.3). Covers every animation and
+   transition, including keyframes injected via <style> tags (e.g. the skeleton
+   pulse), because it targets the elements, not the keyframes. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -214,7 +225,7 @@
 
   /* ── Warm form inputs ── */
   .control-input {
-    @apply w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none;
+    @apply w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground;
     font-family: var(--font-body);
   }
 
@@ -266,7 +277,6 @@
   .input-glow:focus {
     border-color: hsl(var(--primary));
     box-shadow: var(--focus-ring);
-    outline: none;
   }
 }
 

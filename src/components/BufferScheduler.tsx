@@ -1,13 +1,24 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { Post } from "@/components/wizard/constants";
 import { formatForPlatform, niceLabelFor } from "@/lib/platformCopy";
 import { FontStyle } from "@/lib/unicodeFonts";
+import { supabase } from "@/integrations/supabase/client";
+import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
+import { dateForDow, nextMonday, parseLocalDate, toDateInputValue } from "@/lib/calendarSchedule";
+import { suggestedTimeForDay } from "@/lib/postingTimes";
+import { browserTimezone } from "@/lib/timezones";
+import { buildScheduledAt, countSchedulerResults } from "@/lib/schedulerDates";
+import { validateSchedulerKey, type SchedulerKeyProvider } from "@/lib/schedulerKeys";
 
 interface BufferSchedulerProps {
   posts: Post[];
   platform: string;
   postTimes?: Record<string, string>;
+  /** Monday of the calendar week (YYYY-MM-DD string or Date). Defaults to next Monday. */
+  weekStart?: string | Date | null;
+  /** IANA time zone the post times are expressed in. Defaults to the browser zone. */
+  timezone?: string | null;
 }
 
 interface ScheduleResult {
@@ -28,11 +39,10 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({
   posts,
   platform,
   postTimes = {},
+  weekStart,
+  timezone,
 }) => {
   const [schedulerType, setSchedulerType] = useState<"buffer" | "hootsuite">("buffer");
-
-  const [bufferKey, setBufferKey] = useState("");
-  const [hootsuiteKey, setHootsuiteKey] = useState("");
 
   const [bufferProfileId, setBufferProfileId] = useState(
     () => localStorage.getItem(BUFFER_PROFILE_STORAGE) || ""
@@ -45,25 +55,95 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({
   const [scheduling, setScheduling] = useState(false);
   const [results, setResults] = useState<ScheduleResult[]>([]);
 
-  const clearBufferKey = () => {
-    setBufferKey("");
+  const [savedKeys, setSavedKeys] = useState<Record<SchedulerKeyProvider, boolean>>({
+    buffer: false,
+    hootsuite: false,
+  });
+  const [keyDraft, setKeyDraft] = useState<Record<SchedulerKeyProvider, string>>({
+    buffer: "",
+    hootsuite: "",
+  });
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [keyError, setKeyError] = useState("");
+
+  const callKeyFunction = async (payload: Record<string, unknown>) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) throw new Error("Please sign in again.");
+    const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+    const res = await fetch(`${resolveFunctionsBaseUrl(supabaseUrl)}/functions/v1/save-scheduler-key`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);
+    return data;
   };
 
-  const clearHootsuiteKey = () => {
-    setHootsuiteKey("");
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    callKeyFunction({ action: "status" })
+      .then((data) => {
+        if (!cancelled && data?.saved) {
+          setSavedKeys({ buffer: !!data.saved.buffer, hootsuite: !!data.saved.hootsuite });
+        }
+      })
+      .catch(() => {
+        /* status is best-effort; the push button stays disabled until it succeeds */
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const saveKey = async () => {
+    const check = validateSchedulerKey(schedulerType, keyDraft[schedulerType]);
+    if (!check.ok) {
+      setKeyError(check.reason);
+      return;
+    }
+    setKeyError("");
+    setKeyBusy(true);
+    try {
+      await callKeyFunction({ provider: schedulerType, key: keyDraft[schedulerType] });
+      setSavedKeys((s) => ({ ...s, [schedulerType]: true }));
+      setKeyDraft((d) => ({ ...d, [schedulerType]: "" }));
+      toast.success("Token saved");
+    } catch (err) {
+      setKeyError(err instanceof Error ? err.message : "Could not save the token.");
+    } finally {
+      setKeyBusy(false);
+    }
+  };
+
+  const removeKey = async () => {
+    setKeyError("");
+    setKeyBusy(true);
+    try {
+      await callKeyFunction({ action: "delete", provider: schedulerType });
+      setSavedKeys((s) => ({ ...s, [schedulerType]: false }));
+      toast.success("Token removed");
+    } catch (err) {
+      setKeyError(err instanceof Error ? err.message : "Could not remove the token.");
+    } finally {
+      setKeyBusy(false);
+    }
   };
 
   const scheduleAll = async () => {
     const isBuffer = schedulerType === "buffer";
-    const apiKey = isBuffer ? bufferKey : hootsuiteKey;
+    const label = isBuffer ? "Buffer" : "Hootsuite";
     const profileId = isBuffer ? bufferProfileId : hootsuiteProfileId;
 
-    if (!apiKey.trim()) {
-      toast.error(`Enter your ${isBuffer ? "Buffer" : "Hootsuite"} API key first`);
-      return;
-    }
     if (!profileId.trim()) {
-      toast.error(`Enter your ${isBuffer ? "Buffer" : "Hootsuite"} Profile ID first`);
+      toast.error(`Enter your ${label} Profile ID first`);
       return;
     }
 
@@ -75,92 +155,71 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({
     }
 
     setScheduling(true);
-    const initResults: ScheduleResult[] = posts.map((p) => ({ day: p.day, status: "pending" }));
-    setResults(initResults);
+    setResults(posts.map((p) => ({ day: p.day, status: "pending" })));
 
-    for (let i = 0; i < posts.length; i++) {
-      const post = posts[i];
-      const text = buildPostText(post, platform);
-      const scheduledAt = postTimes[String(post.day)]
-        ? `${new Date().toISOString().slice(0, 10)}T${postTimes[String(post.day)]}:00`
-        : undefined;
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error("Please sign in again to push posts.");
 
-      try {
-        let response: Response;
-        if (isBuffer) {
-          const body: Record<string, any> = {
-            profile_ids: [profileId.trim()],
-            text,
-          };
-          if (scheduledAt) {
-            body.scheduled_at = scheduledAt;
-          }
-          if (post.image_url) {
-            body["media[picture]"] = post.image_url;
-            body["media[thumbnail]"] = post.image_url;
-          }
+      const weekStartDate =
+        (weekStart instanceof Date ? weekStart : parseLocalDate(weekStart ?? null)) || nextMonday();
+      const tz = timezone || browserTimezone();
 
-          response = await fetch("https://api.bufferapp.com/1/updates/create.json", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${apiKey.trim()}`,
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams(
-              Object.entries(body).flatMap(([k, v]) =>
-                Array.isArray(v) ? v.map((val) => [k + "[]", String(val)]) : [[k, String(v)]]
-              )
-            ).toString(),
-          });
-        } else {
-          // Hootsuite API call
-          response = await fetch("https://platform.hootsuite.com/v1/messages", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${apiKey.trim()}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              text,
-              socialProfileIds: [profileId.trim()],
-              ...(scheduledAt ? { scheduledSendTime: new Date(scheduledAt).toISOString() } : {}),
-              ...(post.image_url ? { media: [{ url: post.image_url }] } : {}),
-            }),
-          });
+      const payloadPosts = posts.map((post) => {
+        const time = postTimes[String(post.day)] || suggestedTimeForDay(post.day, platform);
+        const dayDate = toDateInputValue(dateForDow(weekStartDate, post.dow));
+        return {
+          text: buildPostText(post, platform),
+          scheduledAt: buildScheduledAt(dayDate, time, tz),
+          ...(post.image_url ? { imageUrl: post.image_url } : {}),
+        };
+      });
+
+      const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+      const res = await fetch(
+        `${resolveFunctionsBaseUrl(supabaseUrl)}/functions/v1/push-to-scheduler`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            provider: schedulerType,
+            profileId: profileId.trim(),
+            posts: payloadPosts,
+          }),
         }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Push failed (${res.status})`);
 
-        if (response.ok) {
-          setResults((prev) =>
-            prev.map((r) =>
-              r.day === post.day ? { ...r, status: "success", message: "Scheduled ✓" } : r
-            )
-          );
-        } else {
-          const errData = await response.json().catch(() => ({}));
-          setResults((prev) =>
-            prev.map((r) =>
-              r.day === post.day
-                ? { ...r, status: "error", message: errData?.error || `HTTP ${response.status}` }
-                : r
-            )
-          );
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Network error";
-        setResults((prev) =>
-          prev.map((r) => (r.day === post.day ? { ...r, status: "error", message: msg } : r))
-        );
+      const failedIdx = new Map<number, string>(
+        (data.errors ?? []).map((e: { index: number; message: string }) => [e.index, e.message])
+      );
+      setResults(
+        posts.map((p, i) =>
+          failedIdx.has(i)
+            ? { day: p.day, status: "error", message: failedIdx.get(i) }
+            : { day: p.day, status: "success", message: "Scheduled ✓" }
+        )
+      );
+
+      const counts = countSchedulerResults(data, label);
+      if (counts.failed > 0) {
+        toast.error(`${counts.message}. ${data.errors?.[0]?.message ?? ""}`.trim());
+      } else {
+        toast.success(counts.message);
       }
-
-      // Small delay between API calls to avoid rate limiting
-      if (i < posts.length - 1) await new Promise((r) => setTimeout(r, 400));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Network error";
+      setResults(posts.map((p) => ({ day: p.day, status: "error", message: msg })));
+      toast.error(msg);
+    } finally {
+      setScheduling(false);
     }
-
-    setScheduling(false);
-    const successCount = results.filter((r) => r.status === "success").length;
-    toast.success(
-      `${successCount}/${posts.length} posts pushed to ${isBuffer ? "Buffer" : "Hootsuite"}`
-    );
   };
 
   return (
@@ -185,7 +244,7 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({
             display: "flex",
             flexDirection: "column",
             gap: 12,
-            minWidth: 320,
+            minWidth: "min(100%, 320px)",
           }}
         >
           {/* Tab selector for Buffer vs Hootsuite */}
@@ -238,52 +297,6 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({
             <>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 11, color: "var(--text3)" }}>
-                  Buffer API Access Token{" "}
-                  <a
-                    href="https://buffer.com/developers/api"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "var(--accent)" }}
-                  >
-                    (get yours →)
-                  </a>
-                </label>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <input
-                    type="password"
-                    value={bufferKey}
-                    onChange={(e) => setBufferKey(e.target.value)}
-                    placeholder="Enter Buffer API access token…"
-                    style={{
-                      flex: 1,
-                      background: "var(--bg)",
-                      border: "1px solid var(--border2)",
-                      borderRadius: 6,
-                      padding: "6px 10px",
-                      fontSize: 12,
-                      color: "var(--text)",
-                      fontFamily: "var(--font-body)",
-                      outline: "none",
-                    }}
-                  />
-                  {bufferKey.trim() && (
-                    <button
-                      type="button"
-                      className="cpbtn"
-                      style={{ fontSize: 11, padding: "5px 10px", color: "var(--err)" }}
-                      onClick={clearBufferKey}
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <div style={{ fontSize: 10, color: "var(--text3)", opacity: 0.75 }}>
-                  Access token is kept in memory for this tab only.
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 11, color: "var(--text3)" }}>
                   Buffer Profile ID{" "}
                   <span style={{ color: "var(--text3)", opacity: 0.7 }}>(find in Buffer URL)</span>
                 </label>
@@ -307,52 +320,6 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({
             </>
           ) : (
             <>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 11, color: "var(--text3)" }}>
-                  Hootsuite API Client Credential Token{" "}
-                  <a
-                    href="https://platform.hootsuite.com/docs/api"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "var(--accent)" }}
-                  >
-                    (get yours →)
-                  </a>
-                </label>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <input
-                    type="password"
-                    value={hootsuiteKey}
-                    onChange={(e) => setHootsuiteKey(e.target.value)}
-                    placeholder="Enter Hootsuite API key…"
-                    style={{
-                      flex: 1,
-                      background: "var(--bg)",
-                      border: "1px solid var(--border2)",
-                      borderRadius: 6,
-                      padding: "6px 10px",
-                      fontSize: 12,
-                      color: "var(--text)",
-                      fontFamily: "var(--font-body)",
-                      outline: "none",
-                    }}
-                  />
-                  {hootsuiteKey.trim() && (
-                    <button
-                      type="button"
-                      className="cpbtn"
-                      style={{ fontSize: 11, padding: "5px 10px", color: "var(--err)" }}
-                      onClick={clearHootsuiteKey}
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <div style={{ fontSize: 10, color: "var(--text3)", opacity: 0.75 }}>
-                  Access token is kept in memory for this tab only.
-                </div>
-              </div>
-
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 11, color: "var(--text3)" }}>
                   Hootsuite Social Profile ID{" "}
@@ -380,6 +347,47 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({
             </>
           )}
 
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="scheduler-token" className="text-[11px] opacity-70">
+              {schedulerType === "buffer" ? "Buffer" : "Hootsuite"} access token
+            </label>
+            {savedKeys[schedulerType] ? (
+              <div className="flex items-center gap-2 text-[11px]">
+                <span>Saved</span>
+                <button type="button" className="cpbtn" onClick={removeKey} disabled={keyBusy}>
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  id="scheduler-token"
+                  type="password"
+                  autoComplete="off"
+                  value={keyDraft[schedulerType]}
+                  onChange={(e) =>
+                    setKeyDraft((d) => ({ ...d, [schedulerType]: e.target.value }))
+                  }
+                  placeholder="Paste your token"
+                  className="flex-1 rounded border bg-transparent px-2 py-1 text-xs"
+                />
+                <button
+                  type="button"
+                  className="cpbtn"
+                  onClick={saveKey}
+                  disabled={keyBusy || !keyDraft[schedulerType]}
+                >
+                  {keyBusy ? "Saving…" : "Save"}
+                </button>
+              </div>
+            )}
+            {keyError && (
+              <div role="alert" className="text-[11px]">
+                {keyError}
+              </div>
+            )}
+          </div>
+
           <div
             style={{
               display: "flex",
@@ -397,9 +405,8 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({
               onClick={scheduleAll}
               disabled={
                 scheduling ||
-                (schedulerType === "buffer"
-                  ? !bufferKey.trim() || !bufferProfileId.trim()
-                  : !hootsuiteKey.trim() || !hootsuiteProfileId.trim())
+                !savedKeys[schedulerType] ||
+                (schedulerType === "buffer" ? !bufferProfileId.trim() : !hootsuiteProfileId.trim())
               }
               style={{ fontSize: 11, padding: "6px 14px" }}
             >
@@ -408,6 +415,13 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({
                 : `Push to ${schedulerType === "buffer" ? "Buffer" : "Hootsuite"} →`}
             </button>
           </div>
+
+          {!savedKeys[schedulerType] && (
+            <div className="text-[11px] opacity-70">
+              Save your {schedulerType === "buffer" ? "Buffer" : "Hootsuite"} token above to enable
+              pushing.
+            </div>
+          )}
 
           {results.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
@@ -447,8 +461,8 @@ export const BufferScheduler: React.FC<BufferSchedulerProps> = ({
               marginTop: 4,
             }}
           >
-            API access tokens are kept in memory for this tab only and are sent directly to the
-            selected scheduler API.
+            Posts are sent from our server using your saved access token. Once saved, the token is
+            stored encrypted and is never shown again.
           </div>
         </div>
       )}

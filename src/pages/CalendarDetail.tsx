@@ -68,7 +68,8 @@ import {
   getEngagementPrediction,
   ENGAGEMENT_BADGE,
 } from "@/lib/postPerformanceScore";
-import { buildBrandMemoryPrompt } from "@/lib/brandMemory";
+import { buildBrandPrompt, mergeBrandSources } from "@/lib/brandPrompt";
+import { cacheToBrandInput, readBrandCache } from "@/lib/brandCache";
 import { resolveActiveBrandSlot } from "@/lib/brandSlots";
 import { createSeedFromPost, storeSeed } from "@/lib/seedFromPost";
 import { isEnabled } from "@/lib/featureFlags";
@@ -614,7 +615,11 @@ export default function CalendarDetail() {
             extra: formPayload.extra || "",
             bannedWords: formPayload.bannedWords || [],
             requiredWords: formPayload.requiredWords || [],
-            brandMemory: isEnabled("brandMemory") ? buildBrandMemoryPrompt(activeBrandSlot) : "",
+            brandMemory: isEnabled("brandMemory")
+          ? buildBrandPrompt(
+              mergeBrandSources(activeBrandSlot, cacheToBrandInput(readBrandCache(user?.id)))
+            )
+          : "",
             post: posts[i],
             siblings: next,
           }),
@@ -1022,7 +1027,11 @@ export default function CalendarDetail() {
         extra: formPayload.extra || "",
         bannedWords: formPayload.bannedWords || [],
         requiredWords: formPayload.requiredWords || [],
-        brandMemory: isEnabled("brandMemory") ? buildBrandMemoryPrompt(activeBrandSlot) : "",
+        brandMemory: isEnabled("brandMemory")
+          ? buildBrandPrompt(
+              mergeBrandSources(activeBrandSlot, cacheToBrandInput(readBrandCache(user?.id)))
+            )
+          : "",
         post: target,
         siblings: posts,
         tweak,
@@ -2270,7 +2279,7 @@ export default function CalendarDetail() {
                                 ? "var(--color-status-approved)"
                                 : st === "failed"
                                   ? "var(--color-error-text)"
-                                  : "var(--color-text-disabled)",
+                                  : "var(--color-text-muted)",
                         }}
                       />
                     )}
@@ -2338,7 +2347,13 @@ export default function CalendarDetail() {
           </button>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
-          <BufferScheduler posts={posts} platform={platform} postTimes={postTimes} />
+          <BufferScheduler
+            posts={posts}
+            platform={platform}
+            postTimes={postTimes}
+            weekStart={weekStart}
+            timezone={timezone || profileTimezone}
+          />
         </div>
 
         <div className="cd-bulk-bar">

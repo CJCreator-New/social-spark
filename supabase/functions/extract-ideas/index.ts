@@ -179,6 +179,7 @@ Return the result using return_ideas.`;
 
     let ideas: any[] = [];
     let attempts = 0;
+    let quotaCounted = false;
 
     while (attempts < 2 && ideas.length < 3) {
       attempts++;
@@ -202,10 +203,6 @@ Return the result using return_ideas.`;
       if (aiRes.status !== 200) {
         if (attempts === 1) continue;
         return jsonResponse({ error: aiRes.error }, aiRes.status);
-      }
-
-      if (usingSharedKey && attempts === 1) {
-        await incrementGenerationCount(userId);
       }
 
       const parseResult = parseAIResponse(aiRes.data || {}, "return_ideas");
@@ -253,6 +250,13 @@ Return the result using return_ideas.`;
           return true;
         })
         .slice(0, count);
+
+      // Count the generation quota once, on the first attempt that yields
+      // usable ideas (never on failures, never twice across retries).
+      if (usingSharedKey && !quotaCounted && ideas.length > 0) {
+        quotaCounted = true;
+        await incrementGenerationCount(userId);
+      }
     }
 
     if (ideas.length === 0) {

@@ -123,6 +123,15 @@ const App = () => {
                       </Suspense>
                     }
                   />
+                  {/* Neutral path; depends on the Supabase OAuth authorization path config (unverified). */}
+                  <Route
+                    path="/oauth/consent"
+                    element={
+                      <Suspense fallback={<RouteFallback title="Authorize" />}>
+                        <OAuthConsent />
+                      </Suspense>
+                    }
+                  />
                   {import.meta.env.DEV && <Route path="/__e2e/crash" element={<E2ECrashRoute />} />}
                   <Route
                     element={

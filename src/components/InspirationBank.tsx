@@ -253,7 +253,6 @@ export const InspirationBank: React.FC<InspirationBankProps> = ({
             position: "fixed",
             inset: 0,
             backgroundColor: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(4px)",
             zIndex: 1100,
             display: "flex",
             alignItems: "center",

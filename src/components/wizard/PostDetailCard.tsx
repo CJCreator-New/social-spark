@@ -1,7 +1,7 @@
 import React from "react";
 import { Post, WizardForm } from "./constants";
 import { shortDateLabel, dateForDow } from "@/lib/calendarSchedule";
-import { resolvePlatform } from "@/lib/platformCopy";
+import { platformLimitStatus, sanitizeCopy } from "@/lib/copyLimits";
 import { TopicGapBadge } from "@/components/TopicGapBadge";
 import { HashtagChipEditor } from "@/components/HashtagChipEditor";
 
@@ -40,6 +40,17 @@ export const PostDetailCard = React.memo(function PostDetailCard({
     (t) => t && t.trim().toLowerCase() === post.topic.trim().toLowerCase()
   );
 
+  // Single choke point: strip markdown emphasis when the user leaves a field.
+  const commitClean = (field: "title" | "hook" | "body" | "cta", value: string) => {
+    const clean = sanitizeCopy(value);
+    if (clean !== value) onFieldChange(field, clean);
+  };
+
+  const status = platformLimitStatus(
+    [post.hook, post.body, post.cta, post.hashtags].filter(Boolean).join("\n\n"),
+    form.platform
+  );
+
   return (
     <div className="pcard editor-workspace">
       {/* Editor Header Tags */}
@@ -73,6 +84,7 @@ export const PostDetailCard = React.memo(function PostDetailCard({
           className="text-input ptitle-input focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus:outline-none"
           value={post.title || ""}
           onChange={(e) => onFieldChange("title", e.target.value)}
+          onBlur={(e) => commitClean("title", e.target.value)}
           rows={1}
           placeholder="Write an engaging title..."
           style={{
@@ -99,6 +111,7 @@ export const PostDetailCard = React.memo(function PostDetailCard({
           className="text-input phook-input focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus:outline-none"
           value={post.hook || ""}
           onChange={(e) => onFieldChange("hook", e.target.value)}
+          onBlur={(e) => commitClean("hook", e.target.value)}
           rows={2}
           placeholder="Hook (the first 1-2 sentences)..."
           style={{
@@ -124,6 +137,7 @@ export const PostDetailCard = React.memo(function PostDetailCard({
           className="text-input pbody-input focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus:outline-none"
           value={post.body || ""}
           onChange={(e) => onFieldChange("body", e.target.value)}
+          onBlur={(e) => commitClean("body", e.target.value)}
           rows={6}
           placeholder="Write the core value or message of the post..."
           style={{
@@ -137,6 +151,14 @@ export const PostDetailCard = React.memo(function PostDetailCard({
             resize: "vertical",
           }}
         />
+        <div
+          className={`char-counter char-${status.state}`}
+          aria-live="polite"
+          data-testid="char-counter"
+        >
+          {status.count} / {status.limit}
+          {status.state === "over" ? " (over limit)" : ""}
+        </div>
       </div>
 
       {/* CTA Editor */}
@@ -149,6 +171,7 @@ export const PostDetailCard = React.memo(function PostDetailCard({
           className="text-input pcta-input focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent focus:outline-none"
           value={post.cta || ""}
           onChange={(e) => onFieldChange("cta", e.target.value)}
+          onBlur={(e) => commitClean("cta", e.target.value)}
           rows={2}
           placeholder="Call to action..."
           style={{

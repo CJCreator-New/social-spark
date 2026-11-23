@@ -3,119 +3,96 @@ import { Link } from "react-router-dom";
 import { Sparkles, X, Zap, ArrowRight } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { APP_NAME } from "@/constants/branding";
+import { Button } from "@/components/ui/button";
 
-const SEEN_KEY = "social_spark_welcome_seen";
+export const WELCOME_CARD_KEY = "social_spark_welcome_card_v2";
+// Older first-run flags: anyone who already dismissed those should not see the card again.
+const LEGACY_KEYS = ["social_spark_welcome_seen", "social_spark_onboarding_completed"];
+
+function readSeen(): boolean {
+  try {
+    return [WELCOME_CARD_KEY, ...LEGACY_KEYS].some((k) => localStorage.getItem(k) === "true");
+  } catch {
+    return false;
+  }
+}
+
+interface WelcomeBannerProps {
+  /** Opens the guided steps. */
+  onStart?: () => void;
+}
 
 /**
- * Lightweight first-run welcome shown once per browser to orient new users:
- * what the product does, their remaining free generations, and where to start.
- * Dismissible; the "seen" flag lives in localStorage (no backend dependency, so
- * it works regardless of edge-function deploy state).
+ * The single first-run welcome card, shown once per browser. "Start" opens the
+ * guided steps; "Skip" dismisses it. The dismissal flag lives in a versioned
+ * localStorage key (no backend dependency).
  */
-export function WelcomeBanner() {
+export function WelcomeBanner({ onStart }: WelcomeBannerProps) {
   const { status, loading } = useSubscription();
-  const [dismissed, setDismissed] = useState(() => {
-    try {
-      return localStorage.getItem(SEEN_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
+  const [dismissed, setDismissed] = useState(readSeen);
 
-  // Don't show to returning users, to paid users, or while loading.
-  if (dismissed || loading || status.effectiveTier !== "free") return null;
+  if (dismissed) return null;
 
   const remaining = Math.max(0, status.limit - status.used);
+  const showAllowance = !loading && status.effectiveTier === "free";
 
   function dismiss() {
     try {
-      localStorage.setItem(SEEN_KEY, "true");
+      localStorage.setItem(WELCOME_CARD_KEY, "true");
     } catch {
       /* ignore */
     }
     setDismissed(true);
   }
 
+  function start() {
+    dismiss();
+    onStart?.();
+  }
+
   return (
     <div
       role="note"
       aria-label={`Welcome to ${APP_NAME}`}
-      style={{
-        position: "relative",
-        marginBottom: 18,
-        padding: "16px 18px",
-        borderRadius: 14,
-        border: "1px solid hsl(var(--primary) / 0.18)",
-        background:
-          "linear-gradient(135deg, hsl(var(--primary) / 0.06), hsl(var(--primary) / 0.015))",
-      }}
+      className="relative mb-4 rounded-2xl border border-primary/20 bg-accent p-4"
     >
       <button
         type="button"
         onClick={dismiss}
         aria-label="Dismiss welcome message"
-        className="text-muted-foreground"
-        style={{
-          position: "absolute",
-          top: 12,
-          right: 12,
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          padding: 2,
-          display: "flex",
-        }}
+        className="absolute right-3 top-3 flex p-0.5 text-muted-foreground"
       >
         <X size={16} />
       </button>
 
-      <div
-        style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}
-        className="text-primary"
-      >
+      <div className="mb-1.5 flex items-center gap-2 text-primary">
         <Sparkles size={16} />
-        <span style={{ fontWeight: 600, fontSize: 15 }} className="text-foreground">
-          Welcome to {APP_NAME}
-        </span>
+        <span className="text-[15px] font-semibold text-foreground">Welcome to {APP_NAME}</span>
       </div>
 
-      <p
-        style={{ fontSize: 13, lineHeight: 1.55, margin: "0 0 12px", maxWidth: 560 }}
-        className="text-muted-foreground"
-      >
-        Generate a full week of platform-native posts — tailored to your niche, voice, and audience.
-        Pick your niche and platform below, add a few topics, and let the AI draft your calendar.
+      <p className="mb-3 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
+        Generate a full week of platform-native posts tailored to your niche, voice, and audience.
+        Take a short tour, or skip it and start building.
       </p>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-        <span
-          className="text-primary border-primary/20 bg-accent"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 12,
-            fontWeight: 600,
-            padding: "4px 10px",
-            borderRadius: 99,
-            borderWidth: 1,
-            borderStyle: "solid",
-          }}
-        >
-          <Zap size={12} />
-          {remaining} free generation{remaining === 1 ? "" : "s"} left
-        </span>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" size="sm" onClick={start}>
+          Start
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={dismiss}>
+          Skip
+        </Button>
+
+        {showAllowance && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-card px-2.5 py-1 text-xs font-semibold text-primary">
+            <Zap size={12} />
+            {remaining} free generation{remaining === 1 ? "" : "s"} left
+          </span>
+        )}
 
         <Link
           to="/profile?tab=plan"
-          className="text-muted-foreground"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            fontSize: 12,
-            textDecoration: "none",
-          }}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground no-underline"
         >
           See plans <ArrowRight size={12} />
         </Link>

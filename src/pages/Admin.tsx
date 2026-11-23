@@ -200,7 +200,7 @@ export function AdminDashboard() {
 
   return (
     <div className="relative w-full overflow-hidden bg-design-bg text-stone-900">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(194,65,12,0.035),transparent_28%)]" />
+      <div className="absolute inset-0" />
       <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-8 px-6 py-8">
         {/* Header */}
         <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">

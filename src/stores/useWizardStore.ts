@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { WizardForm, Post, INITIAL_FORM, WizardDraftSnapshot } from "@/components/wizard/constants";
 import { toDateInputValue, nextMonday } from "@/lib/calendarSchedule";
+import { clampRestoredStep } from "@/lib/wizardRestore";
 
 interface WizardState {
   step: number;
@@ -173,6 +174,11 @@ export const useWizardStore = create<WizardState>()(
         return {
           ...currentState,
           ...persisted,
+          // A reload mid-generation leaves nothing in flight: leave step 3.
+          step: clampRestoredStep(
+            typeof persisted.step === "number" ? persisted.step : currentState.step,
+            (persisted.posts?.length ?? 0) > 0
+          ),
           form: {
             ...INITIAL_FORM,
             ...(currentState.form || {}),
