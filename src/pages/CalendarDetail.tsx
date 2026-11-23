@@ -78,6 +78,7 @@ import { useBulkRepurpose, mergeRepurposedResults } from "@/hooks/useBulkRepurpo
 import { BulkRepurposeModal } from "@/components/BulkRepurposeModal";
 import { BulkRepurposePanel } from "@/components/BulkRepurposePanel";
 import { sendEvent } from "@/lib/telemetry";
+import { trackAnalyticsEvent, msSinceCalendarGenerated } from "@/lib/analyticsEvents";
 import {
   browserTimezone,
   fmtDateInTz,
@@ -1659,6 +1660,15 @@ export default function CalendarDetail() {
     }
   }
 
+  function openScheduleDialog() {
+    trackAnalyticsEvent("schedule_clicked", {
+      surface: "calendar_detail",
+      platform: platform || "unknown",
+      post_count: posts.length,
+    });
+    setScheduleOpen(true);
+  }
+
   async function scheduleWeek() {
     if (!id || scheduling) return;
     const {
@@ -1727,6 +1737,12 @@ export default function CalendarDetail() {
       const newStatus: typeof statusByDay = {};
       for (const p of posts) newStatus[p.day] = "drafted";
       setStatusByDay(newStatus);
+      trackAnalyticsEvent("post_scheduled", {
+        surface: "calendar_detail",
+        platform: platform || "unknown",
+        post_count: rows.length,
+        ms_since_generated: msSinceCalendarGenerated(),
+      });
       toast.success(`Scheduled ${rows.length} posts in ${tz} ✓`);
       setScheduleOpen(false);
     } catch (e) {
@@ -2376,7 +2392,7 @@ export default function CalendarDetail() {
               <button
                 type="button"
                 className="cd-bulk-btn primary"
-                onClick={() => setScheduleOpen(true)}
+                onClick={openScheduleDialog}
                 disabled={bulkRegenerating || regenerating || editing}
                 title="Queue all posts at the times shown"
               >
@@ -2389,7 +2405,7 @@ export default function CalendarDetail() {
               <button
                 type="button"
                 className="cd-bulk-btn primary"
-                onClick={() => setScheduleOpen(true)}
+                onClick={openScheduleDialog}
                 disabled={bulkRegenerating || regenerating || editing}
                 title="Schedule this post"
               >

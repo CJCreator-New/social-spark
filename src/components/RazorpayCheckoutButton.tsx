@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { toast } from "sonner";
 import { Loader2, CreditCard } from "lucide-react";
+import { trackAnalyticsEvent } from "@/lib/analyticsEvents";
 import { startRazorpayCheckout, type CheckoutParams, type PaidPlan } from "@/lib/razorpayCheckout";
 
 interface RazorpayCheckoutButtonProps {
@@ -31,9 +32,11 @@ export function RazorpayCheckoutButton({
 
   async function handleClick() {
     setLoading(true);
+    trackAnalyticsEvent("checkout_started", { plan });
     try {
       const result = await startRazorpayCheckout({ plan, name, description, prefill });
       if (result.status === "success") {
+        trackAnalyticsEvent("checkout_completed", { plan, tier: result.tier });
         toast.success("Payment successful!");
         onSuccess?.(result.tier, result.periodEnd);
       } else if (result.status === "dismissed") {

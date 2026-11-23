@@ -15,6 +15,8 @@ import type { BatchEditPayload } from "@/components/BatchEditModal";
 import { createScopedLogger } from "@/lib/logger";
 import { getUserFriendlyMessage } from "@/lib/errors";
 import telemetry from "@/lib/telemetry";
+import { trackAnalyticsEvent, markCalendarGenerated } from "@/lib/analyticsEvents";
+import { NpsPrompt } from "@/components/NpsPrompt";
 import {
   downloadIcs,
   nextMonday,
@@ -647,6 +649,9 @@ const Index = () => {
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const generatingRef = useRef(false);
+  const generateStartedAtRef = useRef(0);
+  const wizardStartTracked = useRef(false);
+  const [npsReady, setNpsReady] = useState(false);
   const hydrated = useRef(false);
   const draftReady = useRef(false);
   const draftSaveTimer = useRef<number | null>(null);
@@ -674,6 +679,12 @@ const Index = () => {
       setPosts(postsHistory);
     }
   }, [postsHistory, posts]);
+
+  useEffect(() => {
+    if (wizardStartTracked.current) return;
+    wizardStartTracked.current = true;
+    trackAnalyticsEvent("wizard_started", { surface: "app" });
+  }, []);
 
   useEffect(() => {
     setBrandMemory(readBrandMemory(user?.id));
@@ -1400,6 +1411,7 @@ const Index = () => {
     setIsGenerating(true);
     setLastGenerationError(null);
     setGenerationBlocked(null);
+    generateStartedAtRef.current = Date.now();
     if (typeof telemetry?.sendEvent === "function")
       telemetry.sendEvent("generate_start", { user: user?.id, mode: form.mode });
     setStep(3);
@@ -1714,6 +1726,15 @@ const Index = () => {
           mode: form.mode,
           postCount: result.length,
         });
+      trackAnalyticsEvent("calendar_generated", {
+        platform: form.platform,
+        platform_count: 1,
+        post_count: result.length,
+        duration_ms: generateStartedAtRef.current ? Date.now() - generateStartedAtRef.current : 0,
+        mode: form.mode,
+      });
+      markCalendarGenerated();
+      setNpsReady(true);
       toast.success(
         `${isRetry ? "Regenerated" : "Generated"} ${isDay ? "post" : "week"} successfully${inferredTopics ? " — topics were inferred from your core idea" : ""}`
       );
@@ -4181,6 +4202,7 @@ const Index = () => {
           </button>
         )}
       </div>
+      <NpsPrompt ready={npsReady && step === 4} userId={user?.id} />
     </WorkspacePage>
   );
 };
