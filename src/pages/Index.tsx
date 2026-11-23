@@ -3234,7 +3234,7 @@ const Index = () => {
                   </div>
 
                   {/* Inspiration Bank - Show trending topics for quick selection */}
-                  {form.industry ? (
+                  {form.industry && isEnabled("trends_enabled") ? (
                     <div className="csect">
                       <InspirationBank
                         industry={form.industry}

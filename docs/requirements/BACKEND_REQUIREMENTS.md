@@ -5,7 +5,7 @@ Platform & stack
 - Serverless Edge Functions handle heavy operations, external API routing, and AI generation tasks (`supabase/functions/`).
 
 Serverless Edge Functions (`supabase/functions/`)
-1. **`generate-calendar`**: Generates a structured multi-day, multi-platform post schedule based on a topic brief. Incorporates content validation, variant evaluation, and JSON payload parsing.
+1. **`generate-calendar`**: Generates a structured multi-day, multi-platform post schedule based on a topic brief. Incorporates content validation and JSON payload parsing.
 2. **`generate-single-post`**: Generates a single post draft based on user specifications.
 3. **`regenerate-post`**: Tweaks or regenerates a post copy based on feedback.
 4. **`repurpose-post`**: Adapts an existing post copy for other social platforms using network-specific style instructions (e.g., LinkedIn vs. Twitter).

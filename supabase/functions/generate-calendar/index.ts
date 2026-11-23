@@ -173,7 +173,6 @@ Deno.serve(async (req: Request) => {
                   // 7-post calendar schema. Combined with the large per-post schema,
                   // they made Gemini's forced tool-call fail with an upstream 400
                   // (reproduced deterministically against the AI gateway).
-                  // Variant scoring degrades gracefully when body_variants is absent.
                   hashtags: {
                     type: "string",
                     description: isLongFormPlatform(payload.platform)

@@ -58,6 +58,7 @@ import { insightFor } from "@/lib/postInsights";
 import PostInsights from "@/components/PostInsights";
 import { PerformanceScoreCard } from "@/components/PerformanceScoreCard";
 import { TopicGapBadge } from "@/components/TopicGapBadge";
+import { isTopicCovered } from "@/lib/topicCoverage";
 import { IdeaBacklogPanel } from "@/components/IdeaBacklogPanel";
 import {
   PerformanceFocusMetric,
@@ -388,7 +389,10 @@ export default function CalendarDetail() {
   const removeIdeaFromBacklogMutation = useRemoveIdeaFromBacklogMutation(user?.id);
   const [removingBacklogId, setRemovingBacklogId] = useState<string | null>(null);
 
+  const trendsEnabled = isEnabled("trends_enabled");
+
   useEffect(() => {
+    if (!trendsEnabled) return;
     let cancelled = false;
     (async () => {
       try {
@@ -406,7 +410,7 @@ export default function CalendarDetail() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [trendsEnabled]);
 
   const missingTopics = useMemo(() => {
     if (!formPayload?.topics || !posts.length) return [];
@@ -414,8 +418,9 @@ export default function CalendarDetail() {
     const gaps = formPayload.topics.filter(
       (t: string) =>
         t &&
-        !posts.some(
-          (p) => p.topic && p.topic.trim().toLowerCase() === t.trim().toLowerCase()
+        !isTopicCovered(
+          t,
+          posts.map((p) => p.topic)
         )
     );
 
@@ -428,7 +433,7 @@ export default function CalendarDetail() {
       );
       return {
         topic,
-        isTrending: !!match,
+        isTrending: trendsEnabled && !!match,
         volume: match?.volume || 0,
       };
     });
@@ -438,7 +443,7 @@ export default function CalendarDetail() {
       if (!a.isTrending && b.isTrending) return 1;
       return b.volume - a.volume;
     });
-  }, [formPayload?.topics, posts, trends]);
+  }, [formPayload?.topics, posts, trends, trendsEnabled]);
 
   const handleGenerateForMissingTheme = useCallback(
     async (topic: string, coreIdeaOverride?: string) => {
@@ -2183,7 +2188,7 @@ export default function CalendarDetail() {
                 }}
               >
                 <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".05em" }}>
-                  Topic Coverage Gaps
+                  Plan coverage
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {missingTopics.map(({ topic, isTrending }) => (
@@ -2192,7 +2197,7 @@ export default function CalendarDetail() {
                       topic={topic}
                       isInferred={false}
                       isMissing={true}
-                      isTrending={isTrending}
+                      isTrending={trendsEnabled && isTrending}
                       generating={generatingTopic === topic}
                       onGenerate={() => handleGenerateForMissingTheme(topic)}
                     />

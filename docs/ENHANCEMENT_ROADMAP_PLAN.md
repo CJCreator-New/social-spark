@@ -34,7 +34,7 @@ Cheapest cluster, highest leverage. Each item turns an existing read-only featur
 - **Done when:** trends appear in the creation flow and each can seed a draft in one click.
 
 ### 1.3 Brand-compliance scoring dimension (2–3 days)
-- **Extends:** Quality Variant Scoring + Brand Memory Database.
+- **Extends:** Quality Scoring + Brand Memory Database.
 - **Build:** check drafts against stored forbidden terms and hashtag policies as a fourth score alongside hook/CTA/readability, with inline violation flags.
 - **User problem:** brand rules are stored but nothing enforces them at draft time.
 - **Done when:** a draft containing a forbidden term is visibly flagged before scheduling.
@@ -57,7 +57,7 @@ Deepens the daily workflow; protects work and teaches the user.
 - **User problem:** paste a transcript, get 10 angles, expand 3, lose 7.
 
 ### 2.2 Score explanations + targeted rewrite (3–5 days)
-- **Extends:** Quality Variant Scoring + inline rewrite edge function.
+- **Extends:** Quality Scoring + inline rewrite edge function.
 - **Build:** each scoring card explains *why* a dimension is low and offers a one-click fix scoped to that dimension ("strengthen the hook").
 - **User problem:** a number without a reason doesn't teach anything; the P2 backlog already flags the heuristics as weak.
 
@@ -83,7 +83,7 @@ Bigger items tied to the stated business levers.
 - **User problem:** the stated value is "10x faster cross-posting velocity," but post-at-a-time repurposing caps that well below 10x for a 7-post week.
 
 ### 3.2 In-app engagement telemetry → hook/CTA insights (5–8 days)
-- **Extends:** Analytics & Logs tables + telemetry edge function + Quality Variant Scoring.
+- **Extends:** Analytics & Logs tables + telemetry edge function + Quality Scoring.
 - **Build:** insights view showing which hooks/CTAs users keep, discard, or regenerate most — using data already collected, no external platform APIs.
 - **User problem:** directly attacks the "Analytics Black Box" problem statement.
 

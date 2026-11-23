@@ -8,11 +8,9 @@ import "@/styles/pages.css";
 // Section components (eager — no Three.js inside them)
 import LandingNav from "@/components/landing/LandingNav";
 import LandingHero from "@/components/landing/LandingHero";
-import SocialProofBar from "@/components/landing/SocialProofBar";
 import FeatureShowcase from "@/components/landing/FeatureShowcase";
 import BentoGrid from "@/components/landing/BentoGrid";
 import HowItWorks from "@/components/landing/HowItWorks";
-import Testimonials from "@/components/landing/Testimonials";
 import Pricing from "@/components/landing/Pricing";
 import FinalCTA from "@/components/landing/FinalCTA";
 import LandingFooter from "@/components/landing/LandingFooter";
@@ -112,11 +110,9 @@ export default function Landing() {
       <div className="ld-w">
         <main id="main-content">
           <LandingHero />
-          <SocialProofBar />
           <FeatureShowcase />
           <BentoGrid />
           <HowItWorks />
-          <Testimonials />
           <Pricing />
           <FinalCTA />
         </main>

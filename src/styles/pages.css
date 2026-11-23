@@ -857,6 +857,9 @@
 .ld-w-bento-col-6 {
   grid-column: span 6;
 }
+.ld-w-bento-col-12 {
+  grid-column: span 12;
+}
 
 .ld-w-bento-card {
   background: var(--color-surface);
@@ -1769,7 +1772,8 @@
   }
   .ld-w-bento-col-8,
   .ld-w-bento-col-4,
-  .ld-w-bento-col-6 {
+  .ld-w-bento-col-6,
+  .ld-w-bento-col-12 {
     grid-column: span 1;
   }
   .ld-w-stat-grid {

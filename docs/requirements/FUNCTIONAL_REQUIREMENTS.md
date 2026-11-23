@@ -13,7 +13,7 @@ Core user flows
 
 3. **AI-Powered Content Generation & Optimization**
    - **Draft Generation**: Generate content calendars for multiple days/platforms based on brief settings.
-   - **Quality Variant Scoring**: The system generates multiple post variations, scores them on hooks, CTA, and readability, and presents evaluation insights (`src/components/PerformanceScoreCard.tsx` and `src/components/PostInsights.tsx`).
+   - **Post Quality Scoring**: The system scores each post on hooks, CTA, and readability, and presents evaluation insights (`src/components/PerformanceScoreCard.tsx` and `src/components/PostInsights.tsx`).
    - **Brand Memory Integration**: Injects custom brand styles, voice, and industry guidelines (`src/lib/brandMemory.ts`) directly into AI prompts to ensure consistent brand identity.
 
 4. **Interactive Post Editing & Composer**

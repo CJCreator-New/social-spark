@@ -4,7 +4,9 @@ import getCalendarTool from "./tools/get-calendar";
 import listScheduledPostsTool from "./tools/list-scheduled-posts";
 import extractIdeasTool from "./tools/extract-ideas";
 import repurposePostTool from "./tools/repurpose-post";
-import listTrendsTool from "./tools/list-trends";
+// list_trends is hidden while the trends feature flag is off. The tool file is kept;
+// re-enable by importing it again and adding it back to `tools` below.
+// import listTrendsTool from "./tools/list-trends";
 
 // Direct supabase.co issuer (not the .lovable.cloud proxy). Built from the
 // project ref that Vite inlines at build time so this module stays import-safe.
@@ -43,11 +45,11 @@ export default defineMcp({
   title: "ContentForge",
   version: "0.1.0",
   instructions:
-    "Tools for ContentForge — an AI-powered social media content planner. Use `list_calendars` to browse the user's saved weekly content calendars, `get_calendar` to fetch one calendar and its posts by ID, `list_scheduled_posts` to see upcoming scheduled posts, `extract_ideas` to pull distinct post ideas out of pasted long-form source material, `repurpose_post` to rewrite an existing post for a different target platform, and `list_trends` to browse recent trending keywords.",
+    "Tools for ContentForge — an AI-powered social media content planner. Use `list_calendars` to browse the user's saved weekly content calendars, `get_calendar` to fetch one calendar and its posts by ID, `list_scheduled_posts` to see upcoming scheduled posts, `extract_ideas` to pull distinct post ideas out of pasted long-form source material, `repurpose_post` to rewrite an existing post for a different target platform.",
   // Scope vocabulary for this server: `read:calendars` (list_calendars,
   // get_calendar), `read:scheduled_posts` (list_scheduled_posts),
   // `generate:ideas` (extract_ideas), `generate:repurpose` (repurpose_post),
-  // and `read:trends` (list_trends). The SDK's per-issuer `requiredScopes`
+  // and `read:trends` (list_trends, currently hidden). The SDK's per-issuer `requiredScopes`
   // gates ALL tools on the same scope set, which would force every client to
   // hold every scope even if it only needs one — so scopes are declared here
   // for documentation and enforced per-tool instead, via `ctx.getScopes()` in
@@ -73,6 +75,6 @@ export default defineMcp({
     listScheduledPostsTool,
     extractIdeasTool,
     repurposePostTool,
-    listTrendsTool,
+    // listTrendsTool, // hidden: trends feature flag is off
   ],
 });

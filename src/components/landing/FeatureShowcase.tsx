@@ -5,7 +5,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 gsap.registerPlugin(ScrollTrigger);
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const PLATFORMS = ["LinkedIn", "X", "Instagram", "Threads"];
+const PLATFORMS = ["LinkedIn", "X", "Instagram"];
 // posted cells = [platformIndex][dayIndex]
 const POSTED: Set<string> = new Set([
   "0-0",
@@ -15,8 +15,6 @@ const POSTED: Set<string> = new Set([
   "1-3",
   "2-0",
   "2-5",
-  "3-2",
-  "3-4",
 ]);
 
 // Illustrative example numbers only — not live or aggregated user analytics.
@@ -225,7 +223,7 @@ const FEATURES = [
         strong: "Optimal timing hints",
         text: " — AI suggests the best days and times per platform.",
       },
-      { strong: "CSV & scheduler export", text: " — works with Buffer, Hootsuite, and Notion." },
+      { strong: "CSV & scheduler export", text: " — works with Buffer and Hootsuite." },
     ],
     visual: <FeatureB />,
     reverse: true,

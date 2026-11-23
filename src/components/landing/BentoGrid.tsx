@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { Wand2, Save, Repeat, Users, Zap, CheckCircle2 } from "lucide-react";
+import { Wand2, Save, Repeat, Zap, CheckCircle2 } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -45,22 +45,12 @@ const CARDS = [
     featured: false,
     icon: Zap,
     title: "Brief templates",
-    desc: "Start from curated templates for product launches, thought leadership, promotions, and more — then customize.",
-    extra: null,
-  },
-  {
-    id: "collab",
-    span: "ld-w-bento-col-6",
-    tall: false,
-    featured: false,
-    icon: Users,
-    title: "Team collaboration",
-    desc: "Multiple brand voices, shared calendars, and role-based access for agencies and marketing teams.",
+    desc: "Save a calendar setup as a template, then reload it from your profile whenever you plan your next week.",
     extra: null,
   },
   {
     id: "analytics",
-    span: "ld-w-bento-col-6",
+    span: "ld-w-bento-col-12",
     tall: false,
     featured: false,
     icon: CheckCircle2,
