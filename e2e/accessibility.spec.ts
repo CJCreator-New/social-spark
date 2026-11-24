@@ -82,7 +82,7 @@ test.describe("Accessibility smoke checks", () => {
     });
 
     await checkRoute(page, "/schedule");
-    await expect(page.getByRole("heading", { name: /my schedule/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /publishing queue|my schedule/i })).toBeVisible({
       timeout: 30000,
     });
   });
