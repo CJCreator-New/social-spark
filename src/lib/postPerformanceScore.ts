@@ -4,8 +4,8 @@ import { WARM_PALETTE } from "@/lib/theme";
 export interface PerformanceScore {
   hookStrength: number; // 1-10: Does opening line create curiosity?
   ctaEffectiveness: number; // 1-10: Specific question or vague?
-  hashtagRelevance: number; // 0-100: % of hashtags related to topic
-  readability: number; // Flesch-Kincaid grade level (lower is better, 8-12 ideal)
+  hashtagRelevance: number | null; // 0-100: % of hashtags related to topic; null when not scored (non-Latin text)
+  readability: number | null; // Flesch-Kincaid grade level (8-12 ideal); null when not scored (non-Latin text)
   brandCompliance: number; // 1-10: absence of forbidden terms and hashtag violations
   brandViolations: string[]; // List of found forbidden phrases/terms
   overallScore: number; // 1-10: Average of all metrics (rounded, for display)
@@ -15,6 +15,40 @@ export interface PerformanceScore {
 
 export type PerformanceFocusMetric =
   "hookStrength" | "ctaEffectiveness" | "hashtagRelevance" | "readability" | "brandCompliance";
+
+/**
+ * True when at least 80% of the letter characters are Latin script (or when
+ * there are no letters at all). English-only heuristics (syllables, stems) are
+ * meaningless for other scripts, so callers skip those metrics.
+ */
+export function isLatinText(text: string): boolean {
+  const letters = (text || "").match(/\p{L}/gu);
+  if (!letters || letters.length === 0) return true;
+  const latin = letters.filter((ch) => /\p{Script=Latin}/u.test(ch)).length;
+  return latin / letters.length >= 0.8;
+}
+
+/** Lowercased word tokens (letters/digits only). */
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((t) => t.length > 0);
+}
+
+/**
+ * Whole-word match for a keyword. Short keywords (<= 3 chars) must match a
+ * whole word (optionally plural); longer ones match at a word start so
+ * "build" still matches "building" but "ai" never matches "retail".
+ */
+function hasTerm(textLower: string, term: string): boolean {
+  // Terms are fixed lowercase literals from this file (no regex metacharacters).
+  const pattern =
+    term.length <= 3
+      ? `(?<![\\p{L}\\p{N}])${term}s?(?![\\p{L}\\p{N}])`
+      : `(?<![\\p{L}\\p{N}])${term}`;
+  return new RegExp(pattern, "u").test(textLower);
+}
 
 /**
  * Detect if a hook creates curiosity (starts with stat, question, or strong verb)
@@ -96,7 +130,7 @@ function meaningfulTopicWords(topic: string): string[] {
   return topic
     .toLowerCase()
     .split(/\s+/)
-    .map((w) => w.replace(/[^a-z0-9]/g, ""))
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ""))
     .filter((w) => w.length > 0 && !STOPWORDS.has(w));
 }
 
@@ -115,7 +149,7 @@ function scoreCtaEffectiveness(cta: string, topic: string, platform?: string): n
     /comment.*below|let.*know/i,
     /tag.*friend|forward.*to/i,
     /share.*experience|your story/i,
-    /react.*with|vote|poll/i,
+    /react.*with|\b(vote|poll)\b/i,
   ];
 
   let score = 4; // Baseline for generic CTAs
@@ -127,7 +161,8 @@ function scoreCtaEffectiveness(cta: string, topic: string, platform?: string): n
 
   // Bonus if CTA relates to a meaningful (non-stopword) topic word
   const topicWords = meaningfulTopicWords(topic);
-  if (topicWords.some((word) => ctaLower.includes(word))) {
+  const ctaStems = tokenize(ctaLower).map(stem);
+  if (topicWords.some((word) => ctaStems.includes(stem(word)))) {
     score += 2;
   }
 
@@ -150,7 +185,7 @@ function scoreCtaEffectiveness(cta: string, topic: string, platform?: string): n
   }
 
   // Bonus for urgency/specificity
-  if (/now|today|this week|don't miss/i.test(ctaLower)) {
+  if (/\b(now|today|this week|don't miss)\b/i.test(ctaLower)) {
     score += 1;
   }
 
@@ -174,7 +209,11 @@ function stem(word: string): string {
 /**
  * Score hashtag relevance: % of hashtags that relate to the topic
  */
-function scoreHashtagRelevance(hashtags: string, topic: string): number {
+const MIN_HASHTAG_BODY_LENGTH = 3;
+
+function scoreHashtagRelevance(hashtags: string, topic: string): number | null {
+  // English stems/topic words are meaningless for other scripts: don't score.
+  if (!isLatinText(`${hashtags || ""} ${topic || ""}`)) return null;
   if (!hashtags) return 0;
 
   const hashtagList = hashtags
@@ -189,11 +228,15 @@ function scoreHashtagRelevance(hashtags: string, topic: string): number {
 
   const relatedTags = hashtagList.filter((tag) => {
     const tagBody = tag.replace(/^#/, "");
+    // Very short tags (#a, #in) are never treated as topic-relevant.
+    if (tagBody.length < MIN_HASHTAG_BODY_LENGTH) return false;
     const tagStem = stem(tagBody);
     return topicWords.some((word, i) => {
-      if (tagBody.includes(word) || word.includes(tagBody)) return true;
+      // Whole-token match, or the tag is a compound containing the (4+ char) topic word.
+      if (tagBody === word || tagBody.includes(word)) return true;
       const wordStem = topicStems[i];
-      return tagStem === wordStem || tagStem.includes(wordStem) || wordStem.includes(tagStem);
+      if (tagStem === wordStem) return true;
+      return wordStem.length >= 4 && tagStem.includes(wordStem);
     });
   });
 
@@ -204,7 +247,9 @@ function scoreHashtagRelevance(hashtags: string, topic: string): number {
  * Estimate Flesch-Kincaid Grade Level
  * 0-6 = easy, 7-8 = ideal for social, 9-12 = moderate, 13+ = difficult
  */
-function estimateReadability(text: string): number {
+function estimateReadability(text: string): number | null {
+  // The syllable counter is English-only: don't score other scripts.
+  if (!isLatinText(text)) return null;
   if (!text || text.length < 20) return 0;
 
   const sentences = text.split(/[.!?;\n]+|\s+—\s+|--/).filter((s) => s.trim().length > 0).length || 1;
@@ -251,17 +296,17 @@ function generateFeedback(scores: Partial<PerformanceScore>, post: Post): string
     feedback.push("📞 CTA: Make it specific—ask a direct question or request a concrete action.");
   }
 
-  if (scores.hashtagRelevance !== undefined && scores.hashtagRelevance < 50) {
+  if (typeof scores.hashtagRelevance === "number" && scores.hashtagRelevance < 50) {
     feedback.push(
       `#️⃣ Hashtags: Only ${scores.hashtagRelevance}% relate to your topic. Make them more specific.`
     );
   }
 
-  if (scores.readability !== undefined && scores.readability > 12) {
+  if (typeof scores.readability === "number" && scores.readability > 12) {
     feedback.push(
       `📖 Readability: Grade ${scores.readability} is complex. Use shorter sentences and simpler words.`
     );
-  } else  if (scores.readability !== undefined && scores.readability < 6) {
+  } else if (typeof scores.readability === "number" && scores.readability < 6) {
     feedback.push(
       `📖 Readability: Grade ${scores.readability} might be too basic. Add depth or complexity.`
     );
@@ -290,10 +335,27 @@ function generateFeedback(scores: Partial<PerformanceScore>, post: Post): string
 }
 
 /**
+ * Single source of truth for readability grade bands. Both the label shown to
+ * the user and the 0-10 score are derived from this table so they agree.
+ * `below` is the exclusive upper grade bound; `ideal` bands score a full 10.
+ */
+const READABILITY_BANDS: ReadonlyArray<{ below: number; label: string; ideal: boolean }> = [
+  { below: 6, label: "Very Easy", ideal: false },
+  { below: 8, label: "Easy", ideal: false },
+  { below: 13, label: "Ideal", ideal: true }, // grades 8-12
+  { below: 15, label: "Challenging", ideal: false },
+  { below: Infinity, label: "Very Difficult", ideal: false },
+];
+
+function getReadabilityBand(grade: number) {
+  return READABILITY_BANDS.find((b) => grade < b.below) ?? READABILITY_BANDS[READABILITY_BANDS.length - 1];
+}
+
+/**
  * Normalize readability grade to a 0-10 score
  */
 function scoreReadability(grade: number): number {
-  if (grade >= 8 && grade <= 12) return 10;
+  if (getReadabilityBand(grade).ideal) return 10;
   if (grade < 8) return Math.max(0, 10 - (8 - grade));
   return Math.max(0, 10 - (grade - 12));
 }
@@ -341,7 +403,7 @@ export function calculatePerformanceScore(
   const ctaEffectiveness = scoreCtaEffectiveness(post.cta, topic, plat);
   const hashtagRelevance = scoreHashtagRelevance(post.hashtags, topic || post.topic);
   const readability = estimateReadability(post.body);
-  const readabilityScoreVal = scoreReadability(readability);
+  const readabilityScoreVal = readability === null ? null : scoreReadability(readability);
 
   const { score: brandCompliance, violations: brandViolations } = scoreBrandCompliance(
     (post.hook || "") + " " + (post.body || "") + " " + (post.cta || ""),
@@ -351,12 +413,22 @@ export function calculatePerformanceScore(
   );
 
   // Weight formula: hook 30%, CTA 25%, hashtags 20%, readability 15%, brandCompliance 10%
-  const rawOverallScore =
-    hookStrength * 0.3 +
-    ctaEffectiveness * 0.25 +
-    (hashtagRelevance / 10) * 0.2 +
-    readabilityScoreVal * 0.15 +
-    brandCompliance * 0.1;
+  // Unscored (null) metrics are dropped and the remaining weights renormalised.
+  const weighted: Array<[number | null, number]> = [
+    [hookStrength, 0.3],
+    [ctaEffectiveness, 0.25],
+    [hashtagRelevance === null ? null : hashtagRelevance / 10, 0.2],
+    [readabilityScoreVal, 0.15],
+    [brandCompliance, 0.1],
+  ];
+  let weightSum = 0;
+  let weightedTotal = 0;
+  for (const [val, w] of weighted) {
+    if (val === null) continue;
+    weightSum += w;
+    weightedTotal += val * w;
+  }
+  const rawOverallScore = weightedTotal / weightSum;
   const overallScore = Math.round(rawOverallScore);
 
   const feedback = generateFeedback(
@@ -378,14 +450,17 @@ export function calculatePerformanceScore(
 }
 
 export function getWeakestPerformanceMetric(score: PerformanceScore): PerformanceFocusMetric {
-  const readabilityScoreVal = scoreReadability(score.readability);
   const candidates: Array<{ metric: PerformanceFocusMetric; gap: number }> = [
     { metric: "hookStrength", gap: 10 - score.hookStrength },
     { metric: "ctaEffectiveness", gap: 10 - score.ctaEffectiveness },
-    { metric: "hashtagRelevance", gap: 10 - score.hashtagRelevance / 10 },
-    { metric: "readability", gap: 10 - readabilityScoreVal },
     { metric: "brandCompliance", gap: 10 - score.brandCompliance },
   ];
+  if (score.hashtagRelevance !== null) {
+    candidates.push({ metric: "hashtagRelevance", gap: 10 - score.hashtagRelevance / 10 });
+  }
+  if (score.readability !== null) {
+    candidates.push({ metric: "readability", gap: 10 - scoreReadability(score.readability) });
+  }
 
   return candidates.sort((a, b) => b.gap - a.gap)[0]?.metric || "hookStrength";
 }
@@ -404,12 +479,12 @@ export function getScoreColor(score: number): string {
  * Get label for readability grade
  */
 export function getReadabilityLabel(grade: number): string {
-  if (grade < 6) return "Very Easy";
-  if (grade < 8) return "Easy";
-  if (grade < 10) return "Ideal";
-  if (grade < 12) return "Moderate";
-  if (grade < 14) return "Challenging";
-  return "Very Difficult";
+  return getReadabilityBand(grade).label;
+}
+
+/** 0-10 readability score for a grade, using the same bands as the label. */
+export function getReadabilityScore(grade: number): number {
+  return scoreReadability(grade);
 }
 
 /**
@@ -439,7 +514,6 @@ export function getWeakestMetrics(
   score: PerformanceScore,
   threshold: number = 6
 ): PerformanceFocusMetric[] {
-  const readabilityScoreVal = scoreReadability(score.readability);
   const candidates: Array<{ metric: PerformanceFocusMetric; gap: number; scoreVal: number }> = [
     { metric: "hookStrength", gap: 10 - score.hookStrength, scoreVal: score.hookStrength },
     {
@@ -447,14 +521,16 @@ export function getWeakestMetrics(
       gap: 10 - score.ctaEffectiveness,
       scoreVal: score.ctaEffectiveness,
     },
-    {
-      metric: "hashtagRelevance",
-      gap: 10 - score.hashtagRelevance / 10,
-      scoreVal: score.hashtagRelevance / 10,
-    },
-    { metric: "readability", gap: 10 - readabilityScoreVal, scoreVal: readabilityScoreVal },
     { metric: "brandCompliance", gap: 10 - score.brandCompliance, scoreVal: score.brandCompliance },
   ];
+  if (score.hashtagRelevance !== null) {
+    const v = score.hashtagRelevance / 10;
+    candidates.push({ metric: "hashtagRelevance", gap: 10 - v, scoreVal: v });
+  }
+  if (score.readability !== null) {
+    const v = scoreReadability(score.readability);
+    candidates.push({ metric: "readability", gap: 10 - v, scoreVal: v });
+  }
 
   return candidates
     .filter((c) => c.scoreVal < threshold)
@@ -467,38 +543,21 @@ export function getWeakestMetrics(
  */
 export function suggestBetterCta(currentCta: string, topic: string, platform?: string): string {
   const topicLower = topic.toLowerCase();
+  const has = (...terms: string[]) => terms.some((t) => hasTerm(topicLower, t));
 
-  if (
-    topicLower.includes("tech") ||
-    topicLower.includes("code") ||
-    topicLower.includes("build") ||
-    topicLower.includes("ai")
-  ) {
+  if (has("tech", "code", "build", "ai")) {
     return "What's in your current tech stack? Drop a comment below! 👇";
   }
-  if (
-    topicLower.includes("growth") ||
-    topicLower.includes("marketing") ||
-    topicLower.includes("sales") ||
-    topicLower.includes("audience")
-  ) {
+  if (has("growth", "marketing", "sales", "audience")) {
     return "What is your main growth channel right now? Let's discuss in the comments!";
   }
-  if (topicLower.includes("design") || topicLower.includes("ux") || topicLower.includes("art")) {
+  if (has("design", "ux", "art")) {
     return "Which design trend are you loving (or hating) lately? Comment below!";
   }
-  if (
-    topicLower.includes("productivity") ||
-    topicLower.includes("routine") ||
-    topicLower.includes("habit")
-  ) {
+  if (has("productivity", "routine", "habit")) {
     return "What is the single best productivity hack you've adopted this year? 👇";
   }
-  if (
-    topicLower.includes("career") ||
-    topicLower.includes("job") ||
-    topicLower.includes("hiring")
-  ) {
+  if (has("career", "job", "hiring")) {
     return "What is the biggest lesson you've learned in your career journey? Tell me below!";
   }
 

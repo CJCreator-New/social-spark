@@ -24,7 +24,7 @@ export function ScheduleSkeleton({ rows = 5 }: ScheduleSkeletonProps) {
           </div>
 
           {/* Meta column: title + platform tag + status chip */}
-          <div className="flex-1 min-w-[200px] space-y-2">
+          <div className="flex-1 min-w-[min(100%,200px)] space-y-2">
             <Skeleton className="h-4 w-1/2" />
             <div className="flex gap-2">
               <Skeleton className="h-5 w-16 rounded-full" />

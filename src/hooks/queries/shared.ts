@@ -156,6 +156,14 @@ export interface BrandSlotRow {
   preferred_structures: string[];
   brand_examples: string[] | null;
   default_framework: string | null;
+  // Single-source brand fields (Phase 3). Optional so older rows/fixtures stay valid.
+  voice?: string | null;
+  style?: string | null;
+  audiences?: string[] | null;
+  goals?: string[] | null;
+  required_phrases?: string[] | null;
+  banned_hashtags?: string[] | null;
+  required_hashtags?: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -171,6 +179,13 @@ export type BrandSlotInsert = {
   preferred_structures?: string[];
   brand_examples?: string[] | null;
   default_framework?: string | null;
+  voice?: string | null;
+  style?: string | null;
+  audiences?: string[] | null;
+  goals?: string[] | null;
+  required_phrases?: string[] | null;
+  banned_hashtags?: string[] | null;
+  required_hashtags?: string[] | null;
   created_at?: string;
   updated_at?: string;
 };

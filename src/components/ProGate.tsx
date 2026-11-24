@@ -1,7 +1,8 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Crown, Lock } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
+import { trackAnalyticsEvent } from "@/lib/analyticsEvents";
 import type { Tier } from "@/lib/subscription";
 
 interface ProGateProps {
@@ -23,9 +24,20 @@ const TIER_RANK: Record<Tier, number> = { free: 0, starter: 1, pro: 2 };
  */
 export function ProGate({ requires = "pro", children, fallback, featureName }: ProGateProps) {
   const { status, loading } = useSubscription();
+  const viewedRef = useRef(false);
+  const meets = TIER_RANK[status.effectiveTier] >= TIER_RANK[requires];
+  const showsUpgrade = !loading && !meets && !fallback;
+  useEffect(() => {
+    if (!showsUpgrade || viewedRef.current) return;
+    viewedRef.current = true;
+    trackAnalyticsEvent("upgrade_viewed", {
+      surface: "pro_gate",
+      tier: status.effectiveTier,
+      required_tier: requires,
+    });
+  }, [showsUpgrade, status.effectiveTier, requires]);
   if (loading) return null;
 
-  const meets = TIER_RANK[status.effectiveTier] >= TIER_RANK[requires];
   if (meets) return <>{children}</>;
   if (fallback) return <>{fallback}</>;
 

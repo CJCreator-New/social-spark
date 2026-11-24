@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { isEnabled } from "@/lib/featureFlags";
 
 interface TopicGapBadgeProps {
   topic: string;
@@ -20,6 +21,7 @@ export const TopicGapBadge: React.FC<TopicGapBadgeProps> = ({
   generating = false,
 }) => {
   const [showPopover, setShowPopover] = useState(false);
+  const trendsEnabled = isEnabled("trends_enabled");
 
   // If it's neither inferred nor missing, don't show anything
   if (!isInferred && !isMissing) return null;
@@ -51,8 +53,8 @@ export const TopicGapBadge: React.FC<TopicGapBadgeProps> = ({
           cursor: "pointer",
         }}
       >
-        {isMissing ? `🔍 ${topic}` : `🤖 AI: ${topic}`}
-        {isTrending && <span style={{ fontSize: 10 }}>🔥</span>}
+        {isMissing ? `🔍 ${topic}` : `Not in plan: ${topic}`}
+        {trendsEnabled && isTrending && <span style={{ fontSize: 10 }}>🔥</span>}
       </span>
 
       {showPopover && (
@@ -78,8 +80,8 @@ export const TopicGapBadge: React.FC<TopicGapBadgeProps> = ({
           {isMissing ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div>
-                <strong>Missing Theme:</strong> This topic is in your campaign plan but has no draft posts yet.
-                {isTrending && <span style={{ color: "var(--accent)", display: "block", marginTop: 4 }}>🔥 Trending topic on feed algorithm!</span>}
+                <strong>Plan coverage:</strong> This topic is in your campaign plan but has no draft posts yet.
+                {trendsEnabled && isTrending && <span style={{ color: "var(--accent)", display: "block", marginTop: 4 }}>🔥 Trending topic on feed algorithm!</span>}
               </div>
               {onGenerate && (
                 <button
@@ -103,8 +105,8 @@ export const TopicGapBadge: React.FC<TopicGapBadgeProps> = ({
             </div>
           ) : (
             <div>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>AI-Inferred Theme</div>
-              <div>{rationale || "AI inferred this topic based on the core focus of your posts."}</div>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Not in your plan</div>
+              <div>{rationale || "This post's topic is not one of the topics in your campaign plan."}</div>
             </div>
           )}
         </div>

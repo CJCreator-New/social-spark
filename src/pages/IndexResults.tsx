@@ -492,7 +492,12 @@ export function IndexResults({
             Push your calendar updates directly to Buffer or Hootsuite feeds.
           </p>
 
-          <BufferScheduler posts={posts} platform={form.platform} postTimes={postTimes} />
+          <BufferScheduler
+            posts={posts}
+            platform={form.platform}
+            postTimes={postTimes}
+            weekStart={weekStartDate}
+          />
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 }}>
             {savedId ? (

@@ -1,70 +1,21 @@
 import { resolveFunctionsBaseUrl } from "@/lib/functionsBaseUrl";
+import { buildBrandPrompt, hasBrandPromptContent, type BrandPromptInput } from "@/lib/brandPrompt";
 
 /**
- * Minimal shape shared by anything that can act as a "brand identity" source
- * for prompt assembly — currently satisfied structurally by both
- * `ProfileRow` (legacy single-brand-per-user fields) and `BrandSlotRow`
- * (see src/hooks/queries/shared.ts, part of the brand-slots feature). Keeping
- * this interface minimal (rather than importing either concrete row type)
- * lets both call sites pass their row directly with no mapping step.
+ * Brand identity source for prompt assembly: anything shaped like a brand slot
+ * (or a merged slot + cache, see brandPrompt.ts). The single builder lives in
+ * src/lib/brandPrompt.ts; the helpers below delegate to it.
  */
-export interface BrandIdentityFields {
-  forbidden_phrases?: string[] | null;
-  proof_points?: string[] | null;
-  cta_preferences?: string[] | null;
-  preferred_structures?: string[] | null;
-}
+export type BrandIdentityFields = BrandPromptInput;
 
-/**
- * Checks if the user has configured any brand memory elements in their profile.
- */
+/** Checks whether any brand field would reach the prompt. */
 export function hasBrandMemory(profile?: BrandIdentityFields | null): boolean {
-  if (!profile) return false;
-
-  const hasForbidden =
-    Array.isArray(profile.forbidden_phrases) && profile.forbidden_phrases.length > 0;
-  const hasProof = Array.isArray(profile.proof_points) && profile.proof_points.length > 0;
-  const hasCta = Array.isArray(profile.cta_preferences) && profile.cta_preferences.length > 0;
-  const hasStructures =
-    Array.isArray(profile.preferred_structures) && profile.preferred_structures.length > 0;
-
-  return hasForbidden || hasProof || hasCta || hasStructures;
+  return hasBrandPromptContent(profile);
 }
 
-/**
- * Builds a prompt snippet enforcing brand identity based on profile settings.
- */
+/** @deprecated Delegates to buildBrandPrompt; kept so existing imports keep working. */
 export function buildBrandMemoryPrompt(profile?: BrandIdentityFields | null): string {
-  if (!profile || !hasBrandMemory(profile)) return "";
-
-  const sections: string[] = ["### BRAND MEMORY & IDENTITY CONSTRAINTS"];
-
-  if (Array.isArray(profile.forbidden_phrases) && profile.forbidden_phrases.length > 0) {
-    sections.push(
-      `- FORBIDDEN PHRASES (NEVER USE): ${profile.forbidden_phrases.map((p) => `"${p}"`).join(", ")}`
-    );
-  }
-
-  if (Array.isArray(profile.proof_points) && profile.proof_points.length > 0) {
-    sections.push("- PROOF POINTS & KEY DATA (WEAVE THESE IN WHERE NATURAL):");
-    profile.proof_points.forEach((point) => {
-      sections.push(`  * ${point}`);
-    });
-  }
-
-  if (Array.isArray(profile.cta_preferences) && profile.cta_preferences.length > 0) {
-    sections.push(
-      `- PREFERRED CTA PATTERNS: Use call-to-action styles matching: ${profile.cta_preferences.join(", ")}`
-    );
-  }
-
-  if (Array.isArray(profile.preferred_structures) && profile.preferred_structures.length > 0) {
-    sections.push(
-      `- PREFERRED WRITING STRUCTURES: Align content formats to: ${profile.preferred_structures.join(", ")}`
-    );
-  }
-
-  return sections.join("\n");
+  return buildBrandPrompt(profile);
 }
 
 /**

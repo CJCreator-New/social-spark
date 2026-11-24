@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import { trackAnalyticsEvent } from "@/lib/analyticsEvents";
 import { CheckCircle2, Sparkles, Zap, Crown, AlertCircle } from "lucide-react";
 import { RazorpayCheckoutButton } from "@/components/RazorpayCheckoutButton";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -30,6 +32,12 @@ export function PlanSettings() {
   const { status, loading, refresh } = useSubscription();
   const current = status.effectiveTier;
   const remaining = daysRemaining(status.planPeriodEnd);
+  const viewedRef = useRef(false);
+  useEffect(() => {
+    if (loading || viewedRef.current) return;
+    viewedRef.current = true;
+    trackAnalyticsEvent("upgrade_viewed", { surface: "plan_settings", tier: current });
+  }, [loading, current]);
 
   return (
     <div className="pf-card" style={{ marginTop: 14 }}>

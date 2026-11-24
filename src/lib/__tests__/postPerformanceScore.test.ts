@@ -97,14 +97,14 @@ describe("postPerformanceScore tests", () => {
       expect(weakScore.ctaEffectiveness).toBeLessThan(strongScore.ctaEffectiveness);
     });
 
-    it("does not crash on non-English (non-Latin script) body text and returns a finite readability grade", () => {
+    it("does not crash on non-English (non-Latin script) body text and leaves readability unscored (null)", () => {
       const nonEnglishPost: Post = {
         ...samplePost,
         body: "कृत्रिम बुद्धिमत्ता आजकल हर जगह इस्तेमाल हो रही है। डेवलपर्स इसका उपयोग बेहतर कोड लिखने के लिए करते हैं।",
       };
       const score = calculatePerformanceScore(nonEnglishPost, "AI Engineering");
-      expect(Number.isFinite(score.readability)).toBe(true);
-      expect(score.readability).toBeGreaterThanOrEqual(0);
+      expect(score.readability).toBeNull();
+      expect(Number.isFinite(score.overallScore)).toBe(true);
     });
   });
 
@@ -226,7 +226,8 @@ describe("postPerformanceScore tests", () => {
       expect(getReadabilityLabel(4)).toBe("Very Easy");
       expect(getReadabilityLabel(7)).toBe("Easy");
       expect(getReadabilityLabel(9)).toBe("Ideal");
-      expect(getReadabilityLabel(11)).toBe("Moderate");
+      // Grades 8-12 are one "Ideal" band (matches the 10/10 readability score); "Moderate" was removed.
+      expect(getReadabilityLabel(11)).toBe("Ideal");
       expect(getReadabilityLabel(13)).toBe("Challenging");
       expect(getReadabilityLabel(15)).toBe("Very Difficult");
     });

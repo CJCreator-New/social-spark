@@ -85,7 +85,7 @@ interface SchedulePage {
 const STATUS_LABEL: Record<WorkflowStatus, string> = {
   drafted: "Drafted",
   approved: "Approved",
-  published: "Published",
+  published: "Marked posted",
   failed: "Failed",
 };
 
@@ -247,7 +247,7 @@ export default function Schedule() {
       )
     );
     log.info(`Post status updated`, { postId: row.id, newStatus: status });
-    toast.success(`Marked ${STATUS_LABEL[status].toLowerCase()}`);
+    toast.success(status === "published" ? "Marked posted" : `Marked ${STATUS_LABEL[status].toLowerCase()}`);
   }
 
   function requestCancelRow(row: ScheduledRow) {
@@ -426,7 +426,7 @@ export default function Schedule() {
                   className="sc-menu-item"
                   onSelect={() => void setStatus(row, "published")}
                 >
-                  <CheckCircle2 size={14} aria-hidden="true" /> Mark published
+                  <CheckCircle2 size={14} aria-hidden="true" /> Mark posted
                 </DropdownMenuItem>
               )}
               {row.workflow_status === "published" && (
@@ -503,7 +503,7 @@ export default function Schedule() {
               <div className="sc-summary-sub">Ready to publish or reschedule.</div>
             </div>
             <div className="sc-summary-card">
-              <div className="sc-summary-label">Published</div>
+              <div className="sc-summary-label">Marked posted</div>
               <div className="sc-summary-value">{summary.published}</div>
               <div className="sc-summary-sub">Completed and archived in the schedule.</div>
             </div>

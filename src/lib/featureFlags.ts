@@ -4,6 +4,8 @@ const DEFAULT_FLAGS: Record<string, boolean> = {
   enable_new_drag: true,
   enable_queue_scheduler: false,
   enable_telemetry: true,
+  // Trend surfaces are paused (no reliable trend source); keep code for re-enable.
+  trends_enabled: false,
   // Include all config-level feature flags as defaults
   ...Object.fromEntries(Object.entries(FEATURES).map(([k, v]) => [k, v])),
 };

@@ -21,8 +21,11 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+let mockSearch = "authorization_id=auth_123";
 vi.mock("react-router-dom", () => ({
-  useSearchParams: () => [new URLSearchParams("authorization_id=auth_123")],
+  useSearchParams: () => [new URLSearchParams(mockSearch)],
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) =>
+    React.createElement("a", { href: to }, children),
 }));
 
 vi.mock("react-helmet-async", () => ({
@@ -35,6 +38,7 @@ const originalLocation = window.location;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockSearch = "authorization_id=auth_123";
   mockGetSession.mockResolvedValue({ data: { session: { user: { id: "u1" } } } });
   // jsdom's window.location.href setter doesn't navigate; make it observable.
   Object.defineProperty(window, "location", {
@@ -57,9 +61,23 @@ describe("OAuthConsent", () => {
     render(<OAuthConsent />);
 
     await waitFor(() => {
-      expect(screen.getByText("read:calendars")).toBeInTheDocument();
+      expect(screen.getByText("See your content calendars")).toBeInTheDocument();
     });
-    expect(screen.getByText("read:scheduled_posts")).toBeInTheDocument();
+    expect(screen.getByText("See your scheduled posts")).toBeInTheDocument();
+    expect(screen.queryByText("read:calendars")).not.toBeInTheDocument();
+  });
+
+  it("shows a friendly message with a way back when the link is incomplete", async () => {
+    mockSearch = "";
+    render(<OAuthConsent />);
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(/this link is incomplete/i);
+    });
+    expect(screen.queryByText(/missing authorization_id/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /back to contentforge/i })).toHaveAttribute(
+      "href",
+      "/app"
+    );
   });
 
   it("marks the approve/deny buttons as busy while a decision is in flight", async () => {

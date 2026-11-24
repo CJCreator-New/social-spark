@@ -137,7 +137,7 @@ export const CalendarItem = React.memo(function CalendarItem({
                 padding: 4,
                 display: "flex",
                 alignItems: "center",
-                color: it.is_favorite ? "var(--color-warning)" : "var(--color-text-disabled)",
+                color: it.is_favorite ? "var(--color-warning-text)" : "var(--color-text-muted)",
                 transition: "color 0.15s",
               }}
               onClick={(e) => {

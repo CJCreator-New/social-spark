@@ -21,7 +21,7 @@ Social Spark streamlines social media management through eight integrated workfl
 graph TD
     A[Campaign Brief Input] --> B[Brand Memory Context]
     B --> C[AI Multi-Post Generator]
-    C --> D[Quality Variant Scoring]
+    C --> D[Quality Scoring]
     D --> E[Interactive Composer & Editor]
     E --> F[Timezone-Aware Publisher]
     F --> G[Analytics & Topic Gap Insights]
@@ -37,7 +37,7 @@ graph TD
 
 1. **Brand Memory Database**: Persists custom brand styles, specific voices, audience targets, goals, forbidden terms, and hashtag policies across generation cycles.
 2. **AI Calendar Wizard**: Automatically produces a full week's worth of posts tailored to multiple channels based on a single brief.
-3. **Quality Variant Scoring**: Generates variations of draft posts, scoring them in real-time on hook strength, CTA effectiveness, and readability.
+3. **Quality Scoring**: Scores each draft post in real time on hook strength, CTA effectiveness, and readability. Variant generation is planned for a later release.
 4. **Draft Auto-Recovery**: Autosaves the state of the creation wizard locally (Zustand `persist`) and remotely so a browser refresh or crash never resets your progress.
 5. **Multi-Channel Repurposing**: Easily transforms a successful post from one channel layout into another using specialized platform guides.
 6. **Topic Gap Detection**: Calendar listings automatically identify and highlight missing content categories or themes to keep feeds balanced.

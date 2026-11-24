@@ -2,8 +2,8 @@ declare const Deno: any;
 
 // Edge function: fetch-url-content
 // Accepts: { url: string }
-// Returns: { text: string; title: string; wordCount: number }
-// Fetches a URL server-side, strips HTML tags, truncates to 8000 chars for AI
+// Returns: { text: string; title: string; wordCount: number; truncated: boolean }
+// Fetches a URL server-side, strips HTML tags, truncates to 20000 chars for AI
 // processing. Requires auth, rate-limits callers, and blocks SSRF against
 // private/loopback/link-local networks (including the cloud metadata
 // endpoint at 169.254.169.254).
@@ -18,7 +18,7 @@ import {
 
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024; // 2 MB
 const FETCH_TIMEOUT_MS = 8_000;
-const MAX_TEXT_CHARS = 8_000;
+const MAX_TEXT_CHARS = 20_000;
 
 // ─── SSRF PROTECTION ────────────────────────────────────────────────────────
 
@@ -222,13 +222,14 @@ Deno.serve(async (req: Request) => {
     const html = await readBodyCapped(res, MAX_RESPONSE_BYTES);
 
     // Strip HTML tags
-    const text = html
+    const fullText = html
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, MAX_TEXT_CHARS);
+      .trim();
+    const truncated = fullText.length > MAX_TEXT_CHARS;
+    const text = truncated ? fullText.slice(0, MAX_TEXT_CHARS) : fullText;
 
     // Try to extract title
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
@@ -238,6 +239,7 @@ Deno.serve(async (req: Request) => {
       text,
       title,
       wordCount: text ? text.split(/\s+/).filter(Boolean).length : 0,
+      truncated,
     });
   } catch (e) {
     return errorResponse("fetch-url-content", e);

@@ -46,11 +46,11 @@ export default function Insights() {
   return (
     <>
       <Helmet>
-        <title>Insights — {APP_NAME}</title>
+        <title>Editing insights — {APP_NAME}</title>
       </Helmet>
       <WorkspacePage size="wide">
         <h1 className="text-2xl font-semibold" style={{ color: "var(--color-text)" }}>
-          Hook &amp; CTA insights
+          Editing insights
         </h1>
         <p className="text-sm mt-1 mb-6" style={{ color: "var(--color-text-secondary)" }}>
           A look at how often you fine-tune hooks and CTAs, and how often those changes stick — over

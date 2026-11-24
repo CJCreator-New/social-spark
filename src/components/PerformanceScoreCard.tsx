@@ -28,6 +28,8 @@ const METRIC_LABELS: Record<PerformanceFocusMetric, string> = {
   brandCompliance: "Brand Compliance",
 };
 
+const NOT_SCORED_NOTE = "Not scored for this language";
+
 /**
  * Returns a short, context-specific explanation for a given metric score.
  * Used to add inline guidance beneath each score bar.
@@ -53,6 +55,7 @@ function getMetricExplanation(metric: string, score: number): string {
       // score here is the Flesch-Kincaid grade level
       if (score > 12) return "Post may be hard to read — simplify sentences";
       if (score < 6) return "Very easy to read — consider adding some depth";
+      if (score < 8) return "Easy to read — a little more depth could help";
       return "Readability is in the ideal range for social";
 
     default:
@@ -210,38 +213,52 @@ export const PerformanceScoreCard: React.FC<PerformanceScoreCardProps> = ({
         <div className="perf-metric">
           <div className="perf-metric-label">
             <span>Hashtag Relevance</span>
-            <span
-              className="perf-metric-value tabular-nums"
-              style={{ color: getScoreColor(score.hashtagRelevance / 10) }}
-            >
-              {score.hashtagRelevance}%
-            </span>
+            {score.hashtagRelevance === null ? (
+              <span className="perf-metric-value">{NOT_SCORED_NOTE}</span>
+            ) : (
+              <span
+                className="perf-metric-value tabular-nums"
+                style={{ color: getScoreColor(score.hashtagRelevance / 10) }}
+              >
+                {score.hashtagRelevance}%
+              </span>
+            )}
           </div>
-          <div className="perf-bar">
-            <div
-              className="perf-bar-fill"
-              style={{
-                width: `${score.hashtagRelevance}%`,
-                background: getScoreColor(score.hashtagRelevance / 10),
-              }}
-            />
-          </div>
-          <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3, fontStyle: 'italic' }}>
-            {getMetricExplanation('hashtagRelevance', score.hashtagRelevance)}
-          </div>
+          {score.hashtagRelevance !== null && (
+            <>
+              <div className="perf-bar">
+                <div
+                  className="perf-bar-fill"
+                  style={{
+                    width: `${score.hashtagRelevance}%`,
+                    background: getScoreColor(score.hashtagRelevance / 10),
+                  }}
+                />
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3, fontStyle: 'italic' }}>
+                {getMetricExplanation('hashtagRelevance', score.hashtagRelevance)}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="perf-metric">
           <div className="perf-metric-label">
             <span>Readability</span>
-            <span className="perf-metric-value" style={{ color: "var(--text2)" }}>
-              {getReadabilityLabel(score.readability)} (
-              <span className="tabular-nums">Grade {score.readability}</span>)
-            </span>
+            {score.readability === null ? (
+              <span className="perf-metric-value">{NOT_SCORED_NOTE}</span>
+            ) : (
+              <span className="perf-metric-value" style={{ color: "var(--text2)" }}>
+                {getReadabilityLabel(score.readability)} (
+                <span className="tabular-nums">Grade {score.readability}</span>)
+              </span>
+            )}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3, fontStyle: 'italic' }}>
-            {getMetricExplanation('readability', score.readability)}
-          </div>
+          {score.readability !== null && (
+            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3, fontStyle: 'italic' }}>
+              {getMetricExplanation('readability', score.readability)}
+            </div>
+          )}
         </div>
 
         <div className="perf-metric">

@@ -101,7 +101,7 @@ export function normalizeHashtags(input: string | string[] | undefined, max: num
     .map((t) => t.trim())
     .filter(Boolean)
     .map((t) => (t.startsWith("#") ? t : `#${t.replace(/^#+/, "")}`))
-    .map((t) => t.replace(/[^#\w]/g, ""))
+    .map((t) => t.replace(/[^#_\p{L}\p{N}\p{M}]/gu, ""))
     .filter((t) => t.length > 1);
   const seen = new Set<string>();
   const out: string[] = [];
@@ -196,12 +196,20 @@ function buildTwitter(post: PostLike): { text: string; truncated: boolean } {
 }
 
 import { FontStyle, applyStyle } from "./unicodeFonts";
+import { sanitizeCopy } from "./copyLimits";
 
 export function formatForPlatform(
-  post: PostLike,
+  rawPost: PostLike,
   platformInput?: string | null,
   options?: { style?: FontStyle }
 ): FormattedCopy {
+  // Single sanitize point for copy/export (hashtags untouched).
+  const post: PostLike = {
+    ...rawPost,
+    hook: sanitizeCopy(rawPost.hook || ""),
+    body: sanitizeCopy(rawPost.body || ""),
+    cta: sanitizeCopy(rawPost.cta || ""),
+  };
   const platform = resolvePlatform(platformInput);
   const limit = PLATFORM_LIMITS[platform];
   const platformLabel = PLATFORM_LABELS[platform];

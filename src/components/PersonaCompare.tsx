@@ -111,7 +111,6 @@ export const PersonaCompare: React.FC<PersonaCompareProps> = ({
         alignItems: "center",
         justifyContent: "center",
         padding: 20,
-        backdropFilter: "blur(4px)",
       }}
       onClick={onClose}
     >

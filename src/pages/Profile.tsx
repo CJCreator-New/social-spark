@@ -15,6 +15,13 @@ import {
   useUpdateBrandSlotMutation,
 } from "@/hooks/useAppQueries";
 import type { BrandSlotRow } from "@/hooks/queries/shared";
+import {
+  migrateLocalBrandToProfile,
+  readBrandCache,
+  resetBrandMigration,
+  slotToCache,
+  writeBrandCache,
+} from "@/lib/brandCache";
 import { toast } from "sonner";
 import { normalizeTag, displayTag, parsePolicyList } from "@/lib/hashtagPolicy";
 import { listTimezones, browserTimezone, tzLabel } from "@/lib/timezones";
@@ -194,6 +201,9 @@ export default function Profile() {
   const [defaultFramework, setDefaultFramework] = useState<string>("Auto");
   const [forbiddenPhrases, setForbiddenPhrases] = useState<string[]>([]);
   const [forbiddenPhraseInput, setForbiddenPhraseInput] = useState("");
+  const [requiredPhrases, setRequiredPhrases] = useState<string[]>([]);
+  const [requiredPhraseInput, setRequiredPhraseInput] = useState("");
+  const [brandSaveError, setBrandSaveError] = useState<string | null>(null);
   const [proofPoints, setProofPoints] = useState<string[]>([]);
   const [proofPointInput, setProofPointInput] = useState("");
   const [ctaPreferences, setCtaPreferences] = useState<string[]>([]);
@@ -244,17 +254,7 @@ export default function Profile() {
     if (!profileData) return;
     setDisplayName(profileData.display_name || "");
     setAvatarUrl(profileData.avatar_url || "");
-    setDefaultVoice(profileData.default_voice || "");
-    setDefaultStyle(profileData.default_style || "");
-    setDefaultAudiences(profileData.default_audiences || []);
-    setDefaultGoals(profileData.default_goals || []);
-    const d = profileData as {
-      banned_hashtags?: string[] | null;
-      required_hashtags?: string[] | null;
-      default_timezone?: string | null;
-    } | null;
-    setBannedHashtags(parsePolicyList(d?.banned_hashtags));
-    setRequiredHashtags(parsePolicyList(d?.required_hashtags));
+    const d = profileData as { default_timezone?: string | null } | null;
     setDefaultTimezone(d?.default_timezone || browserTimezone());
   }, [profileData]);
 
@@ -285,8 +285,84 @@ export default function Profile() {
     setProofPoints(slot.proof_points || []);
     setCtaPreferences(slot.cta_preferences || []);
     setPreferredStructures(slot.preferred_structures || []);
+    setRequiredPhrases(slot.required_phrases || []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSlotId, brandSlots]);
+
+  // Voice, style, audiences, goals and hashtag policy: the selected brand slot
+  // wins; legacy profile columns only fill fields the slot has never set.
+  useEffect(() => {
+    if (!profileData) return;
+    const slot = brandSlots.find((s) => s.id === selectedSlotId);
+    const legacy = profileData as {
+      default_voice?: string | null;
+      default_style?: string | null;
+      default_audiences?: string[] | null;
+      default_goals?: string[] | null;
+      banned_hashtags?: string[] | null;
+      required_hashtags?: string[] | null;
+    };
+    const pickList = (fromSlot?: string[] | null, fromProfile?: string[] | null) =>
+      fromSlot && fromSlot.length ? fromSlot : fromProfile || [];
+    setDefaultVoice(slot?.voice || legacy.default_voice || "");
+    setDefaultStyle(slot?.style || legacy.default_style || "");
+    setDefaultAudiences(pickList(slot?.audiences, legacy.default_audiences));
+    setDefaultGoals(pickList(slot?.goals, legacy.default_goals));
+    setBannedHashtags(
+      parsePolicyList(slot?.banned_hashtags?.length ? slot.banned_hashtags : legacy.banned_hashtags)
+    );
+    setRequiredHashtags(
+      parsePolicyList(
+        slot?.required_hashtags?.length ? slot.required_hashtags : legacy.required_hashtags
+      )
+    );
+  }, [profileData, selectedSlotId, brandSlots]);
+
+  // One-time migration: copy brand fields that only exist in this browser (or in
+  // the legacy profile columns) onto the default brand slot. Never overwrites
+  // anything already saved on the slot.
+  useEffect(() => {
+    if (!user?.id || !profileData || brandSlots.length === 0) return;
+    const target = brandSlots.find((s) => s.is_default) || brandSlots[0];
+    const legacy = profileData as {
+      default_voice?: string | null;
+      default_style?: string | null;
+      default_audiences?: string[] | null;
+      default_goals?: string[] | null;
+      banned_hashtags?: string[] | null;
+      required_hashtags?: string[] | null;
+    };
+    const cache = readBrandCache(user.id);
+    const nonEmpty = (v?: string[] | null, fallback?: string[] | null) =>
+      v && v.length ? v : fallback || [];
+    const patch = migrateLocalBrandToProfile(
+      {
+        voice: cache?.voice || legacy.default_voice || "",
+        style: cache?.style || legacy.default_style || "",
+        cta: cache?.cta,
+        audiences: nonEmpty(cache?.audiences, legacy.default_audiences),
+        goals: nonEmpty(cache?.goals, legacy.default_goals),
+        bannedWords: cache?.bannedWords,
+        requiredWords: cache?.requiredWords,
+        bannedHashtags: nonEmpty(cache?.bannedHashtags, parsePolicyList(legacy.banned_hashtags)),
+        requiredHashtags: nonEmpty(
+          cache?.requiredHashtags,
+          parsePolicyList(legacy.required_hashtags)
+        ),
+      },
+      target,
+      user.id
+    );
+    if (Object.keys(patch).length === 0) return;
+    void (async () => {
+      try {
+        await updateBrandSlot.mutateAsync({ id: target.id, patch });
+      } catch {
+        resetBrandMigration(user.id);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, profileData, brandSlots]);
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -397,6 +473,14 @@ export default function Profile() {
     setProofPointInput("");
   }
 
+  function addRequiredPhrase() {
+    const v = requiredPhraseInput.trim();
+    if (!v) return;
+    if (requiredPhrases.includes(v)) return;
+    setRequiredPhrases((p) => [...p, v]);
+    setRequiredPhraseInput("");
+  }
+
   function addCtaPreference() {
     const v = ctaPreferenceInput.trim();
     if (!v) return;
@@ -470,27 +554,44 @@ export default function Profile() {
   // audiences, goals, hashtag policy, timezone) plus the currently selected
   // brand slot's memory fields (forbidden phrases, proof points, CTAs,
   // structures, brand examples, default framework).
-  async function handleSaveBrandTab() {
-    if (!user) return;
+  async function handleSaveBrandTab(): Promise<boolean> {
+    if (!user) return false;
     setSaving(true);
+    setBrandSaveError(null);
     try {
       await persistProfileFields();
       if (selectedSlotId) {
+        const slotFields = {
+          voice: defaultVoice || null,
+          style: defaultStyle || null,
+          audiences: defaultAudiences,
+          goals: defaultGoals,
+          required_phrases: requiredPhrases,
+          banned_hashtags: bannedHashtags,
+          required_hashtags: requiredHashtags,
+          forbidden_phrases: forbiddenPhrases,
+          proof_points: proofPoints,
+          cta_preferences: ctaPreferences,
+          preferred_structures: preferredStructures,
+        };
         await updateBrandSlot.mutateAsync({
           id: selectedSlotId,
           patch: {
+            ...slotFields,
             brand_examples: brandExamples.length ? brandExamples : null,
             default_framework: defaultFramework || null,
-            forbidden_phrases: forbiddenPhrases,
-            proof_points: proofPoints,
-            cta_preferences: ctaPreferences,
-            preferred_structures: preferredStructures,
           },
         });
+        // Browser copy is only a cache: write through after the profile save succeeds.
+        writeBrandCache(user.id, slotToCache(slotFields, readBrandCache(user.id)));
       }
       toast.success("Brand settings updated");
+      return true;
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update brand settings");
+      const message = error instanceof Error ? error.message : "Failed to update brand settings";
+      setBrandSaveError(message);
+      toast.error(message);
+      return false;
     } finally {
       setSaving(false);
     }
@@ -543,8 +644,8 @@ export default function Profile() {
     setSavedOnce(true);
   };
   const wrappedHandleSaveBrand = async () => {
-    await handleSaveBrandTab();
-    setSavedOnce(true);
+    const ok = await handleSaveBrandTab();
+    if (ok) setSavedOnce(true);
   };
   const tabLabels = {
     profile: "Account Info",
@@ -1099,6 +1200,42 @@ export default function Profile() {
               </button>
             </div>
 
+            {/* Required Phrases */}
+            <div className="pf-label" id="pf-required-label">
+              Required Phrases (Work in naturally)
+            </div>
+            <div className="pf-tagrow" role="list" aria-labelledby="pf-required-label">
+              {requiredPhrases.length === 0 ? (
+                <span className="pf-tagrow-empty">No required phrases saved</span>
+              ) : (
+                requiredPhrases.map((p) => (
+                  <span key={p} className="pf-tag" role="listitem">
+                    "{p}"
+                    <button
+                      className="pf-tag-x"
+                      onClick={() => setRequiredPhrases((prev) => prev.filter((x) => x !== p))}
+                      aria-label={`Remove ${p}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))
+              )}
+            </div>
+            <div className="pf-add-row">
+              <input
+                className="pf-input"
+                placeholder="+ e.g. a product name or tagline"
+                value={requiredPhraseInput}
+                onChange={(e) => setRequiredPhraseInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addRequiredPhrase())}
+                aria-label="New required phrase"
+              />
+              <button className="pf-add-btn" onClick={addRequiredPhrase}>
+                Add
+              </button>
+            </div>
+
             {/* Proof Points */}
             <div className="pf-label" id="pf-proof-label">
               Key Proof Points & Data Points
@@ -1333,7 +1470,12 @@ export default function Profile() {
                 <button className="pf-btn" onClick={wrappedHandleSaveBrand} disabled={saving}>
                   {saving ? "Saving…" : "Save changes"}
                 </button>
-                {savedOnce && !saving && (
+                {brandSaveError && !saving && (
+                  <span className="pf-tagrow-empty" role="alert">
+                    Not saved: {brandSaveError}
+                  </span>
+                )}
+                {savedOnce && !saving && !brandSaveError && (
                   <span
                     style={{
                       fontSize: 11,

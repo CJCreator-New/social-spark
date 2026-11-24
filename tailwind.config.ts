@@ -47,7 +47,7 @@ export default {
           foreground: "hsl(var(--muted-foreground))",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
+          DEFAULT: "hsl(var(--accent-ui))",
           foreground: "hsl(var(--accent-foreground))",
         },
         popover: {
@@ -116,6 +116,7 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        "3xl": "var(--radius-2xl)", // editorial cap: nothing rounder than 16px
       },
       keyframes: {
         "accordion-down": {

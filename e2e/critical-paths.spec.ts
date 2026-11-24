@@ -178,7 +178,7 @@ test.describe("Calendar Management", () => {
     // (the fixture data pre-seeds scheduled rows for this calendar's days 1 & 2).
     await page.goto("/schedule", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/.*schedule/);
-    await expect(page.getByRole("heading", { name: /my schedule/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /publishing queue|my schedule/i })).toBeVisible({
       timeout: 15000,
     });
     await expect(page.getByText(/test day 1/i)).toBeVisible({ timeout: 15000 });
@@ -193,7 +193,7 @@ test.describe("Schedule Management", () => {
   });
 
   test("should display scheduled posts", async ({ page }) => {
-    await expect(page.getByRole("heading", { name: /my schedule/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /publishing queue|my schedule/i })).toBeVisible({
       timeout: 15000,
     });
 
@@ -244,7 +244,7 @@ test.describe("Schedule Management", () => {
 
     // Reload to confirm the new time was actually persisted, not just held in local state.
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /my schedule/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /publishing queue|my schedule/i })).toBeVisible({
       timeout: 15000,
     });
     await expect(page.getByText(/aug 3/i).first()).toBeVisible({ timeout: 15000 });

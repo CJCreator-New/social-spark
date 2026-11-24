@@ -6,6 +6,8 @@
   --color-primary-xlight: #ffedd5;
   --color-primary-tint: #fff7ed;
   --color-accent: #c2410c;
+  /* Single page-level accent alias (shadcn accent is --accent-ui, see index.css) */
+  --accent: var(--color-primary);
 
   /* Surface and background */
   --color-bg: #faf8f4;
@@ -18,8 +20,8 @@
   /* Text tiers */
   --color-text: #1c1917;
   --color-text-secondary: #57534e;
-  --color-text-muted: #78716c;
-  --color-text-disabled: #a8a29e;
+  --color-text-muted: #68625d; /* 4.84:1 on surface-hover, 5.67:1 on bg */
+  --color-text-disabled: #a8a29e; /* decorative/disabled only (2.5:1); never for informative text or icons */
   --color-text-tertiary: #5a5753;
   --color-body: #292524;
   --color-text-2: var(--color-text-secondary);
@@ -30,6 +32,8 @@
   --color-border: #e7e5e4;
   --color-border-strong: #d6d3d1;
   --color-border-2: var(--color-border-strong);
+  /* Form-control boundary: 3.5:1 on page bg, 3.7:1 on white (WCAG 1.4.11) */
+  --color-border-input: #8a837d;
 
   /* Status colors */
   --color-success: #22c55e;
@@ -63,7 +67,7 @@
   --color-platform-facebook-text: #1d4ed8;
   --color-platform-facebook-border: #bfdbfe;
   --color-platform-generic-bg: #fef3c7;
-  --color-platform-generic-text: #d97706;
+  --color-platform-generic-text: #92400e;
   --color-platform-generic-border: #fde68a;
   --color-status-approved: #2563eb;
   --color-score-gold: #ffd700;
@@ -71,10 +75,12 @@
   /* Hashtag guidance chip colors (per-platform, warm-editorial one-offs) */
   --color-chip-amber: #92400e;
   --color-chip-twitter: #78350f;
-  --color-chip-neutral: #a16207;
+  --color-chip-neutral: #92400e;
   --color-highlight-lime: #d4f7aa;
 
   /* Focus ring */
+  /* Global keyboard focus ring: #c2410c is 4.9:1 on page bg and 5.2:1 on white */
+  --focus-outline: #c2410c;
   --focus-ring-color: rgba(194, 65, 12, 0.25);
   --focus-ring: 0 0 0 3px var(--focus-ring-color);
 
